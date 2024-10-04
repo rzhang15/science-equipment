@@ -3,6 +3,7 @@ clear all
 * Data 
 global derived "$sci_equip/derived"
 global herd "$sci_equip/HERD/raw"
+global iris "$sci_equip/IRIS"
 global xwalk "$sci_equip/Crosswalks"
 
 * Code
@@ -11,6 +12,7 @@ program main
 	merge_herd_survey_years
 	clean_herd_variables
 	create_herd_survey
+	merge_herd_iris
 
 end 
 
@@ -148,6 +150,29 @@ program create_herd_survey
 	
 	save "$derived/herd_survey_clean", replace
 end
+
+program merge_herd_iris
+
+	import delimited "$iris/university_membership_data_with_fice.csv", clear
+	
+		drop status 
+		destring endyear, force replace 
+		replace endyear = 2024 if mi(endyear)
+		
+	save "$derived/iris_members_fice.dta", replace
+	
+	* Merge to HERD 
+	use "$derived/herd_survey_clean", clear 
+	
+	merge m:1 fice using "$derived/iris_members_fice.dta", ///
+		assert(master matched) nogen keepusing(endyear) 
+		
+		ren endyear iris_lastyear 
+		gen iris_flag = !mi(iris_lastyear)
+		
+	save "$derived/herd_survey_clean", replace 
+
+end 
 
 main 
 
