@@ -4,6 +4,7 @@ clear all
 global derived "$sci_equip/derived"
 global herd "$sci_equip/HERD/raw"
 global iris "$sci_equip/IRIS"
+global bea "$sci_equip/BEA"
 global xwalk "$sci_equip/Crosswalks"
 
 * Code
@@ -13,6 +14,7 @@ program main
 	clean_herd_variables
 	create_herd_survey
 	merge_herd_iris
+	merge_price_delfator
 
 end 
 
@@ -170,7 +172,57 @@ program merge_herd_iris
 		ren endyear iris_lastyear 
 		gen iris_flag = !mi(iris_lastyear)
 		
+		label variable iris_lastyear "Last year as IRIS member"
+		label variable iris_flag "Indicator variable for IRIS member"
+		
 	save "$derived/herd_survey_clean", replace 
+
+end 
+
+program merge_price_delfator
+
+	import delimited "$bea/Table 1-1-9 Implicit Price Deflators for Gross Domestic Product.csv", ///
+			clear varnames(4)
+			
+	label variable v2 "Type"
+			
+	foreach v of varlist _all {
+		local x : variable label `v'
+		ren `v' deflator_`x'
+	}
+	
+	destring deflator_1970-deflator_2023, force replace
+	drop deflator_Line 
+	
+	* Reshape to have to variables by year 
+	ren deflator_Type Type
+	keep if inlist(Type, "        Gross domestic product", "Gross private domestic investment")
+		replace Type = "gdp" if Type == "        Gross domestic product"
+		replace Type = "gpdi" if Type == "Gross private domestic investment"
+	
+	* Two reshapes to have dataset unique on year 
+	reshape long deflator_, i(Type) j(year)
+	reshape wide deflator_, i(year) j(Type) string
+	
+	* Label variables 
+	label variable deflator_gdp "Gross Domestic Product Implicit Price Deflators (BEA)"
+	label variable deflator_gpdi "Gross Private Domestic Investment Implicit Price Deflators (BEA)"
+	
+	isid year 
+	pwcorr deflator*
+	
+	* Merge into the HERD survey 
+	merge 1:m year using "$derived/herd_survey_clean", nogen keep(2 3) 
+	
+	* Sort and order HERD survey 
+	isid fice year field expenditure 
+	sort fice year field expenditure 
+	
+	order year fice ipeds_id ncses_id state city zip ///
+			name field expenditure spend_* ///
+			iris_flag iris_lastyear deflator_gdp deflator_gpdi
+	
+	save "$derived/herd_survey_clean", replace
 
 end 
 
