@@ -1,11 +1,12 @@
 clear all
 
 * Data 
-global derived "$sci_equip/derived"
-global herd "$sci_equip/HERD/raw"
-global iris "$sci_equip/IRIS"
-global bea "$sci_equip/BEA"
-global xwalk "$sci_equip/Crosswalks"
+global derived "$sci_equip/derived_output/clean_herd"
+global herd "$sci_equip/raw/HERD/raw"
+global iris "$sci_equip/raw/IRIS"
+global ipeds "$sci_equip/raw/IPEDS"
+global bea "$sci_equip/raw/BEA"
+global xwalk "$sci_equip/raw/Crosswalks"
 
 * Code
 program main 
@@ -15,6 +16,7 @@ program main
 	create_herd_survey
 	merge_herd_iris
 	merge_price_delfator
+	merge_herd_ipeds
 
 end 
 
@@ -214,14 +216,36 @@ program merge_price_delfator
 	* Merge into the HERD survey 
 	merge 1:m year using "$derived/herd_survey_clean", nogen keep(2 3) 
 	
-	* Sort and order HERD survey 
+	* Check unique
+	isid fice year field expenditure 
+	
+	save "$derived/herd_survey_clean", replace
+
+end 
+
+program merge_herd_ipeds
+
+	* Keep IPEDS variable to use 
+	use "$ipeds/hd2022_data_stata.dta", clear 
+	
+		ren unitid ipeds_id
+		ren control public
+		ren longitud longitude
+		
+		keep ipeds_id public longitude latitude
+
+	* Merge into the HERD survey 
+	merge 1:m ipeds_id using "$derived/herd_survey_clean", nogen keep(2 3) 
+	
+	* Sort and order herds survey
 	isid fice year field expenditure 
 	sort fice year field expenditure 
 	
-	order year fice ipeds_id ncses_id state city zip ///
+	order year fice ipeds_id ncses_id public ///
+			state city zip longitude latitude ///
 			name field expenditure spend_* ///
 			iris_flag iris_lastyear deflator_gdp deflator_gpdi
-	
+			
 	save "$derived/herd_survey_clean", replace
 
 end 
