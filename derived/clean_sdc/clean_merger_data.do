@@ -1,15 +1,15 @@
 clear all
 
 * Data 
-global derived "$sci_equip/derived"
-global sdc "$sci_equip/SDC Platinum"
+global derived "$sci_equip/derived_output"
+global sdc "$sci_equip/raw/SDC Platinum"
 
 * Code
 program main 
 
-	subset_merger_data_thermo
-	subset_merger_data_sigma
-	//subset_merger_data_sic
+// 	subset_merger_data_thermo
+// 	subset_merger_data_sigma
+	subset_merger_data_sic
 
 end 
 
@@ -43,20 +43,17 @@ end
 
 program subset_merger_data_sic
 
-	// keep SIC starting with 38, 28, 50, 51 
-	tab TSICP, sort
-	
-	* Generate first two digits of the SIC codes 
-	gen short_TSIC = substr(TSICP,1,2)
-	
-	tab short_TSIC, sort
-	
-	local short_SIC_list 38 28 35 87 36 49 73 37 50 15 32 80 30 34 42 51 62 67 75
-	
-	* Test avantor (formerly Mallinckrodt), VWR international
-	
-	* Test Sigma Chemical, Aldrich Chemical, Millipore Corporation, Sigma-Aldrich, MilliporeSigma (2015), (Merck?)
+	use "$sdc/SDC platinum all mergers since 1965", clear
 
+	* Keep following SIC codes: 
+	keep if inlist(TSICP, "3826", "3841", "3821", "3829", "3823", "2836", "2835", "2834", "8731")
+	
+	* Did not include but thee are chemical companies: 2899, 2869, 5169
+	
+	sort DATEANN
+	drop if TMANAMES == AMANAMES
+	
+	save "$derived/sdc_mergers_subset_target_sic.dta", replace
 	
 end 
 
