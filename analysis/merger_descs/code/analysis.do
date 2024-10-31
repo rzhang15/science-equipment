@@ -14,6 +14,7 @@ program main
             merger_hist, file(`f')
     }
 end
+
 program clean_mergers 
     syntax, file(str)
     use ../external/sdc/sdc_mergers_`file', clear
