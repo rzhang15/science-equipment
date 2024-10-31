@@ -1,14 +1,14 @@
 clear all
 
 * Data 
-global derived "$sci_equip/derived_output"
+global derived "$sci_equip/derived_output/clean_sdc"
 global sdc "$sci_equip/raw/SDC Platinum"
 
 * Code
 program main 
 
-// 	subset_merger_data_thermo
-// 	subset_merger_data_sigma
+	subset_merger_data_thermo
+	subset_merger_data_sigma
 	subset_merger_data_sic
 
 end 
