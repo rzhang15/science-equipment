@@ -23,6 +23,11 @@ program clean_mergers
     save  ../temp/`file', replace
 end
 
+program thermo_fisher
+
+
+end
+
 program merger_hist
     syntax, file(str)
     use ../temp/`file', clear
