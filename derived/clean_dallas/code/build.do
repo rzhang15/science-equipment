@@ -10,10 +10,11 @@ global derived_output "${dropbox_dir}/derived_output"
 
 program main   
     import_data
+	split_data_half
     desc
 end
 
-program import_data 
+program import_data
     import excel using "../external/foia/utdallas_2011_2024.xlsx", firstrow case(lower) clear
     drop unitpricedate referenceawardid costcenter
     rename (purchaseorderidentifier purchasedate suppliernumber productdescription projectid skucatalog) (purchase_id purchase_date supplier_id product_desc project_id sku)
@@ -27,6 +28,20 @@ program import_data
 	drop if mi(sku)
 	save ../temp/thermo_trans, replace
 end
+
+program split_data_half
+	import excel using "$sci_equip/raw/FOIA/utdallas_2011_2024.xlsx", firstrow case(lower) clear
+	drop unitpricedate costcenter
+    rename (purchaseorderidentifier purchasedate suppliernumber productdescription projectid skucatalog referenceawardid) (purchase_id purchase_date supplier_id product_desc project_id sku award_id)
+	gen row = _n 
+	
+	// Split randomly in half 
+	gen random_num = runiform() 
+	gen data_group = ((random_num > 0.5) + 1)
+	drop random_num 
+	export excel using "$sci_equip/derived_output/ut_dallas_group1.xlsx" if data_group == 1, replace firstrow(variables)
+	export excel using "$sci_equip/derived_output/ut_dallas_group2.xlsx" if data_group == 2, replace firstrow(variables)
+end 
 
 program desc
     use ../temp/dallas, clear  

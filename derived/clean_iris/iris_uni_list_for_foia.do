@@ -8,6 +8,7 @@ global xwalk "$sci_equip/Crosswalks"
 program main 
 
 	iris_uni_highest_life_sci_rd
+	iris_uni_total_rd
 	
 end 
 
@@ -30,10 +31,28 @@ program iris_uni_highest_life_sci_rd
 	gsort -state_spend -spend_total 
 	
 	* Save variables and save 
-	keep fice public state city name spend_total state_spend 
+	keep fice public state city name spend_total spend_federal state_spend 
 	
 	save "$derived/iris_uni_life_sci_2022_spend.dta", replace 
 
 end 
 
+program iris_uni_total_rd 
+
+	use "$derived/herd_survey_clean", clear
+	
+	* Total R&D
+	keep if year == 2022 & expenditure == "Total R&D"
+	
+	keep if iris_flag == 1
+	
+	isid fice field 
+	collapse (firstnm) public state city name  (sum) spend_total spend_federal, by(fice) 
+	
+	* Save variables and save 
+	keep fice public state city name spend_total spend_federal 
+	
+	save "$derived/iris_uni_total_rd_2022_spend.dta", replace 
+
+end 
 main 
