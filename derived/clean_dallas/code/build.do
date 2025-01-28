@@ -9,7 +9,7 @@ global dropbox_dir "~/dropbox (harvard university)/scientific equipment"
 global derived_output "${dropbox_dir}/derived_output"
 
 program main   
-    *import_data
+    import_data
     desc
 end
 
@@ -57,14 +57,19 @@ program desc
     gcollapse (sum) trans thermo_trans, by(project_id year)
     gen perc_thermo = thermo_trans/trans
     gcollapse (mean) trans thermo_trans perc_thermo, by(year)
-	graph bar trans , over(year, label(angle(45))) ytitle("Avg. Number of Transactions per Project") 
+	graph bar trans , over(year, label(angle(45))) ytitle("Avg. Number of Transactions per Project", size(small)) 
 	graph export ../output/figures/avg_trans_proj_yr.pdf, replace
 	graph bar perc_thermo , over(year, lab(angle(45))) ytitle("Avg. % of Transactions bought from ThermoFisher per Project", size(small)) 
 	graph export ../output/figures/avg_perc_thermo_trans_proj_yr.pdf, replace
 	// thermo analysis
 	use ../temp/thermo_trans, clear
-	graph bar (sum) trans, over(year, lab(angle(45))) ytitle("Number of ThermoFisher Transactions", size(small))
-	graph export ../output/figures/num_thermo_trans_yr.pdf, replace
+    collapse (firstnm)  product_desc (min) year, by(sku)
+    export delimited ../output/thermo_skus.csv, replace
+    use ../temp/dallas, clear
+    drop if mi(sku)
+    keep if lifetech == 1
+    collapse (firstnm)  product_desc (min) year , by(sku)
+    export delimited ../output/lifetech_skus.csv, replace
 end
 **
 main
