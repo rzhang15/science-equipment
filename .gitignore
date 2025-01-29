@@ -3,3 +3,5 @@
 **/temp/
 **/external/
 *.dta
+*.pdf
+*.csv
