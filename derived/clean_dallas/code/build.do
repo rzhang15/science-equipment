@@ -77,7 +77,10 @@ program desc
 	// all products 
 	use ../temp/dallas, clear
     drop if mi(sku)
-    collapse (firstnm)  product_desc suppliername (min) year , by(sku supplier_id)
+	gen times_bought = 1
+	gen total_revenue = quantity * unitprice
+    collapse (firstnm)  product_desc suppliername (min) year (mean) avg_unitprice = unitprice ///
+		(sum) total_quantity = quantity  total_revenue times_bought, by(sku supplier_id)
 	order supplier_id suppliername product_desc sku year 
     export delimited ../output/dallas_skus.csv, replace
 end
