@@ -16,12 +16,19 @@ end
 program import_data
     import excel using "../external/dallas/ut_dallas_products_group2_cx.xlsx", clear firstrow
     keep supplier_id suppliername product_desc sku prdct_ctgry 
+    replace prdct_ctgry = strlower(prdct_ctgry)
+    replace prdct_ctgry = strtrim(prdct_ctgry)
+    replace prdct_ctgry = "calf sera" if prdct_ctgry == "bovine calf serum"
+    replace prdct_ctgry = subinstr(prdct_ctgry, "-"," ",.)
     save ../temp/pt1, replace
     import excel using "../external/dallas/ut_dallas_products_group1_rz.xlsx", clear firstrow
     keep supplier_id suppliername product_desc sku prdct_ctgry 
+    replace prdct_ctgry = strlower(prdct_ctgry)
+    replace prdct_ctgry = strtrim(prdct_ctgry)
+    replace prdct_ctgry = "us fetal bovine serum" if prdct_ctgry == "foetal bovine serum (fbs)"
+    replace prdct_ctgry = subinstr(prdct_ctgry, "-"," ",.)
     append using ../temp/pt1
     save ../output/ctgry_xw, replace
-
     import excel using "../external/foias/utdallas_2011_2024.xlsx", clear firstrow case(lower)
     rename (purchaseorderidentifier purchasedate suppliernumber productdescription projectid skucatalog unitprice quantity) (purchase_id purchase_date supplier_id product_desc project_id sku price qty)
     gen year = year(purchase_date)
@@ -53,9 +60,10 @@ end
 
 program raw_plots
     use ../output/mkt_yr, clear
+    drop if year >= 2020
     drop if mi(merged_price)
     bys mkt: gen tot_yrs = _N 
-    keep if tot_yrs >= 12  
+    keep if tot_yrs >= 7  
     glevelsof prdct_ctgry, local(categories)
     foreach c in `categories' {
         preserve
