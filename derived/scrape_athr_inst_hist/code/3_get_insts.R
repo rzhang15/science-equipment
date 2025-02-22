@@ -16,7 +16,6 @@ num_file <- length(split_insts)
 for (q in 1:1) {
   insts <- oa_fetch(
     entity = "institutions",
-    mailto = "conniexu@g.harvard.edu",
     id  = split_insts[[q]] %>%  mutate(inst_id = as.character(inst_id)) %>% pull(inst_id),
     verbose = TRUE,
     output = "list"
@@ -135,5 +134,5 @@ for (q in 1:1) {
            associated_id = str_replace(associated_id, "https://openalex.org/","")) 
   
   
-  write_dta(inst_chars, paste0("../output/inst_geo_chars", as.character(q), ".dta"))
+  write_csv(inst_chars, paste0("../output/inst_geo_chars", as.character(q), ".csv"))
 }

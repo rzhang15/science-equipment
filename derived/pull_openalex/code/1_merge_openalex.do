@@ -7,7 +7,8 @@ pause on
 set seed 8975
 here, set
 set maxvar 120000
-
+global dropbox_dir "~/dropbox (harvard university)/scientific equipment"
+global derived_output "${dropbox_dir}/derived_output/"
 program main
     append_files
     append_mesh
@@ -63,11 +64,20 @@ program append_files
 	gen dallas_pi = athr_pos == "last" & inst_id == "I162577319"
 	bys id: egen has_dallas_pi = max(dallas_pi)
 	keep if has_dallas_pi == 1
-    save ../output/openalex_all_jrnls_merged, replace
-    
+    save "${derived_output}/pull_openalex/openalex_all_jrnls_merged", replace
+    preserve
+	gcontract id, nomiss
+	drop _freq
+	save "${derived_output}/pull_openalex/list_of_works", replace
+	restore
+	preserve
+	gcontract athr_id, nomiss
+	drop _freq
+	save "${derived_output}/pull_openalex/list_of_athrs", replace
+	restore
     gcontract inst_id, nomiss
     drop _freq
-    save ../output/list_of_insts, replace
+    save "${derived_output}/pull_openalex/list_of_insts", replace
 end
 program append_mesh
         forval i = 2010/2019 {
@@ -98,7 +108,8 @@ program append_mesh
         replace gen_mesh = rev_mesh if mi(gen_mesh)
         drop rev_mesh
         contract id gen_mesh qualifier_name, nomiss
-        save ../output/contracted_gen_mesh_all_jrnls, replace
+		merge m:1 id using "${derived_output}/pull_openalex/list_of_works", assert(1 2 3) keep(3) nogen
+        save "${derived_output}/pull_openalex/contracted_gen_mesh_all_jrnls", replace
 end
 program append_concepts
         forval i = 2010/2019 {
@@ -115,7 +126,8 @@ program append_concepts
             di "`i'"
             cap qui append using ../output/topics`i'
         }
-        save ../output/topics_all_jrnls_merged,replace
+		merge m:1 id using "${derived_output}/pull_openalex/list_of_works", assert(1 2 3) keep(3) nogen
+        save "${derived_output}/pull_openalex/topics_all_jrnls_merged",replace
 end
 program append_grants
         forval i = 2010/2019 {
@@ -132,6 +144,7 @@ program append_grants
             di "`i'"
             cap qui append using ../output/grants`i'
         }
-        save ../output/grants_all_jrnls_merged,replace
+		merge m:1 id using "${derived_output}/pull_openalex/list_of_works", assert(1 2 3) keep(3) nogen
+        save "${derived_output}/pull_openalex/grants_all_jrnls_merged",replace
 end
 main

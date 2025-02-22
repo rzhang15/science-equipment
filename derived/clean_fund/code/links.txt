@@ -1,0 +1,5 @@
+./geo/ | /Users/conniexu/Dropbox (Harvard University)/Scientific Equipment/raw/geo/
+./openalex/ | /Users/conniexu/Dropbox (Harvard University)/Scientific Equipment/derived_output/pull_openalex/
+./all/ | /Users/conniexu/Dropbox (Harvard University)/Scientific Equipment/derived_output/pull_openalex/
+./insts/ | /Users/conniexu/Dropbox (Harvard University)/Scientific Equipment/derived_output/scrape_athr_inst_hist/
+./year_insts/ | /Users/conniexu/Dropbox (Harvard University)/Scientific Equipment/derived_output/clean_athr_inst_hist/

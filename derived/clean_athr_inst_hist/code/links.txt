@@ -1,0 +1,3 @@
+./geo/ | /Users/conniexu/Dropbox (Harvard University)/Scientific Equipment/raw/geo/
+./pprs/ | /Users/conniexu/Dropbox (Harvard University)/Scientific Equipment/derived_output/scrape_athr_inst_hist/
+./athrs/ | /Users/conniexu/Dropbox (Harvard University)/Scientific Equipment/derived_output/pull_openalex/
