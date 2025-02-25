@@ -155,6 +155,7 @@ program create_xwalk
 
 	replace pi = subinstr(pi,"alonso faruck","faruck",.)
 	replace pi = subinstr(pi,"Ó","o",.)
+	replace pi = ustrtrim(pi)
 	label var num_pi "Number of PIs associated with this grant"
 	
 	drop spend referenceawardid fain 
