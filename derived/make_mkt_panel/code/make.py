@@ -18,6 +18,6 @@ start_makelog(paths)
 # MAKE LINKS
 link_externals(paths, ['links.txt'])
 # BUILD.DO
-run_stata(paths, program = 'analysis.do')
+run_stata(paths, program = 'build.do')
 end_makelog(paths)
 input('\n Press <Enter> to exit.')

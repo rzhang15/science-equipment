@@ -59,6 +59,9 @@ control_pre <- control %>%
   )
 
 all_data_pre <- bind_rows(treated_pre, control_pre) %>% 
+  group_by(sku) %>%
+  filter(n() >= 2) %>%
+  ungroup() %>%
   group_by(mkt) %>% 
   filter(n_distinct(treated) == 2) %>%
   ungroup()
