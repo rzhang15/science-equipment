@@ -140,7 +140,7 @@ program plot_spend_acct
 		, ///
 		xtitle("Year", size(small)) ///
 		ytitle("Percent of Total Spend Matched to a PI", size(small)) ///
-		xlabel(2011(1)2019, nogrid) ylabel(50(10)100, nogrid)
+		xlabel(2011(1)2019, nogrid) ylabel(40(10)100, nogrid)
 			
 		graph export "../output/perc_spend_matched_by_year.png",replace
 	
@@ -217,7 +217,7 @@ program plot_agency_stats
 		xtitle("Year", size(small)) ///
 		ytitle("Total Percent Spend from Agencies", size(small)) ///
 		legend(order(1 "NIH" 2 "NSF" 3 "Welch" 4 "CPRIT" 5 "Other") ///
-			pos(5) ring(0) col(1) size(vsmall)) ///
+			pos(1) ring(0) col(1) size(small)) ///
 		xlabel(2011(1)2019, nogrid) ylabel(, nogrid)
 
 		graph export "../output/perc_spend_by_agency_by_year.png",replace

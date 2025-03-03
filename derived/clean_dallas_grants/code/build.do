@@ -152,9 +152,14 @@ program create_xwalk
     merge m:1 grantid using ../temp/nih_grants, nogen assert(master matched)
 	merge m:1 grantid using ../temp/nsf_grants, update nogen keep(1 3 4)
 	merge m:1 grantid using ../temp/cprit_grants, update nogen keep(1 3 4)
-
-	replace pi = subinstr(pi,"alonso faruck","faruck",.)
+	
 	replace pi = subinstr(pi,"Ó","o",.)
+	replace pi = subinstr(pi,"alonso faruck","faruck",.)
+	replace pi = "black, bryan" if strpos(pi, "black, bryan") > 0
+	replace pi = "palmer, kelli" if strpos(pi, "palmer, kelli") > 0
+	replace pi = "draper, rockford" if strpos(pi, "draper, rockford") > 0
+	replace pi = "winkler, duane" if strpos(pi, "winkler, duane") > 0
+	replace pi = "nisco, nicole" if strpos(pi, "nisco, nicole") > 0
 	replace pi = ustrtrim(pi)
 	label var num_pi "Number of PIs associated with this grant"
 	
