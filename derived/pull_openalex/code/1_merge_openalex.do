@@ -16,7 +16,7 @@ program main
 	append_grants
 end
 program append_files
-        forval i =2010/2019 {
+        forval i =2000/2024 {
         di "`i'"
         qui {
                 import delimited using ../output/openalex_authors`i', stringcols(_all) clear varn(1) bindquotes(strict) maxquotedrows(unlimited)
@@ -27,7 +27,7 @@ program append_files
             }
         }
         clear
-        forval i = 2010/2019 {
+        forval i = 2000/2024 {
             di "`i'"
             qui append using ../output/openalex_authors`i'
         }
@@ -80,7 +80,7 @@ program append_files
     save "${derived_output}/pull_openalex/list_of_insts", replace
 end
 program append_mesh
-        forval i = 2010/2019 {
+        forval i = 2000/2024 {
         di "`i'"
         qui {
                 cap import delimited using ../output/mesh_terms`i', stringcols(_all) clear varn(1) bindquotes(strict) maxquotedrows(unlimited)
@@ -95,7 +95,7 @@ program append_mesh
             }
         }
         clear
-        forval i = 2010/2019 {
+        forval i = 2000/2024 {
             di "`i'"
             cap qui append using ../output/mesh_terms`i'
         }
@@ -112,7 +112,7 @@ program append_mesh
         save "${derived_output}/pull_openalex/contracted_gen_mesh_all_jrnls", replace
 end
 program append_concepts
-        forval i = 2010/2019 {
+        forval i = 2000/2024 {
         di "`i'"
         qui {
                 cap import delimited using ../output/topics`i', stringcols(_all) clear varn(1) bindquotes(strict) maxquotedrows(unlimited)
@@ -122,7 +122,7 @@ program append_concepts
             }
         }
         clear
-        forval i = 2010/2019 {
+        forval i = 2000/2024 {
             di "`i'"
             cap qui append using ../output/topics`i'
         }
@@ -130,17 +130,17 @@ program append_concepts
         save "${derived_output}/pull_openalex/topics_all_jrnls_merged",replace
 end
 program append_grants
-        forval i = 2010/2019 {
+        forval i = 2000/2024 {
         di "`i'"
         qui {
                 cap import delimited using ../output/grants`i', stringcols(_all) clear varn(1) bindquotes(strict) maxquotedrows(unlimited)
-                gen year = `i'
-                compress, nocoalesce
-                save ../output/grants`i', replace
+                cap gen year = `i'
+                cap compress, nocoalesce
+                cap save ../output/grants`i', replace
             }
         }
         clear
-        forval i = 2010/2019 {
+        forval i = 2000/2024 {
             di "`i'"
             cap qui append using ../output/grants`i'
         }

@@ -8,7 +8,7 @@ library(purrr)
 library(tidyverse)
 set.seed(8975)
 
-years <- 2010:2019
+years <- 2000:2024
 # nih_funded_papers <- list()
 # for (year in years) {
 #   var_name <- paste0("nih_funded_papers_", year)  # Create the variable name dynamically
@@ -65,7 +65,7 @@ process_article <- function(article) {
 for (year in years) {
   works <- oa_fetch(
     entity = "works",
-    primary_topic.domain.id = 1,
+    primary_topic.domain.id = c(1,3,4),
     institutions.id = "I162577319",
     publication_year = as.character(year),
     output = "list",
