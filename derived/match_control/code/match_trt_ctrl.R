@@ -5,7 +5,7 @@ library(MatchIt)
 library(cobalt)
 library(ggplot2)
 library(here)
-
+library(haven)
 # Create output directory
 dir.create("../output/figures", recursive = TRUE, showWarnings = FALSE)
 
@@ -34,12 +34,12 @@ control <- panel %>% filter(treated == 0)
 treated_pre <- treated %>%
   filter(year <= 2013) %>%
   select(mkt, prdct_ctgry, year, treated, avg_log_price,
-         log_tot_qty, log_tot_spend, raw_price, raw_qty, raw_spend)
+         log_tot_qty, log_tot_spend, raw_price, raw_qty, raw_spend, num_suppliers)
 
 control_pre <- control %>%
   filter(year <= 2013) %>%
   select(mkt, prdct_ctgry, year, treated, avg_log_price,
-         log_tot_qty, log_tot_spend, raw_price, raw_qty, raw_spend)
+         log_tot_qty, log_tot_spend, raw_price, raw_qty, raw_spend, num_suppliers)
 
 all_data_pre <- bind_rows(treated_pre, control_pre)
 
@@ -59,9 +59,9 @@ all_data_pre <- all_data_pre %>%
 # Pivot data to wide format
 data_wide <- all_data_pre %>%
   pivot_wider(names_from = year, names_sep = "_",
-              values_from = c(avg_log_price, raw_price, log_tot_spend, raw_spend, log_tot_qty, raw_qty)) %>%
-  mutate(log_price_chg = avg_log_price_2013 - avg_log_price_2012) %>%
+              values_from = c(num_suppliers, avg_log_price, raw_price, log_tot_spend, raw_spend, log_tot_qty, raw_qty)) %>%
   rowwise() %>%
+  mutate(avg_pre_log_price = mean(c_across(starts_with("avg_log_price_")), na.rm = TRUE)) %>%
   na.omit() %>%
   ungroup()
 
@@ -80,7 +80,8 @@ price_trends <- panel %>%
 # ---------------------------
 # Matching and Plot Saving Loop
 # ---------------------------
-covariates <- "coef_log_price + raw_price_2011 + coef_price"
+
+covariates <- "avg_log_price_2011+avg_log_price_2012+avg_log_price_2013"
 treated_markets <- unique(data_wide$mkt[data_wide$treated == 1])
 
 # Initialize storage
@@ -97,11 +98,12 @@ for (mkt_id in treated_markets) {
     matchit(
       as.formula(paste("treated ~", covariates)),
       method = "nearest",
-      distance = "glm",
       data = temp_data,
-      caliper = 0.2,
-      ratio = 1,
-      replace = TRUE
+      drop = "none",
+      #caliper = 1,
+      ratio =1,  # change this value to > 1 when needed
+      replace = TRUE,
+     restimate = TRUE
     )
   }, error = function(e) {
     message("Matching failed for market ", mkt_id, ": ", e$message)
@@ -136,30 +138,72 @@ for (mkt_id in treated_markets) {
   
   # Append to list
   match_pairs_list[[as.character(mkt_id)]] <- data.frame(
-    mkt = treated_mkt, matched_control = matched_control_mkt, stringsAsFactors = FALSE
+    mkt = treated_mkt, 
+    matched_control = paste(matched_control_mkt, collapse = ", "),
+    stringsAsFactors = FALSE
   )
   
   # ---------------------------
   # Generate and Display Plot in Console & Save to File
   # ---------------------------
-  pair_data <- price_trends %>%
-    filter(mkt %in% c(treated_mkt, matched_control_mkt)) %>%
-    mutate(mkt_label = case_when(
-      mkt == treated_mkt ~ paste0("Treated: ", prdct_info$prdct_ctgry[prdct_info$mkt == treated_mkt]),
-      mkt == matched_control_mkt ~ paste0("Control: ", prdct_info$prdct_ctgry[prdct_info$mkt == matched_control_mkt])
-    ))
+  # ---------------------------
+  # Generate and Display Plot in Console & Save to File
+  # ---------------------------
+  
+  if (length(matched_control_mkt) > 1) {
+    # Treated data remains unaggregated
+    treated_data <- price_trends %>% 
+      filter(mkt == treated_mkt) %>% 
+      mutate(mkt_label = paste0("Treated Market: ", 
+                                prdct_info$prdct_ctgry[prdct_info$mkt == treated_mkt]))
+    
+    # Retrieve the product category names for the matched control markets
+    matched_control_names <- prdct_info %>% 
+      filter(mkt %in% matched_control_mkt) %>% 
+      arrange(mkt) %>% 
+      pull(prdct_ctgry)
+    
+    # Create a legend label that lists the control market names
+    control_label <- paste0("Control Markets: ", paste(matched_control_names, collapse = ", "))
+    
+    # Aggregate control markets: for each year, take the average of price_adj.
+    control_data <- price_trends %>%
+      filter(mkt %in% matched_control_mkt) %>%
+      group_by(year) %>%
+      summarise(price_adj = mean(price_adj, na.rm = TRUE)) %>%
+      ungroup() %>%
+      mutate(mkt_label = control_label)
+    
+    pair_data <- bind_rows(treated_data, control_data)
+    
+  } else {
+    # Only one control is matched; use individual labels.
+    pair_data <- price_trends %>%
+      filter(mkt %in% c(treated_mkt, matched_control_mkt)) %>%
+      mutate(mkt_label = case_when(
+        mkt == treated_mkt ~ paste0("Treated Market: ", 
+                                    prdct_info$prdct_ctgry[prdct_info$mkt == treated_mkt]),
+        mkt == matched_control_mkt ~ paste0("Control Market: ", 
+                                            prdct_info$prdct_ctgry[prdct_info$mkt == matched_control_mkt])
+      ))
+  }
   
   p <- ggplot(pair_data, aes(x = year, y = price_adj, color = mkt_label)) +
     geom_line(linewidth = 1) +
     geom_point() +
-    labs(title = paste("Price Trends for Treated:", treated_mkt, "and Control:", matched_control_mkt),
-         x = "Year", y = "Avg Log Price (2013 = 0)", color = "Market Type") +
-    theme_minimal()
+    labs(x = "Year", y = "Avg Log Price") +
+    scale_color_discrete(name = NULL) +
+    scale_x_continuous(breaks = seq(2011, 2019, 1), limits = c(2011, 2019)) +
+    theme_minimal() +
+    # Move legend below the x-axis and arrange it in one row
+    theme(legend.position = "bottom",
+          legend.direction = "horizontal",
+          legend.box = "horizontal")
   
-  # **Print the plot to the console**
-  print(p)  # This ensures the plot is displayed in the console
+  # Print the plot to the console
+  print(p)
   
-  # **Save the plot to a PDF file**
+  # Save the plot to a PDF file
   pdf_file <- paste0("../output/figures/log_price_trends_", treated_mkt, ".pdf")
   tryCatch({
     ggsave(pdf_file, plot = p, width = 8, height = 6)
