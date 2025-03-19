@@ -53,7 +53,9 @@ program merge_pi_grant
 	replace pi = "delk, nikki" if strpos(grantid, "RSG-20-138-01") > 0
 	replace pi = "kim, tae hoon" if strpos(grantid, "W81XWH1810439") > 0
 	
-	save "../temp/projectid_to_pi_xwalk.dta", replace 
+	replace agency = "welch" if agency == "welch foundation"
+	
+	save "${derived_output}/ut_dallas_grants/final_projectid_to_pi_xwalk.dta", replace 
 
 end 
 
@@ -63,7 +65,7 @@ program clean_merge_data
 
 	import excel using "$raw/FOIA/utdallas_2011_2024.xlsx", firstrow case(lower) clear
 	
-		merge m:1 projectid using "../temp/projectid_to_pi_xwalk.dta", nogen assert(matched)
+		merge m:1 projectid using "${derived_output}/ut_dallas_grants/final_projectid_to_pi_xwalk.dta", nogen assert(matched)
 	
 		gen spend = quantity * unitprice 
 		drop extendedprice 
@@ -72,7 +74,6 @@ program clean_merge_data
 		
 		gen matched_pi = !mi(pi)
 		
-		replace agency = "welch" if agency == "welch foundation"
 		replace agency = "other" if !inlist(agency, "nih", "nsf", "welch", "cprit")
 	
 end 

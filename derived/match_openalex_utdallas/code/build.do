@@ -143,10 +143,9 @@ program merge_utdallas_pi
 		order pi num_grant* num_paper* *year*
 		pwcorr num_grant* num_paper*
 		
-		drop if source == "openalex only"
 		isid pi 
 		
-		save "../output/match_pi_foia_openalex_utdallas.dta", replace
+		save "../temp/match_pi_foia_openalex_utdallas.dta", replace
 end 
 
 program merge_utdallas_grant
@@ -160,6 +159,7 @@ program merge_utdallas_grant
 	* Merge in the PIs that are matched 
 	merge m:1 pi using "../output/match_pi_foia_openalex_utdallas.dta", nogen keepusing(pi school source)
 		ren pi pi_foia
+		drop if source == "openalex only"
 		
 	* Merge in Open Alex data
 	merge 1:m grantid using "../temp/openalex_author_grant.dta"
