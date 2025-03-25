@@ -11,7 +11,7 @@ global dropbox_dir "$sci_equip"
 cd "$github/science-equipment/analysis/pi_spend_products/code"
 
 global raw "${dropbox_dir}/raw"
-global derived_output "${dropbox_dir}/derived_output"
+global derived_output "${dropbox_dir}/derived_output_sci_eq"
 
 program main   
 
@@ -68,6 +68,16 @@ program pi_spend_antibody
 		sum spend* perc_prdct, d 
 		
 		gsort -spend
+		
+	* Plot distribution
+	tw ///
+		(kdensity perc_prdct, color(lavender)) ///
+		, ///
+		xtitle("Share of PI FOIA Spend on Antibodies", size(small)) ///
+		ytitle("Probability Density", size(small)) ///
+		xlabel(, nogrid) ylabel(, nogrid) 
+			
+		graph export "../output/pi_share_foia_antibody_pre2020.png",replace
 
 end
 

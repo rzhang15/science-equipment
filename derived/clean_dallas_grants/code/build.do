@@ -168,7 +168,7 @@ program create_xwalk
 	replace pi = ustrtrim(pi)
 	label var num_pi "Number of PIs associated with this grant"
 	
-	drop spend referenceawardid fain 
+	drop spend 
 	
 	isid projectid 
 	save "${derived_output}/ut_dallas_grants/ut_dallas_projectid_to_pi_xwalk.dta", replace
