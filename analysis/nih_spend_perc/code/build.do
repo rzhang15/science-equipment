@@ -18,6 +18,7 @@ program main
 	merge_without_cost
 	merge_transaction_grant
 	calculate_consumable_stats
+	save_transaction_spine
 	
 end
 
@@ -218,6 +219,32 @@ program calculate_consumable_stats
 		note("Total Grant Cycles: `num_cycles', Total PIs: `num_pis'")
 			
 		graph export "../output/nih_share_foia_pre2020.png",replace
+
+end 
+
+program save_transaction_spine
+
+	* Import transaction at the year level 
+	import excel using "$raw/FOIA/utdallas_2011_2024.xlsx", firstrow case(lower) clear
+			
+	drop unitpricedate extendedprice costcenter vendoraddress city state fain referenceawardid
+	
+	* match to product categories 
+	ren (suppliernumber purchaseorderidentifier skucatalog productdescription) ///
+		(supplier_id ponumber sku product_desc)
+		
+	merge m:1 sku supplier_id using "$derived_output/make_mkt_panel/ctgry_xw.dta", nogen keepusing(prdct_ctgry)
+		
+	* Merge in grant data
+	merge m:1 projectid purchasedate using ../temp/nih_merged_spending.dta, nogen assert(matched)
+	
+		drop pi_U purchase_antibody purchase 
+		ren full_grantid full_nih_grantid
+		label var cycle_id "Unique numeric identifier for which cycle this purchase is a part of"
+		
+	duplicates drop 
+		
+	save "$derived_output/ut_dallas_grants/transaction_spine_with_pi_grant.dta", replace
 
 end 
 
