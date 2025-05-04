@@ -1,3 +1,2 @@
-./dallas/ | /Users/conniexu/Dropbox (Harvard University)/Scientific Equipment/derived_output/ut_dallas_products/
-./foias/ | /Users/conniexu/Dropbox (Harvard University)/Scientific Equipment/raw/FOIA/
+./samp/ | /Users/conniexu/Documents/Harvard/research projects/dissertation/science-equipment/derived/fuzzy_supplier/output
 

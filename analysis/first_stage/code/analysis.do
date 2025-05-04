@@ -20,8 +20,7 @@ program merge_matched
     save ../temp/matched_pairs, replace
     use ../external/samp/mkt_yr, clear
     bys mkt: gen num_year = _N 
-    keep if num_year == 9
-    merge m:1 mkt using ../temp/matched_pairs, assert(1 3) keep(1 3)
+    merge m:1 mkt using ../temp/matched_pairs, assert(1  3) keep(1 3)
     drop if treated == 1 & _merge == 1
     drop _merge
     foreach var in avg_log_price log_tot_qty log_tot_spend  {
@@ -34,6 +33,7 @@ end
 
 program raw_plots
     use ../temp/matched_mkt_panel, clear
+    keep if year >= 2011
     glevelsof mkt if treated == 1, local(categories)
     foreach c in `categories' {
         preserve

@@ -1,0 +1,4 @@
+./dallas/ | /Users/conniexu/Dropbox (Harvard University)/RubiCon Dissertation/derived_output_sci_eq/ut_dallas_products/
+./foias/ | /Users/conniexu/Dropbox (Harvard University)/RubiCon Dissertation/raw/FOIA/
+./trained/ | /Users/conniexu/Documents/Harvard/research projects/dissertation/science-equipment/derived/prdct_classification/output
+

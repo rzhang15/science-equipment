@@ -1,1 +1,1 @@
-./dallas/ | /Users/conniexu/Dropbox (Harvard University)/Scientific Equipment/derived_output/make_mkt_panel/
+./dallas/ | /Users/conniexu/Documents/Harvard/research projects/dissertation/science-equipment/derived/make_mkt_panel/output

@@ -1,11 +1,11 @@
 # Load necessary libraries
 library(tidyverse)
 library(fixest)
-library(MatchIt)
 library(cobalt)
 library(ggplot2)
 library(here)
 library(haven)
+
 # Create output directory
 dir.create("../output/figures", recursive = TRUE, showWarnings = FALSE)
 
@@ -44,16 +44,16 @@ control_pre <- control %>%
 
 all_data_pre <- bind_rows(treated_pre, control_pre)
 
-# Compute linear time trend coefficients
+# Compute linear time trend coefficients for several price/quantity measures
 all_data_pre <- all_data_pre %>%
   group_by(mkt) %>%
   mutate(
     coef_log_price = coef(lm(avg_log_price ~ year, data = cur_data()))[2],
     coef_log_spend = coef(lm(log_tot_spend ~ year, data = cur_data()))[2],
     coef_log_qty   = coef(lm(log_tot_qty ~ year, data = cur_data()))[2],
-    coef_price = coef(lm(raw_price ~ year, data = cur_data()))[2],
-    coef_spend = coef(lm(raw_spend ~ year, data = cur_data()))[2],
-    coef_qty   = coef(lm(raw_qty ~ year, data = cur_data()))[2]
+    coef_price     = coef(lm(raw_price ~ year, data = cur_data()))[2],
+    coef_spend     = coef(lm(raw_spend ~ year, data = cur_data()))[2],
+    coef_qty       = coef(lm(raw_qty ~ year, data = cur_data()))[2]
   ) %>%
   ungroup()
 
@@ -79,115 +79,61 @@ price_trends <- panel %>%
   ungroup()
 
 # ---------------------------
-# Matching and Plot Saving Loop
+# Euclidean Distance Matching and Plot Saving Loop
 # ---------------------------
 
-covariates <- "avg_log_price_2011 + avg_log_price_2012 + avg_log_price_2013"
+# Define the covariates to be used for Euclidean distance calculation
+covs <- c("avg_log_price_2011", "avg_log_price_2012","avg_log_price_2013")
 treated_markets <- unique(data_wide$mkt[data_wide$treated == 1])
 
-# Initialize storage
+# Initialize storage for matched pairs
 match_pairs_list <- list()
 
 for (mkt_id in treated_markets) {
   cat("\nProcessing treated market:", mkt_id, "\n")
   
-  # Subset data for the treated market and controls
+  # Subset data: the treated unit and all control units
   temp_data <- data_wide %>% filter(mkt == mkt_id | treated == 0)
   
-  # Run matching
-  current_model <- tryCatch({
-    matchit(
-      as.formula(paste("treated ~", covariates)),
-      method = "nearest",
-      data = temp_data,
-      drop = "none",
-      #caliper =1,
-      ratio =1,  # change this value to > 1 when needed
-      replace = TRUE,
-     restimate = TRUE
-    )
-  }, error = function(e) {
-    message("Matching failed for market ", mkt_id, ": ", e$message)
-    return(NULL)
-  })
+  treated_row <- temp_data %>% filter(mkt == mkt_id)
+  control_rows <- temp_data %>% filter(treated == 0)
   
-  # Skip if no match was found
-  if (is.null(current_model)) {
+  # Skip if no control available
+  if (nrow(control_rows) == 0) {
+    message("No control units available for market ", mkt_id)
     next
   }
   
-  # Extract matched data
-  match_data <- tryCatch({
-    match.data(current_model)
-  }, error = function(e) {
-    message("Error extracting matched data for market ", mkt_id)
-    return(NULL)
-  })
+  # Compute Euclidean distances on the specified covariates
+  treated_vals <- treated_row %>% select(all_of(covs)) %>% unlist() %>% as.numeric()
+  control_rows <- control_rows %>%
+    mutate(distance = apply(select(., all_of(covs)), 1, 
+                            function(x) sqrt(sum((as.numeric(x) - treated_vals)^2))))
   
-  # Skip if matched data is empty
-  if (is.null(match_data) || nrow(match_data) == 0) {
-    next
-  }
+  # Select the control with the smallest distance (if ties, the first is chosen)
+  matched_control <- control_rows %>% filter(distance == min(distance))
+  matched_control_mkt <- matched_control$mkt[1]
   
-  # Identify matched pairs
-  treated_mkt <- unique(match_data$mkt[match_data$treated == 1])
-  matched_control_mkt <- unique(match_data$mkt[match_data$treated == 0])
+  treated_mkt <- mkt_id
   
-  if (length(treated_mkt) < 1 || length(matched_control_mkt) < 1) {
-    next  # Skip if no control found
-  }
-  
-  # Append to list
+  # Append match pair to the list
   match_pairs_list[[as.character(mkt_id)]] <- data.frame(
     mkt = treated_mkt, 
-    matched_control = paste(matched_control_mkt, collapse = ", "),
+    matched_control = matched_control_mkt,
     stringsAsFactors = FALSE
   )
   
   # ---------------------------
-  # Generate and Display Plot in Console & Save to File
-  # ---------------------------
-  # ---------------------------
-  # Generate and Display Plot in Console & Save to File
+  # Plotting the Price Trends for the Matched Pair
   # ---------------------------
   
-  if (length(matched_control_mkt) > 1) {
-    # Treated data remains unaggregated
-    treated_data <- price_trends %>% 
-      filter(mkt == treated_mkt) %>% 
-      mutate(mkt_label = paste0("Treated Market: ", 
-                                prdct_info$prdct_ctgry[prdct_info$mkt == treated_mkt]))
-    
-    # Retrieve the product category names for the matched control markets
-    matched_control_names <- prdct_info %>% 
-      filter(mkt %in% matched_control_mkt) %>% 
-      arrange(mkt) %>% 
-      pull(prdct_ctgry)
-    
-    # Create a legend label that lists the control market names
-    control_label <- paste0("Control Markets: ", paste(matched_control_names, collapse = ", "))
-    
-    # Aggregate control markets: for each year, take the average of price_adj.
-    control_data <- price_trends %>%
-      filter(mkt %in% matched_control_mkt) %>%
-      group_by(year) %>%
-      summarise(price_adj = mean(price_adj, na.rm = TRUE)) %>%
-      ungroup() %>%
-      mutate(mkt_label = control_label)
-    
-    pair_data <- bind_rows(treated_data, control_data)
-    
-  } else {
-    # Only one control is matched; use individual labels.
-    pair_data <- price_trends %>%
-      filter(mkt %in% c(treated_mkt, matched_control_mkt)) %>%
-      mutate(mkt_label = case_when(
-        mkt == treated_mkt ~ paste0("Treated Market: ", 
-                                    prdct_info$prdct_ctgry[prdct_info$mkt == treated_mkt]),
-        mkt == matched_control_mkt ~ paste0("Control Market: ", 
-                                            prdct_info$prdct_ctgry[prdct_info$mkt == matched_control_mkt])
-      ))
-  }
+  # Since a single control is matched, assign individual labels for treated and control
+  pair_data <- price_trends %>%
+    filter(mkt %in% c(treated_mkt, matched_control_mkt)) %>%
+    mutate(mkt_label = case_when(
+      mkt == treated_mkt ~ paste0("Treated Market: ", prdct_info$prdct_ctgry[prdct_info$mkt == treated_mkt]),
+      mkt == matched_control_mkt ~ paste0("Control Market: ", prdct_info$prdct_ctgry[prdct_info$mkt == matched_control_mkt])
+    ))
   
   p <- ggplot(pair_data, aes(x = year, y = price_adj, color = mkt_label)) +
     geom_line(linewidth = 1) +
@@ -196,12 +142,11 @@ for (mkt_id in treated_markets) {
     scale_color_discrete(name = NULL) +
     scale_x_continuous(breaks = seq(2011, 2019, 1), limits = c(2011, 2019)) +
     theme_minimal() +
-    # Move legend below the x-axis and arrange it in one row
     theme(legend.position = "bottom",
           legend.direction = "horizontal",
           legend.box = "horizontal")
   
-  # Print the plot to the console
+  # Display the plot in the console
   print(p)
   
   # Save the plot to a PDF file
