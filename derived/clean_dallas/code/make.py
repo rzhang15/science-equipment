@@ -8,10 +8,10 @@ from gslab_make.modify_dir import *
 from gslab_make.write_logs import *
 #****************************************************
 # MAKE.PY STARTS
-clear_dir(['../output/', '../temp/', '/Users/conniexu/Dropbox (Harvard University)/Scientific Equipment/derived_output/clean_mergers'])
+clear_dir(['../output/', '../temp/'])
 remove_dir(['../external/'])
-os.mkdir('../output/figures/')
-os.mkdir('../output/tables/')
+#os.mkdir('../output/figures/')
+#os.mkdir('../output/tables/')
 paths = {'makelog' : '../output/make.log', 'external_dir' : '../external/'}
 start_makelog(paths)
 

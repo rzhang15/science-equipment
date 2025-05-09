@@ -4,10 +4,7 @@ capture log close
 program drop _all
 set scheme modern
 preliminaries
-version 18
-global dropbox_dir "~/dropbox (harvard university)/scientific equipment"
-//global dropbox_dir "$sci_equip"
-global derived_output "${dropbox_dir}/derived_output/"
+version 17
 
 program main   
     import_data

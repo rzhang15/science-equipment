@@ -1,1 +1,1 @@
-./foia/ | /Users/conniexu/Dropbox (Harvard University)/Scientific Equipment/raw/FOIA/
+./foia/ | /n/netscratch/pakes_lab/Lab/sci_eq/raw/FOIA/ 
