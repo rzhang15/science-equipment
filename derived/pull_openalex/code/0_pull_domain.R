@@ -65,8 +65,7 @@ process_article <- function(article) {
 for (year in years) {
   works <- oa_fetch(
     entity = "works",
-    primary_topic.domain.id = c(1,3,4),
-    institutions.id = "I162577319",
+    primary_topic.domain.id = c(1),
     publication_year = as.character(year),
     output = "list",
     type = "article"

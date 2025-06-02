@@ -5,7 +5,7 @@ program drop _all
 set scheme modern
 pause on
 set seed 8975
-
+global temp "/scratch"
 program main
     foreach s in 15jrnls newfund_cns {
         foreach t in year { 
