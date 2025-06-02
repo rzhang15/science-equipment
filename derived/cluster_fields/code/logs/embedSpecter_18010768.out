@@ -1,0 +1,14 @@
+=== DEBUG ==========================================
+Node           : holygpu7c26106.rc.fas.harvard.edu
+Torch version  : 2.5.1
+CUDA available : True device count: 1
+Using device   : cuda
+====================================================
+
+Sentences to encode : 189910
+Loading SPECTER-2 model …
+Embedding dimension : 768
+Starting encoding …
+
+Finished.  Embedding matrix shape: (189910, 768)
+Saved → /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/cluster_fields/output/embeddings.npy
