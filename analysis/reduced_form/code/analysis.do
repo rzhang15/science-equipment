@@ -10,6 +10,7 @@ global dropbox_dir "~/dropbox (harvard university)/scientific equipment"
 
 program main   
     event_study
+    output_tables
 end
 
 program event_study
@@ -44,7 +45,7 @@ program event_study
         preserve
         mat drop _all 
         reghdfe `yvar' posttreatlr posttreatsr , absorb(athr_id year)  cluster(athr_id)
-        mat did_`var' = (_b[posttreatlr] , _se[posttreatlr]) \ (_b[posttreatsr], _se[posttreatsr]) \ (_cons, .)
+        mat did_`yvar' = (_b[posttreatlr] , _se[posttreatlr]) \ (_b[posttreatsr], _se[posttreatsr]) \ (_cons, .)
 
         qui sum `yvar' if trt == 1 & rel == -1 
         local trt_mean : dis %4.3f r(mean)
