@@ -1,0 +1,3 @@
+./samp1/ | /n/netscratch/pakes_lab/Lab/sci_eq/FOIA/first stage usable
+./samp2/ | /n/netscratch/pakes_lab/Lab/sci_eq/FOIA/unusable
+
