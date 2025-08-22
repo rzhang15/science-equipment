@@ -1,0 +1,440 @@
+# initial_seed.yml
+#
+# This file contains seed keywords for identifying lab consumables.
+# The loading script in 1_prepare_data.py expects a top-level 'keywords:' key
+# followed by a list of keyword strings.
+# Keywords will be lowercased upon loading.
+
+keywords:
+  # Pipetting & Liquid Handling
+  - pipette tip
+  - lts tip
+  - filter tip
+  - aerosol tip
+  - serological pipette
+  - stripette
+  - repeater syringe # Or repeater tip
+  - repeater tip
+  - wide bore pipette tip # More specific
+  - low retention tip
+  - gel loading tip
+  - reservoir
+  - reagent reservoir
+  - reagent trough
+  - barrier tip
+
+  # Tubes & Vials
+  - pcr tube
+  - pcr strip
+  - tube strip
+  - microcentrifuge tube
+  - microfuge tube
+  - microtube
+  - microspin # Often microspin column or tube
+  - micro spin column
+  - snap cap tube
+  - safe-lock tube
+  - conical tube
+  - test tube
+  - tube # General, keep if useful
+  - cryovial
+  - cryotube
+  - scintillation vial
+  - screw cap vial
+  - glass vial
+  - sample vial
+
+  # Plates
+  - pcr plate
+  - 96 well plate
+  - 384 well plate
+  - 6 well plate
+  - 12 well plate
+  - 24 well plate
+  - 48 well plate
+  - deepwell plate
+  - deep well plate
+  - v-bottom plate
+  - u-bottom plate
+  - microplate
+  - assay plate
+  - cell culture plate
+
+  # Cryogenics & Storage (non-electronic)
+  - cryobox
+  - freezer box
+  - cardboard freezer box
+  - cryocane
+  - freezer rack
+  - cryorack
+  - storage bottle
+  - media bottle
+  - amber bottle
+  - hdpe bottle
+  - wash bottle
+  - spray bottle
+
+  # Filtration & Separation
+  - syringe filter
+  - centrifugal filter
+  - amicon filter
+  - vivaspin concentrator
+  - pvdf membrane
+  - nitrocellulose membrane
+  - vacuum filter unit # The disposable funnel/bottle unit
+  - bottle top filter
+  - filter flask # Usually glassware, but the filter unit attached might be key
+  - spin column
+  - guard column
+  - spe column # Solid Phase Extraction
+  - c18 column # If referring to SPE or small prep columns
+  - c4 column  # If referring to SPE or small prep columns
+  - superdex column # If disposable/prep scale
+  - sephacryl column # If disposable/prep scale
+  - sephadex g25    # Often as pre-packed columns
+
+  # Cell & Tissue Culture (Consumables)
+  - culture flask
+  - t25 flask
+  - t-25 flask
+  - t75 flask
+  - t-75 flask
+  - t175 flask
+  - t-175 flask
+  - volumetric flask
+  - spinner flask
+  - roller bottle
+  - cell factory
+  - cell stack
+  - hyperflask
+  - suspension bag
+  - petri dish
+  - tissue culture dish
+  - cell culture plate # e.g. 6-well cell culture plate
+  - cell culture insert
+  - transwell insert
+  - coverslip
+  - coverglass
+  - microscope slide
+  - poly-l-lysine slide
+  - chamber slide
+  - glass bottom dish
+  - cell scraper
+  - cell lifter
+  - cell strainer
+
+  # General Labware & Supplies
+  - stir bar
+  - stirbar
+  - stir bar retriever
+  - stirring flea
+  - weigh boat
+  - weigh paper
+  - kimwipe
+  - parafilm
+  - sealing film
+  - adhesive foil
+  - plate seal
+  - cap strip
+  - septum cap
+  - carboy
+  - wash bottle
+  - squirt bottle
+  - reagent reservoir
+  - desiccator plate
+  - o-ring
+  - gasket
+  - pcr rack
+  - tube rack
+  - microtube rack
+  - conical tube rack
+  - inoculating loop
+  - disposable mortar
+  - scalpel blade
+  - surgical blade
+  - syringe
+  - luer lock syringe
+  - insulin syringe
+  - needle hub
+  - needle
+  - blunt needle
+  - cryogenic marker
+  - cryolabel
+  - aliquot label
+  - freezer label
+  - ph paper
+
+  # Buffers (Premixed or Powders for Buffers)
+  - phosphate buffered saline
+  - pbs
+  - pbs tablet
+  - tris buffer
+  - tbs buffer
+  - tae buffer
+  - tbe buffer
+  - ripa buffer
+  - tricine buffer
+  - hepes buffer
+  - mops buffer
+  - pipes buffer
+  - glycine buffer
+  - lysis buffer
+  - elution buffer
+  - running buffer
+  - loading dye
+  - sample buffer
+  - transfer buffer
+
+  # Reagents & Chemicals (Consumable Grade/Kits)
+  - datp
+  - dctp
+  - dgtp
+  - dttp
+  - utp
+  - dntp
+  - agarose powder
+  - agarose
+  - agarose gel
+  - agar plate # Pre-poured consumable
+  - agarose le
+  - agarose me
+  - agar
+  - broth # (e.g. lb broth powder)
+  - albumin # (e.g. bsa powder/solution)
+  - antibody # General, specific ones below are better
+  - reagent # Very general
+  - trizol reagent
+  - lb broth
+  - soc medium
+  - dna ladder
+  - rna ladder
+  - 1 kb ladder
+  - 100 bp ladder
+  - dntp mix
+  - glycine # (as a chemical)
+  - dtt
+  - β mercaptoethanol
+  - beta mercaptoethanol
+  - edta
+  - egta
+  - dmso # (solvent)
+  - ethanol # (lab grade, for molecular biology)
+  - isopropanol # (lab grade)
+  - methanol # (lab grade)
+  - acetone # (lab grade)
+  - acetonitrile optima # (hplc grade solvent)
+  - formic acid # (hplc grade)
+  - trifluoroacetic acid # (tfa)
+  - hydrochloric acid # (solutions)
+  - sodium hydroxide # (solutions/pellets)
+  - trypsin edta # (cell culture)
+  - trypsin replacement
+  - accutase
+  - collagenase # (if purchased as reagent)
+  - papain # (if purchased as reagent)
+  - hyqtase
+  - trypan blue
+  - viability stain
+  - taq
+  - taq polymerase
+  - hotstart taq
+  - hot start taq
+  - gotaq
+  - yeast extract # More specific than just 'yeast'
+  - peptone
+  - tryptone
+  - hot start # As part of name
+  - hotstart # As part of name
+  - high fidelity polymerase
+  - phusion polymerase
+  - pcr master mix
+  - qpcr master mix
+  - rt qpcr kit
+  - dna # As a purified reagent, e.g. salmon sperm dna
+  - rna # As a purified reagent, e.g. total rna from yeast
+  - sirna
+  - shrna
+  - rnai
+  - cloning
+  - enzyme
+  - mrna # (e.g. poly(A) mrna)
+  - cdna synthesis kit
+  - proteinase k
+  - reverse transcriptase
+  - superscript iv # Brand name example
+  - ligation kit
+  - quick ligase
+  - dna ligase
+  - rnase inhibitor
+  - dnase i # (rnase-free often specified)
+  - restriction enzyme # Examples below
+  - ecori
+  - bamhi
+  - hindiii
+  - fastdigest enzyme
+  - competent cells
+  - chemically competent cell
+  - electrocompetent cell
+  - miniprep kit
+  - maxiprep kit
+  - midiprep kit
+  - gigaprep kit
+  - spin column # Often part of kits
+  - gel extraction kit
+  - pcr cleanup kit
+  - site directed mutagenesis kit
+  - in fusion cloning kit
+  - gibson assembly mix
+  - golden gate mix
+  - bca assay kit
+  - bradford reagent
+  - bicinchoninic reagent # (BCA component)
+  - coomassie brilliant blue # (dye or solution)
+  - instant blue stain
+  - ponceau stain
+  - silver stain kit
+  - blocking buffer
+  - skim milk powder # (for westerns)
+  - casein blocker
+  - western blot kit
+  - chemiluminescent substrate
+  - ecl substrate # Common name
+  - femto substrate
+  - luciferase
+  - luciferin
+  - protein ladder
+  - prestained ladder
+  - dual color marker
+  - his tag resin
+  - ni-nta resin
+  - gst resin
+  - sepharose bead
+  - sephadex resin
+  - streptavidin bead
+  - streptavidin agarose
+  - nickel agarose
+  - protein g bead
+  - protein a bead
+  - magnetic bead
+  - dynabead protein g
+  - dynabead streptavidin
+  - ethidium bromide
+  - gelred
+  - gelsafe stain
+  - sybr green
+  - sybr safe
+  - dapi
+  - hoechst 33342
+  - propidium iodide
+  - acridine orange
+  - crystal violet # (stain)
+  - neutral red # (stain)
+  - nile red # (stain)
+  - alcian blue # (stain)
+  - fast green # (stain)
+  - eosin y # (stain)
+  - primary antibody
+  - secondary antibody
+  - hrp antibody
+  - fluorescent antibody
+  - fitc antibody
+  - pe antibody # (phycoerythrin)
+  - apc antibody
+  - cy3 antibody
+  - cy5 antibody
+  - cy7 antibody
+  - alexafluor 488 # and other Alexa Fluor numbers
+  - alexafluor 555
+  - alexafluor 594
+  - alexafluor 647
+  - bv421 antibody # and other BV dyes
+  - bv510 antibody
+  - bv605 antibody
+  - bv650 antibody
+  - bv711 antibody
+  - bv786 antibody
+
+  # Transfection Reagents
+  - lipofectamine
+  - fugene
+  - transfection reagent
+
+  # Cell Culture Media (Specific Names)
+  - dmem
+  - rpmi1640 # Often written together or rpmi-1640
+  - rpmi 1640
+  - mem # Minimum Essential Medium
+  - ham f12
+  - ham's f-12
+  - emem # Eagle's Minimum Essential Medium
+  - mcoy 5a
+  - mccoy's 5a
+  - m199
+  - medium 199
+  - l15
+  - leibovitz's l-15
+  - dulbecco's modified eagle medium
+  - eagle's minimum essential medium
+  - minimum essential medium
+  - opti-mem
+  - opti-pro
+  - advanced dmem
+  - grace insect medium
+  - schneider insect medium
+
+  # Cell Culture Supplements & Antibiotics
+  - l-glutamine
+  - glutamax
+  - glutamax supplement
+  - pen strep
+  - penicillin streptomycin
+  - antibiotic antimycotic
+  - ampicillin
+  - kanamycin
+  - chloramphenicol
+  - tetracycline
+  - gentamicin
+  - gentamicin solution
+  - puromycin
+  - blasticidin
+  - zeocin
+  - hygromycin
+  - g418
+  - fetal bovine serum
+  - fbs
+  - dialyzed fbs
+  - horse serum
+  - newborn calf serum
+  - calf serum
+  - charcoal stripped serum
+
+  # Safety & Apparel (Consumable/Disposable)
+  - nitrile glove
+  - latex glove
+  - vinyl glove
+  - lab coat # (disposable ones)
+  - disposable lab coat
+  - sleeve cover
+  - face shield # (disposable ones)
+  - safety goggle # (some basic ones are almost consumable)
+  - bouffant cap
+  - hairnet
+  - shoe cover
+  - mask # (surgical, n95)
+  - surgical mask
+  - n95 respirator
+
+  # Measurement & Diagnostics (Consumable)
+  # - hemocytometer # Usually reusable, but disposable slides exist
+  - disposable hemocytometer slide
+  # - counting chamber # Often reusable
+  - disposable counting slide
+  - biological indicator
+  - ph paper
+  # - ph probe # Usually equipment
+  # - conductivity standard # Often solutions
+  # - turbidity standard # Often solutions
+
+  # Tissue Grinding (Consumable)
+  - tissue grinder # (disposable plastic ones)
+  - dounce homogenizer (disposable plastic pestles)

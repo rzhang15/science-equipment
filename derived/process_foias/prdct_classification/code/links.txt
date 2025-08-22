@@ -1,0 +1,4 @@
+./samp/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/process_foias/clean_foia_text/output 
+./combined/ | /n/netscratch/pakes_lab/Lab/sci_eq/
+./catalogs/ | /n/netscratch/pakes_lab/Lab/sci_eq/product_catalogs
+
