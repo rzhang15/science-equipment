@@ -1,0 +1,2 @@
+./samp/ | /n/netscratch/pakes_lab/Lab/sci_eq/govspend/
+./keywords/ | /n/netscratch/pakes_lab/Lab/sci_eq/

@@ -1,0 +1,3 @@
+./postsamp/ | /n/netscratch/pakes_lab/Lab/sci_eq/govspend pulls/
+./rawsamp/ | /n/netscratch/pakes_lab/Lab/sci_eq/govspend/
+./presamp/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/govspend/clean_pre2015/output/
