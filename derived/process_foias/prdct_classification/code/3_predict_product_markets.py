@@ -1,136 +1,139 @@
-# 3_predict.py (Reworked with classification reasoning)
+# 3_predict.py (Final version with file looping and model comparison)
 """
-Applies the full multi-stage classification pipeline to new, pre-cleaned data,
-incorporating the keyword-first logic and outputting a "reason" for each
-classification to allow for workflow and performance verification.
+Loops through all input files, uses the TF-IDF model for Lab/Not-Lab classification,
+then runs multiple embedding models in parallel to assign product markets and saves
+a separate, detailed comparison file for each input.
+
+Can be run in two ways:
+1. To process all files: python 3_predict.py
+2. To process a single university's file: python 3_predict.py <university_abbreviation>
+   (e.g., python 3_predict.py utdallas) - This will match files like 'utdallas_2011_2024_standardized_clean.csv'.
 """
+from tqdm import tqdm
 import pandas as pd
 import glob
 import os
 import joblib
-import yaml
-import re
-
+import sys # Import sys to access command-line arguments
 import config
-from categorize_items import ItemCategorizer
-
-def load_keywords_and_compile_regex(filepath: str):
-    """Loads keywords from a YAML file and returns a compiled regex pattern."""
-    try:
-        with open(filepath, 'r') as f:
-            data = yaml.safe_load(f)
-            keywords = data.get('keywords', [])
-            if not keywords:
-                print(f"⚠️ No keywords found in {filepath}")
-                return None
-            # Create a regex pattern: \b(word1|word2|...)\b
-            pattern = r'\b(' + '|'.join(re.escape(kw) for kw in keywords) + r')\b'
-            return re.compile(pattern, re.IGNORECASE)
-    except FileNotFoundError:
-        print(f"❌ Keyword file not found: {filepath}")
-        return None
+from categorize_items import TfidfItemCategorizer, EmbeddingItemCategorizer, Word2VecItemCategorizer
 
 def main():
-    print("--- Starting Step 3: Classifying New Data ---")
+    print("--- Starting Step 3: Prediction and Model Comparison ---")
 
-    print("ℹ️ Loading all models and artifacts...")
+    # 1. Load the TF-IDF Binary Classifier (The "Gatekeeper")
+    print("ℹ️ Loading TF-IDF Lab/Not-Lab model...")
     try:
-        # Load the binary classifier
         lab_model = joblib.load(config.LAB_MODEL_PATH)
+    except FileNotFoundError:
+        print("❌ Lab/Not-Lab model not found. Run relevant scripts first.")
+        return
 
-        # Initialize the granular categorizer
-        categorizer = ItemCategorizer(
+    # 2. Initialize all Granular Categorizers
+    print("ℹ️ Initializing all product market categorizers...")
+    try:
+        tfidf_categorizer = TfidfItemCategorizer(
             category_data_path=config.CATEGORY_MODEL_DATA_PATH,
             vectorizer_path=config.CATEGORY_VECTORIZER_PATH
         )
-
-        # Load keyword patterns for the pre-classification step
-        lab_keyword_pattern = load_keywords_and_compile_regex(config.SEED_KEYWORD_YAML)
-        non_lab_keyword_pattern = load_keywords_and_compile_regex(config.ANTI_SEED_KEYWORD_YAML)
-
-    except FileNotFoundError:
-        print("❌ Model/artifact files not found. Please run steps 1 and 2 first.")
+        #word2vec_categorizer = Word2VecItemCategorizer(embedding_name="word2vec", model_path="../output/model_word2vec.model")
+        bert_categorizer = EmbeddingItemCategorizer(embedding_name="bert", model_name="all-MiniLM-L6-v2")
+        #scibert_categorizer = EmbeddingItemCategorizer(embedding_name="scibert", model_name="allenai/scibert_scivocab_uncased")
+        #gte_categorizer = EmbeddingItemCategorizer(embedding_name="gte", model_name="thenlper/gte-large")
+    except Exception as e:
+        print(f"❌ Error initializing categorizers: {e}")
         return
 
-    foia_files = glob.glob(os.path.join(config.FOIA_INPUT_DIR, "*_standardized_clean.csv"))
-    if not foia_files:
-        print(f"❌ No standardized clean CSV files found in {config.FOIA_INPUT_DIR}")
+    # --- 3. Find input files to process based on command-line arguments ---
+    input_files = []
+    # Check if a command-line argument (e.g., 'utdallas') was provided
+    if len(sys.argv) > 1:
+        uni_abbrev = sys.argv[1]
+        print(f"ℹ️ Specific university requested: {uni_abbrev}")
+        # Construct a search pattern to find the file, accommodating for years in the name
+        search_pattern = os.path.join(config.FOIA_INPUT_DIR, f"{uni_abbrev}*_standardized_clean.csv")
+        found_files = glob.glob(search_pattern)
+
+        # Check if any matching file was found
+        if found_files:
+            if len(found_files) > 1:
+                print(f"⚠️  Warning: Found multiple files for '{uni_abbrev}'. Using the first one found: {os.path.basename(found_files[0])}")
+            input_files = [found_files[0]]
+        else:
+            print(f"❌ No file found for '{uni_abbrev}' with pattern '{os.path.basename(search_pattern)}'")
+            return # Exit if no matching file is found
+    else:
+        # If no argument is given, find all relevant files as before
+        print("ℹ️ No specific university requested, searching for all files...")
+        input_files = glob.glob(os.path.join(config.FOIA_INPUT_DIR, "*_standardized_clean.csv"))
+
+    if not input_files:
+        print(f"❌ No standardized clean CSV files found to process in {config.FOIA_INPUT_DIR}")
         return
 
-    print(f"ℹ️ Found {len(foia_files)} files to process.")
+    print(f"ℹ️ Found {len(input_files)} file(s) to process.")
 
-    # --- Process each input file ---
-    for file_path in foia_files:
+    # --- Loop through each file, process it, and save a unique output ---
+    for file_path in input_files:
+        print(f"\n--- Processing file: {os.path.basename(file_path)} ---")
         try:
-            print(f"\n--- Processing file: {os.path.basename(file_path)} ---")
             df_new = pd.read_csv(file_path, low_memory=False)
-
             if df_new.empty or config.CLEAN_DESC_COL not in df_new.columns:
                 print("  - Skipping empty or invalid file.")
                 continue
 
             descriptions = df_new[config.CLEAN_DESC_COL].astype(str).fillna("")
 
-            # Create lists to hold the results AND the reasons for verification
-            results = []
-            reasons = []
+            # === BATCH PROCESSING START ===
+            print("  - Step 1: Predicting Lab/Not-Lab for all rows...")
+            # Predict all descriptions at once
+            lab_probabilities = lab_model.predict_proba(descriptions)[:, 1]
 
-            # --- Apply the full, multi-stage logic to each description ---
-            for desc in descriptions:
-                if not desc.strip():
-                    results.append("No Description")
-                    reasons.append("No Description Provided")
-                    continue
+            # Create a boolean "mask" to identify rows that are likely "Lab" items
+            is_lab_mask = lab_probabilities >= config.PREDICTION_THRESHOLD
 
-                # 1. Keyword check first
-                if non_lab_keyword_pattern and non_lab_keyword_pattern.search(desc):
-                    results.append("Non-Lab")
-                    reasons.append("Non-Lab Keyword Match")
-                    continue
+            # Get just the subset of descriptions that need detailed categorization
+            lab_descriptions = descriptions[is_lab_mask]
+            print(f"  - Found {len(lab_descriptions)} potential lab items to categorize.")
 
-                if lab_keyword_pattern and lab_keyword_pattern.search(desc):
-                    category = categorizer.get_item_category(
-                        desc,
-                        sim_weight=config.CATEGORY_SIMILARITY_WEIGHT,
-                        overlap_weight=config.CATEGORY_OVERLAP_WEIGHT,
-                        min_threshold=config.CATEGORY_MIN_SCORE_THRESHOLD
-                    )
-                    results.append(category)
-                    reasons.append("Categorized by Lab Keyword")
-                    continue
+            # Initialize all new columns with the default "Non-Lab" value
+            df_new['market_prediction_tfidf'] = "Non-Lab"
+            #df_new['market_prediction_word2vec'] = "Non-Lab"
+            df_new['market_prediction_bert'] = "Non-Lab"
+            #df_new['market_prediction_scibert'] = "Non-Lab"
+            #df_new['market_prediction_gte'] = "Non-Lab"
 
-                # 2. If no keywords, use the binary model as a fallback
-                lab_probability = lab_model.predict_proba([desc])[0, 1]
+            # If there are any lab items, run the detailed models ONLY on them
+            if not lab_descriptions.empty:
+                print("  - Step 2: Categorizing lab items with all models...")
 
-                # 3. Route based on model output
-                if lab_probability >= config.PREDICTION_THRESHOLD:
-                    category = categorizer.get_item_category(
-                        desc,
-                        sim_weight=config.CATEGORY_SIMILARITY_WEIGHT,
-                        overlap_weight=config.CATEGORY_OVERLAP_WEIGHT,
-                        min_threshold=config.CATEGORY_MIN_SCORE_THRESHOLD
-                    )
-                    results.append(category)
-                    reasons.append(f"Categorized by Model (Prob: {lab_probability:.2f})")
-                else:
-                    results.append("Non-Lab")
-                    reasons.append(f"Non-Lab by Model (Prob: {lab_probability:.2f})")
+                # The tqdm wrapper adds a progress bar for each model!
+                tqdm.pandas(desc="TF-IDF")
+                df_new.loc[is_lab_mask, 'market_prediction_tfidf'] = lab_descriptions.progress_apply(
+                    lambda desc: tfidf_categorizer.get_item_category(desc, sim_weight=config.CATEGORY_SIMILARITY_WEIGHT, overlap_weight=config.CATEGORY_OVERLAP_WEIGHT)
+                )
+                #tqdm.pandas(desc="Word2Vec")
+                #df_new.loc[is_lab_mask, 'market_prediction_word2vec'] = lab_descriptions.progress_apply(word2vec_categorizer.get_item_category)
+                tqdm.pandas(desc="BERT")
+                df_new.loc[is_lab_mask, 'market_prediction_bert'] = lab_descriptions.progress_apply(bert_categorizer.get_item_category)
+                #tqdm.pandas(desc="SciBERT")
+                #df_new.loc[is_lab_mask, 'market_prediction_scibert'] = lab_descriptions.progress_apply(scibert_categorizer.get_item_category)
+                #tqdm.pandas(desc="GTE")
+                #df_new.loc[is_lab_mask, 'market_prediction_gte'] = lab_descriptions.progress_apply(gte_categorizer.get_item_category)
 
-            # Add both new columns to the DataFrame for analysis
-            df_new['product_market'] = results
-            df_new['classification_reason'] = reasons
+            # === BATCH PROCESSING END ===
 
-            # Save the output file
+            # Create a new filename for the classified output
             base_filename = os.path.basename(file_path)
             name_part, ext = os.path.splitext(base_filename)
             output_filename = f"{name_part}_classified{ext}"
             output_path = os.path.join(config.OUTPUT_DIR, output_filename)
 
             df_new.to_csv(output_path, index=False)
-            print(f"  ✅ Classified data saved to: {output_path}")
+            print(f"✅ Comparison file saved to: {output_path}")
 
         except Exception as e:
-            print(f"  ❌ An error occurred while processing {os.path.basename(file_path)}: {e}")
+            print(f"❌ An error occurred while processing {os.path.basename(file_path)}: {e}")
             continue
 
     print("\n--- All files processed. ---")

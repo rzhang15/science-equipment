@@ -16,13 +16,13 @@ BASE_DIR = os.path.abspath(os.path.join(CODE_DIR, ".."))
 # ==============================================================================
 FOIA_INPUT_DIR = os.path.join(BASE_DIR, "external", "samp")
 UT_DALLAS_CLEAN_CSV = os.path.join(BASE_DIR, "external", "samp", "utdallas_2011_2024_standardized_clean.csv")
+UT_DALLAS_CATEGORIES_FEATHER = "../output/utdallas_categories.feather"
 UT_DALLAS_CATEGORIES_XLSX = os.path.join(BASE_DIR, "external", "combined", "combined_nochem.xlsx")
 CA_NON_LAB_DTA = os.path.join(BASE_DIR, "external", "samp", "non_lab_clean.csv")
-NY_FISHER_CSV = os.path.join(BASE_DIR, "external", "samp", "ny_fisher_desc_clean.csv")
 SEED_KEYWORD_YAML = os.path.join(CODE_DIR, "initial_seed.yml")
 ANTI_SEED_KEYWORD_YAML = os.path.join(CODE_DIR, "anti_seed_keywords.yml")
-FISHER_LAB_XLSX = os.path.join(BASE_DIR, "external", "catalogs", "fisher_lab.xlsx")
-FISHER_NONLAB_XLSX = os.path.join(BASE_DIR, "external", "catalogs", "fisher_nonlab.xlsx")
+FISHER_LAB = os.path.join(BASE_DIR, "external", "samp", "fisher_lab_clean.csv")
+FISHER_NONLAB = os.path.join(BASE_DIR, "external", "samp", "fisher_nonlab_clean.csv")
 
 # ==============================================================================
 # 3. Output File Paths
@@ -41,14 +41,14 @@ REVIEW_OUTPUT_PATH = os.path.join(OUTPUT_DIR, "foia_review_items.csv")
 # ==============================================================================
 CLEAN_DESC_COL = "clean_desc"
 RAW_DESC_COL = "product_desc"
-UT_DALLAS_MERGE_KEYS = ["supplier_id", "sku"]
+UT_DALLAS_MERGE_KEYS = ["supplier_id", "sku", "product_desc", "supplier"]
 UT_CAT_COL = "category"
 CA_DESC_COL = "clean_desc"
 FISHER_DESC_COL = "clean_desc"
 
-PREDICTION_THRESHOLD = 0.6
+PREDICTION_THRESHOLD = 0.8
 VECTORIZER_MIN_DF = 7 # Ignores tokens that appear in less than this many documents
-
+DENSE_CATEGORY_THRESHOLD = 10
 # Categorization Model Parameters
 CATEGORY_SIMILARITY_WEIGHT = 0.7
 CATEGORY_OVERLAP_WEIGHT = 0.3

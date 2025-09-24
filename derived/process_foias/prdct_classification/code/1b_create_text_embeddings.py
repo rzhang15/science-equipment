@@ -64,7 +64,6 @@ def generate_transformer_vectors(df, model_name, output_filename):
     joblib.dump(vectors, os.path.join(config.OUTPUT_DIR, output_filename))
     print(f"✅ {model_name} vectors saved.")
 
-
 def main():
     print("--- Starting Step 1b: Embedding Generation ---")
     try:
@@ -74,18 +73,17 @@ def main():
         return
 
     # Generate and save each type of embedding
-    #generate_tfidf_vectors(df)
-    #generate_word2vec_vectors(df)
+    generate_tfidf_vectors(df)
+    # generate_word2vec_vectors(df) # Comment out or delete the Word2Vec line
 
     # Using a popular, high-performance BERT model
-    #generate_transformer_vectors(df, model_name='all-MiniLM-L6-v2', output_filename="embeddings_bert.joblib")
+    generate_transformer_vectors(df, model_name='all-MiniLM-L6-v2', output_filename="embeddings_bert.joblib") # Uncomment this line for BERT
 
-    # Using the General Text Embeddings (GTE) model
-    generate_transformer_vectors(df, model_name='allenai/scibert_scivocab_uncased', output_filename="embeddings_scibert.joblib")
-    generate_transformer_vectors(df, model_name='thenlper/gte-large', output_filename="embeddings_gte.joblib")
+    # You can safely delete these other commented-out lines
+    #generate_transformer_vectors(df, model_name='allenai/scibert_scivocab_uncased', output_filename="embeddings_scibert.joblib")
+    #generate_transformer_vectors(df, model_name='thenlper/gte-large', output_filename="embeddings_gte.joblib")
 
     print("\n--- All embeddings generated successfully. ---")
-
-
+    
 if __name__ == "__main__":
     main()
