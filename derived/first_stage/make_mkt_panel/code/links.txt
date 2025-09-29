@@ -1,2 +1,2 @@
-./samp/ | /Users/conniexu/Documents/Harvard/research projects/dissertation/science-equipment/derived/fuzzy_supplier/output
-
+./samp/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/process_foias/prdct_classification/output/
+./sup/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/process_foias/fuzzy_match_suppliers/output/
