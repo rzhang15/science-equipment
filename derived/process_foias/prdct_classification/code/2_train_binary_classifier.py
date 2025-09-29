@@ -46,7 +46,11 @@ def main(embedding_name: str):
     print("  - Training the Logistic Regression model...")
     clf.fit(X_train, y_train)
     print("  - Model training complete.")
-
+    print("  - Saving the trained model...")
+    # This path should match the LAB_MODEL_PATH in your config.py
+    model_path = os.path.join(config.OUTPUT_DIR, f"lab_binary_classifier_{embedding_name}.joblib")
+    joblib.dump(clf, model_path)
+    print(f"✅ Model saved to: {model_path}")
     # 4. Evaluate the model and print the report
     y_pred_proba = clf.predict_proba(X_test)[:, 1]
     custom_threshold = 0.8 

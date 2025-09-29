@@ -14,9 +14,9 @@ BASE_DIR = os.path.abspath(os.path.join(CODE_DIR, ".."))
 # ==============================================================================
 # 2. Input File Paths
 # ==============================================================================
+# Raw Data Inputs
 FOIA_INPUT_DIR = os.path.join(BASE_DIR, "external", "samp")
 UT_DALLAS_CLEAN_CSV = os.path.join(BASE_DIR, "external", "samp", "utdallas_2011_2024_standardized_clean.csv")
-UT_DALLAS_CATEGORIES_FEATHER = "../output/utdallas_categories.feather"
 UT_DALLAS_CATEGORIES_XLSX = os.path.join(BASE_DIR, "external", "combined", "combined_nochem.xlsx")
 CA_NON_LAB_DTA = os.path.join(BASE_DIR, "external", "samp", "non_lab_clean.csv")
 SEED_KEYWORD_YAML = os.path.join(CODE_DIR, "initial_seed.yml")
@@ -25,16 +25,24 @@ FISHER_LAB = os.path.join(BASE_DIR, "external", "samp", "fisher_lab_clean.csv")
 FISHER_NONLAB = os.path.join(BASE_DIR, "external", "samp", "fisher_nonlab_clean.csv")
 
 # ==============================================================================
-# 3. Output File Paths
+# 3. Intermediate & Output File Paths
 # ==============================================================================
+# NEW: Temp directory for cleaned, intermediate files
+TEMP_DIR = os.path.join(BASE_DIR, "temp")
+os.makedirs(TEMP_DIR, exist_ok=True)
+
+# Path to the clean, merged file created by 0_clean_category_file.py
+UT_DALLAS_MERGED_CLEAN_PATH = os.path.join(TEMP_DIR, "utdallas_merged_clean.parquet")
+
+# Main output directory
 OUTPUT_DIR = os.path.join(BASE_DIR, "output")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+# Final prepared data and model artifacts
 PREPARED_DATA_PATH = os.path.join(OUTPUT_DIR, "prepared_training_data.parquet")
-LAB_MODEL_PATH = os.path.join(OUTPUT_DIR, "lab_binary_classifier.joblib")
 CATEGORY_MODEL_DATA_PATH = os.path.join(OUTPUT_DIR, "category_similarity_data.joblib")
 CATEGORY_VECTORIZER_PATH = os.path.join(OUTPUT_DIR, "category_tfidf_vectorizer.joblib")
-FINAL_OUTPUT_PATH = os.path.join(OUTPUT_DIR, "foia_classified_output.csv")
-REVIEW_OUTPUT_PATH = os.path.join(OUTPUT_DIR, "foia_review_items.csv")
+
 
 # ==============================================================================
 # 4. Column Names & Model Parameters
@@ -48,39 +56,18 @@ FISHER_DESC_COL = "clean_desc"
 
 PREDICTION_THRESHOLD = 0.8
 VECTORIZER_MIN_DF = 7 # Ignores tokens that appear in less than this many documents
-DENSE_CATEGORY_THRESHOLD = 10
 # Categorization Model Parameters
 CATEGORY_SIMILARITY_WEIGHT = 0.7
 CATEGORY_OVERLAP_WEIGHT = 0.3
-CATEGORY_MIN_SCORE_THRESHOLD = 0.10
 
 # List of categories to be considered 'Non-Lab' for binary labeling
 NONLAB_CATEGORIES = [
-    "office", "service", "sequencing", "training", "instrument",
-    "shipping", "bucket", "biohazard", "sharps", "container",
-    "clamp", "bracket", "printer toner", "storage cabinet",
-    "organic synthesis reagent", "equipment",
-    "furniture", "infrastructure", "tool", "random", "unclear",
-    "bin", "subaward", "fee", "electronic", "hardware",
-    "fitting", "software", "tubing", "wire", "book",
-    "battery", "cart", "timer", "led light", "towel",
-    "irrelevant chemicals", "oring", "caps", "cleaning",
-    "vacuum pump oil", "gas", "burn", "first-aid", "first aid",
-    "3d printing", "desk", "chair", "ladder", "paint",
-    "mop", "wiper", "tissue", "trash", "liner",
-    "soap", "cleaner", "printer", "toner", "storage lid", "storage bins",
-    "storage shelves", "storage bags",
-    "cabinet", "trolley", "3d", "printing",
-    "fixture", "light", "led", "lamp", "cork",
-    "ring", "folder", "label", "gas regulators",
-    "sign", "heavy duty", "cap", "tooth",
-    "basket", "durac plus", "acs", "usb",
-    "adapter", "cable", "high purity", "metal",
-    "bench", "vacuum", "notebook", "cotton ball",
-    "shppr", "thermo scientific", "tape", "stopper",
-    "bundle of products", "labeling tape", "hepa", "clamps",
-    "clips", "shelf", "flint", "connectors",
-    "batteries", "miscellaneous"
+    "office", "instrument", "waste disposal", "clamp", "equipment", "furniture", "tool", "random", "unclear",
+    "fee", "electronic", "software", "tubing", "wire", "towel", "irrelevant chemicals", "oring", "caps",
+    "gas ", "first-aid", "first aid", "desk", "chair", "brushes", "trash", "cleaner", "cotton ball",
+    "bundle of products", "tape", "clamps", "miscellaneous", "clips", "flint", "accessories", "stands",
+    "batteries", "miscellaneous", "ear protection", "apron", "pots", "pans", "stoppers" , "closures", "rings", 
+    "mortor", "pestle", "supports", "trays", "applicators and swabs"
 ]
 
 # ==============================================================================

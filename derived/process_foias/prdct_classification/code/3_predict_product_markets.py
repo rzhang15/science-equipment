@@ -1,142 +1,121 @@
-# 3_predict.py (Final version with file looping and model comparison)
+# 3_predict.py (Corrected to run all experts on a single gatekeeper's results)
 """
-Loops through all input files, uses the TF-IDF model for Lab/Not-Lab classification,
-then runs multiple embedding models in parallel to assign product markets and saves
-a separate, detailed comparison file for each input.
-
-Can be run in two ways:
-1. To process all files: python 3_predict.py
-2. To process a single university's file: python 3_predict.py <university_abbreviation>
-   (e.g., python 3_predict.py utdallas) - This will match files like 'utdallas_2011_2024_standardized_clean.csv'.
+Uses a single, specified gatekeeper model (TF-IDF or BERT) to identify
+potential lab items, then runs all expert categorizers on those items for
+a side-by-side comparison.
 """
 from tqdm import tqdm
 import pandas as pd
 import glob
 import os
 import joblib
-import sys # Import sys to access command-line arguments
+import sys
+import argparse
+
 import config
-from categorize_items import TfidfItemCategorizer, EmbeddingItemCategorizer, Word2VecItemCategorizer
+from categorize_items import TfidfItemCategorizer, EmbeddingItemCategorizer
 
-def main():
-    print("--- Starting Step 3: Prediction and Model Comparison ---")
+def main(gatekeeper_name: str, uni_abbrev: str = None):
+    print(f"--- Starting Step 3: Prediction using '{gatekeeper_name}' gatekeeper ---")
 
-    # 1. Load the TF-IDF Binary Classifier (The "Gatekeeper")
-    print("ℹ️ Loading TF-IDF Lab/Not-Lab model...")
+    # 1. Load the selected Lab/Not-Lab gatekeeper model
+    print(f"ℹ️ Loading '{gatekeeper_name}' Lab/Not-Lab model...")
     try:
-        lab_model = joblib.load(config.LAB_MODEL_PATH)
+        model_filename = f"lab_binary_classifier_{gatekeeper_name}.joblib"
+        model_path = os.path.join(config.OUTPUT_DIR, model_filename)
+        lab_model = joblib.load(model_path)
     except FileNotFoundError:
-        print("❌ Lab/Not-Lab model not found. Run relevant scripts first.")
+        print(f"❌ Gatekeeper model not found at: {model_path}. Please run 2_train_model.py first.")
         return
 
-    # 2. Initialize all Granular Categorizers
-    print("ℹ️ Initializing all product market categorizers...")
+    # 2. Load the TF-IDF vectorizer needed for the gatekeeper
     try:
-        tfidf_categorizer = TfidfItemCategorizer(
-            category_data_path=config.CATEGORY_MODEL_DATA_PATH,
-            vectorizer_path=config.CATEGORY_VECTORIZER_PATH
-        )
-        #word2vec_categorizer = Word2VecItemCategorizer(embedding_name="word2vec", model_path="../output/model_word2vec.model")
-        bert_categorizer = EmbeddingItemCategorizer(embedding_name="bert", model_name="all-MiniLM-L6-v2")
-        #scibert_categorizer = EmbeddingItemCategorizer(embedding_name="scibert", model_name="allenai/scibert_scivocab_uncased")
-        #gte_categorizer = EmbeddingItemCategorizer(embedding_name="gte", model_name="thenlper/gte-large")
+        vectorizer_path = os.path.join(config.OUTPUT_DIR, "vectorizer_tfidf.joblib")
+        tfidf_vectorizer = joblib.load(vectorizer_path)
+    except FileNotFoundError:
+        print(f"❌ TF-IDF Vectorizer not found at: {vectorizer_path}. Please run 1b_create_text_embeddings.py.")
+        return
+        
+    # 3. Initialize all the expert categorizers you want to compare
+    print("ℹ️ Initializing expert product market categorizers...")
+    try:
+        expert_categorizers = {
+            "tfidf": TfidfItemCategorizer(config.CATEGORY_MODEL_DATA_PATH, config.CATEGORY_VECTORIZER_PATH),
+            "bert": EmbeddingItemCategorizer("bert", "all-MiniLM-L6-v2")
+        }
     except Exception as e:
-        print(f"❌ Error initializing categorizers: {e}")
+        print(f"❌ Error initializing expert categorizers: {e}")
         return
 
-    # --- 3. Find input files to process based on command-line arguments ---
-    input_files = []
-    # Check if a command-line argument (e.g., 'utdallas') was provided
-    if len(sys.argv) > 1:
-        uni_abbrev = sys.argv[1]
-        print(f"ℹ️ Specific university requested: {uni_abbrev}")
-        # Construct a search pattern to find the file, accommodating for years in the name
+    # 4. Find input files to process
+    if uni_abbrev:
         search_pattern = os.path.join(config.FOIA_INPUT_DIR, f"{uni_abbrev}*_standardized_clean.csv")
-        found_files = glob.glob(search_pattern)
-
-        # Check if any matching file was found
-        if found_files:
-            if len(found_files) > 1:
-                print(f"⚠️  Warning: Found multiple files for '{uni_abbrev}'. Using the first one found: {os.path.basename(found_files[0])}")
-            input_files = [found_files[0]]
-        else:
-            print(f"❌ No file found for '{uni_abbrev}' with pattern '{os.path.basename(search_pattern)}'")
-            return # Exit if no matching file is found
     else:
-        # If no argument is given, find all relevant files as before
-        print("ℹ️ No specific university requested, searching for all files...")
-        input_files = glob.glob(os.path.join(config.FOIA_INPUT_DIR, "*_standardized_clean.csv"))
-
+        search_pattern = os.path.join(config.FOIA_INPUT_DIR, "*_standardized_clean.csv")
+    input_files = glob.glob(search_pattern)
     if not input_files:
-        print(f"❌ No standardized clean CSV files found to process in {config.FOIA_INPUT_DIR}")
+        print(f"❌ No files found for pattern: {search_pattern}")
         return
 
     print(f"ℹ️ Found {len(input_files)} file(s) to process.")
 
-    # --- Loop through each file, process it, and save a unique output ---
+    # 5. Process each file
     for file_path in input_files:
         print(f"\n--- Processing file: {os.path.basename(file_path)} ---")
-        try:
-            df_new = pd.read_csv(file_path, low_memory=False)
-            if df_new.empty or config.CLEAN_DESC_COL not in df_new.columns:
-                print("  - Skipping empty or invalid file.")
-                continue
+        df_new = pd.read_csv(file_path, low_memory=False)
+        descriptions = df_new[config.CLEAN_DESC_COL].astype(str).fillna("")
 
-            descriptions = df_new[config.CLEAN_DESC_COL].astype(str).fillna("")
+        # Step A: Use the single gatekeeper to identify all potential lab items
+        print("  - Step 1: Identifying potential lab items with the gatekeeper...")
+        text_vectors = tfidf_vectorizer.transform(descriptions)
+        lab_probabilities = lab_model.predict_proba(text_vectors)[:, 1]
+        is_lab_mask = lab_probabilities >= config.PREDICTION_THRESHOLD
+        lab_descriptions = descriptions[is_lab_mask]
+        print(f"  - Gatekeeper found {len(lab_descriptions)} potential lab items to categorize.")
 
-            # === BATCH PROCESSING START ===
-            print("  - Step 1: Predicting Lab/Not-Lab for all rows...")
-            # Predict all descriptions at once
-            lab_probabilities = lab_model.predict_proba(descriptions)[:, 1]
+        # Step B: Run ALL expert categorizers on that single set of lab items
+        if not lab_descriptions.empty:
+            print("  - Step 2: Running all expert categorizers for comparison...")
+            for expert_name, categorizer in expert_categorizers.items():
+                col_name = f'market_prediction_{expert_name}'
+                df_new[col_name] = "Non-Lab"
+                
+                tqdm.pandas(desc=f"  - Categorizing ({expert_name})")
+                if expert_name == 'tfidf':
+                    predictions = lab_descriptions.progress_apply(
+                        lambda desc: categorizer.get_item_category(desc, sim_weight=config.CATEGORY_SIMILARITY_WEIGHT, overlap_weight=config.CATEGORY_OVERLAP_WEIGHT)
+                    )
+                else: # BERT
+                    predictions = lab_descriptions.progress_apply(categorizer.get_item_category)
+                
+                df_new.loc[is_lab_mask, col_name] = predictions
+        else: # If no lab items were found, just create the empty columns
+            for expert_name in expert_categorizers.keys():
+                df_new[f'market_prediction_{expert_name}'] = "Non-Lab"
 
-            # Create a boolean "mask" to identify rows that are likely "Lab" items
-            is_lab_mask = lab_probabilities >= config.PREDICTION_THRESHOLD
-
-            # Get just the subset of descriptions that need detailed categorization
-            lab_descriptions = descriptions[is_lab_mask]
-            print(f"  - Found {len(lab_descriptions)} potential lab items to categorize.")
-
-            # Initialize all new columns with the default "Non-Lab" value
-            df_new['market_prediction_tfidf'] = "Non-Lab"
-            #df_new['market_prediction_word2vec'] = "Non-Lab"
-            df_new['market_prediction_bert'] = "Non-Lab"
-            #df_new['market_prediction_scibert'] = "Non-Lab"
-            #df_new['market_prediction_gte'] = "Non-Lab"
-
-            # If there are any lab items, run the detailed models ONLY on them
-            if not lab_descriptions.empty:
-                print("  - Step 2: Categorizing lab items with all models...")
-
-                # The tqdm wrapper adds a progress bar for each model!
-                tqdm.pandas(desc="TF-IDF")
-                df_new.loc[is_lab_mask, 'market_prediction_tfidf'] = lab_descriptions.progress_apply(
-                    lambda desc: tfidf_categorizer.get_item_category(desc, sim_weight=config.CATEGORY_SIMILARITY_WEIGHT, overlap_weight=config.CATEGORY_OVERLAP_WEIGHT)
-                )
-                #tqdm.pandas(desc="Word2Vec")
-                #df_new.loc[is_lab_mask, 'market_prediction_word2vec'] = lab_descriptions.progress_apply(word2vec_categorizer.get_item_category)
-                tqdm.pandas(desc="BERT")
-                df_new.loc[is_lab_mask, 'market_prediction_bert'] = lab_descriptions.progress_apply(bert_categorizer.get_item_category)
-                #tqdm.pandas(desc="SciBERT")
-                #df_new.loc[is_lab_mask, 'market_prediction_scibert'] = lab_descriptions.progress_apply(scibert_categorizer.get_item_category)
-                #tqdm.pandas(desc="GTE")
-                #df_new.loc[is_lab_mask, 'market_prediction_gte'] = lab_descriptions.progress_apply(gte_categorizer.get_item_category)
-
-            # === BATCH PROCESSING END ===
-
-            # Create a new filename for the classified output
-            base_filename = os.path.basename(file_path)
-            name_part, ext = os.path.splitext(base_filename)
-            output_filename = f"{name_part}_classified{ext}"
-            output_path = os.path.join(config.OUTPUT_DIR, output_filename)
-
-            df_new.to_csv(output_path, index=False)
-            print(f"✅ Comparison file saved to: {output_path}")
-
-        except Exception as e:
-            print(f"❌ An error occurred while processing {os.path.basename(file_path)}: {e}")
-            continue
+        # Step C: Save the combined results
+        output_filename = f"{os.path.splitext(os.path.basename(file_path))[0]}_classified.csv"
+        output_path = os.path.join(config.OUTPUT_DIR, output_filename)
+        df_new.to_csv(output_path, index=False)
+        print(f"✅ Comparison file with predictions from all experts saved to: {output_path}")
 
     print("\n--- All files processed. ---")
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Run product market predictions using a specified gatekeeper model.")
+    parser.add_argument(
+        "uni_abbrev",
+        type=str,
+        nargs='?',
+        default=None,
+        help="Optional: Abbreviation of a single university to process (e.g., 'utdallas')."
+    )
+    parser.add_argument(
+        "--gatekeeper",
+        type=str,
+        required=True, # Gatekeeper choice is now mandatory
+        choices=['tfidf', 'bert'],
+        help="The gatekeeper model to use for Lab/Not-Lab classification ('tfidf' or 'bert')."
+    )
+    args = parser.parse_args()
+    main(gatekeeper_name=args.gatekeeper, uni_abbrev=args.uni_abbrev)
