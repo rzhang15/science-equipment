@@ -1,0 +1,2 @@
+./samp/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/govspend/make_panel/output 
+
