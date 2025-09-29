@@ -106,10 +106,20 @@ program append_predata
     replace agencyname = strtrim(agencyname)
     replace suppliername = strtrim(strlower(suppliername))
     drop if strpos(agencyname, "school district")
-    foreach v in "prints" "leasing" "bank" "owens" "mckesson" "office" "staples" "paper" "home depot" "officemax" "apple" "electronics" "construction" "us food" "professional hospital supply" "builders" "stryker" "shipyards" "elsevier" "leica" "nikon" "software" "red cross" "flitco" "blood center" "blood bank" "bloodwords" "ebsco" "instrument" "contract" "contracting" "pharmacy" "computer" "electric" "philips" "power" "olympus" "digi" "paving" "cooper-atkins" "diuble" "best buy" "diagnostic" "dell" "cdwg" {
+    foreach v in "prints" "leasing" "bank" "owens" "mckesson" "office" "staples" "paper" "home depot" "officemax" "apple" "electronics" "construction" "us food" "professional hospital supply" "builders" "stryker" "shipyards" "elsevier" "leica" "nikon" "software" "red cross" "flitco" "blood center" "blood bank" "bloodwords" "ebsco" "instrument" "contract" "contracting" "pharmacy" "computer" "electric" "philips" "power" "olympus" "digi" "paving" "cooper-atkins" "diuble" "best buy" "diagnostic" "dell" "cdwg" "govconnection inc" {
         drop if strpos(suppliername, "`v'") > 0 
     }
+	foreach v in "hotel" "audit" "consulting" "courier" "custom" "grant" "honorarium" "membership" "postage" "reimb" "salaried" "secur" "ship" "staff" "blanket po" "adapter" "adap" "computer" "dell" "desktop" "ink cartridge" "laptop" "monitor" "optiplex" "printer" "bucket" "cabinet" "can" "cart" "handle" "haz" "laundry Barrier" "laundry FR" "step stool" "tackymat" "label" "fy20" "lodg" "print" "orientation" "isbn" "report" {
+        drop if strpos(product_desc, "`v'") > 0 
+    }
+    drop if strpos(agencyname, "jr college")  > 0
     save ../output/govspend_panel, replace
+    keep if year >= 2010
+    bys agencyname year: gen org_yr_cntr = _n == 1
+    bys agencyname: egen num_yrs = total(org_yr_cntr)
+    keep if num_yrs == 10
+    save ../output/balanced_govspend_2010_2019, replace
     export delimited ../output/govspend_panel, replace
 end
+
 main
