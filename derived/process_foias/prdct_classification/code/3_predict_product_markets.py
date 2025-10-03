@@ -1,121 +1,93 @@
-# 3_predict.py (Corrected to run all experts on a single gatekeeper's results)
-"""
-Uses a single, specified gatekeeper model (TF-IDF or BERT) to identify
-potential lab items, then runs all expert categorizers on those items for
-a side-by-side comparison.
-"""
+# 3_predict_product_markets.py (REVISED to use ground truth file for validation run)
 from tqdm import tqdm
 import pandas as pd
 import glob
 import os
 import joblib
-import sys
 import argparse
 
 import config
+from classifier import HybridClassifier # Needed for joblib
 from categorize_items import TfidfItemCategorizer, EmbeddingItemCategorizer
 
-def main(gatekeeper_name: str, uni_abbrev: str = None):
-    print(f"--- Starting Step 3: Prediction using '{gatekeeper_name}' gatekeeper ---")
+def main(model_type: str, uni_abbrev: str = None):
+    print(f"--- Starting Prediction using '{model_type}' HybridClassifier ---")
 
-    # 1. Load the selected Lab/Not-Lab gatekeeper model
-    print(f"ℹ️ Loading '{gatekeeper_name}' Lab/Not-Lab model...")
+    # 1. Load the single, complete HybridClassifier object
+    print("ℹ️ Loading the saved HybridClassifier...")
     try:
-        model_filename = f"lab_binary_classifier_{gatekeeper_name}.joblib"
-        model_path = os.path.join(config.OUTPUT_DIR, model_filename)
-        lab_model = joblib.load(model_path)
+        hybrid_model_path = os.path.join(config.OUTPUT_DIR, f"hybrid_classifier_{model_type}.joblib")
+        hybrid_model = joblib.load(hybrid_model_path)
     except FileNotFoundError:
-        print(f"❌ Gatekeeper model not found at: {model_path}. Please run 2_train_model.py first.")
-        return
-
-    # 2. Load the TF-IDF vectorizer needed for the gatekeeper
-    try:
-        vectorizer_path = os.path.join(config.OUTPUT_DIR, "vectorizer_tfidf.joblib")
-        tfidf_vectorizer = joblib.load(vectorizer_path)
-    except FileNotFoundError:
-        print(f"❌ TF-IDF Vectorizer not found at: {vectorizer_path}. Please run 1b_create_text_embeddings.py.")
+        print(f"❌ HybridClassifier not found at: {hybrid_model_path}.")
         return
         
-    # 3. Initialize all the expert categorizers you want to compare
+    # 2. Initialize the expert categorizers
     print("ℹ️ Initializing expert product market categorizers...")
-    try:
-        expert_categorizers = {
-            "tfidf": TfidfItemCategorizer(config.CATEGORY_MODEL_DATA_PATH, config.CATEGORY_VECTORIZER_PATH),
-            "bert": EmbeddingItemCategorizer("bert", "all-MiniLM-L6-v2")
-        }
-    except Exception as e:
-        print(f"❌ Error initializing expert categorizers: {e}")
-        return
+    expert_categorizers = {
+        "tfidf": TfidfItemCategorizer(config.CATEGORY_MODEL_DATA_PATH, config.CATEGORY_VECTORIZER_PATH),
+        "bert": EmbeddingItemCategorizer("bert", "all-MiniLM-L6-v2")
+    }
 
-    # 4. Find input files to process
-    if uni_abbrev:
-        search_pattern = os.path.join(config.FOIA_INPUT_DIR, f"{uni_abbrev}*_standardized_clean.csv")
+    # --- NEW: Special logic to select the input file ---
+    df_to_process = None
+    if uni_abbrev == 'utdallas':
+        print(f"ℹ️ 'utdallas' specified, using ground truth file for validation run: {config.UT_DALLAS_MERGED_CLEAN_PATH}")
+        try:
+            df_to_process = pd.read_parquet(config.UT_DALLAS_MERGED_CLEAN_PATH)
+        except FileNotFoundError:
+            print(f"❌ UT Dallas merged file not found. Please run script #0.")
+            return
     else:
-        search_pattern = os.path.join(config.FOIA_INPUT_DIR, "*_standardized_clean.csv")
-    input_files = glob.glob(search_pattern)
-    if not input_files:
-        print(f"❌ No files found for pattern: {search_pattern}")
-        return
+        # Original logic for processing other university files
+        search_pattern = os.path.join(config.FOIA_INPUT_DIR, f"{uni_abbrev or '*'}*_standardized_clean.csv")
+        input_files = glob.glob(search_pattern)
+        if not input_files:
+            print(f"❌ No files found for pattern: {search_pattern}")
+            return
+        print(f"ℹ️ Found {len(input_files)} file(s) to process. Starting with {os.path.basename(input_files[0])}")
+        df_to_process = pd.read_csv(input_files[0], low_memory=False)
 
-    print(f"ℹ️ Found {len(input_files)} file(s) to process.")
+    # Perform prediction on the loaded dataframe
+    descriptions = df_to_process[config.CLEAN_DESC_COL].astype(str).fillna("")
 
-    # 5. Process each file
-    for file_path in input_files:
-        print(f"\n--- Processing file: {os.path.basename(file_path)} ---")
-        df_new = pd.read_csv(file_path, low_memory=False)
-        descriptions = df_new[config.CLEAN_DESC_COL].astype(str).fillna("")
+    # Step 1: Use the HybridClassifier for Lab/Non-Lab decisions
+    print("  - Step 1: Identifying lab items with the HybridClassifier...")
+    is_lab_prediction = hybrid_model.predict(descriptions).astype(bool)
+    
+    # Step 2: Run Expert Models on the "Lab" items
+    print("  - Step 2: Running expert models on final lab set...")
+    final_lab_descriptions = descriptions[is_lab_prediction]
+    print(f"    - A total of {len(final_lab_descriptions)} items will be categorized by experts.")
 
-        # Step A: Use the single gatekeeper to identify all potential lab items
-        print("  - Step 1: Identifying potential lab items with the gatekeeper...")
-        text_vectors = tfidf_vectorizer.transform(descriptions)
-        lab_probabilities = lab_model.predict_proba(text_vectors)[:, 1]
-        is_lab_mask = lab_probabilities >= config.PREDICTION_THRESHOLD
-        lab_descriptions = descriptions[is_lab_mask]
-        print(f"  - Gatekeeper found {len(lab_descriptions)} potential lab items to categorize.")
+    if not final_lab_descriptions.empty:
+        for expert_name, categorizer in expert_categorizers.items():
+            col_name = f'market_prediction_{expert_name}'
+            df_to_process[col_name] = "Non-Lab"
+            
+            tqdm.pandas(desc=f"    - Categorizing ({expert_name})")
+            predictions = final_lab_descriptions.progress_apply(categorizer.get_item_category)
+            predictions_filled = predictions.fillna("Unclassified")
+            
+            df_to_process.loc[is_lab_prediction, col_name] = predictions_filled
+    else:
+        for expert_name in expert_categorizers.keys():
+            df_to_process[f'market_prediction_{expert_name}'] = "Non-Lab"
 
-        # Step B: Run ALL expert categorizers on that single set of lab items
-        if not lab_descriptions.empty:
-            print("  - Step 2: Running all expert categorizers for comparison...")
-            for expert_name, categorizer in expert_categorizers.items():
-                col_name = f'market_prediction_{expert_name}'
-                df_new[col_name] = "Non-Lab"
-                
-                tqdm.pandas(desc=f"  - Categorizing ({expert_name})")
-                if expert_name == 'tfidf':
-                    predictions = lab_descriptions.progress_apply(
-                        lambda desc: categorizer.get_item_category(desc, sim_weight=config.CATEGORY_SIMILARITY_WEIGHT, overlap_weight=config.CATEGORY_OVERLAP_WEIGHT)
-                    )
-                else: # BERT
-                    predictions = lab_descriptions.progress_apply(categorizer.get_item_category)
-                
-                df_new.loc[is_lab_mask, col_name] = predictions
-        else: # If no lab items were found, just create the empty columns
-            for expert_name in expert_categorizers.keys():
-                df_new[f'market_prediction_{expert_name}'] = "Non-Lab"
-
-        # Step C: Save the combined results
-        output_filename = f"{os.path.splitext(os.path.basename(file_path))[0]}_classified.csv"
+    # Save the results
+    if uni_abbrev == 'utdallas':
+        output_path = config.UTDALLAS_VALIDATION_PREDICTIONS_CSV
+    else:
+        # Fallback for single file processing, can be improved for loops
+        output_filename = f"{os.path.splitext(os.path.basename(input_files[0]))[0]}_classified.csv"
         output_path = os.path.join(config.OUTPUT_DIR, output_filename)
-        df_new.to_csv(output_path, index=False)
-        print(f"✅ Comparison file with predictions from all experts saved to: {output_path}")
-
-    print("\n--- All files processed. ---")
+        
+    df_to_process.to_csv(output_path, index=False)
+    print(f"✅ Final results saved to: {output_path}")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Run product market predictions using a specified gatekeeper model.")
-    parser.add_argument(
-        "uni_abbrev",
-        type=str,
-        nargs='?',
-        default=None,
-        help="Optional: Abbreviation of a single university to process (e.g., 'utdallas')."
-    )
-    parser.add_argument(
-        "--gatekeeper",
-        type=str,
-        required=True, # Gatekeeper choice is now mandatory
-        choices=['tfidf', 'bert'],
-        help="The gatekeeper model to use for Lab/Not-Lab classification ('tfidf' or 'bert')."
-    )
+    parser = argparse.ArgumentParser(description="Run predictions using a saved HybridClassifier.")
+    parser.add_argument("uni_abbrev", type=str, nargs='?', default=None, help="Optional: Abbreviation of a single university to process (e.g., 'utdallas').")
+    parser.add_argument("--model", type=str, required=True, choices=['tfidf', 'bert'], help="The type of saved HybridClassifier to use ('tfidf' or 'bert').")
     args = parser.parse_args()
-    main(gatekeeper_name=args.gatekeeper, uni_abbrev=args.uni_abbrev)
+    main(model_type=args.model, uni_abbrev=args.uni_abbrev)

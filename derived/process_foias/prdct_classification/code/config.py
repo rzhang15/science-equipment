@@ -42,6 +42,7 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 PREPARED_DATA_PATH = os.path.join(OUTPUT_DIR, "prepared_training_data.parquet")
 CATEGORY_MODEL_DATA_PATH = os.path.join(OUTPUT_DIR, "category_similarity_data.joblib")
 CATEGORY_VECTORIZER_PATH = os.path.join(OUTPUT_DIR, "category_tfidf_vectorizer.joblib")
+UTDALLAS_VALIDATION_PREDICTIONS_CSV = os.path.join(OUTPUT_DIR, "utdallas_predictions_for_validation.csv")
 
 
 # ==============================================================================
@@ -54,7 +55,7 @@ UT_CAT_COL = "category"
 CA_DESC_COL = "clean_desc"
 FISHER_DESC_COL = "clean_desc"
 
-PREDICTION_THRESHOLD = 0.8
+PREDICTION_THRESHOLD = 0.7
 VECTORIZER_MIN_DF = 7 # Ignores tokens that appear in less than this many documents
 # Categorization Model Parameters
 CATEGORY_SIMILARITY_WEIGHT = 0.7
@@ -67,7 +68,7 @@ NONLAB_CATEGORIES = [
     "gas ", "first-aid", "first aid", "desk", "chair", "brushes", "trash", "cleaner", "cotton ball",
     "bundle of products", "tape", "clamps", "miscellaneous", "clips", "flint", "accessories", "stands",
     "batteries", "miscellaneous", "ear protection", "apron", "pots", "pans", "stoppers" , "closures", "rings", 
-    "mortor", "pestle", "supports", "trays", "applicators and swabs"
+    "mortor", "pestle", "supports", "trays", "applicators and swabs", "bundle of items"
 ]
 
 # ==============================================================================
