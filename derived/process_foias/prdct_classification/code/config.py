@@ -23,6 +23,8 @@ SEED_KEYWORD_YAML = os.path.join(CODE_DIR, "initial_seed.yml")
 ANTI_SEED_KEYWORD_YAML = os.path.join(CODE_DIR, "anti_seed_keywords.yml")
 FISHER_LAB = os.path.join(BASE_DIR, "external", "samp", "fisher_lab_clean.csv")
 FISHER_NONLAB = os.path.join(BASE_DIR, "external", "samp", "fisher_nonlab_clean.csv")
+MARKET_RULES_YAML = os.path.join(CODE_DIR, "market_rules.yml") # <-- NEW
+GOVSPEND_PANEL_CSV = os.path.join(BASE_DIR, "external", "govspend", "govspend_panel.csv")
 
 # ==============================================================================
 # 3. Intermediate & Output File Paths
@@ -40,7 +42,7 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # Final prepared data and model artifacts
 PREPARED_DATA_PATH = os.path.join(OUTPUT_DIR, "prepared_training_data.parquet")
-CATEGORY_MODEL_DATA_PATH = os.path.join(OUTPUT_DIR, "category_similarity_data.joblib")
+CATEGORY_MODEL_DATA_PATH = os.path.join(OUTPUT_DIR, "category_vectors_tfidf.joblib")
 CATEGORY_VECTORIZER_PATH = os.path.join(OUTPUT_DIR, "category_tfidf_vectorizer.joblib")
 UTDALLAS_VALIDATION_PREDICTIONS_CSV = os.path.join(OUTPUT_DIR, "utdallas_predictions_for_validation.csv")
 

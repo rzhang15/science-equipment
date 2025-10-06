@@ -1,0 +1,406 @@
+keyword_groups:
+  # --- General Lab Actions & Types ---
+  ASSAY_OR_KIT:
+    - "*kit*"
+    - "*assay*"
+
+  HIGH_FIDELITY:
+    - "*high fidelity*"
+    - hf
+  HOT_START:
+    - "*hot start*"
+    - "*fast start*"
+    - fs
+    - hs
+  APOPTOSIS:
+    - "*apoptosis*"
+    - "*caspase*" # A key protein involved in apoptosis
+    - "*tunel*"
+  NITRILE:
+    - "*nitrile*"
+    - "*nitril*"
+    - "*ntl*"
+    - "*nitr*"
+    - "*ntrl*"
+  GLOVES:
+    - "*glove*"
+    - "*glv*"
+    - "*examglv*"
+
+  STIR_BAR:
+    - "*stir bar*"
+    - "*spin bar*"
+
+  PIPETTE:
+    - pipette
+    - pipet
+    - ppt
+  TUBE:
+    - tube
+    - tb
+    - tbe
+  FBS_TERMS:
+    - fbs
+    - "*fetal bovine serum*"
+    - "*fetal calf serum*"
+    - fcs
+
+  RESTRICTION_ENZYME:
+    - AclI
+    - HindIII-HF
+    - SspI-HF
+    - MluCI
+    - PciI
+    - AgeI-HF
+    - BspMI
+    - BfuAI
+    - SexAI
+    - MluI-HF
+    - BceAI
+    - HpyCH4IV
+    - HpyCH4III
+    - BaeI
+    - BsaXI
+    - AflIII
+    - SpeI-HF
+    - BsrI
+    - BmrI
+    - BglII
+    - AfeI
+    - AluI
+    - StuI
+    - ScaI-HF
+    - ClaI
+    - BspDI
+    - PI-SceI
+    - NsiI-HF
+    - AseI
+    - SwaI
+    - CspCI
+    - MfeI-HF
+    - PaqCI
+    - BssSI-v2
+    - Nb.BssSI
+    - BmgBI
+    - PmlI
+    - DraIII-HF
+    - AleI-v2
+    - EcoP15I
+    - PvuII-HF
+    - AlwNI
+    - BtsIMutI
+    - NdeI
+    - FatI
+    - NlaIII
+    - MslI
+    - XcmI
+    - BstXI
+    - PflMI
+    - BccI
+    - NcoI-HF
+    - BseYI
+    - FauI
+    - TspMI
+    - XmaI
+    - SmaI
+    - Nt.CviPII
+    - AciI
+    - SacII
+    - BsrBI
+    - MspI
+    - HpaII
+    - ScrFI
+    - StyD4I
+    - BsaJI
+    - BslI
+    - BtgI
+    - NciI
+    - AvrII
+    - MnlI
+    - BbvCI
+    - Nb.BbvCI
+    - Nt.BbvCI
+    - SbfI-HF
+    - Bpu10I
+    - Bsu36I
+    - EcoNI
+    - HpyAV
+    - PspGI
+    - BstNI
+    - StyI-HF
+    - BcgI
+    - PvuI-HF
+    - BstUI
+    - EagI-HF
+    - RsrII
+    - BsiEI
+    - BsiWI-HF
+    - BsmBI-v2
+    - Esp3I
+    - Hpy99I
+    - MspA1I
+    - MspJI
+    - SgrAI
+    - BfaI
+    - BspCNI
+    - PaeR7I
+    - XhoI
+    - EarI
+    - AcuI
+    - PstI-HF
+    - BpmI
+    - DdeI
+    - SfcI
+    - AflII
+    - BpuEI
+    - SmlI
+    - BsoBI
+    - AvaI
+    - MboII
+    - BbsI-HF
+    - XmnI
+    - BsmI
+    - Nb.BsmI
+    - EcoRI-HF
+    - HgaI
+    - ZraI
+    - AatII
+    - PflFI
+    - Tth111I
+    - PshAI
+    - AhdI
+    - DrdI
+    - SacI-HF
+    - Eco53kI
+    - BseRI
+    - MlyI
+    - PleI
+    - WarmStart Nt.BstNBI
+    - HinfI
+    - EcoRV-HF
+    - Sau3AI
+    - DpnII
+    - MboI
+    - DpnI
+    - BsaBI
+    - TfiI
+    - BsrDI
+    - Nb.BsrDI
+    - BbvI
+    - BtsI-v2
+    - Nb.BtsI
+    - BstAPI
+    - SfaNI
+    - SphI-HF
+    - SrfI
+    - NmeAIII
+    - NgoMIV
+    - NaeI
+    - BglI
+    - AsiSI
+    - BtgZI
+    - HhaI
+    - HinP1I
+    - BssHII
+    - NotI-HF
+    - Fnu4HI
+    - Cac8I
+    - MwoI
+    - NheI-HF
+    - BmtI-HF
+    - BspQI-HF
+    - SapI
+    - Nt.BspQI
+    - BlpI
+    - ApeKI
+    - TseI
+    - Bsp1286I
+    - AlwI
+    - BamHI-HF
+    - Nt.AlwI
+    - BtsCI
+    - FokI
+    - HaeIII
+    - FseI
+    - SfiI
+    - NarI
+    - KasI
+    - PluTI
+    - SfoI
+    - AscI
+    - EciI
+    - BsmFI
+    - ApaI
+    - PspOMI
+    - Sau96I
+    - NlaIV
+    - Acc65I
+    - KpnI-HF
+    - BsaI-HFv2
+    - HphI
+    - BstEII-HF
+    - AvaII
+    - BanI
+    - BaeGI
+    - BsaHI
+    - BanII
+    - RsaI
+    - CviQI
+    - BstZ17I-HF
+    - BciVI
+    - SalI-HF
+    - BsmAI
+    - BcoDI
+    - Nt.BsmAI
+    - ApaLI
+    - BsgI
+    - AccI
+    - Hpy166II
+    - Tsp45I
+    - HpaI
+    - PmeI
+    - HincII
+    - BsiHKAI
+    - TspRI
+    - ApoI-HF
+    - NspI
+    - BsrFI-v2
+    - BstYI
+    - HaeII
+    - CviKI-1
+    - EcoO109I
+    - PpuMI
+    - I-CeuI
+    - SnaBI
+    - I-SceI
+    - BspHI
+    - BspEI
+    - MmeI
+    - TaqI-v2
+    - NruI-HF
+    - Hpy188I
+    - Hpy188III
+    - XbaI
+    - BclI-HF
+    - HpyCH4V
+    - FspI
+    - PI-PspI
+    - MscI
+    - BsrGI-HF
+    - MseI
+    - PacI
+    - PsiI-v2
+    - BstBI
+    - DraI
+    - PspXI
+    - BsaWI
+    - BsaAI
+    - EaeI
+
+# ==============================================================================
+#  Market Rules
+#  Rules now combine the general keyword groups from above.
+# ==============================================================================
+market_rules:
+  - name: "high-fidelity dna polymerases"
+    all_of:
+      - $HIGH_FIDELITY
+      - "*polymerase*"
+    none_of: ["*taq*"]
+
+  - name: "taq polymerases"
+    all_of: ["*taq*",  "*polymerase*"]
+    none_of:
+      - $HIGH_FIDELITY
+      - $HOT_START
+
+  - name: "hot start dna polymerases"
+    all_of:
+      - $HOT_START
+      - "*polymerase*"
+    none_of: [$HIGH_FIDELITY]
+
+  - name: "stir bars"
+    any_of: [$STIR_BAR]
+    none_of: ["retriever"]
+
+  - name: "apoptosis detection kits"
+    all_of:
+      - $APOPTOSIS
+      - $ASSAY_OR_KIT
+  - name: "apoptosis detection kits"
+    all_of: ["caspase", "colorimetric"]
+
+  - name: "synthetic dna oligonucleotide"
+    all_of: ["*oligo*", "dna"]
+  - name: "synthetic dna oligonucleotide"
+    all_of: ["*oligo*", "dna"]
+
+  - name: "nitrile gloves"
+    all_of: [$NITRILE, $GLOVES]
+
+  - name: "sterile filtered pipette tips"
+    all_of: ["tip", "*fil*"]
+    none_of: ["lw reten", "low reten", "low"]
+  - name: "sterile filtered pipette tips"
+    all_of: ["tip", "*fitl*"]
+    none_of: ["lw reten", "low reten", "low"]
+  - name: "sterile filtered pipette tips"
+    all_of: ["tip", "*fltr*"]
+    none_of: ["lw reten", "low reten", "low"]
+  - name: "sterile filtered pipette tips"
+    all_of: ["tip", "*barrier*"]
+    none_of: ["lw reten", "low reten", "low"]
+
+  - name: "low retention pipette tips"
+    all_of: ["tip", "low reten"]
+  - name: "low retention pipette tips"
+    all_of: ["tip", "lw reten"]
+  - name: "low retention pipette tips"
+    all_of: ["tip", "lr"]
+
+  - name: "gel loading pipette tips"
+    all_of: ["tip", "gel load"]
+  - name: "extended length pipette tips"
+    all_of: ["tip", "xl"]
+
+  - name: "standard pipette tips"
+    any_of: ["tip", "$PIPETTE"]
+
+  - name: "serological pipettes"
+    all_of: [$PIPETTE, "*ser*"]
+  - name: "serological pipettes"
+    all_of: [$PIPETTE, "stripet"]
+  - name: "serological pipettes"
+    all_of: [$PIPETTE, "strpet"]
+
+  - name: "liquid basal media, not chemically defined"
+    all_of: ["*mccoy*", "5a"]
+  - name: "liquid basal media, not chemically defined"
+    all_of: ["*leibovitz*", "med"]
+  - name: "liquid basal media, not chemically defined"
+    all_of: ["rhtgf-b1"]
+  - name: "liquid basal media, not chemically defined"
+    all_of: ["bme", "glutamine"]
+  - name: "liquid basal media, not chemically defined"
+    all_of: ["basal", "med"]
+  - name: "liquid basal media, not chemically defined"
+    all_of: ["basal", "med"]
+  - name: "liquid basal media, not chemically defined"
+    all_of: ["*dme*", "media"]
+  - name: "liquid basal media, not chemically defined"
+    all_of: ["*dmem*"]
+  - name: "liquid basal media, not chemically defined"
+    all_of: ["*dulbecco*", "modified"]
+  - name: "liquid basal media, not chemically defined"
+    all_of: ["rpmi 1640"]
+  - name: "liquid basal media, not chemically defined"
+    all_of: ["*emem*"]
+  - name: "liquid basal media, not chemically defined"
+    all_of: ["*eagle medi*"]
+
+  - name: "new zealand fbs"
+    all_of: [$FBS_TERMS, "*new zealand*"]
+
+  - name: "us fbs"
+    all_of: [$FBS_TERMS]

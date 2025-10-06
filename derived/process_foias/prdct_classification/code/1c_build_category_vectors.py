@@ -49,8 +49,6 @@ def main():
 
         print("  - Generating embeddings for all lab item descriptions...")
         
-        # FIX: Ensure all descriptions are strings and handle any potential None/NaN values
-        # before passing them to the model.
         descriptions_list = df_lab_only[config.CLEAN_DESC_COL].fillna('').tolist()
         embeddings = model.encode(descriptions_list, show_progress_bar=True)
         
