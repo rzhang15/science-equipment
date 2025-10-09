@@ -6,12 +6,12 @@ keyword_groups:
 
   HIGH_FIDELITY:
     - "*high fidelity*"
-    - hf
+    - "hf"
   HOT_START:
     - "*hot start*"
     - "*fast start*"
-    - fs
-    - hs
+    - "fs"
+    - "hs"
   APOPTOSIS:
     - "*apoptosis*"
     - "*caspase*" # A key protein involved in apoptosis
@@ -32,270 +32,271 @@ keyword_groups:
     - "*spin bar*"
 
   PIPETTE:
-    - pipette
-    - pipet
-    - ppt
+    - "*pipette*"
+    - "*pipet*"
+
   TUBE:
-    - tube
-    - tb
-    - tbe
+    - "*tube*"
+    - "*tb*"
+    - "*tbe*"
   FBS_TERMS:
-    - fbs
+    - "fbs"
     - "*fetal bovine serum*"
     - "*fetal calf serum*"
-    - fcs
+    - "fcs"
 
   RESTRICTION_ENZYME:
-    - AclI
-    - HindIII-HF
-    - SspI-HF
-    - MluCI
-    - PciI
-    - AgeI-HF
-    - BspMI
-    - BfuAI
-    - SexAI
-    - MluI-HF
-    - BceAI
-    - HpyCH4IV
-    - HpyCH4III
-    - BaeI
-    - BsaXI
-    - AflIII
-    - SpeI-HF
-    - BsrI
-    - BmrI
-    - BglII
-    - AfeI
-    - AluI
-    - StuI
-    - ScaI-HF
-    - ClaI
-    - BspDI
-    - PI-SceI
-    - NsiI-HF
-    - AseI
-    - SwaI
-    - CspCI
-    - MfeI-HF
-    - PaqCI
-    - BssSI-v2
-    - Nb.BssSI
-    - BmgBI
-    - PmlI
-    - DraIII-HF
-    - AleI-v2
-    - EcoP15I
-    - PvuII-HF
-    - AlwNI
-    - BtsIMutI
-    - NdeI
-    - FatI
-    - NlaIII
-    - MslI
-    - XcmI
-    - BstXI
-    - PflMI
-    - BccI
-    - NcoI-HF
-    - BseYI
-    - FauI
-    - TspMI
-    - XmaI
-    - SmaI
-    - Nt.CviPII
-    - AciI
-    - SacII
-    - BsrBI
-    - MspI
-    - HpaII
-    - ScrFI
-    - StyD4I
-    - BsaJI
-    - BslI
-    - BtgI
-    - NciI
-    - AvrII
-    - MnlI
-    - BbvCI
-    - Nb.BbvCI
-    - Nt.BbvCI
-    - SbfI-HF
-    - Bpu10I
-    - Bsu36I
-    - EcoNI
-    - HpyAV
-    - PspGI
-    - BstNI
-    - StyI-HF
-    - BcgI
-    - PvuI-HF
-    - BstUI
-    - EagI-HF
-    - RsrII
-    - BsiEI
-    - BsiWI-HF
-    - BsmBI-v2
-    - Esp3I
-    - Hpy99I
-    - MspA1I
-    - MspJI
-    - SgrAI
-    - BfaI
-    - BspCNI
-    - PaeR7I
-    - XhoI
-    - EarI
-    - AcuI
-    - PstI-HF
-    - BpmI
-    - DdeI
-    - SfcI
-    - AflII
-    - BpuEI
-    - SmlI
-    - BsoBI
-    - AvaI
-    - MboII
-    - BbsI-HF
-    - XmnI
-    - BsmI
-    - Nb.BsmI
-    - EcoRI-HF
-    - HgaI
-    - ZraI
-    - AatII
-    - PflFI
-    - Tth111I
-    - PshAI
-    - AhdI
-    - DrdI
-    - SacI-HF
-    - Eco53kI
-    - BseRI
-    - MlyI
-    - PleI
-    - WarmStart Nt.BstNBI
-    - HinfI
-    - EcoRV-HF
-    - Sau3AI
-    - DpnII
-    - MboI
-    - DpnI
-    - BsaBI
-    - TfiI
-    - BsrDI
-    - Nb.BsrDI
-    - BbvI
-    - BtsI-v2
-    - Nb.BtsI
-    - BstAPI
-    - SfaNI
-    - SphI-HF
-    - SrfI
-    - NmeAIII
-    - NgoMIV
-    - NaeI
-    - BglI
-    - AsiSI
-    - BtgZI
-    - HhaI
-    - HinP1I
-    - BssHII
-    - NotI-HF
-    - Fnu4HI
-    - Cac8I
-    - MwoI
-    - NheI-HF
-    - BmtI-HF
-    - BspQI-HF
-    - SapI
-    - Nt.BspQI
-    - BlpI
-    - ApeKI
-    - TseI
-    - Bsp1286I
-    - AlwI
-    - BamHI-HF
-    - Nt.AlwI
-    - BtsCI
-    - FokI
-    - HaeIII
-    - FseI
-    - SfiI
-    - NarI
-    - KasI
-    - PluTI
-    - SfoI
-    - AscI
-    - EciI
-    - BsmFI
-    - ApaI
-    - PspOMI
-    - Sau96I
-    - NlaIV
-    - Acc65I
-    - KpnI-HF
-    - BsaI-HFv2
-    - HphI
-    - BstEII-HF
-    - AvaII
-    - BanI
-    - BaeGI
-    - BsaHI
-    - BanII
-    - RsaI
-    - CviQI
-    - BstZ17I-HF
-    - BciVI
-    - SalI-HF
-    - BsmAI
-    - BcoDI
-    - Nt.BsmAI
-    - ApaLI
-    - BsgI
-    - AccI
-    - Hpy166II
-    - Tsp45I
-    - HpaI
-    - PmeI
-    - HincII
-    - BsiHKAI
-    - TspRI
-    - ApoI-HF
-    - NspI
-    - BsrFI-v2
-    - BstYI
-    - HaeII
-    - CviKI-1
-    - EcoO109I
-    - PpuMI
-    - I-CeuI
-    - SnaBI
-    - I-SceI
-    - BspHI
-    - BspEI
-    - MmeI
-    - TaqI-v2
-    - NruI-HF
-    - Hpy188I
-    - Hpy188III
-    - XbaI
-    - BclI-HF
-    - HpyCH4V
-    - FspI
-    - PI-PspI
-    - MscI
-    - BsrGI-HF
-    - MseI
-    - PacI
-    - PsiI-v2
-    - BstBI
-    - DraI
-    - PspXI
-    - BsaWI
-    - BsaAI
-    - EaeI
+    - "AclI"
+    - "HindIII-HF"
+    - "SspI-HF"
+    - "MluCI"
+    - "PciI"
+    - "AgeI-HF"
+    - "BspMI"
+    - "BfuAI"
+    - "SexAI"
+    - "MluI-HF"
+    - "BceAI"
+    - "HpyCH4IV"
+    - "HpyCH4III"
+    - "BaeI"
+    - "BsaXI"
+    - "AflIII"
+    - "SpeI-HF"
+    - "BsrI"
+    - "BmrI"
+    - "BglII"
+    - "AfeI"
+    - "AluI"
+    - "StuI"
+    - "ScaI-HF"
+    - "ClaI"
+    - "BspDI"
+    - "PI-SceI"
+    - "NsiI-HF"
+    - "AseI"
+    - "SwaI"
+    - "CspCI"
+    - "MfeI-HF"
+    - "PaqCI"
+    - "BssSI-v2"
+    - "Nb.BssSI"
+    - "BmgBI"
+    - "PmlI"
+    - "DraIII-HF"
+    - "AleI-v2"
+    - "EcoP15I"
+    - "PvuII-HF"
+    - "AlwNI"
+    - "BtsIMutI"
+    - "NdeI"
+    - "FatI"
+    - "NlaIII"
+    - "MslI"
+    - "XcmI"
+    - "BstXI"
+    - "PflMI"
+    - "BccI"
+    - "NcoI-HF"
+    - "BseYI"
+    - "FauI"
+    - "TspMI"
+    - "XmaI"
+    - "SmaI"
+    - "Nt.CviPII"
+    - "AciI"
+    - "SacII"
+    - "BsrBI"
+    - "MspI"
+    - "HpaII"
+    - "ScrFI"
+    - "StyD4I"
+    - "BsaJI"
+    - "BslI"
+    - "BtgI"
+    - "NciI"
+    - "AvrII"
+    - "MnlI"
+    - "BbvCI"
+    - "Nb.BbvCI"
+    - "Nt.BbvCI"
+    - "SbfI-HF"
+    - "Bpu10I"
+    - "Bsu36I"
+    - "EcoNI"
+    - "HpyAV"
+    - "PspGI"
+    - "BstNI"
+    - "StyI-HF"
+    - "BcgI"
+    - "PvuI-HF"
+    - "BstUI"
+    - "EagI-HF"
+    - "RsrII"
+    - "BsiEI"
+    - "BsiWI-HF"
+    - "BsmBI-v2"
+    - "Esp3I"
+    - "Hpy99I"
+    - "MspA1I"
+    - "MspJI"
+    - "SgrAI"
+    - "BfaI"
+    - "BspCNI"
+    - "PaeR7I"
+    - "XhoI"
+    - "EarI"
+    - "AcuI"
+    - "PstI-HF"
+    - "BpmI"
+    - "DdeI"
+    - "SfcI"
+    - "AflII"
+    - "BpuEI"
+    - "SmlI"
+    - "BsoBI"
+    - "AvaI"
+    - "MboII"
+    - "BbsI-HF"
+    - "XmnI"
+    - "BsmI"
+    - "Nb.BsmI"
+    - "EcoRI-HF"
+    - "HgaI"
+    - "ZraI"
+    - "AatII"
+    - "PflFI"
+    - "Tth111I"
+    - "PshAI"
+    - "AhdI"
+    - "DrdI"
+    - "SacI-HF"
+    - "Eco53kI"
+    - "BseRI"
+    - "MlyI"
+    - "PleI"
+    - "WarmStart Nt.BstNBI"
+    - "HinfI"
+    - "EcoRV-HF"
+    - "Sau3AI"
+    - "DpnII"
+    - "MboI"
+    - "DpnI"
+    - "BsaBI"
+    - "TfiI"
+    - "BsrDI"
+    - "Nb.BsrDI"
+    - "BbvI"
+    - "BtsI-v2"
+    - "Nb.BtsI"
+    - "BstAPI"
+    - "SfaNI"
+    - "SphI-HF"
+    - "SrfI"
+    - "NmeAIII"
+    - "NgoMIV"
+    - "NaeI"
+    - "BglI"
+    - "AsiSI"
+    - "BtgZI"
+    - "HhaI"
+    - "HinP1I"
+    - "BssHII"
+    - "NotI-HF"
+    - "Fnu4HI"
+    - "Cac8I"
+    - "MwoI"
+    - "NheI-HF"
+    - "BmtI-HF"
+    - "BspQI-HF"
+    - "SapI"
+    - "Nt.BspQI"
+    - "BlpI"
+    - "ApeKI"
+    - "TseI"
+    - "Bsp1286I"
+    - "AlwI"
+    - "BamHI-HF"
+    - "Nt.AlwI"
+    - "BtsCI"
+    - "FokI"
+    - "HaeIII"
+    - "FseI"
+    - "SfiI"
+    - "NarI"
+    - "KasI"
+    - "PluTI"
+    - "SfoI"
+    - "AscI"
+    - "EciI"
+    - "BsmFI"
+    - "ApaI"
+    - "PspOMI"
+    - "Sau96I"
+    - "NlaIV"
+    - "Acc65I"
+    - "KpnI-HF"
+    - "BsaI-HFv2"
+    - "HphI"
+    - "BstEII-HF"
+    - "AvaII"
+    - "BanI"
+    - "BaeGI"
+    - "BsaHI"
+    - "BanII"
+    - "RsaI"
+    - "CviQI"
+    - "BstZ17I-HF"
+    - "BciVI"
+    - "SalI-HF"
+    - "BsmAI"
+    - "BcoDI"
+    - "Nt.BsmAI"
+    - "ApaLI"
+    - "BsgI"
+    - "AccI"
+    - "Hpy166II"
+    - "Tsp45I"
+
+    - "HpaI"
+    - "PmeI"
+    - "HincII"
+    - "BsiHKAI"
+    - "TspRI"
+    - "ApoI-HF"
+    - "NspI"
+    - "BsrFI-v2"
+    - "BstYI"
+    - "HaeII"
+    - "CviKI-1"
+    - "EcoO109I"
+    - "PpuMI"
+    - "I-CeuI"
+    - "SnaBI"
+    - "I-SceI"
+    - "BspHI"
+    - "BspEI"
+    - "MmeI"
+    - "TaqI-v2"
+    - "NruI-HF"
+    - "Hpy188I"
+    - "Hpy188III"
+    - "XbaI"
+    - "BclI-HF"
+    - "HpyCH4V"
+    - "FspI"
+    - "PI-PspI"
+    - "MscI"
+    - "BsrGI-HF"
+    - "MseI"
+    - "PacI"
+    - "PsiI-v2"
+    - "BstBI"
+    - "DraI"
+    - "PspXI"
+    - "BsaWI"
+    - "BsaAI"
+    - "EaeI"
 
 # ==============================================================================
 #  Market Rules
@@ -339,6 +340,13 @@ market_rules:
   - name: "nitrile gloves"
     all_of: [$NITRILE, $GLOVES]
 
+  - name: "serological pipettes"
+    all_of: [$PIPETTE, "*ser*"]
+  - name: "serological pipettes"
+    all_of: [$PIPETTE, "stripet"]
+  - name: "serological pipettes"
+    all_of: [$PIPETTE, "strpet"]
+
   - name: "sterile filtered pipette tips"
     all_of: ["tip", "*fil*"]
     none_of: ["lw reten", "low reten", "low"]
@@ -366,13 +374,7 @@ market_rules:
 
   - name: "standard pipette tips"
     any_of: ["tip", "$PIPETTE"]
-
-  - name: "serological pipettes"
-    all_of: [$PIPETTE, "*ser*"]
-  - name: "serological pipettes"
-    all_of: [$PIPETTE, "stripet"]
-  - name: "serological pipettes"
-    all_of: [$PIPETTE, "strpet"]
+    none_of: ["*ser*", "stripet", "strpet"]
 
   - name: "liquid basal media, not chemically defined"
     all_of: ["*mccoy*", "5a"]
@@ -404,3 +406,61 @@ market_rules:
 
   - name: "us fbs"
     all_of: [$FBS_TERMS]
+
+  
+  - name: "laemmli sample buffer"
+    all_of: ["laemmli", "buffer"]
+  - name: "laemmli sample buffer"
+    all_of: ["laemmli", "buf"]
+    
+  - name: "cell lysis detergents"
+    all_of: ["sodium deoxycholate"]
+  - name: "cell lysis detergents"
+    all_of: ["sds"]
+  - name: "cell lysis detergents"
+    all_of: ["triton"]
+  - name: "cell lysis detergents"
+    all_of: ["dodecyl sulfate"]
+  - name: "cell lysis detergents"
+    all_of: ["tween"]
+  - name: "cell lysis detergents"
+    all_of: ["digitonin"]
+  - name: "cell lysis detergents"
+    all_of: ["igepalr"]
+  - name: "cell lysis detergents"
+    all_of: ["sodium dodecyl sulfate"]
+  - name: "cell lysis detergents"
+    all_of: ["chaps"]
+  - name: "cell lysis detergents"
+    all_of: ["np40"]
+  - name: "cell lysis detergents"
+    all_of: ["b-per"]
+
+  - name: "column-based rna miniprep"
+    all_of: ["*rna*", "mini prep", "column"]
+  - name: "column-based dna plasmid miniprep"
+    all_of: ["mini prep", "column"]
+  - name: "spin columns"
+    all_of: ["spin" , "column"]
+
+  - name: "pvdf blotting membranes"
+    all_of: ["pvdf", "membrane"]
+  - name: "pvdf blotting membranes"
+    all_of: ["pvdf", "fltr sheet"]
+  - name: "pvdf blotting membranes"
+    all_of: ["ipvh", "membrane"]
+  - name: "pvdf blotting membranes"
+    all_of: ["ipvh", "fltr sheet"]
+
+  - name: "nucleic acid gel stains"
+    all_of: ["gel", "stain" , "dna"]
+  - name: "nucleic acid gel stains"
+    all_of: ["gelred"]
+  - name: "nucleic acid gel stains"
+    all_of: ["diamidino", "phenylin"]
+  - name: "nucleic acid gel stains"
+    all_of: ["hoechst", "trihydroch"]
+  - name: "nucleic acid gel stains"
+    all_of: ["gelgreen"]
+  - name: "nucleic acid gel stains"
+    all_of: ["sybr green"]
