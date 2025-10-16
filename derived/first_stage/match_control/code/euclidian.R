@@ -8,18 +8,19 @@ library(haven)
 
 # Create output directory
 dir.create("../output/figures", recursive = TRUE, showWarnings = FALSE)
+setwd("~/sci_eq/derived/first_stage/match_control/code")
 
 # ---------------------------
 # Data Preparation
 # ---------------------------
 # Load your data into a data frame
-panel <- read_dta("../external/dallas/mkt_yr.dta")  # Adjust if using Stata files
-panel <- panel %>% mutate(mkt = as.character(mkt))
+panel <- read_dta("../external/samp/category_yr_tfidf.dta")
+panel <- panel %>% mutate(category = as.character(category))
 
 # Compute number of years per market
 panel <- panel %>% 
   filter(year >= 2011) %>% 
-  group_by(mkt) %>%
+  group_by(category) %>%
   mutate(n_years = n()) %>%
   ungroup()
 
@@ -34,19 +35,19 @@ control <- panel %>% filter(treated == 0)
 # Create pre-treatment datasets (years ≤ 2013)
 treated_pre <- treated %>%
   filter(year <= 2013) %>%
-  select(mkt, prdct_ctgry, year, treated, avg_log_price,
+  select(category, category, year, treated, avg_log_price,
          log_tot_qty, log_tot_spend, raw_price, raw_qty, raw_spend, num_suppliers)
 
 control_pre <- control %>%
   filter(year <= 2013) %>%
-  select(mkt, prdct_ctgry, year, treated, avg_log_price,
+  select(category, category, year, treated, avg_log_price,
          log_tot_qty, log_tot_spend, raw_price, raw_qty, raw_spend, num_suppliers)
 
 all_data_pre <- bind_rows(treated_pre, control_pre)
 
 # Compute linear time trend coefficients for several price/quantity measures
 all_data_pre <- all_data_pre %>%
-  group_by(mkt) %>%
+  group_by(category) %>%
   mutate(
     coef_log_price = coef(lm(avg_log_price ~ year, data = cur_data()))[2],
     coef_log_spend = coef(lm(log_tot_spend ~ year, data = cur_data()))[2],
@@ -67,14 +68,14 @@ data_wide <- all_data_pre %>%
   ungroup()
 
 # Merge product category info
-prdct_info <- all_data_pre %>% distinct(mkt, prdct_ctgry)
-data_wide <- left_join(data_wide, prdct_info, by = "mkt")
+prdct_info <- all_data_pre %>% distinct(category, category)
+data_wide <- left_join(data_wide, prdct_info, by = "category")
 
 # Prepare price trends data for plotting
 price_trends <- panel %>%
-  filter(mkt %in% unique(data_wide$mkt)) %>%
-  select(mkt, prdct_ctgry, year, avg_log_price, treated) %>%
-  group_by(mkt) %>%
+  filter(category %in% unique(data_wide$category)) %>%
+  select(category, category, year, avg_log_price, treated) %>%
+  group_by(category) %>%
   mutate(price_adj = avg_log_price - avg_log_price[year == 2013]) %>%
   ungroup()
 
@@ -84,23 +85,23 @@ price_trends <- panel %>%
 
 # Define the covariates to be used for Euclidean distance calculation
 covs <- c("avg_log_price_2011", "avg_log_price_2012","avg_log_price_2013")
-treated_markets <- unique(data_wide$mkt[data_wide$treated == 1])
+treated_markets <- unique(data_wide$category[data_wide$treated == 1])
 
 # Initialize storage for matched pairs
 match_pairs_list <- list()
 
-for (mkt_id in treated_markets) {
-  cat("\nProcessing treated market:", mkt_id, "\n")
+for (category_id in treated_markets) {
+  cat("\nProcessing treated market:", category_id, "\n")
   
   # Subset data: the treated unit and all control units
-  temp_data <- data_wide %>% filter(mkt == mkt_id | treated == 0)
+  temp_data <- data_wide %>% filter(category == category_id | treated == 0)
   
-  treated_row <- temp_data %>% filter(mkt == mkt_id)
+  treated_row <- temp_data %>% filter(category == category_id)
   control_rows <- temp_data %>% filter(treated == 0)
   
   # Skip if no control available
   if (nrow(control_rows) == 0) {
-    message("No control units available for market ", mkt_id)
+    message("No control units available for market ", category_id)
     next
   }
   
@@ -112,14 +113,14 @@ for (mkt_id in treated_markets) {
   
   # Select the control with the smallest distance (if ties, the first is chosen)
   matched_control <- control_rows %>% filter(distance == min(distance))
-  matched_control_mkt <- matched_control$mkt[1]
+  matched_control_category <- matched_control$category[1]
   
-  treated_mkt <- mkt_id
+  treated_category <- category_id
   
   # Append match pair to the list
-  match_pairs_list[[as.character(mkt_id)]] <- data.frame(
-    mkt = treated_mkt, 
-    matched_control = matched_control_mkt,
+  match_pairs_list[[as.character(category_id)]] <- data.frame(
+    category = treated_category, 
+    matched_control = matched_control_category,
     stringsAsFactors = FALSE
   )
   
@@ -129,13 +130,13 @@ for (mkt_id in treated_markets) {
   
   # Since a single control is matched, assign individual labels for treated and control
   pair_data <- price_trends %>%
-    filter(mkt %in% c(treated_mkt, matched_control_mkt)) %>%
-    mutate(mkt_label = case_when(
-      mkt == treated_mkt ~ paste0("Treated Market: ", prdct_info$prdct_ctgry[prdct_info$mkt == treated_mkt]),
-      mkt == matched_control_mkt ~ paste0("Control Market: ", prdct_info$prdct_ctgry[prdct_info$mkt == matched_control_mkt])
+    filter(category %in% c(treated_category, matched_control_category)) %>%
+    mutate(category_label = case_when(
+      category == treated_category ~ paste0("Treated Market: ", prdct_info$category[prdct_info$category == treated_category]),
+      category == matched_control_category ~ paste0("Control Market: ", prdct_info$category[prdct_info$category == matched_control_category])
     ))
   
-  p <- ggplot(pair_data, aes(x = year, y = price_adj, color = mkt_label)) +
+  p <- ggplot(pair_data, aes(x = year, y = price_adj, color = category_label)) +
     geom_line(linewidth = 1) +
     geom_point() +
     labs(x = "Year", y = "Avg Log Price") +
@@ -150,12 +151,12 @@ for (mkt_id in treated_markets) {
   print(p)
   
   # Save the plot to a PDF file
-  pdf_file <- paste0("../output/figures/log_price_trends_", treated_mkt, ".pdf")
+  pdf_file <- paste0("../output/figures/log_price_trends_", treated_category, ".pdf")
   tryCatch({
     ggsave(pdf_file, plot = p, width = 8, height = 6)
     cat("Saved plot to:", pdf_file, "\n")
   }, error = function(e) {
-    message("Failed to save plot for market ", treated_mkt, ": ", e$message)
+    message("Failed to save plot for market ", treated_category, ": ", e$message)
   })
 }
 

@@ -1,1 +1,1 @@
-./dallas/ | /Users/conniexu/Documents/Harvard/research projects/dissertation/science-equipment/derived/make_mkt_panel/output
+./samp/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/first_stage/make_mkt_panel/output

@@ -6,218 +6,190 @@ library(cobalt)
 library(ggplot2)
 library(here)
 library(haven)
-# Create output directory
+library(stringr) # Added for str_to_title
+
+# Set working directory and create output folders
+setwd("~/sci_eq/derived/first_stage/match_control/code")
 dir.create("../output/figures", recursive = TRUE, showWarnings = FALSE)
+dir.create("../output/balance_plots", recursive = TRUE, showWarnings = FALSE)
+
+# ---------------------------
+# Define Covariates, Weights, & Outcomes
+# ---------------------------
+COVARIATES_TO_USE <- c("coef_log_spend")
+WEIGHTING_VAR <- "tot_obs"
+VARS_TO_CHECK <- c(COVARIATES_TO_USE, WEIGHTING_VAR)
+MATCH_RATIO <- 3 
+
+# ✅ DEFINE a vector of outcome variables to loop through
+OUTCOME_VARS <- c("avg_log_spend")
 
 # ---------------------------
 # Data Preparation
 # ---------------------------
-# Load your data into a data frame
-panel <- read_dta("../external/dallas/mkt_yr.dta")  # Adjust if using Stata files
-panel <- panel %>% mutate(mkt = as.character(mkt))
+# Load data
+panel <- read_dta("../external/samp/category_yr_tfidf.dta")
+panel <- panel %>% mutate(category = as.character(category))
 
-# Compute number of years per market
-panel <- panel %>% 
-  filter(year >= 2011) %>% 
-  group_by(mkt) %>%
-  mutate(n_years = n()) %>%
+# Filter for a balanced panel
+panel <- panel %>%
+  filter(year >= 2010) %>%
+  group_by(category) %>%
+  filter(n() == 10) %>%
   ungroup()
 
-# Keep only markets that have exactly 9 years of data
-panel <- panel %>%
-  filter(n_years == 9)
-
-# Split treated and control groups
-treated <- panel %>% filter(treated == 1)
-control <- panel %>% filter(treated == 0)
-
-# Create pre-treatment datasets (years ≤ 2013)
-treated_pre <- treated %>%
-  filter(year <= 2013) %>%
-  select(mkt, prdct_ctgry, year, treated, avg_log_price,
-         log_tot_qty, log_tot_spend, raw_price, raw_qty, raw_spend, num_suppliers)
-
-control_pre <- control %>%
-  filter(year <= 2013) %>%
-  select(mkt, prdct_ctgry, year, treated, avg_log_price,
-         log_tot_qty, log_tot_spend, raw_price, raw_qty, raw_spend, num_suppliers)
-
-all_data_pre <- bind_rows(treated_pre, control_pre)
+# Create pre-treatment dataset
+all_data_pre <- panel %>%
+  filter(year <= 2013)
 
 # Compute linear time trend coefficients
-all_data_pre <- all_data_pre %>%
-  group_by(mkt) %>%
-  mutate(
-    coef_log_price = coef(lm(avg_log_price ~ year, data = cur_data()))[2],
-    coef_log_spend = coef(lm(log_tot_spend ~ year, data = cur_data()))[2],
-    coef_log_qty   = coef(lm(log_tot_qty ~ year, data = cur_data()))[2],
-    coef_price = coef(lm(raw_price ~ year, data = cur_data()))[2],
-    coef_spend = coef(lm(raw_spend ~ year, data = cur_data()))[2],
-    coef_qty   = coef(lm(raw_qty ~ year, data = cur_data()))[2]
-  ) %>%
-  ungroup()
+trends_pre <- all_data_pre %>%
+  group_by(category, treated) %>%
+  summarise(
+    coef_log_price = possibly(~coef(lm(avg_log_price ~ year, .x))[2], otherwise = NA_real_)(cur_data()),
+    coef_log_spend = possibly(~coef(lm(avg_log_spend ~ year, .x))[2], otherwise = NA_real_)(cur_data()),
+    .groups = "drop"
+  )
 
 # Pivot data to wide format
-data_wide <- all_data_pre %>%
-  pivot_wider(names_from = year, names_sep = "_",
-              values_from = c(num_suppliers, avg_log_price, raw_price, log_tot_spend, raw_spend, log_tot_qty, raw_qty)) %>%
-  rowwise() %>%
-  mutate(avg_pre_log_price = mean(c_across(starts_with("avg_log_price_")), na.rm = TRUE)) %>%
-  na.omit() %>%
-  ungroup()
+data_wide_raw <- all_data_pre %>%
+  pivot_wider(
+    names_from = year,
+    names_sep = "_",
+    id_cols = c(category, treated, spend_2013, tot_obs),
+    values_from = c(avg_log_price, avg_log_spend) # Ensure both outcomes are pivoted
+  )
 
-# Merge product category info
-prdct_info <- all_data_pre %>% distinct(mkt, prdct_ctgry)
-data_wide <- left_join(data_wide, prdct_info, by = "mkt")
+# Join pre-treatment trends
+data_wide_raw <- left_join(data_wide_raw, trends_pre, by = c("category", "treated"))
 
-# Prepare price trends data for plotting
-price_trends <- panel %>%
-  filter(mkt %in% unique(data_wide$mkt)) %>%
-  select(mkt, prdct_ctgry, year, avg_log_price, treated) %>%
-  group_by(mkt) %>%
-  mutate(price_adj = avg_log_price - avg_log_price[year == 2013]) %>%
-  ungroup()
+# ✅ KEY FIX: Safely remove rows with NAs in covariates OR the weighting variable
+data_wide <- data_wide_raw %>%
+  drop_na(all_of(VARS_TO_CHECK))
+
+# CRITICAL DIAGNOSTIC: Check if data remains after cleaning
+cat("Dimensions of raw wide data:", dim(data_wide_raw), "\n")
+cat("Dimensions after targeted NA removal:", dim(data_wide), "\n")
 
 # ---------------------------
-# Matching and Plot Saving Loop
+# Robust Matching Loop (UPDATED FOR MULTIPLE OUTCOMES)
 # ---------------------------
+covariates_formula <- as.formula(paste("treated ~", paste(COVARIATES_TO_USE, collapse = " + ")))
+treated_markets <- unique(data_wide$category[data_wide$treated == 1])
 
-covariates <- "avg_log_price_2011 + avg_log_price_2012 + avg_log_price_2013"
-treated_markets <- unique(data_wide$mkt[data_wide$treated == 1])
+cat("\n\n====================================================\n")
+cat("Found", length(treated_markets), "treated markets to process after cleaning.\n")
+cat("Matching up to", MATCH_RATIO, "controls per treated market.\n")
+cat("====================================================\n\n")
 
-# Initialize storage
 match_pairs_list <- list()
 
-for (mkt_id in treated_markets) {
-  cat("\nProcessing treated market:", mkt_id, "\n")
+# --- Main loop over each treated market ---
+for (category_id in treated_markets) {
+  cat("\nProcessing treated market:", category_id, "\n")
   
-  # Subset data for the treated market and controls
-  temp_data <- data_wide %>% filter(mkt == mkt_id | treated == 0)
+  temp_data <- data_wide %>%
+    filter(category == category_id | treated == 0)
   
-  # Run matching
+  cat("--- Diagnostic summary for market:", category_id, "---\n")
+  print(
+    temp_data %>%
+      group_by(treated) %>%
+      summarise(count = n(), across(all_of(COVARIATES_TO_USE), list(mean = mean, sd = sd))) %>% 
+      as.data.frame()
+  )
+  cat("--------------------------------------------------\n")
+
+  # --- Perform matching ONCE per treated market ---
   current_model <- tryCatch({
     matchit(
-      as.formula(paste("treated ~", covariates)),
-      method = "nearest",
-      data = temp_data,
-      drop = "none",
-      #caliper =1,
-      ratio =1,  # change this value to > 1 when needed
-      replace = TRUE,
-     restimate = TRUE
+      formula = covariates_formula, method = "nearest", data = temp_data,
+      ratio = MATCH_RATIO, caliper = 0.25, replace = TRUE
     )
-  }, error = function(e) {
-    message("Matching failed for market ", mkt_id, ": ", e$message)
-    return(NULL)
-  })
+  }, error = function(e) { message("Matching failed: ", e$message); return(NULL) })
   
-  # Skip if no match was found
-  if (is.null(current_model)) {
+  if (is.null(current_model)) next
+  
+  # Assess and save balance plot
+  balance_plot <- love.plot(current_model, binary = "std", thresholds = c(m = .1), title = paste("Covariate Balance for Market:", category_id))
+  ggsave(filename = paste0("../output/balance_plots/balance_", category_id, ".pdf"), plot = balance_plot, width = 7, height = 6)
+  
+  match_data <- match.data(current_model)
+  if (nrow(match_data) <= 1) {
+    message("No valid control found for market ", category_id)
     next
   }
   
-  # Extract matched data
-  match_data <- tryCatch({
-    match.data(current_model)
-  }, error = function(e) {
-    message("Error extracting matched data for market ", mkt_id)
-    return(NULL)
-  })
+  treated_category <- unique(match_data$category[match_data$treated == 1])
+  matched_control_categories <- unique(match_data$category[match_data$treated == 0])
   
-  # Skip if matched data is empty
-  if (is.null(match_data) || nrow(match_data) == 0) {
-    next
-  }
-  
-  # Identify matched pairs
-  treated_mkt <- unique(match_data$mkt[match_data$treated == 1])
-  matched_control_mkt <- unique(match_data$mkt[match_data$treated == 0])
-  
-  if (length(treated_mkt) < 1 || length(matched_control_mkt) < 1) {
-    next  # Skip if no control found
-  }
-  
-  # Append to list
-  match_pairs_list[[as.character(mkt_id)]] <- data.frame(
-    mkt = treated_mkt, 
-    matched_control = paste(matched_control_mkt, collapse = ", "),
-    stringsAsFactors = FALSE
+  # The match_pairs summary is independent of the outcome, so it stays here
+  match_pairs_list[[category_id]] <- data.frame(
+    category = treated_category,
+    matched_control = paste(matched_control_categories, collapse = ", ")
   )
   
-  # ---------------------------
-  # Generate and Display Plot in Console & Save to File
-  # ---------------------------
-  # ---------------------------
-  # Generate and Display Plot in Console & Save to File
-  # ---------------------------
-  
-  if (length(matched_control_mkt) > 1) {
-    # Treated data remains unaggregated
-    treated_data <- price_trends %>% 
-      filter(mkt == treated_mkt) %>% 
-      mutate(mkt_label = paste0("Treated Market: ", 
-                                prdct_info$prdct_ctgry[prdct_info$mkt == treated_mkt]))
+  # 💡 --- NEW: Loop over each OUTCOME variable to generate plots ---
+  for (outcome_var in OUTCOME_VARS) {
+    cat("--- Generating plot for outcome:", outcome_var, "\n")
     
-    # Retrieve the product category names for the matched control markets
-    matched_control_names <- prdct_info %>% 
-      filter(mkt %in% matched_control_mkt) %>% 
-      arrange(mkt) %>% 
-      pull(prdct_ctgry)
-    
-    # Create a legend label that lists the control market names
-    control_label <- paste0("Control Markets: ", paste(matched_control_names, collapse = ", "))
-    
-    # Aggregate control markets: for each year, take the average of price_adj.
-    control_data <- price_trends %>%
-      filter(mkt %in% matched_control_mkt) %>%
+    # 1. Prepare trend data for the current outcome variable
+    # We use .data[[outcome_var]] to use the string as a column name
+    outcome_trends <- panel %>%
+      select(category, year, treated, all_of(outcome_var)) %>%
+      group_by(category) %>%
+      mutate(outcome_adj = .data[[outcome_var]] - .data[[outcome_var]][year == 2013]) %>%
+      ungroup()
+
+    # 2. Get the trend data for the single treated market
+    treated_plot_data <- outcome_trends %>%
+      filter(category == treated_category) %>%
+      mutate(group_label = paste("Treated:", treated_category))
+
+    # 3. Calculate the AVERAGE trend across all matched control markets
+    avg_control_plot_data <- outcome_trends %>%
+      filter(category %in% matched_control_categories) %>%
       group_by(year) %>%
-      summarise(price_adj = mean(price_adj, na.rm = TRUE)) %>%
-      ungroup() %>%
-      mutate(mkt_label = control_label)
+      summarise(outcome_adj = mean(outcome_adj, na.rm = TRUE), .groups = "drop") %>%
+      mutate(group_label = paste("Avg. Control:", paste(matched_control_categories, collapse = ", ")))
+
+    # 4. Combine the two datasets for plotting
+    plot_data_final <- bind_rows(treated_plot_data, avg_control_plot_data)
     
-    pair_data <- bind_rows(treated_data, control_data)
+    # 5. Generate a dynamic title for the plot and y-axis
+    plot_y_label <- str_to_title(str_replace_all(outcome_var, "_", " "))
+    plot_title <- paste(plot_y_label, "Trend:", treated_category)
     
-  } else {
-    # Only one control is matched; use individual labels.
-    pair_data <- price_trends %>%
-      filter(mkt %in% c(treated_mkt, matched_control_mkt)) %>%
-      mutate(mkt_label = case_when(
-        mkt == treated_mkt ~ paste0("Treated Market: ", 
-                                    prdct_info$prdct_ctgry[prdct_info$mkt == treated_mkt]),
-        mkt == matched_control_mkt ~ paste0("Control Market: ", 
-                                            prdct_info$prdct_ctgry[prdct_info$mkt == matched_control_mkt])
-      ))
+    # 6. Generate the plot
+    p <- ggplot(plot_data_final, aes(x = year, y = outcome_adj, color = group_label)) +
+      geom_line(linewidth = 1) + 
+      geom_point() +
+      geom_vline(xintercept = 2013.5, linetype = "dashed", color = "gray40") +
+      labs(
+        title = plot_title,
+        subtitle = "Treated vs. Average of Matched Control Markets",
+        x = "Year", 
+        y = paste(plot_y_label, "(Adjusted to 2013)"),
+        color = "Market Group"
+      ) +
+      theme_minimal(base_size = 12) +
+      scale_x_continuous(breaks = seq(2010, 2019, 1)) +
+      theme(legend.position = "bottom", 
+            plot.title = element_text(face = "bold"),
+            legend.text = element_text(size = 8))
+
+    # 7. Save the plot with a dynamic filename
+    ggsave(paste0("../output/figures/", outcome_var, "_trends_", treated_category, ".pdf"), plot = p, width = 10, height = 7)
+    cat("Saved", outcome_var, "trend plot for", category_id, "\n")
   }
-  
-  p <- ggplot(pair_data, aes(x = year, y = price_adj, color = mkt_label)) +
-    geom_line(linewidth = 1) +
-    geom_point() +
-    labs(x = "Year", y = "Avg Log Price") +
-    scale_color_discrete(name = NULL) +
-    scale_x_continuous(breaks = seq(2011, 2019, 1), limits = c(2011, 2019)) +
-    theme_minimal() +
-    # Move legend below the x-axis and arrange it in one row
-    theme(legend.position = "bottom",
-          legend.direction = "horizontal",
-          legend.box = "horizontal")
-  
-  # Print the plot to the console
-  print(p)
-  
-  # Save the plot to a PDF file
-  pdf_file <- paste0("../output/figures/log_price_trends_", treated_mkt, ".pdf")
-  tryCatch({
-    ggsave(pdf_file, plot = p, width = 8, height = 6)
-    cat("Saved plot to:", pdf_file, "\n")
-  }, error = function(e) {
-    message("Failed to save plot for market ", treated_mkt, ": ", e$message)
-  })
 }
 
-# Combine matched pairs into a data frame
-match_pairs <- do.call(rbind, match_pairs_list)
-cat("Final Matched Pairs:\n")
-print(match_pairs)
-
-# Save match pairs to CSV
-write_csv(match_pairs, "../output/match_pairs.csv")
+# Final summary
+if (length(match_pairs_list) > 0) {
+  match_pairs <- do.call(rbind, match_pairs_list)
+  cat("\nSuccessfully matched pairs:\n")
+  print(match_pairs)
+  write_csv(match_pairs, "../output/match_pairs.csv")
+} else {
+  cat("\nNo successful matches were made.\n")
+}
