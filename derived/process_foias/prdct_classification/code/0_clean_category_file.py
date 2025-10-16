@@ -1,7 +1,9 @@
-# 0_clean_category_file.py
+# 0_clean_category_file.py (UPDATED with Smart Plural Detection)
 """
 Central script for cleaning and merging the UT Dallas data.
-This script creates the single source of truth for all downstream processes.
+This script creates the single source of truth for all downstream processes
+and now includes logic to automatically consolidate plural/singular categories
+and consolidate sparse antibody categories.
 """
 import pandas as pd
 import os
@@ -33,6 +35,28 @@ def main():
         df_cat['old_category'] = df_cat['old_category'].astype(str).str.lower().str.strip()
         df_cat[config.UT_CAT_COL] = df_cat[config.UT_CAT_COL].replace('', pd.NA).fillna(df_cat['old_category'])
 
+    # +++ NEW STEP: SMARTLY DETECT AND MERGE PLURALS +++
+    print("ℹ️ Automatically detecting and merging singular/plural category names...")
+    if config.UT_CAT_COL in df_cat.columns:
+        # Get a list of all unique, non-null category names
+        unique_categories = set(df_cat[config.UT_CAT_COL].dropna().unique())
+        
+        # Create a mapping from singular to plural for confirmed pairs
+        plural_map = {}
+        for category in unique_categories:
+            plural_form = category + 's'
+            # If the plural form exists in our set, we have a pair
+            if plural_form in unique_categories:
+                plural_map[category] = plural_form # Map the singular to the plural
+        
+        if plural_map:
+            print(f"  ✅ Found and merged {len(plural_map)} singular/plural pairs.")
+            # Apply the mapping to consolidate the categories
+            df_cat[config.UT_CAT_COL] = df_cat[config.UT_CAT_COL].replace(plural_map)
+        else:
+            print("  - No simple singular/plural pairs detected.")
+    # +++ END OF NEW STEP +++
+
     # 4. Prepare keys for merging
     for key in config.UT_DALLAS_MERGE_KEYS:
         if key in df_ut.columns and key in df_cat.columns:
@@ -44,12 +68,26 @@ def main():
     df_merged = pd.merge(df_ut, df_cat, on=config.UT_DALLAS_MERGE_KEYS, how='inner', validate="many_to_one")
     print(f"  - Merge complete. Resulting dataset has {len(df_merged)} rows.")
 
-    # 6. --- Data Hygiene Step: Drop rows with missing crucial data ---
+    # 6. Data Hygiene Step: Drop rows with missing crucial data
     initial_rows = len(df_merged)
     df_merged.dropna(subset=[config.CLEAN_DESC_COL, config.UT_CAT_COL], inplace=True)
     rows_dropped = initial_rows - len(df_merged)
     if rows_dropped > 0:
         print(f"  - Dropped {rows_dropped} rows due to missing descriptions or categories.")
+
+    # --- Consolidate sparse antibody categories ---
+    print("ℹ️ Consolidating sparse antibody categories...")
+    cat_col = df_merged[config.UT_CAT_COL].astype(str).str.lower()
+    is_antibody = cat_col.str.contains("antibody", na=False)
+    is_poly = cat_col.str.contains("polyclonal", na=False)
+    is_mono = cat_col.str.contains("monoclonal", na=False)
+    is_primary = cat_col.str.contains("primary", na=False)
+    is_secondary = cat_col.str.contains("secondary", na=False)
+    df_merged.loc[is_antibody & is_poly & is_primary, config.UT_CAT_COL] = "polyclonal primary antibody"
+    df_merged.loc[is_antibody & is_mono & is_primary, config.UT_CAT_COL] = "monoclonal primary antibody"
+    df_merged.loc[is_antibody & is_poly & is_secondary, config.UT_CAT_COL] = "polyclonal secondary antibody"
+    df_merged.loc[is_antibody & is_mono & is_secondary, config.UT_CAT_COL] = "monoclonal secondary antibody"
+    print("  ✅ Antibody category consolidation complete.")
 
     # 7. Generate and save category counts for review
     print("ℹ️ Generating and saving category counts...")
@@ -66,4 +104,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

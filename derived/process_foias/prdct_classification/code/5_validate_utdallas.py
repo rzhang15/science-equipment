@@ -1,7 +1,8 @@
-# 5_validate_utdallas.py (Final Version)
+# 5_validate_utdallas.py (Final Version with Prediction Source Tracking)
 """
 Validates the end-to-end performance of a pipeline on the ENTIRE
-UT Dallas dataset and generates multiple, detailed report files.
+UT Dallas dataset and generates multiple, detailed report files,
+including the source of each prediction (model vs. rule).
 """
 import pandas as pd
 import os
@@ -46,7 +47,12 @@ def main(gatekeeper_name: str, expert_model_choice: str, min_support: int = 25):
 
     # 4. Run the full prediction pipeline
     print("\nℹ️ Running the full prediction pipeline on the full dataset...")
+    
+    # +++ MODIFIED: Initialize the prediction source column +++
+    df_output = df_validation.copy()
+    df_output['prediction_source'] = 'Non-Lab' # Default value
     y_pred = pd.Series("Non-Lab", index=df_validation.index)
+    
     is_lab_mask = (gatekeeper_model.predict(descriptions) == 1)
     print(f"  - Gatekeeper identified {is_lab_mask.sum()} potential lab items.")
 
@@ -54,10 +60,16 @@ def main(gatekeeper_name: str, expert_model_choice: str, min_support: int = 25):
         lab_descriptions = descriptions[is_lab_mask]
         expert_predictions = lab_descriptions.apply(expert_predictor.get_item_category)
         y_pred.update(expert_predictions)
+        # +++ MODIFIED: Track that these predictions came from the expert model +++
+        df_output.loc[expert_predictions.index, 'prediction_source'] = 'Expert Model'
 
     overrides = descriptions.apply(rule_categorizer.get_market_override)
-    y_pred.update(overrides.dropna())
-    print(f"  - Applied {overrides.notna().sum()} rule-based overrides.")
+    valid_overrides = overrides.dropna()
+    y_pred.update(valid_overrides)
+    print(f"  - Applied {len(valid_overrides)} rule-based overrides.")
+    # +++ MODIFIED: Track that these predictions came from market rules +++
+    if not valid_overrides.empty:
+        df_output.loc[valid_overrides.index, 'prediction_source'] = 'Market Rules'
 
     # 5. Simplify true labels and handle NaNs
     nonlab_pattern = '|'.join(config.NONLAB_CATEGORIES)
@@ -100,9 +112,9 @@ def main(gatekeeper_name: str, expert_model_choice: str, min_support: int = 25):
     print(f"  - Summary report (support >= {min_support}) saved to: {path_summary_report_txt}")
     
     # --- Save Detailed Predictions CSV ---
-    df_output = df_validation.copy()
     df_output['predicted_market_final'] = y_pred
     df_output['true_market_simplified'] = y_true_simplified
+    # The 'prediction_source' column is now automatically included here
     df_output.to_csv(path_predictions_csv, index=False)
     print(f"  - Detailed row-by-row predictions saved to: {path_predictions_csv}")
 

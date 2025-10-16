@@ -1,12 +1,51 @@
+# ==============================================================================
+# VETO RULES: required_keywords
+# ------------------------------------------------------------------------------
+# Use this section to VETO a prediction from the expert model if it's missing
+# an essential keyword. This prevents incorrect classifications.
+# ==============================================================================
+hierarchical_veto_rules:
+  - prefix: "cell culture antibiotics - "
+    abbreviations:
+      "penicillin-streptomycin": ["pen-strep", "pen strep"]
+      
+  - prefix: "amino acid - "
+    abbreviations:
+      "l-glutamine": ["glutamine", "gln"]
+      "l-glycine": ["glycine", "gly"]
+
+required_keywords:
+  "us fbs":
+    any_of:
+      - $FBS_TERMS
+  "bovine serum albumin":
+    any_of:
+      - "albumin"
+  "laemmli sample buffer":
+    any_of:
+      - "laemmli"
+  "polyclonal antibody":
+    any_of:
+      - "polyclonal"
+      - "pab"
+
+# ==============================================================================
+# ALIASES: keyword_groups
+# ------------------------------------------------------------------------------
+# Use this section to define groups of keywords you can reference later.
+# ==============================================================================
 keyword_groups:
-  # --- General Lab Actions & Types ---
   ASSAY_OR_KIT:
     - "*kit*"
     - "*assay*"
-
+  BUFFER:
+    - "*buffer*"
+    - "*bufr*"
   HIGH_FIDELITY:
     - "*high fidelity*"
+    - "high-fidelity"
     - "hf"
+    - "hifi"
   HOT_START:
     - "*hot start*"
     - "*fast start*"
@@ -14,7 +53,7 @@ keyword_groups:
     - "hs"
   APOPTOSIS:
     - "*apoptosis*"
-    - "*caspase*" # A key protein involved in apoptosis
+    - "*caspase*"
     - "*tunel*"
   NITRILE:
     - "*nitrile*"
@@ -26,441 +65,1114 @@ keyword_groups:
     - "*glove*"
     - "*glv*"
     - "*examglv*"
-
   STIR_BAR:
     - "*stir bar*"
     - "*spin bar*"
-
   PIPETTE:
     - "*pipette*"
     - "*pipet*"
-
   TUBE:
     - "*tube*"
     - "*tb*"
     - "*tbe*"
+    - "*tub*"
   FBS_TERMS:
-    - "fbs"
+    - "*fbs*"
+    - "*dfbs*"
     - "*fetal bovine serum*"
     - "*fetal calf serum*"
-    - "fcs"
-
+    - "*fcs*"
   RESTRICTION_ENZYME:
-    - "AclI"
-    - "HindIII-HF"
-    - "SspI-HF"
-    - "MluCI"
-    - "PciI"
-    - "AgeI-HF"
-    - "BspMI"
-    - "BfuAI"
-    - "SexAI"
-    - "MluI-HF"
-    - "BceAI"
-    - "HpyCH4IV"
-    - "HpyCH4III"
-    - "BaeI"
-    - "BsaXI"
-    - "AflIII"
-    - "SpeI-HF"
-    - "BsrI"
-    - "BmrI"
-    - "BglII"
-    - "AfeI"
-    - "AluI"
-    - "StuI"
-    - "ScaI-HF"
-    - "ClaI"
-    - "BspDI"
-    - "PI-SceI"
-    - "NsiI-HF"
-    - "AseI"
-    - "SwaI"
-    - "CspCI"
-    - "MfeI-HF"
-    - "PaqCI"
-    - "BssSI-v2"
-    - "Nb.BssSI"
-    - "BmgBI"
-    - "PmlI"
-    - "DraIII-HF"
-    - "AleI-v2"
-    - "EcoP15I"
-    - "PvuII-HF"
-    - "AlwNI"
-    - "BtsIMutI"
-    - "NdeI"
-    - "FatI"
-    - "NlaIII"
-    - "MslI"
-    - "XcmI"
-    - "BstXI"
-    - "PflMI"
-    - "BccI"
-    - "NcoI-HF"
-    - "BseYI"
-    - "FauI"
-    - "TspMI"
-    - "XmaI"
-    - "SmaI"
-    - "Nt.CviPII"
-    - "AciI"
-    - "SacII"
-    - "BsrBI"
-    - "MspI"
-    - "HpaII"
-    - "ScrFI"
-    - "StyD4I"
-    - "BsaJI"
-    - "BslI"
-    - "BtgI"
-    - "NciI"
-    - "AvrII"
-    - "MnlI"
-    - "BbvCI"
-    - "Nb.BbvCI"
-    - "Nt.BbvCI"
-    - "SbfI-HF"
-    - "Bpu10I"
-    - "Bsu36I"
-    - "EcoNI"
-    - "HpyAV"
-    - "PspGI"
-    - "BstNI"
-    - "StyI-HF"
-    - "BcgI"
-    - "PvuI-HF"
-    - "BstUI"
-    - "EagI-HF"
-    - "RsrII"
-    - "BsiEI"
-    - "BsiWI-HF"
-    - "BsmBI-v2"
-    - "Esp3I"
-    - "Hpy99I"
-    - "MspA1I"
-    - "MspJI"
-    - "SgrAI"
-    - "BfaI"
-    - "BspCNI"
-    - "PaeR7I"
-    - "XhoI"
-    - "EarI"
-    - "AcuI"
-    - "PstI-HF"
-    - "BpmI"
-    - "DdeI"
-    - "SfcI"
-    - "AflII"
-    - "BpuEI"
-    - "SmlI"
-    - "BsoBI"
-    - "AvaI"
-    - "MboII"
-    - "BbsI-HF"
-    - "XmnI"
-    - "BsmI"
-    - "Nb.BsmI"
-    - "EcoRI-HF"
-    - "HgaI"
-    - "ZraI"
-    - "AatII"
-    - "PflFI"
-    - "Tth111I"
-    - "PshAI"
-    - "AhdI"
-    - "DrdI"
-    - "SacI-HF"
-    - "Eco53kI"
-    - "BseRI"
-    - "MlyI"
-    - "PleI"
-    - "WarmStart Nt.BstNBI"
-    - "HinfI"
-    - "EcoRV-HF"
-    - "Sau3AI"
-    - "DpnII"
-    - "MboI"
-    - "DpnI"
-    - "BsaBI"
-    - "TfiI"
-    - "BsrDI"
-    - "Nb.BsrDI"
-    - "BbvI"
-    - "BtsI-v2"
-    - "Nb.BtsI"
-    - "BstAPI"
-    - "SfaNI"
-    - "SphI-HF"
-    - "SrfI"
-    - "NmeAIII"
-    - "NgoMIV"
-    - "NaeI"
-    - "BglI"
-    - "AsiSI"
-    - "BtgZI"
-    - "HhaI"
-    - "HinP1I"
-    - "BssHII"
-    - "NotI-HF"
-    - "Fnu4HI"
-    - "Cac8I"
-    - "MwoI"
-    - "NheI-HF"
-    - "BmtI-HF"
-    - "BspQI-HF"
-    - "SapI"
-    - "Nt.BspQI"
-    - "BlpI"
-    - "ApeKI"
-    - "TseI"
-    - "Bsp1286I"
-    - "AlwI"
-    - "BamHI-HF"
-    - "Nt.AlwI"
-    - "BtsCI"
-    - "FokI"
-    - "HaeIII"
-    - "FseI"
-    - "SfiI"
-    - "NarI"
-    - "KasI"
-    - "PluTI"
-    - "SfoI"
-    - "AscI"
-    - "EciI"
-    - "BsmFI"
-    - "ApaI"
-    - "PspOMI"
-    - "Sau96I"
-    - "NlaIV"
-    - "Acc65I"
-    - "KpnI-HF"
-    - "BsaI-HFv2"
-    - "HphI"
-    - "BstEII-HF"
-    - "AvaII"
-    - "BanI"
-    - "BaeGI"
-    - "BsaHI"
-    - "BanII"
-    - "RsaI"
-    - "CviQI"
-    - "BstZ17I-HF"
-    - "BciVI"
-    - "SalI-HF"
-    - "BsmAI"
-    - "BcoDI"
-    - "Nt.BsmAI"
-    - "ApaLI"
-    - "BsgI"
-    - "AccI"
-    - "Hpy166II"
-    - "Tsp45I"
-
-    - "HpaI"
-    - "PmeI"
-    - "HincII"
-    - "BsiHKAI"
-    - "TspRI"
-    - "ApoI-HF"
-    - "NspI"
-    - "BsrFI-v2"
-    - "BstYI"
-    - "HaeII"
-    - "CviKI-1"
-    - "EcoO109I"
-    - "PpuMI"
-    - "I-CeuI"
-    - "SnaBI"
-    - "I-SceI"
-    - "BspHI"
-    - "BspEI"
-    - "MmeI"
-    - "TaqI-v2"
-    - "NruI-HF"
-    - "Hpy188I"
-    - "Hpy188III"
-    - "XbaI"
-    - "BclI-HF"
-    - "HpyCH4V"
-    - "FspI"
-    - "PI-PspI"
-    - "MscI"
-    - "BsrGI-HF"
-    - "MseI"
-    - "PacI"
-    - "PsiI-v2"
-    - "BstBI"
-    - "DraI"
-    - "PspXI"
-    - "BsaWI"
-    - "BsaAI"
-    - "EaeI"
+    - AclI
+    - HindIII-HF
+    - SspI-HF
+    - MluCI
+    - PciI
+    - AgeI-HF
+    - BspMI
+    - BfuAI
+    - SexAI
+    - MluI-HF
+    - BceAI
+    - HpyCH4IV
+    - HpyCH4III
+    - BaeI
+    - BsaXI
+    - AflIII
+    - SpeI-HF
+    - BsrI
+    - BmrI
+    - BglII
+    - AfeI
+    - AluI
+    - StuI
+    - ScaI-HF
+    - ClaI
+    - BspDI
+    - PI-SceI
+    - NsiI-HF
+    - AseI
+    - SwaI
+    - CspCI
+    - MfeI-HF
+    - PaqCI
+    - BssSI-v2
+    - Nb.BssSI
+    - BmgBI
+    - PmlI
+    - DraIII-HF
+    - AleI-v2
+    - EcoP15I
+    - PvuII-HF
+    - AlwNI
+    - BtsIMutI
+    - NdeI
+    - FatI
+    - NlaIII
+    - MslI
+    - XcmI
+    - BstXI
+    - PflMI
+    - BccI
+    - NcoI-HF
+    - BseYI
+    - FauI
+    - TspMI
+    - XmaI
+    - SmaI
+    - Nt.CviPII
+    - AciI
+    - SacII
+    - BsrBI
+    - MspI
+    - HpaII
+    - ScrFI
+    - StyD4I
+    - BsaJI
+    - BslI
+    - BtgI
+    - NciI
+    - AvrII
+    - MnlI
+    - BbvCI
+    - Nb.BbvCI
+    - Nt.BbvCI
+    - SbfI-HF
+    - Bpu10I
+    - Bsu36I
+    - EcoNI
+    - HpyAV
+    - PspGI
+    - BstNI
+    - StyI-HF
+    - BcgI
+    - PvuI-HF
+    - BstUI
+    - EagI-HF
+    - RsrII
+    - BsiEI
+    - BsiWI-HF
+    - BsmBI-v2
+    - Esp3I
+    - Hpy99I
+    - MspA1I
+    - MspJI
+    - SgrAI
+    - BfaI
+    - BspCNI
+    - PaeR7I
+    - XhoI
+    - EarI
+    - AcuI
+    - PstI-HF
+    - BpmI
+    - DdeI
+    - SfcI
+    - AflII
+    - BpuEI
+    - SmlI
+    - BsoBI
+    - AvaI
+    - MboII
+    - BbsI-HF
+    - XmnI
+    - BsmI
+    - Nb.BsmI
+    - EcoRI-HF
+    - HgaI
+    - ZraI
+    - AatII
+    - PflFI
+    - Tth111I
+    - PshAI
+    - AhdI
+    - DrdI
+    - SacI-HF
+    - Eco53kI
+    - BseRI
+    - MlyI
+    - PleI
+    - WarmStart Nt.BstNBI
+    - HinfI
+    - EcoRV-HF
+    - Sau3AI
+    - DpnII
+    - MboI
+    - DpnI
+    - BsaBI
+    - TfiI
+    - BsrDI
+    - Nb.BsrDI
+    - BbvI
+    - BtsI-v2
+    - Nb.BtsI
+    - BstAPI
+    - SfaNI
+    - SphI-HF
+    - SrfI
+    - NmeAIII
+    - NgoMIV
+    - NaeI
+    - BglI
+    - AsiSI
+    - BtgZI
+    - HhaI
+    - HinP1I
+    - BssHII
+    - NotI-HF
+    - Fnu4HI
+    - Cac8I
+    - MwoI
+    - NheI-HF
+    - BmtI-HF
+    - BspQI-HF
+    - SapI
+    - Nt.BspQI
+    - BlpI
+    - ApeKI
+    - TseI
+    - Bsp1286I
+    - AlwI
+    - BamHI-HF
+    - Nt.AlwI
+    - BtsCI
+    - FokI
+    - HaeIII
+    - FseI
+    - SfiI
+    - NarI
+    - KasI
+    - PluTI
+    - SfoI
+    - AscI
+    - EciI
+    - BsmFI
+    - ApaI
+    - PspOMI
+    - Sau96I
+    - NlaIV
+    - Acc65I
+    - KpnI-HF
+    - BsaI-HFv2
+    - HphI
+    - BstEII-HF
+    - AvaII
+    - BanI
+    - BaeGI
+    - BsaHI
+    - BanII
+    - RsaI
+    - CviQI
+    - BstZ17I-HF
+    - BciVI
+    - SalI-HF
+    - BsmAI
+    - BcoDI
+    - Nt.BsmAI
+    - ApaLI
+    - BsgI
+    - AccI
+    - Hpy166II
+    - Tsp45I
+    - HpaI
+    - PmeI
+    - HincII
+    - BsiHKAI
+    - TspRI
+    - ApoI-HF
+    - NspI
+    - BsrFI-v2
+    - BstYI
+    - HaeII
+    - CviKI-1
+    - EcoO109I
+    - PpuMI
+    - I-CeuI
+    - SnaBI
+    - I-SceI
+    - BspHI
+    - BspEI
+    - MmeI
+    - TaqI-v2
+    - NruI-HF
+    - Hpy188I
+    - Hpy188III
+    - XbaI
+    - BclI-HF
+    - HpyCH4V
+    - FspI
+    - PI-PspI
+    - MscI
+    - BsrGI-HF
+    - MseI
+    - PacI
+    - PsiI-v2
+    - BstBI
+    - DraI
+    - PspXI
+    - BsaWI
+    - BsaAI
+    - EaeI
 
 # ==============================================================================
-#  Market Rules
-#  Rules now combine the general keyword groups from above.
+# OVERRIDE RULES: market_rules
+# ------------------------------------------------------------------------------
+# These rules override any previous prediction.
+# IMPORTANT: Always place MOST SPECIFIC rules BEFORE more GENERAL rules.
 # ==============================================================================
 market_rules:
+  # --- PCR & qPCR Reagents ---
   - name: "high-fidelity dna polymerases"
     all_of:
       - $HIGH_FIDELITY
       - "*polymerase*"
-    none_of: ["*taq*"]
-
-  - name: "taq polymerases"
-    all_of: ["*taq*",  "*polymerase*"]
+    none_of:
+      - "*taq*"
+  - name: "taq polymerases" 
+    all_of:
+      - "*taq*"
+      - "*polymerase*"
     none_of:
       - $HIGH_FIDELITY
       - $HOT_START
-
   - name: "hot start dna polymerases"
     all_of:
       - $HOT_START
       - "*polymerase*"
-    none_of: [$HIGH_FIDELITY]
+    none_of:
+      - $HIGH_FIDELITY
+  - name: "hot start pcr systems"
+    all_of:
+      - "sapphireamp"
+    none_of:
+      - "qpcr"
+  - name: "high-fidelity pcr systems"
+    all_of:
+      - $HIGH_FIDELITY
+      - "pcr"
+      - "master"
+  - name: "high-fidelity pcr systems"
+    all_of:
+      - $HIGH_FIDELITY
+      - "master"
+  - name: "pcr systems"
+    all_of:
+      - "pcr"
+      - "master"
+      - "max"
+  - name: "pcr systems"
+    all_of:
+      - "emeraldamp"
+    none_of:
+      - "qpcr"
+  - name: "dye-based qpcr systems"
+    all_of:
+      - "itaq"
+      - "sybr"
+      - "supermix"
+  - name: "dye-based qpcr systems"
+    all_of:
+      - "qpcr"
+      - "master"
+  - name: "dye-based qpcr systems"
+    all_of:
+      - "qpcr"
+      - "mix"
+  - name: "dye-based qpcr systems"
+    all_of:
+      - "powerupsybrgreen"
+  - name: "dye-based qpcr systems"
+    all_of:
+      - "fg"
+      - "fast"
+      - "sybr"
+      - "master"
+  - name: "dye-based qpcr systems"
+    all_of:
+      - "powerup"
+      - "sybr"
+      - "master"
+  - name: "dye-based qpcr systems"
+    all_of:
+      - "kapa"
+      - "sybr"
+      - "master"
+  - name: "probe-based qpcr systems"
+    all_of:
+      - "fg"
+      - "taqman"
+      - "gt"
+      - "master"
+  - name: "first-strand cdna synthesis systems"
+    all_of:
+      - "primescript"
+      - "rt"
+      - "master"
+      - "mix"
 
-  - name: "stir bars"
-    any_of: [$STIR_BAR]
-    none_of: ["retriever"]
-
+  # --- Other Reagents & Kits ---
   - name: "apoptosis detection kits"
     all_of:
       - $APOPTOSIS
       - $ASSAY_OR_KIT
   - name: "apoptosis detection kits"
-    all_of: ["caspase", "colorimetric"]
-
+    all_of:
+      - "caspase"
+      - "colorimetric"
   - name: "synthetic dna oligonucleotide"
-    all_of: ["*oligo*", "dna"]
-  - name: "synthetic dna oligonucleotide"
-    all_of: ["*oligo*", "dna"]
+    all_of:
+      - "*oligo*"
+      - "dna"
+  - name: "synthetic rna oligonucleotide"
+    all_of:
+      - "*oligo*"
+      - "rna"
+  - name: "bovine serum albumin"
+    all_of:
+      - "bovine"
+      - "serum"
+      - "albumin"
+  - name: "laemmli sample buffer"
+    all_of:
+      - "laemmli"
+      - "buffer"
+  - name: "laemmli sample buffer"
+    all_of:
+      - "laemmli"
+      - "buf"
 
-  - name: "nitrile gloves"
-    all_of: [$NITRILE, $GLOVES]
-
-  - name: "serological pipettes"
-    all_of: [$PIPETTE, "*ser*"]
-  - name: "serological pipettes"
-    all_of: [$PIPETTE, "stripet"]
-  - name: "serological pipettes"
-    all_of: [$PIPETTE, "strpet"]
-
-  - name: "sterile filtered pipette tips"
-    all_of: ["tip", "*fil*"]
-    none_of: ["lw reten", "low reten", "low"]
-  - name: "sterile filtered pipette tips"
-    all_of: ["tip", "*fitl*"]
-    none_of: ["lw reten", "low reten", "low"]
-  - name: "sterile filtered pipette tips"
-    all_of: ["tip", "*fltr*"]
-    none_of: ["lw reten", "low reten", "low"]
-  - name: "sterile filtered pipette tips"
-    all_of: ["tip", "*barrier*"]
-    none_of: ["lw reten", "low reten", "low"]
-
-  - name: "low retention pipette tips"
-    all_of: ["tip", "low reten"]
-  - name: "low retention pipette tips"
-    all_of: ["tip", "lw reten"]
-  - name: "low retention pipette tips"
-    all_of: ["tip", "lr"]
-
-  - name: "gel loading pipette tips"
-    all_of: ["tip", "gel load"]
-  - name: "extended length pipette tips"
-    all_of: ["tip", "xl"]
-
-  - name: "standard pipette tips"
-    any_of: ["tip", "$PIPETTE"]
-    none_of: ["*ser*", "stripet", "strpet"]
-
+  # --- Media ---
   - name: "liquid basal media, not chemically defined"
-    all_of: ["*mccoy*", "5a"]
+    all_of:
+      - "*mccoy*"
+      - "5a"
   - name: "liquid basal media, not chemically defined"
-    all_of: ["*leibovitz*", "med"]
+    all_of:
+      - "*leibovitz*"
+      - "med"
   - name: "liquid basal media, not chemically defined"
-    all_of: ["rhtgf-b1"]
+    all_of:
+      - "rhtgf-b1"
   - name: "liquid basal media, not chemically defined"
-    all_of: ["bme", "glutamine"]
+    all_of:
+      - "bme"
+      - "glutamine"
   - name: "liquid basal media, not chemically defined"
-    all_of: ["basal", "med"]
+    all_of:
+      - "basal"
+      - "med"
   - name: "liquid basal media, not chemically defined"
-    all_of: ["basal", "med"]
+    all_of:
+      - "*dme*"
+      - "media"
   - name: "liquid basal media, not chemically defined"
-    all_of: ["*dme*", "media"]
+    all_of:
+      - "*dmem*"
   - name: "liquid basal media, not chemically defined"
-    all_of: ["*dmem*"]
+    all_of:
+      - "*dulbecco*"
+      - "modified"
   - name: "liquid basal media, not chemically defined"
-    all_of: ["*dulbecco*", "modified"]
+    all_of:
+      - "rpmi 1640"
   - name: "liquid basal media, not chemically defined"
-    all_of: ["rpmi 1640"]
+    all_of:
+      - "*emem*"
   - name: "liquid basal media, not chemically defined"
-    all_of: ["*emem*"]
-  - name: "liquid basal media, not chemically defined"
-    all_of: ["*eagle medi*"]
-
+    all_of:
+      - "*eagle medi*"
+  - name: "dehydrated bacterial broth"
+    all_of: 
+      - "soc"
+      - "medium"
+  - name: "dehydrated bacterial broth"
+    all_of: 
+      - "*s.o.c*"
+      - "medium"
+  - name: "dehydrated bacterial broth"
+    all_of: 
+      - "mueller"
+      - "broth"
+  - name: "dehydrated bacterial broth"
+    all_of: 
+      - "mueller"
+      - "brth"
+  - name: "dehydrated bacterial broth"
+    all_of: 
+      - "circlegrow"
+  - name: "dehydrated bacterial broth"
+    all_of: 
+      - "broth"
+      - "lennox"
+  - name: "dehydrated bacterial broth"
+    all_of: 
+      - "brth"
+      - "lennox"
+  - name: "syringe filters"
+    all_of:
+      - "*syr*"
+      - "*flt*"
+  - name: "syringe filters"
+    all_of:
+      - "*sy*"
+      - "*flt*"
+  - name: "syringe filters"
+    all_of:
+      - "millex-gv"
+  - name: "syringe filters"
+    all_of:
+      - "milx"
+  - name: "syringe filters"
+    all_of:
+      - "*millex*"
+  - name: "syringe filters"
+    all_of:
+      - "*anotop*"
+  - name: "syringe filters"
+    all_of:
+      - "*syr*"
+      - "*filt*"
+  - name: "syringe filters"
+    all_of:
+      - "puradisc"
+  # --- FBS Rules (Specific before General) ---
   - name: "new zealand fbs"
-    all_of: [$FBS_TERMS, "*new zealand*"]
-
+    all_of:
+      - $FBS_TERMS
+      - "*new zealand*"
+    none_of:
+      - "albumin"
   - name: "us fbs"
-    all_of: [$FBS_TERMS]
+    all_of:
+      - $FBS_TERMS
+      - "*us*"
+    none_of:
+      - "albumin"
+  - name: "us fbs" # General catch-all for FBS
+    any_of:
+      - $FBS_TERMS
+    none_of:
+      - "albumin"
 
-  
-  - name: "laemmli sample buffer"
-    all_of: ["laemmli", "buffer"]
-  - name: "laemmli sample buffer"
-    all_of: ["laemmli", "buf"]
-    
-  - name: "cell lysis detergents"
-    all_of: ["sodium deoxycholate"]
-  - name: "cell lysis detergents"
-    all_of: ["sds"]
-  - name: "cell lysis detergents"
-    all_of: ["triton"]
-  - name: "cell lysis detergents"
-    all_of: ["dodecyl sulfate"]
-  - name: "cell lysis detergents"
-    all_of: ["tween"]
-  - name: "cell lysis detergents"
-    all_of: ["digitonin"]
-  - name: "cell lysis detergents"
-    all_of: ["igepalr"]
-  - name: "cell lysis detergents"
-    all_of: ["sodium dodecyl sulfate"]
-  - name: "cell lysis detergents"
-    all_of: ["chaps"]
-  - name: "cell lysis detergents"
-    all_of: ["np40"]
-  - name: "cell lysis detergents"
-    all_of: ["b-per"]
-
-  - name: "column-based rna miniprep"
-    all_of: ["*rna*", "mini prep", "column"]
-  - name: "column-based dna plasmid miniprep"
-    all_of: ["mini prep", "column"]
+  # --- Pipettes & Tips (Specific before General) ---
+  - name: "serological pipettes"
+    all_of:
+      - $PIPETTE
+      - "*ser*"
+  - name: "serological pipettes"
+    all_of:
+      - $PIPETTE
+      - "*stripet*"
+  - name: "serological pipettes"
+    all_of:
+      - "pap"
+      - "*stripet*"
+  - name: "serological pipettes"
+    all_of:
+      - $PIPETTE
+      - "*strpet*"
+  - name: "pasteur pipettes"
+    all_of: 
+      - $PIPETTE
+      - "*past*"
+  - name: "pasteur pipettes"
+    all_of: 
+      - $PIPETTE
+      - "*disp*"
+  - name: "sterile filtered pipette tips"
+    all_of:
+      - "tip"
+      - "*fil*"
+    none_of:
+      - "lw reten"
+      - "low reten"
+      - "low"
+  - name: "sterile filtered pipette tips"
+    all_of:
+      - "tip"
+      - "*fitl*"
+    none_of:
+      - "lw reten"
+      - "low reten"
+      - "low"
+  - name: "sterile filtered pipette tips"
+    all_of:
+      - "tip"
+      - "*fltr*"
+    none_of:
+      - "lw reten"
+      - "low reten"
+      - "low"
+  - name: "sterile filtered pipette tips"
+    all_of:
+      - "tip"
+      - "*barrier*"
+    none_of:
+      - "lw reten"
+      - "low reten"
+      - "low"
+  - name: "low retention pipette tips"
+    all_of:
+      - "tip"
+      - "low reten"
+  - name: "low retention pipette tips"
+    all_of:
+      - "tip"
+      - "lw reten"
+  - name: "low retention pipette tips"
+    all_of:
+      - "tip"
+      - "lr"
+  - name: "gel loading pipette tips"
+    all_of:
+      - "tip"
+      - "gel load"
+  - name: "extended length pipette tips"
+    all_of:
+      - "tip"
+      - "xl"
+  - name: "standard pipette tips" # General catch-all for tips
+    any_of:
+      - "tip"
+      - $PIPETTE
+    none_of:
+      - "*ser*"
+      - "stripet"
+      - "strpet"
+      - "gel load"
+      - "low reten"
+  - name: "restriction enzymes"
+    exact_any_of:
+      - $RESTRICTION_ENZYME
+  # --- General Labware ---
+  - name: "nitrile gloves"
+    all_of:
+      - $NITRILE
+      - $GLOVES
+  - name: "stir bars"
+    any_of:
+      - $STIR_BAR
+    none_of:
+      - "retriever"
+      - "stir bar retrievers"
+  - name: "scintillation vials"
+    all_of:
+      - "vial"
+      - "scint"
+  - name: "microcentrifuge tubes"
+    all_of:
+      - "microtub"
+  - name: "microcentrifuge tubes"
+    all_of:
+      - "microtbe"
+  - name: "microcentrifuge tubes"
+    all_of:
+      - "microtub"
+  - name: "microcentrifuge tubes"
+    all_of:
+      - $TUBE
+      - "*microcent*"
+  - name: "microcentrifuge tubes"
+    all_of:
+      - $TUBE
+      - "*lobnd*"
+  - name: "microcentrifuge tubes"
+    all_of:
+      - $TUBE
+      - "*mct*"
+  - name: "centrifuge conical tubes"
+    all_of:
+      - $TUBE
+      - "*cent*"
+  - name: "centrifuge conical tubes"
+    all_of:
+      - $TUBE
+      - "*cfg*"
+  - name: "centrifuge conical tubes"
+    all_of:
+      - $TUBE
+      - "*cnt*"
+  - name: "centrifuge conical tubes"
+    all_of:
+      - $TUBE
+      - "*conic*"
+  - name: "centrifuge conical tubes"
+    all_of:
+      - "cap"
+      - "cb" 
+      - "ct"
+  - name: "centrifuge conical tubes"
+    all_of:
+      - $TUBE
+      - "flatpp"
+  - name: "centrifuge conical tubes"
+    all_of:
+      - $TUBE
+      - "conical"
   - name: "spin columns"
-    all_of: ["spin" , "column"]
+    all_of:
+      - "spin"
+      - "column"
+  - name: "cell culture tubes"
+    all_of:
+      - $TUBE
+      - "*tc*"
+  - name: "cell culture tubes"
+    all_of:
+      - $TUBE
+      - "*cult*"
+  - name: "cell culture dishes"
+    all_of:
+      - "*dish*"
+      - "*tissue*"
+  - name: "cell culture dishes"
+    all_of:
+      - "dish"
+      - "tc"
+  - name: "cell culture dishes"
+    all_of:
+      - "dish"
+      - "cell culture"
+  - name: "cell culture plates"
+    all_of:
+      - "*96well*"
+      - "*plate*"
+  - name: "cell culture plates"
+    all_of:
+      - "*96well*"
+      - "*plt*"
+  - name: "pvdf blotting membranes"
+    all_of:
+      - "pvdf"
+      - "membrane"
+  - name: "pvdf blotting membranes"
+    all_of:
+      - "pvdf"
+      - "fltr sheet"
+  - name: "pvdf blotting membranes"
+    all_of:
+      - "ipvh"
+      - "membrane"
+  - name: "pvdf blotting membranes"
+    all_of:
+      - "ipvh"
+      - "fltr sheet"
+  - name: "centrifugal concentrators"
+    all_of: 
+      - "*vivaspinturbo*"
+  - name: "centrifugal concentrators"
+    all_of: 
+      - "pes"
+      - "concentrator"
 
-  - name: "pvdf blotting membranes"
-    all_of: ["pvdf", "membrane"]
-  - name: "pvdf blotting membranes"
-    all_of: ["pvdf", "fltr sheet"]
-  - name: "pvdf blotting membranes"
-    all_of: ["ipvh", "membrane"]
-  - name: "pvdf blotting membranes"
-    all_of: ["ipvh", "fltr sheet"]
+  # --- Buffers ---
+  - name: "cell lysis buffers"
+    all_of:
+      - "ripa"
+      - $BUFFER
+  - name: "cell lysis buffers"
+    all_of:
+      - "np40"
+      - $BUFFER
+  - name: "cell lysis buffers"
+    all_of:
+      - "extraction"
+      - $BUFFER
+  - name: "cell lysis buffers"
+    all_of:
+      - "xtractor"
+      - $BUFFER
+  - name: "cell lysis buffers"
+    all_of:
+      - "extraction"
+      - "solution"
+  - name: "cell lysis buffers"
+    all_of:
+      - "lysis"
+      - $BUFFER
+  - name: "acidic ph buffers"
+    all_of:
+      - "ph"
+      - "buffer"
+      - "4"
+  - name: "basic ph buffers"
+    all_of:
+      - "ph"
+      - "buffer"
+      - "10"
+  - name: "neutral ph buffers"
+    all_of:
+      - "ph"
+      - "buffer"
+      - "7"
 
+  # --- Detergents ---
+  - name: "cell lysis detergents"
+    all_of: 
+      - "sodium" 
+      - "deoxycholate"
+  - name: "cell lysis detergents"
+    all_of: 
+      - "igepal"
+  - name: "cell lysis detergents"
+    all_of: 
+      - "sds"
+  - name: "cell lysis detergents"
+    all_of: 
+      - "sodium dodecyl sulfate"
+  - name: "cell lysis detergents"
+    all_of: 
+      - "dodecyl sulfate"
+  - name: "cell lysis detergents"
+    all_of: 
+      - "b-per bacterial protein"
+  - name: "cell lysis detergents"
+    all_of: 
+      - "b-per"
+  - name: "cell lysis detergents"
+    all_of: 
+      - "cellytic"
+  - name: "cell lysis detergents"
+    all_of: 
+      - "chaps"
+  - name: "cell lysis detergents"
+    all_of: 
+      - "ddm"
+  - name: "cell lysis detergents"
+    all_of: 
+      - "digiton"
+      - "digitonin"
+  - name: "cell lysis detergents"
+    all_of: 
+      - "m-per"
+  - name: "cell lysis detergents"
+    all_of: 
+      - "np40"
+    none_of:
+      - $BUFFER
+  - name: "cell lysis detergents"
+    all_of: 
+      - "triton"
+  - name: "cell lysis detergents"
+    all_of: 
+      - "tween"
+
+  # --- Other Reagents ---
+  - name: "transfection reagents"
+    all_of:
+      - "lipofectamine"
   - name: "nucleic acid gel stains"
-    all_of: ["gel", "stain" , "dna"]
+    all_of:
+      - "diamidino"
+      - "phenylin"
   - name: "nucleic acid gel stains"
-    all_of: ["gelred"]
+    all_of:
+      - "hoechst"
+      - "trihydroch"
   - name: "nucleic acid gel stains"
-    all_of: ["diamidino", "phenylin"]
+    all_of:
+      - "*gel*"
+      - "*stain*"
   - name: "nucleic acid gel stains"
-    all_of: ["hoechst", "trihydroch"]
+    all_of:
+      - "dapi"
   - name: "nucleic acid gel stains"
-    all_of: ["gelgreen"]
+    all_of:
+      - "gelred"
   - name: "nucleic acid gel stains"
-    all_of: ["sybr green"]
+    all_of:
+      - "gelgreen"
+      - "sybr green"
+  - name: "acrylamide/bis solution"
+    all_of:
+      - "*acrylamid*"
+      - "*bisacrylamid*"
+  - name: "acrylamide/bis solution"
+    all_of:
+      - "*bis-acrylamide*"
+  - name: "antibody-based affinity resins"
+    all_of:
+      - "protein"
+      - "*agarose*"
+  - name: "antibody-based affinity resins"
+    all_of:
+      - "red"
+      - "anti-flag"
+  - name: "antibody-based affinity resins"
+    all_of:
+      - "igg"
+      - "sepharose"
+  - name: "antibody-based affinity resins"
+    all_of:
+      - "igg"
+      - "agar"
+  - name: "cell culture dissociation reagents"
+    all_of:
+      - "trypsin"
+      - "bovine"
+      - "pancreas"
+  - name: "cell culture dissociation reagents"
+    all_of:
+      - "edta"
+      - "trypsn"
+  - name: "cell culture dissociation reagents"
+    all_of:
+      - "trypsin"
+  - name: "cell culture dissociation reagents"
+    all_of:
+      - "collagenase"
+      - "type"
+      - "iv"
+  - name: "cell culture dissociation reagents"
+    all_of:
+      - "versene"
+  - name: "chemiluminescent substrates"
+    all_of: 
+      - "chemiluminescent detection"
+  - name: "chemiluminescent substrates"
+    all_of: 
+      - "d-luciferin potasium salt"
+  - name: "chemiluminescent substrates"
+    all_of: 
+      - "d-luciferin sodium salt"
+  - name: "chemiluminescent substrates"
+    all_of: 
+      - "ecl western blotting sub"
+  - name: "chemiluminescent substrates"
+    all_of: 
+      - "signalfire"
+  - name: "chemiluminescent substrates"
+    all_of: 
+      - "supersignal"
+  - name: "chemiluminescent substrates"
+    all_of: 
+      - "xenolight"
+  - name: "column-based rna extraction kits"
+    all_of:
+      - "rneasy"
+      - "mini"
+  - name: "column-based rna extraction kits"
+    all_of:
+      - "rna"
+      - "cleanup"
+      - "genejet"
+  - name: "column-based rna extraction kits"
+    all_of:
+      - "directzol"
+      - "micro"
+      - "rna"
+  - name: "column-based rna minprep"
+    all_of:
+      - "miniprep"
+      - "rna"
+  - name: "column-based rna minprep"
+    all_of:
+      - "purelink"
+      - "rna"
+      - "mini"
+  - name: "column-based rna purification kits"
+    all_of:
+      - "rneasy"
+      - "minelute"
+  - name: "column-based rna purification kits"
+    all_of:
+      - "mirvana"
+      - "mirna"
+      - "isolation"
+  - name: "column-based rna purification kits"
+    all_of:
+      - "genejet"
+      - "rna"
+      - "purif"
+  - name: "column-based rna purification kits"
+    all_of:
+      - "*rna*"
+      - "*iso*"
+  - name: "column-based rna purification kits"
+    all_of:
+      - "*rna*"
+      - "*purif*"
+  - name: "column-based rna purification kits"
+    all_of:
+      - "*rna*"
+      - "*clean*"
+  - name: "column-based dna plasmid megaprep"
+    all_of:
+      - "megaprep"
+  - name: "column-based dna plasmid midiprep"
+    all_of:
+      - "midi"
+      - "nucleobond"
+  - name: "column-based dna plasmid midiprep"
+    all_of:
+      - "midiprep"
+      - "plasmid"
+  - name: "column-based dna plasmid miniprep"
+    all_of:
+      - "*mini*"
+      - "*prep*"
+  - name: "column-based dna purification kits"
+    all_of:
+      - "dneasy"
+      - "kit"
+  - name: "column-based dna purification kits"
+    all_of:
+      - "monarch"
+      - "dna"
+  - name: "column-based dna purification kits"
+    all_of:
+      - "*clean*"
+      - "dna"
+      - "prep"
+  - name: "crosslinking reagents"
+    all_of:
+      - "egs"
+  - name: "crosslinking reagents"
+    all_of:
+      - "edc"
+  - name: "crosslinking reagents"
+    all_of:
+      - "dgs"
+  - name: "crosslinking reagents"
+    all_of:
+      - "glutaraldehyde"
+      - "*sol*"
+  - name: "dmf"
+    all_of:
+      - "*dimethyl*"
+      - "*formamide*"
+  - name: "dmf"
+    all_of:
+      - "*dimetformamide*"
+  - name: "dmf"
+    all_of:
+      - "dmf"
+  - name: "dmso"
+    all_of:
+      - "*dimethyl*"
+      - "*sulfoxide*"
+  - name: "dmso"
+    all_of:
+      - "dmso"
+  - name: "dna polymerase i"
+    all_of:
+      - "deoxyribonuclease"
+      - "bovine"
+  - name: "dna polymerase i"
+    all_of:
+      - "deoxyribonuclease"
+      - "crude"
+  - name: "dntps"
+    all_of:
+      - "deoxynucleotide solution mix"
+  - name: "dntps"
+    all_of:
+      - "*deoxynuc*"
+      - "mix"
+  - name: "dntps"
+    all_of:
+      - "dntps"
+  - name: "dntps"
+    all_of:
+      - "datp"
+  - name: "dntps"
+    all_of:
+      - "dttp"
+  - name: "dntps"
+    all_of:
+      - "dgtp"
+  - name: "dntps"
+    all_of:
+      - "dctp"
+  - name: "monoclonal primary antibody"
+    all_of:
+      - "monoclonal"
+      - "mouse"
+  - name: "monoclonal primary antibody"
+    all_of:
+      - "monoclonal"
+      - "anti"
+  - name: "monoclonal primary antibody"
+    all_of:
+      - "mab"
+  - name: "methylene chloride"
+    all_of:
+      - "methylene"
+      - "*chlor*"
+    none_of:
+      - "hexane"
+  - name: "weigh boats"
+    all_of:
+      - "*weigh*"
+    any_of:
+      - "*boat*"
+      - "*dish*"
+  - name: "weighing papers"
+    all_of:
+      - "*weigh*"
+    any_of:
+      - "*ppr*"
+      - "*paper*"
+  - name: "unstained protein molecular-weight ladder"
+    all_of: ["protein", "*std*"]
+    any_of: ["*unstain*", "*unstd*"]
+  - name: "unstained protein molecular-weight ladder"
+    all_of: ["protein", "*stand*"]
+    any_of: ["*unstain*", "*unstd*"]
+  - name: "pre-stained protein molecular-weight ladder"
+    all_of: ["protein", "*stand*"]
+    any_of: ["*prestain*", "*prestd*", "*prestn*"]
+  - name: "pre-stained protein molecular-weight ladder"
+    all_of: ["protein", "*std*"]
+    any_of: ["*prestain*", "*prestd*", "*prestn*"]
+  - name: "pre-stained protein molecular-weight ladder"
+    all_of: ["*prot*"]
+    any_of: ["*spectra*", "*seeblue*", "pageruler", "precision plus", "ez-run", "novex"]
+  - name: "pre-stained protein molecular-weight ladder"
+    all_of: ["*ladder*"]
+    any_of: ["*spectra*", "*seeblue*", "pageruler", "precision plus", "ez-run", "novex"]
+  - name: "coverslips"
+    all_of: ["*cover*", "*glas*"]
+  - name: "coverslips"
+    all_of: ["*cover*", "*gls*"]
+  - name: "coverslips"
+    all_of: ["*cv*", "*glas*"]
+  - name: "coverslips"
+    all_of: ["*cv*", "*gls*"]
+  - name: "coverslips"
+    all_of: ["*cvr*", "*glas*"]
+  - name: "coverslips"
+    all_of: ["*cvr*", "*gls*"]
+  - name: "bottle top filters"
+    all_of: ["steritop"]
+  - name: "bottle top filters"
+    all_of: ["*fltr*", "*bottltop*"]
+  - name: "bottle top filters"
+    all_of: ["*flt*", "*uta*"]
+  - name: "bottle top filters"
+    all_of: ["*btl*", "*fltr*"]
+  - name: "bottle top filters"
+    all_of: ["*aspirator*", "*pes*"]
+  - name: "tris base"
+    all_of: ["tris", "base"]
+    non_of: "("
