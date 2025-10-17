@@ -1,3 +1,0 @@
-./samp/ | /Users/conniexu/Dropbox (Harvard University)/RubiCon Dissertation/derived_output_sci_eq/make_mkt_panel/
-./matched/ | /Users/conniexu/Dropbox (Harvard University)/RubiCon Dissertation/derived_output_sci_eq/make_control/
-
