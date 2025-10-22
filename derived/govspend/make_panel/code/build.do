@@ -36,7 +36,7 @@ program import_pulls
         gen purchasedate = date(date, "YMD")
         format purchasedate %td
         gen year = year(purchasedate)
-        keep product_desc suppliername price year agencyname qty spend id poid orgid
+        keep product_desc suppliername price year agencyname qty spend id poid orgid purchasedate
     }
     frame change default
     clear
@@ -96,10 +96,14 @@ program append_predata
     merge m:1 poid using ../output/ls_pos, assert(3) keep(3) nogen
     merge m:1 vendorid using ../output/vendor_chars, assert(3) keep(3) nogen
     gen suppliername = name1 + name2
-    rename (description category unitprice quantity totalprice accountname) (product_desc lineitemcategory price qty spend agencyname) 
-    keep product_desc suppliername price year agencyname qty spend id orgid qty price spend poid year
+    rename (description category unitprice quantity totalprice accountname issueddate) (product_desc lineitemcategory price qty spend agencyname purchasedate) 
+    keep product_desc purchasedate suppliername price year agencyname qty spend id orgid qty price spend poid year
     tostring id,replace 
     tostring poid,replace 
+    gen date = date(purchasedate, "YMD")
+    format date %td
+    drop purchasedate
+    rename date purchasedate
     save ../output/govspend_pre2015, replace
     append using ../output/govspend_post2015
     replace agencyname = strlower(agencyname)
@@ -112,14 +116,21 @@ program append_predata
 	foreach v in "hotel" "audit" "consulting" "courier" "custom" "grant" "honorarium" "membership" "postage" "reimb" "salaried" "secur" "ship" "staff" "blanket po" "adapter" "adap" "computer" "dell" "desktop" "ink cartridge" "laptop" "monitor" "optiplex" "printer" "bucket" "cabinet" "can" "cart" "handle" "haz" "laundry Barrier" "laundry FR" "step stool" "tackymat" "label" "fy20" "lodg" "print" "orientation" "isbn" "report" {
         drop if strpos(product_desc, "`v'") > 0 
     }
-    drop if strpos(agencyname, "jr college")  > 0
-    save ../output/govspend_panel, replace
+    drop if strpos(agencyname, "jr college", "city college")  > 0
+    save ../output/govspend_panel_full, replace
     keep if year >= 2010
-    bys agencyname year: gen org_yr_cntr = _n == 1
+    gen month = month(purchasedate)
+    bys agencyname year month: gen org_yr_mnth_cntr = _n == 1
+    bys agencyname year : egen org_mnth_cntr = total(org_yr_mnth_cntr)
+    keep if org_mnth_cntr >= 6
+    bys agencyname year : gen org_yr_cntr =  _n == 1
     bys agencyname: egen num_yrs = total(org_yr_cntr)
     keep if num_yrs == 10
     save ../output/balanced_govspend_2010_2019, replace
     export delimited ../output/govspend_panel, replace
+    gcontract agencyname
+    drop _freq
+    save ../output/final_unis_list, replace
 end
 
 main
