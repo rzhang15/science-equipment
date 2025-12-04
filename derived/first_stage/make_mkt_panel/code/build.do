@@ -15,8 +15,7 @@ program main
     foreach t in tfidf {
         select_good_categories, embed(`t')
         clean_raw, embed(`t')
-        *analyze_specific_markets, embed(`t')
-        *make_panels, embed(`t')
+        make_panels, embed(`t')
     }
 end
 
@@ -121,7 +120,6 @@ program clean_raw
     replace suppliername = "thermo fisher scientific" if suppliername == "possible missions" & strpos(agencyname, "texas") > 0
     bys suppliername: gegen tot_sup_spend = total(spend)
     drop if tot_sup_spend  < 0 
-    stop 
     gen obs_cnt = 1 
 
     bys category: gen cat_id = _n == 1
@@ -203,30 +201,12 @@ program clean_raw
     bys category year: gegen category_spend = total(raw_spend)
     bys category supplier_id year: gen num_suppliers_id = _n == 1
     bys category year: gegen num_suppliers = total(num_suppliers) 
-    save ../output/item_level_`embed', replace
-end
-
-program analyze_specific_markets
-    syntax, embed(string)
-    use ../output/item_level_`embed', clear
-
-    // us fbs,  dye-based qpcr systems, taq polymerases, cell culture dissociation reagents
-    keep if inlist(category, "us fbs", "dye-based qpcr systems", "taq polymerases", "cell culture dissociation reagents")
-    glevelsof category, local(categories)
-    foreach c in `categories' {
-        preserve
-        keep if category == "`c'"
-        foreach var in raw_price raw_qty raw_spend {
-            graph box `var' , over(year) 
-            graph export "../output/figures/`c'_`var'_dist.pdf", replace
-        }
-        restore
-    }
+    save ../temp/item_level_`embed', replace
 end
 
 program make_panels
     syntax, embed(string)
-    use ../output/item_level_`embed', clear
+    use ../temp/item_level_`embed', clear
     gegen mkt = group(category)
     preserve
     collapse (max) treated (mean) *price num_suppliers (sum) obs_cnt *raw_qty *raw_spend (firstnm) suppliername mkt , by(supplier_id category year)
