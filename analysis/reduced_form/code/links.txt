@@ -1,2 +1,2 @@
-./samp/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/rf_samp/output
+./samp/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/reduced_form/rf_samp/output
 

@@ -122,13 +122,20 @@ program append_predata
     gen month = month(purchasedate)
     bys agencyname year month: gen org_yr_mnth_cntr = _n == 1
     bys agencyname year : egen org_mnth_cntr = total(org_yr_mnth_cntr)
-    keep if org_mnth_cntr >= 6
+*    keep if org_mnth_cntr >= 8
     bys agencyname year : gen org_yr_cntr =  _n == 1
     bys agencyname: egen num_yrs = total(org_yr_cntr)
     keep if num_yrs == 10
     save ../output/balanced_govspend_2010_2019, replace
     export delimited ../output/govspend_panel, replace
+    gcontract agencyname year month
+    bys agencyname year: gen num_mnths = _N
+    drop _freq
+    drop if num_mnths < 8
+    gcontract agencyname year
+    drop _freq
     gcontract agencyname
+    drop if _freq != 10
     drop _freq
     save ../output/final_unis_list, replace
 end

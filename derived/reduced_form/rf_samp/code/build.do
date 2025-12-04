@@ -34,7 +34,7 @@ program import_cluster_classification
     heatplot exposuregemini exposuregpt,  xlab(0 "Low" 1 "Medium" 2 "High") ylab(0 "Low" 1 "Medium" 2 "High") bwidth(1) color(carto Teal, intensity(.5))  statistic(count) values(format(%9.0f)) legend(off) cuts(0 4  7 8 12 16 30 32 68 168)
     graph export ../output/correlation.pdf, replace
     keep if exposuregemini==exposuregpt
-    drop if exposuregemini==1
+    *drop if exposuregemini==0
     gcontract clusterid exposuregemini
     drop _freq
     rename exposuregemini exposure
@@ -46,6 +46,9 @@ program athr_cluster
     drop if cluster == -1
     rename cluster clusterid
     merge m:1 clusterid using ${temp}/relevant_clusters, assert(1 3) keep(3) nogen
+    keep if inlist(clusterid, 8, 2, 278, 75, 47,97, 63, 246, 267) | inlist(clusterid, 343, 52, 9, 306)
+    replace exposure = 0 if  inlist(clusterid, 8, 2, 278, 75, 47,97, 63, 246, 267)
+    replace exposure = 2 if inlist(clusterid, 343, 52, 9, 306)
     save ${temp}/relevant_athrs, replace
 
     use if inrange(year, 2000, 2024) using ../external/samp/second/cleaned_all_15jrnls, clear

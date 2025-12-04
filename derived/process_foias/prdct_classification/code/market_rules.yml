@@ -39,6 +39,7 @@ keyword_groups:
     - "*kit*"
     - "*assay*"
     - "*prep*"
+    - "*assembly*"
   BUFFER:
     - "*buffer*"
     - "*bufr*"
@@ -78,28 +79,35 @@ keyword_groups:
     - "*plt*"
     - "*mltdish*"
     - "*multidish*"
+  FLASK:
+    - "*flask*"
+    - "*flsk*"
   TUBE:
     - "*tube*"
     - "*tb*"
     - "*tbe*"
     - "*tub*"
   FBS_TERMS:
-    - "*fbs*"
-    - "*dfbs*"
+    - "fbs"
+    - "dfbs"
     - "*fetal bovine serum*"
     - "*fetal calf serum*"
-    - "*fcs*"
+    - "fcs"
   RESTRICTION_ENZYME:
     - AclI
     - HindIII-HF
+    - HindIII
     - SspI-HF
+    - SspI
     - MluCI
     - PciI
     - AgeI-HF
+    - AgeI
     - BspMI
     - BfuAI
     - SexAI
     - MluI-HF
+    - MluI
     - BceAI
     - HpyCH4IV
     - HpyCH4III
@@ -107,6 +115,7 @@ keyword_groups:
     - BsaXI
     - AflIII
     - SpeI-HF
+    - SpeI
     - BsrI
     - BmrI
     - BglII
@@ -114,23 +123,28 @@ keyword_groups:
     - AluI
     - StuI
     - ScaI-HF
+    - ScaI
     - ClaI
     - BspDI
     - PI-SceI
     - NsiI-HF
+    - NsiI
     - AseI
     - SwaI
     - CspCI
     - MfeI-HF
+    - MfeI
     - PaqCI
     - BssSI-v2
     - Nb.BssSI
     - BmgBI
     - PmlI
     - DraIII-HF
+    - DraIII
     - AleI-v2
     - EcoP15I
     - PvuII-HF
+    - PvuII
     - AlwNI
     - BtsIMutI
     - NdeI
@@ -142,6 +156,7 @@ keyword_groups:
     - PflMI
     - BccI
     - NcoI-HF
+    - NcoI
     - BseYI
     - FauI
     - TspMI
@@ -172,13 +187,17 @@ keyword_groups:
     - PspGI
     - BstNI
     - StyI-HF
+    - StyI
     - BcgI
     - PvuI-HF
+    - PvuI
     - BstUI
     - EagI-HF
+    - EagI
     - RsrII
     - BsiEI
     - BsiWI-HF
+    - BsiWI
     - BsmBI-v2
     - Esp3I
     - Hpy99I
@@ -192,6 +211,7 @@ keyword_groups:
     - EarI
     - AcuI
     - PstI-HF
+    - PstI
     - BpmI
     - DdeI
     - SfcI
@@ -202,10 +222,12 @@ keyword_groups:
     - AvaI
     - MboII
     - BbsI-HF
+    - BbsI
     - XmnI
     - BsmI
     - Nb.BsmI
     - EcoRI-HF
+    - EcoRI
     - HgaI
     - ZraI
     - AatII
@@ -215,6 +237,7 @@ keyword_groups:
     - AhdI
     - DrdI
     - SacI-HF
+    - SacI
     - Eco53kI
     - BseRI
     - MlyI
@@ -222,6 +245,7 @@ keyword_groups:
     - WarmStart Nt.BstNBI
     - HinfI
     - EcoRV-HF
+    - EcoRV
     - Sau3AI
     - DpnII
     - MboI
@@ -236,6 +260,7 @@ keyword_groups:
     - BstAPI
     - SfaNI
     - SphI-HF
+    - SphI
     - SrfI
     - NmeAIII
     - NgoMIV
@@ -247,12 +272,16 @@ keyword_groups:
     - HinP1I
     - BssHII
     - NotI-HF
+    - NotI
     - Fnu4HI
     - Cac8I
     - MwoI
     - NheI-HF
+    - NheI
     - BmtI-HF
+    - BmtI
     - BspQI-HF
+    - BspQI
     - SapI
     - Nt.BspQI
     - BlpI
@@ -261,6 +290,7 @@ keyword_groups:
     - Bsp1286I
     - AlwI
     - BamHI-HF
+    - BamHI
     - Nt.AlwI
     - BtsCI
     - FokI
@@ -280,9 +310,12 @@ keyword_groups:
     - NlaIV
     - Acc65I
     - KpnI-HF
+    - KpnI
     - BsaI-HFv2
+    - BsaI
     - HphI
     - BstEII-HF
+    - BstEII
     - AvaII
     - BanI
     - BaeGI
@@ -291,8 +324,10 @@ keyword_groups:
     - RsaI
     - CviQI
     - BstZ17I-HF
+    - BstZ17I
     - BciVI
     - SalI-HF
+    - SalI
     - BsmAI
     - BcoDI
     - Nt.BsmAI
@@ -307,6 +342,7 @@ keyword_groups:
     - BsiHKAI
     - TspRI
     - ApoI-HF
+    - ApoI
     - NspI
     - BsrFI-v2
     - BstYI
@@ -322,6 +358,7 @@ keyword_groups:
     - MmeI
     - TaqI-v2
     - NruI-HF
+    - NruI
     - Hpy188I
     - Hpy188III
     - XbaI
@@ -331,6 +368,7 @@ keyword_groups:
     - PI-PspI
     - MscI
     - BsrGI-HF
+    - BsrGI
     - MseI
     - PacI
     - PsiI-v2
@@ -374,6 +412,21 @@ market_rules:
       - "mab"
 
   # --- PCR, qPCR & Molecular Biology Reagents ---
+  - name: "rnase inhibitors"
+    all_of:
+      - "recombinant"
+      - "rrasin"
+  - name: "rnase inhibitors"
+    all_of:
+      - "*superase*"
+  - name: "rnase inhibitors"
+    all_of:
+      - "*rnase*"
+      - "*inhib*"
+  - name: "high-fidelity dna polymerases"
+    all_of:
+      - "ventsupreg"
+      - "polymerase"
   - name: "high-fidelity dna polymerases"
     all_of:
       - $HIGH_FIDELITY
@@ -387,12 +440,15 @@ market_rules:
     none_of:
       - $HIGH_FIDELITY
       - $HOT_START
+      - "*mix*"
   - name: "hot start dna polymerase"
     all_of:
       - $HOT_START
       - "*polymerase*"
     none_of:
       - $HIGH_FIDELITY
+      - "*taq*"
+      - "*aq*"
   - name: "hot start pcr systems"
     all_of:
       - "sapphireamp"
@@ -493,6 +549,8 @@ market_rules:
     all_of:
       - "sirna"
       - "predesigned"
+  - name: "synthetic peptides"
+    all_of: "peptides"
   - name: "synthetic sirna" 
     all_of:
       - "sirna"
@@ -512,6 +570,42 @@ market_rules:
   - name: "transfection reagents"
     all_of:
       - "lipofectamine"
+  - name: "histology & cell stains"
+    any_of:
+      - "schiffs reagent"
+      - "schiff reagent"
+      - "orange ii sodium"
+      - "orange sodium"
+      - "gills iii hematoxylin"
+      - "toluidine blue"
+      - "alcian blue"
+      - "eosin"
+      - "crystal violet"
+      - "hematoxylin"
+      - "eosin"
+      - "methylene blue"
+      - "wrights giemsa"
+      - "evans blue"
+      - "oil red"
+      - "methyl blue"
+      - "pinnacle blue"
+  - name: "protein gel stains"
+    all_of:
+      - "gelcode"
+  - name: "protein gel stains"
+    all_of:
+      - "protein"
+      - "*gel*"
+      - "*stain*"
+  - name: "protein gel stains"
+    all_of:
+      - "gelstar"
+  - name: "protein gel stains"
+    all_of:
+      - "gelcode"
+  - name: "protein gel stains"
+    all_of:
+      - "stains-all"
   - name: "nucleic acid gel stains"
     all_of:
       - "diamidino"
@@ -591,12 +685,16 @@ market_rules:
       - "loading"
       - "dye"
   # --- DNA/RNA Purification Kits ---
-  - name: "column-based rna minprep"
+  - name: "spin columns"
+    all_of:
+      - "spin"
+      - "column"
+  - name: "column-based rna miniprep"
     all_of:
       - "miniprep"
       - "rna"
       - $ASSAY_OR_KIT
-  - name: "column-based rna minprep"
+  - name: "column-based rna miniprep"
     all_of:
       - "purelink"
       - "rna"
@@ -728,7 +826,22 @@ market_rules:
       - $ASSAY_OR_KIT
     none_of:
       - "sequence"
-  - name: "column-based dna genomic extraction kits"
+      - $TUBE
+      - "lysis"
+      - "rna"
+      - "column"
+  - name: "cell culture antibiotics - pen-strep"
+    all_of:
+      - "penicillin" 
+      - "streptomycin" 
+  - name: "cell culture antibiotics - pen-strep"
+    all_of:
+      - "pen"
+      - "strep"
+  - name: "cell culture antibiotics - pen-strep"
+    all_of:
+      - "penicillin-streptomycin" 
+  - name: "column-based dna genomic purification kits"
     all_of:
       - "*dna*"
       - "*genomic*"
@@ -808,18 +921,26 @@ market_rules:
     all_of:
       - "pvdf"
       - "membrane"
+    none_of:
+      - "*pack*"
   - name: "pvdf blotting membranes"
     all_of:
       - "pvdf"
       - "fltr sheet"
+    none_of:
+      - "*pack*"
   - name: "pvdf blotting membranes"
     all_of:
       - "ipvh"
       - "membrane"
+    none_of:
+      - "*pack*"
   - name: "pvdf blotting membranes"
     all_of:
       - "ipvh"
       - "fltr sheet"
+    none_of:
+      - "*pack*"
   - name: "tris-glycine-sds (tgs) buffer"
     all_of:
       - "*tris*"
@@ -941,11 +1062,13 @@ market_rules:
       - "tween"
   - name: "acrylamide/bis solution"
     all_of:
-      - "*acrylamid*"
-      - "*bisacrylamid*"
+      - "bisacrylamid"
   - name: "acrylamide/bis solution"
     all_of:
-      - "*bis-acrylamide*"
+      - "bisacrylamide"
+  - name: "acrylamide/bis solution"
+    all_of:
+      - "bis-acrylamide"
   - name: "antibody-based affinity resins"
     all_of:
       - "protein"
@@ -989,6 +1112,11 @@ market_rules:
   - name: "unstained protein molecular-weight ladder"
     all_of: ["protein", "*stand*"]
     any_of: ["*unstain*", "*unstd*"]
+  - name: "pre-stained protein molecular-weight ladder"
+    all_of: ["*prtlad*"]
+    any_of: ["*prestain*", "*prestd*", "*prestn*"]
+  - name: "pre-stained protein molecular-weight ladder"
+    all_of: ["seeblue", "plus2"]
   - name: "pre-stained protein molecular-weight ladder"
     all_of: ["protein", "*stand*"]
     any_of: ["*prestain*", "*prestd*", "*prestn*"]
@@ -1179,6 +1307,9 @@ market_rules:
   - name: "tris base"
     all_of: ["tris", "base"]
     non_of: "("
+  - name: "slide mounting medium"
+    all_of:
+      - "*fluoromount*"
 
   # --- Specific Labware (Filters, Concentrators) ---
   - name: "syringe filters"
@@ -1219,6 +1350,8 @@ market_rules:
     all_of: ["steritop"]
   - name: "bottle top filters"
     all_of: ["*fltr*", "*bottltop*"]
+  - name: "bottle top filters"
+    all_of: ["*fltrbt*"]
   - name: "bottle top filters"
     all_of: ["*flt*", "*uta*"]
   - name: "bottle top filters"
@@ -1267,6 +1400,8 @@ market_rules:
     all_of: ["*cryovial*", "*storag*"]
   - name: "cryogenic and freezer boxes"
     all_of: ["*cryovial*", "*strg*"]
+  - name: "cryovials"
+    all_of: ["*cryo*", "*vial*"]
   - name: "dialysis casettes"
     all_of: 
       - "*slide*"
@@ -1365,11 +1500,14 @@ market_rules:
       - "*tip*"
       - "*xl*"
   - name: "standard pipette tips" # General catch-all for tips
-    any_of:
+    all_of:
       - "*tip*"
       - $PIPETTE
     none_of:
       - "*ser*"
+      - "*optiplex*"
+      - "*multipurpose*"
+      - "*multiple*"
       - "stripet"
       - "strpet"
       - "gel load"
@@ -1394,6 +1532,10 @@ market_rules:
       - "*strip*"
       - $TUBE
 
+  - name: "test tubes"
+    all_of:
+      - "borosil"
+      - "dct"
   - name: "microcentrifuge tubes"
     all_of:
       - "microtub"
@@ -1448,13 +1590,13 @@ market_rules:
     all_of:
       - "*pcr*"
       - $TUBE
+  - name: "pcr tubes"
+    all_of:
+      - "*smrtcyclr*"
+      - $TUBE
     none_of:
       - "sequence"
       - "*rack*"
-  - name: "spin columns"
-    all_of:
-      - "spin"
-      - "column"
   - name: "cell culture tubes"
     all_of:
       - $TUBE
@@ -1463,7 +1605,7 @@ market_rules:
   - name: "cell culture tubes"
     all_of:
       - $TUBE
-      - "*tc*"
+      - "tc"
   - name: "cell culture tubes"
     all_of:
       - $TUBE
@@ -1605,3 +1747,31 @@ market_rules:
     all_of:
       - "alcohol"
       - "reagent" 
+  - name: "erlenmeyer flasks"
+    all_of:
+      - "*erlen*"
+      - $FLASK
+  - name: "erlenmeyer flasks"
+    all_of:
+      - "shake"
+      - $FLASK
+  - name: "erlenmeyer flasks"
+    all_of:
+      - "*erl"
+      - $FLASK
+  - name: "erlenmeyer flasks"
+    all_of:
+      - "baf"
+      - $FLASK
+  - name: "formaldehydes and paraformaldehydes"
+    any_of:
+      - "*formldhyd*"
+      - "*formaldehyde*"
+      - "*paraformald*"
+      - "*prfrmldhyd*"
+  - name: "hanks' balanced salt solution (hbss) buffer"
+    all_of:
+      - "hbss"
+  - name: "temed"
+    all_of:
+      - "temed"

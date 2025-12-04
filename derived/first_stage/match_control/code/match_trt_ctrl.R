@@ -6,29 +6,29 @@ library(cobalt)
 library(ggplot2)
 library(here)
 library(haven)
-library(stringr) 
-
+library(stringr)
+set.seed(8975)
 # Set working directory and create output folders
 setwd("~/sci_eq/derived/first_stage/match_control/code")
 dir.create("../output/figures", recursive = TRUE, showWarnings = FALSE)
 dir.create("../output/balance_plots", recursive = TRUE, showWarnings = FALSE)
-dir.create("../output/grid_search_logs", recursive = TRUE, showWarnings = FALSE) 
+dir.create("../output/grid_search_logs", recursive = TRUE, showWarnings = FALSE)
 
 # ---------------------------
 # Define Covariates, Weights, & Outcomes
 # ---------------------------
-COVARIATES_TO_USE <- c("coef_log_spend" )
+COVARIATES_TO_USE <- c("coef_log_price", "spend_2013")
 VARS_TO_CHECK <- c(COVARIATES_TO_USE)
 
-# DEFINE a vector of outcome variables to loop through
+# DEFINE a vector of outcome variables tox loop through
 OUTCOME_VARS <- c("avg_log_price")
 
 # ---------------------------
 # Define Grid Search Parameters
 # ---------------------------
 # Define the range of values to test
-CALIPER_GRID <- seq(0.01, 0.25, by = 0.01) 
-RATIO_GRID <- seq(1, 5, by = 1) 
+CALIPER_GRID <- seq(0.01, 0.25, by = 0.01)
+RATIO_GRID <- seq(1,3, by = 1)
 
 cat("Starting grid search with:\n")
 cat("Caliper values:", paste(CALIPER_GRID, collapse = ", "), "\n")
@@ -41,13 +41,6 @@ cat("Ratio values:", paste(RATIO_GRID, collapse = ", "), "\n\n")
 panel <- read_dta("../external/samp/category_yr_tfidf.dta")
 panel <- panel %>% mutate(category = as.character(category))
 
-# Filter for a balanced panel
-panel <- panel %>%
-  filter(year >= 2010) %>%
-  group_by(category) %>%
-  filter(n() == 10) %>%
-  ungroup()
-
 # Create pre-treatment dataset
 all_data_pre <- panel %>%
   filter(year <= 2013)
@@ -56,7 +49,9 @@ all_data_pre <- panel %>%
 trends_pre <- all_data_pre %>%
   group_by(category, treated) %>%
   summarise(
+    coef_price = possibly(~coef(lm(raw_price ~ year, .x, weights = spend_2013))[2], otherwise = NA_real_)(cur_data()),
     coef_log_price = possibly(~coef(lm(avg_log_price ~ year, .x, weights = spend_2013))[2], otherwise = NA_real_)(cur_data()),
+    coef_spend = possibly(~coef(lm(raw_spend ~ year, .x, weights = spend_2013))[2], otherwise = NA_real_)(cur_data()),
     coef_log_spend = possibly(~coef(lm(avg_log_spend ~ year, .x, weights = spend_2013))[2], otherwise = NA_real_)(cur_data()),
     .groups = "drop"
   )
@@ -67,8 +62,8 @@ data_wide_raw <- all_data_pre %>%
     names_from = year,
     names_sep = "_",
     id_cols = c(category, treated, spend_2013 ),
-    values_from = c(avg_log_price, avg_log_spend) # Ensure both outcomes are pivoted
-  ) %>% 
+    values_from = c(avg_log_price, avg_log_spend, num_suppliers, obs_cnt, raw_spend, raw_price, raw_qty) # Ensure both outcomes are pivoted
+  ) %>%
   mutate(
     w_avg_log_price_2013 = avg_log_price_2013 * spend_2013,
     w_avg_log_price_2012 = avg_log_price_2012 * spend_2013,
@@ -115,7 +110,7 @@ for (category_id in treated_markets) {
   print(
     temp_data %>%
       group_by(treated) %>%
-      summarise(count = n(), across(all_of(COVARIATES_TO_USE), list(mean = mean, sd = sd))) %>% 
+      summarise(count = n(), across(all_of(COVARIATES_TO_USE), list(mean = mean, sd = sd))) %>%
       as.data.frame()
   )
   cat("--------------------------------------------------\n")
@@ -134,7 +129,7 @@ for (category_id in treated_markets) {
         matchit(
           formula = covariates_formula, method = "nearest", data = temp_data,
           ratio = rat, caliper = cal, replace = TRUE
-        )
+          )
       }, error = function(e) { NULL })
       
       mean_smd <- Inf
@@ -179,51 +174,84 @@ for (category_id in treated_markets) {
   best_params <- grid_results_df %>%
     filter(is.finite(mean_smd) & num_controls > 0) %>%
     arrange(mean_smd) %>%
-    slice(1)
+    slice(1) %>%
+    # --- !! FIX !! ---
+    # Rename 'mean_smd' to 'best_mean_smd' to match the
+    # fallback logic and the rest of the script.
+    rename(best_mean_smd = mean_smd)
+  # --- !! END FIX !! ---
   
   # Save the log of the grid search for this market
   write_csv(grid_results_df, paste0("../output/grid_search_logs/grid_log_", category_id, ".csv"))
   
-  if (nrow(best_params) == 0) {
-    message("Grid search found NO valid match configuration for market ", category_id)
-    next # Skip to the next market
-  }
   
-  cat("--- Optimal params found for", category_id, ": Caliper =", best_params$caliper, 
-      ", Ratio =", best_params$ratio, ", Mean SMD =", round(best_params$mean_smd, 4), "---\n")
+  # --- !! START: MODIFIED BLOCK (1/2) !! ---
+  # Fallback logic: If grid search finds no match, force one without a caliper.
+  if (nrow(best_params) == 0) {
+    message("Grid search (caliper <= 0.25) found NO valid match for market ", category_id)
+    message("--- ATTEMPTING FALLBACK: Forcing match with best ratio and NO caliper. ---")
+    
+    # We will force a match using the largest ratio and NO caliper
+    # We set caliper to NA_real_ as a flag to remove it in the final call
+    best_params <- data.frame(
+      caliper = NA_real_,
+      ratio = max(RATIO_GRID), # Use the max ratio (e.g., 3)
+      best_mean_smd = NA_real_ # SMD will be bad, but we are forcing it. Use NA_real_
+    )
+  }
+  # --- !! END: MODIFIED BLOCK (1/2) !! ---
+  
+  
+  cat("--- Optimal params found for", category_id, ": Caliper =", best_params$caliper,
+      ", Ratio =", best_params$ratio, ", Mean SMD =", round(best_params$best_mean_smd, 4), "---\n")
   
   # Store for final summary
   optimal_params_list[[category_id]] <- data.frame(
     treated_market = category_id,
     best_caliper = best_params$caliper,
     best_ratio = best_params$ratio,
-    best_mean_smd = best_params$mean_smd
+    best_mean_smd = best_params$best_mean_smd
   )
   
   # -----------------------------------------------------------------
   # END: Grid Search
   # -----------------------------------------------------------------
   
-  # --- Perform matching ONCE using OPTIMAL parameters ---
+  
+  # --- !! START: MODIFIED BLOCK (2/2) !! ---
+  # Perform matching ONCE using OPTIMAL parameters
+  # This now checks for the NA flag to set the final caliper.
+  
+  # Conditionally set the final caliper:
+  # If best_params$caliper is NA (our flag), set caliper to NULL (to force match)
+  # Otherwise, use the best caliper found in the grid search.
+  final_caliper <- if (is.na(best_params$caliper)) {
+    NULL
+  } else {
+    best_params$caliper
+  }
+  
   current_model <- tryCatch({
     matchit(
       formula = covariates_formula, method = "nearest", data = temp_data,
       ratio = best_params$ratio, # Use best ratio
-      caliper = best_params$caliper, # Use best caliper
+      caliper = final_caliper,   # Use our new conditional caliper
       replace = TRUE
     )
   }, error = function(e) { message("Matching failed (on optimal run): ", e$message); return(NULL) })
+  # --- !! END: MODIFIED BLOCK (2/2) !! ---
+  
   
   if (is.null(current_model)) next
   
   # Assess and save balance plot
-  balance_plot <- love.plot(current_model, binary = "std", thresholds = c(m = .1), 
-                            title = paste("Covariate Balance for Market:", category_id, 
+  balance_plot <- love.plot(current_model, binary = "std", thresholds = c(m = .1),
+                            title = paste("Covariate Balance for Market:", category_id,
                                           "\n(Caliper=", best_params$caliper, ", Ratio=", best_params$ratio, ")"))
   ggsave(filename = paste0("../output/balance_plots/balance_", category_id, ".pdf"), plot = balance_plot, width = 7, height = 6)
   
   # ✅ ADDED: Print the plot to the RStudio GUI (Plots pane)
-  print(balance_plot) 
+  print(balance_plot)
   
   match_data <- match.data(current_model)
   if (nrow(match_data) <= 1) {
@@ -274,19 +302,19 @@ for (category_id in treated_markets) {
     
     # 6. Generate the plot
     p <- ggplot(plot_data_final, aes(x = year, y = outcome_adj, color = group_label)) +
-      geom_line(linewidth = 1) + 
+      geom_line(linewidth = 1) +
       geom_point() +
       geom_vline(xintercept = 2013.5, linetype = "dashed", color = "gray40") +
       labs(
         title = plot_title,
         subtitle = "Treated vs. Weighted Average of Matched Control Markets",
-        x = "Year", 
+        x = "Year",
         y = paste(plot_y_label, "(Adjusted to 2013)"),
         color = "Market Group"
       ) +
       theme_minimal(base_size = 12) +
       scale_x_continuous(breaks = seq(2010, 2019, 1)) +
-      theme(legend.position = "bottom", 
+      theme(legend.position = "bottom",
             plot.title = element_text(face = "bold"),
             legend.text = element_text(size = 8))
     
@@ -294,7 +322,7 @@ for (category_id in treated_markets) {
     ggsave(paste0("../output/figures/", outcome_var, "_trends_", treated_category, ".pdf"), plot = p, width = 10, height = 7)
     
     # ✅ ADDED: Print the plot to the RStudio GUI (Plots pane)
-    print(p) 
+    print(p)
     
     # ✅ MODIFIED: Updated cat message
     cat("Saved and displayed", outcome_var, "trend plot for", category_id, "\n")

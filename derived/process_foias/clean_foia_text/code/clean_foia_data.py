@@ -1,209 +1,232 @@
-"""
-Clean FOIA purchase‐order data exported from multiple U.S. universities.
-
-Usage
------
-$ python clean_foia_data.py
-
-The script expects raw Excel workbooks under the relative path
-`../external/samp/` (relative to this file).  Each workbook belongs to one
-university and may have institution-specific column names.  Provide a mapping
-from *standard* variable names to the institution-specific names in the
-`COLUMN_SPECS` dictionary below.
-
-For every workbook, a cleaned CSV will be written to
-`../output/<workbook-stem>_clean.csv` with the 13 standardised columns:
-
-`product_desc, supplier, supplier_id, sku, price, qty, spend, unit, purchaser,
-fund_id, purchase_id, date, clean_desc`
-
-Columns that do **not** exist in the raw file are still included with blanks.
-
-String-cleaning rules applied to **`product_desc` → `clean_desc`**
------------------------------------------------------------------
-The pipeline executes **in order**:
-
-1. **#-snippet removal** – delete anything enclosed by `#…#`, hashes included.
-2. **Unicode → ASCII + lower-case** – NFKD normalise, strip diacritics, down-case.
-3. **Separator harmonisation** – replace `_` and `-` with spaces.
-4. **Punctuation purge** – drop every char except `a-z`, `0-9`, and space
-   (removes `%`, `&`, etc.).
-5. **Standalone-number deletion** – remove tokens that are only digits.
-6. **Generic word removal** – drop uninformative words such as `product`,
-   `item`, `catalog`, `cat`, `for`, `and`, `the`, `of`, `misc`, `various`,
-   `general`, `description`.
-7. **Whitespace collapse** – squeeze multiple spaces, trim ends.
-8. **Trailing artefact removal** – strip suffixes `ea, each, pkg, pack, cs, case`.
-9. **Token de-duplication** – keep only the first occurrence of each token
-   (order preserved).
-
-*Units are **retained** exactly as they appear – both stand-alone tokens and
-those attached to numbers, e.g. `25ml`, `ml25`, `kg`, `cs100` remain.*
-
-Edit `_clean_description()` to adjust rules as needed.
-"""
-from __future__ import annotations
-
+#!/usr/bin/env python
 import re
-import unicodedata
-from pathlib import Path
-from typing import Dict, List, Mapping
-
 import pandas as pd
+from pathlib import Path
+import argparse
+import unicodedata
+from typing import List
 
-###############################################################################
-# Configuration                                                               #
-###############################################################################
+# --- Import NLTK Stopwords ---
+try:
+    from nltk.corpus import stopwords
+    STOP_EN = set(stopwords.words("english"))
+except ImportError:
+    print("❌ NLTK library not found. Please install it: pip install nltk")
+    print("   You may also need to download the stopwords: python -m nltk.downloader stopwords")
+    exit()
+except LookupError:
+    print("❌ NLTK stopwords not found. Please download them.")
+    print("   In a Python interpreter, run: import nltk; nltk.download('stopwords')")
+    exit()
 
-RAW_DIR = Path(__file__).with_suffix("").parent / "../external/samp"
-OUT_DIR = Path(__file__).with_suffix("").parent / "../output"
-OUT_DIR.mkdir(parents=True, exist_ok=True)
+# --- Import Central Configuration ---
+try:
+    import config
+except ImportError:
+    print("❌ Error: config.py not found. Please place it in the same directory.")
+    exit()
 
-# Mapping raw → standard column names per workbook
-COLUMN_SPECS: Dict[str, Mapping[str, str]] = {
-    "ecu_2006_2024.xlsx": {
-        "product_desc": "DESC",
-        "supplier": "VENDOR_NAME",
-        "supplier_id": "VENDOR_ID",
-        "price": "UNIT_PRICE",
-        "qty": "QTY",
-        "spend": "PO_ITEM_TOTAL",
-        "fund_id": "FED_ID",
-        "purchase_id": "PO",
-        "date": "PO_DATE",
-    },
-    "ukansas_2010_2019.xlsx": {
-        "product_desc": "Transaction Description",
-        "supplier": "Supplier Name",
-        "supplier_id": "Supplier ID",
-        "spend": "Expense Amount",
-        "purchaser": "PI",
-        "fund_id": "Sponsor Award Number",
-        "purchase_id": "Transaction ID",
-        "date": "Transaction Date",
-    },
-    "utdallas_2011_2024.xlsx": {
-        "product_desc": "Product Description",
-        "supplier": "Supplier Name",
-        "supplier_id": "Supplier Number",
-        "sku": "SKU/Catalog #",
-        "price": "Unit Price",
-        "qty": "Quantity",
-        "spend": "Extended Price",
-        "fund_id": "Reference Award ID",
-        "purchase_id": "Purchase Order Identifier",
-        "date": "Purchase date",
-    },
-    "usf_2003_2025.xlsx": {
-        "product_desc": "More Info",
-        "supplier": "Supplier",
-        "supplier_id": "Supplier ID",
-        "qty": "PO Qty",
-        "spend": "Merchandise Amt",
-        "purchaser": "PO Owner/Buyer",
-        "purchase_id": "PO No.",
-        "date": "PO Date",
-    },
-}
+# ────────────────────────────── Path Setup ────────────────────────────────── #
+CODE_DIR = Path(__file__).resolve().parent
+ROOT_DIR = CODE_DIR.parent
+DEFAULT_DATA_DIR = ROOT_DIR / "external" / "samp"
+CATALOG_DIR = ROOT_DIR / "external" / "catalogs"  # Path for additional files
+DEFAULT_OUT_DIR = ROOT_DIR / "output"
 
-STANDARD_COLS: List[str] = [
-    "product_desc", "supplier", "supplier_id", "sku", "price", "qty",
-    "spend", "unit", "purchaser", "fund_id", "purchase_id", "date",
-    "clean_desc",
+# --- Define which regexes from config.py correspond to Entities vs. Noise ---
+SKU_REGEX_KEYS = [
+    "cas_full", "item_ref_full", "sku_multi_hyphen", "sku_num_num",
+    "sku_very_long_num", "sku_alpha_hyphen_num", "sku_letters_digits"
 ]
+UNIT_REGEX_KEYS = [
+    "num_in_paren_unit_counts", "num_in_paren_quantities", "unitpack",
+    "sets_pk", "dimensions", "mult", "trailing_slash_unit"
+]
+NOISE_REGEX_KEYS = [k for k in config.REGEXES_NORMALIZE if k not in SKU_REGEX_KEYS and k not in UNIT_REGEX_KEYS]
 
-###############################################################################
-# Cleaning utilities                                                          #
-###############################################################################
+# ───────────────── Core Cleaning & Extraction Functions ─────────────────── #
 
-HASH_SNIPPET_RE = re.compile(r"#.*?#")
-TOKEN_CLEAN_RE = re.compile(r"[^0-9a-z ]+")  # keep only a-z, 0-9, space
-NUM_TOKEN_RE = re.compile(r"\b\d+\b")
-TRAILING_ARTIFACTS = re.compile(r"\b(?:ea|each|pkg|pack|cs|case)\b$", re.I)
+def get_extracted_entities(desc: str) -> pd.Series:
+    """
+    EXTRACTS entities from a description using config.py patterns.
+    This is the "cherry on top" path.
+    """
+    if pd.isna(desc):
+        return pd.Series({"potential_sku": "", "potential_unit": ""})
 
-STOPWORDS = {
-    "product", "item", "catalog", "cat", "for", "and", "the", "of", "misc",
-    "various", "general", "description",
-}
+    text = str(desc)
+    found_skus, found_units = [], []
 
+    for key in SKU_REGEX_KEYS:
+        if key in config.REGEXES_NORMALIZE:
+            pattern, _ = config.REGEXES_NORMALIZE[key]
+            try:
+                matches = re.findall(pattern, text)
+                if matches:
+                    found_skus.extend(m[0] if isinstance(m, tuple) else m for m in matches)
+            except (re.error, TypeError):
+                continue
 
-def _dedup_tokens(text: str) -> str:
-    seen, out = set(), []
-    for tok in text.split():
-        if tok not in seen:
-            seen.add(tok)
-            out.append(tok)
-    return " ".join(out)
+    for key in UNIT_REGEX_KEYS:
+        if key in config.REGEXES_NORMALIZE:
+            pattern, _ = config.REGEXES_NORMALIZE[key]
+            try:
+                matches = re.findall(pattern, text)
+                if matches:
+                    flat_matches = [item for sublist in matches if isinstance(sublist, tuple) for item in sublist if item] if any(isinstance(i, tuple) for i in matches) else matches
+                    found_units.extend(flat_matches)
+            except (re.error, TypeError):
+                continue
 
+    return pd.Series({
+        "potential_sku": ", ".join(map(str, found_skus)),
+        "potential_unit": ", ".join(map(str, found_units))
+    })
 
-def _remove_stopwords(text: str) -> str:
-    return " ".join(tok for tok in text.split() if tok not in STOPWORDS)
-
-
-def _clean_description(desc):
-    if desc is None or (isinstance(desc, float) and pd.isna(desc)):
+def get_clean_description(desc: str) -> str:
+    """
+    CLEANS a description using config.py patterns.
+    This is the primary "cleaning" path.
+    """
+    if pd.isna(desc):
         return ""
-    txt = str(desc).strip()
 
-    # 1. Remove #…# snippets
-    txt = HASH_SNIPPET_RE.sub(" ", txt)
+    text = str(desc).lower()
+    text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("utf-8")
 
-    # 2. Unicode → ASCII & lower-case
-    txt = unicodedata.normalize("NFKD", txt).encode("ascii", "ignore").decode().lower()
+    all_cleaning_keys = SKU_REGEX_KEYS + UNIT_REGEX_KEYS + NOISE_REGEX_KEYS
+    for key in all_cleaning_keys:
+        if key in config.REGEXES_NORMALIZE:
+            pattern, repl = config.REGEXES_NORMALIZE[key]
+            try:
+                text = re.sub(pattern, repl, text)
+            except (re.error, TypeError):
+                continue
 
-    # 3. Replace separators with space
-    txt = txt.replace("_", " ").replace("-", " ")
+    all_stopwords = STOP_EN | config.OTHER_STOPWORDS | set(config.UNIT_TOKENS)
+    tokens = text.split()
+    clean_tokens = [t for t in tokens if t not in all_stopwords and len(t) > 1]
 
-    # 4. Strip punctuation (drops % &)
-    txt = TOKEN_CLEAN_RE.sub(" ", txt)
+    # Join the tokens and deduplicate them while preserving order
+    final_string = " ".join(dict.fromkeys(clean_tokens))
 
-    # 5. Remove standalone numbers
-    txt = NUM_TOKEN_RE.sub(" ", txt)
+    # **FINAL RULE**: Remove a leading hyphen if it exists.
+    if final_string.startswith('-'):
+        final_string = final_string[1:].lstrip()
 
-    # 6. Remove generic stop-words
-    txt = _remove_stopwords(txt)
+    return final_string
 
-    # 7. Collapse whitespace
-    txt = re.sub(r"\s+", " ", txt).strip()
+def process_row(row: pd.Series) -> pd.Series:
+    """
+    Applies the decoupled cleaning and extraction process to a single row.
+    """
+    product_desc = row["product_desc"]
+    clean_desc = get_clean_description(product_desc)
+    entities = get_extracted_entities(product_desc)
 
-    # 8. Drop trailing artefacts
-    txt = TRAILING_ARTIFACTS.sub("", txt).strip()
+    return pd.Series({
+        "clean_desc": clean_desc,
+        "potential_sku": entities["potential_sku"],
+        "potential_unit": entities["potential_unit"]
+    })
 
-    # 9. De-duplicate tokens
-    txt = _dedup_tokens(txt)
+def main() -> None:
+    """Main execution block."""
+    parser = argparse.ArgumentParser(description="Clean FOIA data with a cleaning-first approach using config.py.")
+    parser.add_argument("--data-dir", default=str(DEFAULT_DATA_DIR), help="Directory containing raw FOIA csv files.")
+    parser.add_argument("--out-dir", default=str(DEFAULT_OUT_DIR), help="Directory to save cleaned CSV files.")
+    parser.add_argument("--files", default="", help="Optional: Comma-separated list of exact filenames to process.")
+    args = parser.parse_args()
 
-    return txt
+    data_dir, out_dir = Path(args.data_dir), Path(args.out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
 
-###############################################################################
-# Processing loop                                                             #
-###############################################################################
+    if args.files:
+        files_to_process = []
+        # Check for the file in the primary data, catalog, and current directories
+        for f_name in args.files.split(','):
+            f_name = f_name.strip()
+            found_path = None
+            for directory in [data_dir, CATALOG_DIR, Path.cwd()]:
+                if (directory / f_name).exists():
+                    found_path = directory / f_name
+                    break
+            if found_path:
+                files_to_process.append(found_path)
+            else:
+                print(f"  ⚠️ Specified file not found in known directories: {f_name}. Skipping.")
+    else:
+        # Default: Process all CSVs in the default data dir + the two specified files
+        files_to_process = sorted(data_dir.glob("*.csv"))
+        files_to_process.extend([
+            CATALOG_DIR / "non_lab.dta",
+            CATALOG_DIR / "ny_fisher_desc.csv"
+        ])
 
-def _process_workbook(path: Path):
-    mapping = COLUMN_SPECS.get(path.name, {})
-    print(f"Processing {path.name} …")
-    df = pd.read_excel(path, dtype=str).convert_dtypes()
+    print(f"Found {len(files_to_process)} target workbook(s) to clean...")
 
-    clean_df = pd.DataFrame(columns=STANDARD_COLS)
-    for col in STANDARD_COLS:
-        if col == "clean_desc":
+    for fp in files_to_process:
+        if not fp.exists():
+            print(f"  ⚠️ Target file not found: {fp}. Skipping.")
             continue
-        raw_col = mapping.get(col)
-        clean_df[col] = df[raw_col] if raw_col and raw_col in df.columns else ""
 
-    clean_df["clean_desc"] = clean_df["product_desc"].apply(_clean_description)
+        print(f"Processing {fp.name} …")
+        try:
+            df = None
+            if fp.suffix == '.csv':
+                df = pd.read_csv(fp, dtype=str, on_bad_lines='warn')
+            elif fp.suffix in ['.xlsx', '.xls']:
+                # Read Excel files directly using pandas
+                df = pd.read_excel(fp, dtype=str)
+            elif fp.suffix == '.dta':
+                # FIX 1: Added encoding="latin-1" to handle special characters.
+                df = pd.read_stata(fp)
+                # Ensure object columns are strings to prevent errors
+                for col in df.select_dtypes(include=['object']).columns:
+                    df[col] = df[col].astype(str)
+            else:
+                print(f"  ⚠️ Unsupported file type: {fp.suffix}. Skipping.")
+                continue
 
-    out_path = OUT_DIR / f"{path.stem}_clean.csv"
-    clean_df.to_csv(out_path, index=False)
-    print(f"  → Saved {out_path.relative_to(Path.cwd())}")
+            # FIX 2: Make all column lookups case-insensitive.
+            df.columns = [col.lower() for col in df.columns]
 
+            # Identify the correct description column based on the file (now using lowercase)
+            source_desc_col = ""
+            if fp.name == "non_lab.dta":
+                source_desc_col = config.CA_DESC_COL.lower()
+            elif fp.name == "fisher_lab.xlsx":
+                source_desc_col = config.FISHER_DESC_COL.lower()
+            elif fp.name == "fisher_nonlab.xlsx":
+                source_desc_col = config.FISHER_DESC_COL.lower()
+            elif "product_desc" in df.columns:
+                source_desc_col = "product_desc"
 
-def main():
-    if not RAW_DIR.exists():
-        raise SystemExit(f"RAW_DIR not found: {RAW_DIR.resolve()}")
-    for fp in sorted(RAW_DIR.glob("*.xlsx")):
-        _process_workbook(fp)
-    print("All workbooks processed.")
+            if not source_desc_col or source_desc_col not in df.columns:
+                print(f"  ⚠️ Could not find a suitable description column in {fp.name}. Searched for '{source_desc_col}'. Skipping.")
+                continue
 
+            # Rename original description column to 'product_desc' for standardized processing
+            if source_desc_col != "product_desc":
+                df.rename(columns={source_desc_col: "product_desc"}, inplace=True)
+
+            processed_data = df.apply(process_row, axis=1)
+            clean_df = pd.concat([df, processed_data], axis=1)
+
+            # Define the column order for the output file
+            final_cols_order = [
+                "product_desc", "clean_desc", "potential_sku", "potential_unit"
+            ] + [c for c in df.columns if c not in ["product_desc", "clean_desc", "potential_sku", "potential_unit"]]
+
+            clean_df = clean_df.reindex(columns=[c for c in final_cols_order if c in clean_df.columns])
+
+            out_path = out_dir / f"{fp.stem}_clean.csv"
+            clean_df.to_csv(out_path, index=False)
+            print(f"  → Saved {out_path}")
+        except Exception as e:
+            print(f"  ❌ Could not process file {fp.name}: {e}")
+
+    print(f"\n✅ All targeted workbooks processed.")
 
 if __name__ == "__main__":
     main()

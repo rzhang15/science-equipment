@@ -10,7 +10,7 @@ global dropbox_dir "~/dropbox (harvard university)/scientific equipment"
 
 program main   
     event_study
-    output_tables
+    *output_tables
 end
 
 program event_study
@@ -41,7 +41,7 @@ program event_study
     forval i = 0/9 {
         local lags `lags' lag`i'
     }
-    foreach yvar in impact_cite_affl_wt ppr_cnt {
+    foreach yvar in cite_affl_wt affl_wt impact_cite_affl_wt ppr_cnt {
         preserve
         mat drop _all 
         reghdfe `yvar' posttreatlr posttreatsr , absorb(athr_id year)  cluster(athr_id)

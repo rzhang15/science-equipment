@@ -1,2 +1,6 @@
-./samp/ | /n/netscratch/pakes_lab/Lab/sci_eq/FOIA/first stage usable
+./samp/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/process_foias/standardize_foia/output/standardized
+./catalogs/ | /n/netscratch/pakes_lab/Lab/sci_eq/product_catalogs
+./categories/ | /n/netscratch/pakes_lab/Lab/sci_eq/
+
+
 

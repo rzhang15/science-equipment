@@ -58,9 +58,9 @@ class HybridClassifier:
             is_seed = has_match(desc, self.seed_automaton)
 
             if is_seed:
-                final_predictions[i] = 1  # Rule 1 (highest priority): Lab keyword match
+                final_predictions[i] = 1  
             elif is_anti_seed:
-                final_predictions[i] = 0  # Rule 2: Non-Lab keyword match
+                final_predictions[i] = 0  
             else:
                 # No keyword match, queue it for the ML model
                 to_predict_ml['indices'].append(i)

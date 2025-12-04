@@ -1,0 +1,3 @@
+./all/ | /n/netscratch/pakes_lab/Lab/sci_eq/grants/usa_spending/
+./nih/ | /n/netscratch/pakes_lab/Lab/sci_eq/grants/reporter/
+./foias/ | /n/home02/cxu75/sci_eq/derived/process_foias/merge_foias/output
