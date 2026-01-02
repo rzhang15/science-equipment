@@ -9,15 +9,17 @@ version 17
 program main   
     price_dist
 end
-
 program price_dist
     use ../external/samp/item_level_tfidf, clear
     foreach c in "us fbs" "erlenmeyer flasks" "nitrile gloves" "taq polymerases" "reverse transcriptase" "chemiluminescent substrates" ///
      "pre-stained protein molecular-weight ladder" "hot start dna polymerase" "high-fidelity dna polymerases" ///
-     "column-based pcr purification kits" {
+     "column-based pcr purification kits" "dntps" {
         preserve
         keep if category == "`c'"
         local name = subinstr("`c'", " ", "_", .)
+        graph box avg_log_price, over(year)
+        graph export "../output/figures/`name'_price_box_dist.pdf", replace
+
         tw kdensity avg_log_price if inrange(year, 2010,2013) & agencyname == "florida international university" || ///
           kdensity avg_log_price if inrange(year, 2010,2013) & agencyname == "university of michigan at ann arbor" || ///
           kdensity avg_log_price if inrange(year, 2010, 2013) & agencyname == "georgia institute of technology" || ///

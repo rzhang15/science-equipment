@@ -21,6 +21,7 @@ CANONICAL_MAPPING = {
     'tfs fisher': 'thermo fisher scientific',
     'thermo': 'thermo fisher scientific',
     'life technologies': 'life technologies',
+    'life technology': 'life technologies',
     'life tech': 'life technologies',
     'lifetech': 'life technologies',
     'invitrogen': 'life technologies',
@@ -37,7 +38,8 @@ CANONICAL_MAPPING = {
     'sigma chemical': 'milliporesigma',
     'millipore': 'milliporesigma',
     'supelco': 'milliporesigma',
-
+    'ge health': 'ge healthcare', 
+    'ge healthcare': 'ge healthcare',
     # Zimmer
     'zimmer': 'zimmer',
     # Medtronic
@@ -95,6 +97,11 @@ CANONICAL_MAPPING = {
 
     'usa scientific': 'usa scientific',
     'usascientific': 'usa scientific',
+    'atcc': 'atcc',
+    'amer type culture collec' : 'atcc',
+    'american type culture collec' : 'atcc',
+    'amer type culture collection' : 'atcc',
+
     
     'perkinelmer': 'perkinelmer',
     'zen bio': 'zenbio',

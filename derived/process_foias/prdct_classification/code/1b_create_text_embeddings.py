@@ -1,4 +1,3 @@
-# 1b_create_text_embeddings.py (Modified to save the BERT model object)
 """
 Generates and saves multiple sets of embeddings from the prepared text data.
 Each function creates a file of vectors for a specific model (TF-IDF, BERT, etc.).

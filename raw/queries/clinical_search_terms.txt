@@ -1,0 +1,2 @@
+Query_Name	Query
+clinical	("Clinical Study"[Publication Type])

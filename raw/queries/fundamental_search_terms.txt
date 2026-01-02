@@ -1,0 +1,2 @@
+Query_Name	Query
+fundamental	("Journal Article"[Publication Type] NOT "Clinical Study"[Publication Type]) AND (("Chemicals and Drugs Category"[MeSH Major Topic] NOT "Pharmaceutical Preparations"[MeSH Major Topic]) OR "Anatomy Category"[MeSH Major Topic] OR "Organisms Category"[MeSH Major Topic] OR "Phenomena and Processes Category"[MeSH Major Topic]) NOT "Diseases Category"[MeSH Major Topic]

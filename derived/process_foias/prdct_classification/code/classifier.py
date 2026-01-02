@@ -18,7 +18,7 @@ def load_keywords_and_build_automaton(filepath):
             A.make_automaton()
             return A
     except FileNotFoundError:
-        print(f"⚠️ Keyword file not found: {filepath}")
+        print(f"â ïž Keyword file not found: {filepath}")
         return None
 
 def has_match(description, automaton):

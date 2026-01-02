@@ -1,0 +1,2 @@
+Query_Name	Query
+therapeutics	("Journal Article"[Publication Type] OR "Clinical Study"[Publication Type]) AND ("Pharmaceutical Preparations"[MeSH Major Topic] OR "Anesthesia and Analgesia"[MeSH Major Topic] OR "Therapeutics"[MeSH Major Topic]) NOT ("Dentistry"[MeSH Major Topic] OR "Diagnosis"[MeSH Major Topic] OR "Equipment and Supplies"[MeSH Major Topic] OR "Investigative Techniques"[MeSH Major Topic] OR "Surgical Procedures, Operative"[MeSH Major Topic]) 

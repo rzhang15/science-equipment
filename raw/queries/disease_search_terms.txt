@@ -1,0 +1,2 @@
+Query_Name	Query
+diseases	("Journal Article"[Publication Type] NOT "Clinical Study"[Publication Type]) AND "Diseases Category"[MeSH Major Topic] 

@@ -24,7 +24,7 @@ DEFAULT_OUT_DIR = ROOT_DIR / "output" / "standardized"
 
 # ───────────────── Column Maps ────────────────────────────────────────────── #
 COLUMN_SPECS: Dict[str, Mapping[str, str]] = {
-    "ecu_2006_2024.xlsx": {"product_desc": "DESC", "supplier": "VENDOR_NAME", "supplier_id": "VENDOR_ID", "price": "UNIT_PRICE", "qty": "QTY", "spend": "PO_ITEM_TOTAL", "fund_id": "FED_ID", "purchase_id": "PO", "date": "PO_DATE"},
+    "ecu_2006_2024.xlsx": {"product_desc": "DESC", "supplier": "VENDOR_NAME", "supplier_id": "VENDOR_ID", "price": "UNIT_PRICE", "qty": "QTY", "spend": "PO_ITEM_TOTAL", "fund_id": "FED_ID", "purchase_id": "PO", "date": "PO_DATE", "funder": "AGENCY"},
     "ukansas_2010_2019.xlsx": {"product_desc": "Transaction Description", "supplier": "Supplier Name", "supplier_id": "Supplier ID", "spend": "Expense Amount", "purchaser": "PI", "fund_id": "Sponsor Award Number", "purchase_id": "Transaction ID", "date": "Transaction Date"},
     "utaustin_2012_2019.xlsx": {"product_desc": "Item Description 1", "supplier": "Vendor Name", "supplier_id": "Vendor EID", "qty": "Item Quantity Request", "spend": "Item Subtotal Cost", "purchaser": "Account 1", "purchase_id": "Purchase Order", "date": "Purchase Order Date"},
     "utdallas_2011_2024.xlsx": {"product_desc": "Product Description", "supplier": "Supplier Name", "supplier_id": "Supplier Number", "sku": "SKU/Catalog #", "price": "Unit Price", "qty": "Quantity", "spend": "Extended Price", "fund_id": "Reference Award ID", "purchase_id": "Purchase Order Identifier", "date": "Purchase date"},
@@ -39,7 +39,7 @@ COLUMN_SPECS: Dict[str, Mapping[str, str]] = {
     "tsu_2015_2023.xlsx": {"product_desc": "Short Text", "supplier": "Vendor Name", "supplier_id": "Vendor Number", "price": "Net Price", "spend": "Gross Price", "purchase_id": "Purchasing Doc Num", "date": "Document Date"},
     "md_anderson_2012_2015.xlsx": {"product_desc": "Descr", "supplier": "VendorName", "supplier_id": "VendorID", "price": "PaidUnitPrice", "qty": "PaidQuantity", "purchase_id": "PO No", "date": "PODate"},
 }
-STANDARD_COLS: List[str] = ["product_desc", "supplier", "supplier_id", "sku", "price", "qty", "spend", "unit", "purchaser", "fund_id", "purchase_id", "date"]
+STANDARD_COLS: List[str] = ["product_desc", "supplier", "supplier_id", "sku", "price", "qty", "spend", "unit", "purchaser", "fund_id", "purchase_id", "date", "funder"]
 
 # ───────────────── Processing Loop ────────────────────────
 def _process_workbook(path: Path, out_dir: Path) -> None:
