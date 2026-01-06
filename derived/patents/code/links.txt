@@ -1,0 +1,3 @@
+./openalex/ | /export/projects4/achandra_basicscience/derived/science_geo/openalex/15jrnls/make_15jrnls/output/ 
+./patents/ | /n/netscratch/pakes_lab/Lab/sci_eq/patent/ 
+

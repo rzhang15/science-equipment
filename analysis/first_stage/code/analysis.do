@@ -303,6 +303,33 @@ program event_study
           legend(on order(2 "Spending (Post Period Avg: `spend_mean')" 4 "Price (Post Period Avg: `price_mean')" 6 "Quantity (Post Period Avg: `qty_mean')") pos(11) ring(0) size(small) region(fcolor(none))) xtitle("Relative Year", size(small)) ytitle("Log Estimates", size(small)) plotregion(margin(sides))
     graph export ../output/figures/es_estimatespooled.pdf, replace
 
+    // combined plots
+    use "../temp/es_avg_log_spend_estimatesus fbs", replace
+    gen group = "spend"
+    replace rel = rel - 0.2 
+    sum b if group == "spend" & rel > 0
+    local spend_mean : dis %4.3f r(mean)
+    append using "../temp/es_avg_log_price_estimatesus fbs"
+    replace group = "price" if mi(group)
+    sum b if group == "price" & rel > 0
+    local price_mean : dis %4.3f r(mean)
+    append using "../temp/es_avg_log_qty_estimatesus fbs"
+    replace group = "qty" if mi(group)
+    replace rel = rel + 0.2 if group == "qty"
+    sum b if group == "qty" & rel >0.2
+    local qty_mean : dis %4.3f r(mean)
+    tw rcap ub lb rel if rel != -1.2 & group == "spend",  lcolor(lavender%70) msize(small) || ///
+       scatter b rel if group == "spend", mcolor(lavender%70) msize(small) || ///
+       rcap ub lb rel if rel != -1.0 & group == "price",  lcolor(orange%70) msize(small) || ///
+       scatter b rel if group == "price", mcolor(orange%70) msymbol(smdiamond) msize(small) || /// 
+       rcap ub lb rel if rel != -0.8 & group == "qty",  lcolor(ebblue%70) msize(small) || ///
+       scatter b rel if group == "qty", mcolor(ebblue%70) msymbol(smsquare) msize(small) || /// 
+       scatteri 0.6 -0.3 0.6 0.3 , bcolor(gs12%30) recast(area) base(-0.2) ///
+       xlab(-4(1)5, labsize(small)) ylab(-0.2(0.1)0.6, labsize(vsmall)) ///
+          yline(0, lcolor(black) lpattern(solid)) ///
+          legend(on order(2 "Spending (Post Period Avg: `spend_mean')" 4 "Price (Post Period Avg: `price_mean')" 6 "Quantity (Post Period Avg: `qty_mean')") pos(11) ring(0) size(small) region(fcolor(none))) xtitle("Relative Year", size(small)) ytitle("Log Estimates", size(small)) plotregion(margin(sides))
+    graph export ../output/figures/es_estimatesusfbs_pooled.pdf, replace
+
 end
 
 program uni_fes

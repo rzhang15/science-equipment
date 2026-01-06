@@ -23,6 +23,33 @@ program main
     gduplicates drop inst_id, force
     drop if inst == "I-1"
     save ../output/list_of_insts, replace
+    
+    clear
+    forval i = 1/6 {
+        append using ../output/list_of_athrs_`i'
+    }
+    drop if mi(athr_id)
+    gduplicates drop athr_id, force
+    gen id = substr(athr_id,2, length(athr_id))
+    destring id, replace
+    drop if id < 5000000000
+    drop id
+    save ../output/list_of_athrs, replace
+
+    clear
+    forval i = 1/6 {
+        append using ../output/list_of_works_`i'
+    }
+    drop if mi(id)
+    gduplicates drop id, force
+    save ../output/list_of_works, replace
+
+    clear
+    forval i = 1/6 {
+        append using ../output/openalex_all_jrnls_merged_`i'
+    }
+    compress, nocoalesce
+    save ../output/openalex_all_jrnls_merged, replace
 end
 
 program upload_files
