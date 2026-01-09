@@ -1,0 +1,2 @@
+./pis/ | /n/netscratch/pakes_lab/Lab/sci_eq/FOIA/pis/
+./foias/ | /n/home02/cxu75/sci_eq/derived/process_foias/merge_foias/output
