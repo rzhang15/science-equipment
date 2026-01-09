@@ -1,0 +1,1 @@
+sbatch -p sapphire -t 3-00:00:00 --mem=25G --array=1-62 --wrap="Rscript 1_recovery.R"

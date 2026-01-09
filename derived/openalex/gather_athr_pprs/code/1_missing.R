@@ -1,45 +1,40 @@
 library(openalexR) 
 library(dplyr) 
-library(ggplot2) 
-library(here)
-library(haven)
-library(stringr)
-library(purrr)
 library(tidyverse)
 library(data.table)
+library(haven)
 
 set.seed(8975)
 
-# Load data
+# --- SETUP ---
+# Load original data to map IDs
 athrs <- read_dta("../external/ids/list_of_athrs.dta")  %>% filter(athr_id != "A9999999999")
 nr <- nrow(athrs)
-
-# Split authors into chunks of 500
 split_athr <- split(athrs, rep(1:ceiling(nr/500), each = 500, length.out=nr))
-num_file <- length(split_athr)
 
-# --- SLURM ARRAY LOGIC STARTS HERE ---
+# Load the specific list of chunks we need to do
+missing_chunks <- readRDS("missing_jobs.rds")
 
-# 1. Get the Array Task ID from the system environment
-# If running locally (not on Slurm), this defaults to 1 for safety
+# --- BATCH LOGIC ---
 task_id <- as.numeric(Sys.getenv("SLURM_ARRAY_TASK_ID"))
 if (is.na(task_id)) task_id <- 1
 
-# 2. Define how many chunks 'q' each job should handle
-batch_size <- 500
+# Batch size of 30 ensures ~60 minute runtime
+batch_size <- 1 
 
-# 3. Calculate the start and end indices for THIS specific job
-start_q <- (task_id - 1) * batch_size + 1
-end_q   <- min(task_id * batch_size, num_file) # Use min() to ensure we don't go out of bounds
+start_idx <- (task_id - 1) * batch_size + 1
+end_idx   <- min(task_id * batch_size, length(missing_chunks))
 
-print(paste("Job ID:", task_id, "| Processing chunks:", start_q, "to", end_q))
+if (start_idx > length(missing_chunks)) {
+  quit(save="no")
+}
 
-# --- MAIN LOOP ---
+# Identify which chunks THIS job will run
+current_batch <- missing_chunks[start_idx:end_idx]
+print(paste("Job", task_id, "processing", length(current_batch), "chunks"))
 
-for (q in start_q:end_q) {
-    print(paste("Processing chunk:", q))
-    
-    # Wrap in tryCatch to prevent one bad API call from crashing the whole job
+# --- LOOP ---
+for (q in current_batch) {
     try({
         works <- oa_fetch(
             entity = "works", 
@@ -51,14 +46,11 @@ for (q in start_q:end_q) {
         )
         
         N_articles <- length(works)
-        
         if (N_articles > 0) {
             output <- lapply(1:N_articles, function(i) {
                 ids <- works[[i]][["id"]] %>% data.frame
             })
             output <- output %>% bind_rows() %>% distinct() %>% data.frame
-            
-            # Write the output file
             write_csv(output, paste0("../output/works", as.character(q), ".csv"))
         }
     })
