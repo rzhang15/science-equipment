@@ -8,7 +8,7 @@ from gslab_make.modify_dir import *
 from gslab_make.write_logs import *
 #****************************************************
 # MAKE.PY STARTS
-clear_dir(['../output/', '../temp/'])
+clear_dir(['../output/', '../temp/', '../output_local/'])
 remove_dir(['../external/'])
 paths = {'makelog' : '../output/make.log', 'external_dir' : '../external/'}
 start_makelog(paths)
@@ -17,8 +17,9 @@ start_makelog(paths)
 link_externals(paths, ['links.txt'])
 
 import subprocess
+#subprocess.call('Rscript --no-save build.R > ../output/build.Rout', shell=True)
 # BUILD.DO
 #run_stata(paths, program = 'build.do')
-#subprocess.call('Rscript --no-save build.R > ../output/build.Rout', shell=True)
 end_makelog(paths)
 input('\n Press <Enter> to exit.')
+
