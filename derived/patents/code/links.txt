@@ -1,3 +1,0 @@
-./openalex/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/pull_openalex/output/ 
-./patents/ | /n/netscratch/pakes_lab/Lab/sci_eq/patents/ 
-
