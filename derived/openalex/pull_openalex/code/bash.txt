@@ -1,0 +1,2 @@
+sbatch -p serial_requeue -t 3-00:00:00 --mem=25G --wrap="Rscript 1_build_fast.R"
+

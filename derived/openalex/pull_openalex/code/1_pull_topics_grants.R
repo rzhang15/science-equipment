@@ -63,18 +63,6 @@ for (q in batches) {
     next
   }
   
-  types_df <- map_dfr(batch_works, function(article) {
-    id <- article[["id"]]
-    type_cr <- if(!is.null(article[["type_crossref"]])) article[["type_crossref"]] else NA_character_
-    tibble(id = id, type_crossref = type_cr)
-  })
-  
-  if (nrow(types_df) > 0) {
-    types_df <- types_df %>% 
-      mutate(id = str_replace(id, "https://openalex.org/", ""))
-    write_csv(types_df, paste0("../output/types", as.character(q), ".csv"))
-  }
-  
   awards_df <- map_dfr(batch_works, function(article) {
     if (is.null(article[["awards"]]) || length(article[["awards"]]) == 0) return(NULL)
     
@@ -95,7 +83,7 @@ for (q in batches) {
     awards_df <- awards_df %>% 
       mutate(id = str_replace(id, "https://openalex.org/", ""),
              funder_id = str_replace(funder_id, "https://openalex.org/", ""))
-    write_csv(awards_df, paste0("../output/grants", as.character(q), ".csv"))
+    write_csv(awards_df, paste0("../output/grants/grants", as.character(q), ".csv"))
   }
   
   topics_df <- map_dfr(batch_works, function(article) {
@@ -133,6 +121,6 @@ for (q in batches) {
              field_id = str_replace(field_id, "https://openalex.org/fields/", ""),
              domain_id = str_replace(domain_id, "https://openalex.org/domains/", ""))
     
-    write_csv(topics_df, paste0("../output/topics", as.character(q), ".csv"))
+    write_csv(topics_df, paste0("../output/topics/topics", as.character(q), ".csv"))
   }
 }

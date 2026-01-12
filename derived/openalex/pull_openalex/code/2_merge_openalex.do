@@ -10,11 +10,10 @@ global dropbox_dir "~/dropbox (harvard university)/scientific equipment"
 global derived_output "${dropbox_dir}/derived_output/"
 program main
    * upload_files
-    *append_files, section(6)
-    *append_mesh, section(1)
-    append_topics, section(6)
-    append_grants, section(6)
-
+    append_files, section(6)
+    append_mesh, section(6)
+    *append_topics, section(6)
+    *append_grants, section(6)
     clear
     forval i = 1/6 {
         append using ../output/list_of_insts_`i'
@@ -57,7 +56,7 @@ program upload_files
     forval i =1/5473 {
         di "`i'"
         qui {
-                cap import delimited using ../output/openalex_authors`i', stringcols(_all) clear varn(1) bindquotes(strict) maxquotedrows(unlimited)
+                cap import delimited using ../output/works/openalex_authors`i', stringcols(_all) clear varn(1) bindquotes(strict) maxquotedrows(unlimited)
                 if _rc == 0 {
                     keep if pub_type == "article" 
                     gen n = `i'
@@ -70,7 +69,7 @@ program upload_files
     forval i = 1/5473 {
         di "`i'"
         qui {
-            cap import delimited using ../output/mesh_terms`i', stringcols(_all) clear varn(1) bindquotes(strict) maxquotedrows(unlimited)
+            cap import delimited using ../output/mesh/mesh_terms`i', stringcols(_all) clear varn(1) bindquotes(strict) maxquotedrows(unlimited)
             if _rc == 0 {
                 cap drop n
                 gen year = `i'
@@ -83,12 +82,12 @@ program upload_files
             }
         }
     } 
-
+/*
     // topics
     forval i = 1/5473 {
         di "`i'"
         qui {
-            cap import delimited using ../output/topics`i', stringcols(_all) clear varn(1) bindquotes(strict) maxquotedrows(unlimited) 
+            cap import delimited using ../output/topics/topics`i', stringcols(_all) clear varn(1) bindquotes(strict) maxquotedrows(unlimited) 
             if _rc == 0 {
                 cap gen n = `i'
                 cap compress, nocoalesce
@@ -101,14 +100,14 @@ program upload_files
     forval i = 1/5473 {
         di "`i'"
         qui {
-            cap import delimited using ../output/grants`i', stringcols(_all) clear varn(1) bindquotes(strict) maxquotedrows(unlimited)
+            cap import delimited using ../output/grants/grants`i', stringcols(_all) clear varn(1) bindquotes(strict) maxquotedrows(unlimited)
             if _rc == 0 {
                 cap gen n = `i'
                 cap compress, nocoalesce
                 cap save ../temp/grants`i', replace
             }
         }
-    }
+    }*/
 end
 
 program append_files
