@@ -1,0 +1,48 @@
+openalexR v2.0.0 introduces breaking changes.
+See NEWS.md for details.
+
+To suppress this message, add `openalexR.message = suppressed` to your .Renviron file.
+Warning message:
+package ‘openalexR’ was built under R version 4.4.3 
+
+Attaching package: ‘dplyr’
+
+The following objects are masked from ‘package:stats’:
+
+    filter, lag
+
+The following objects are masked from ‘package:base’:
+
+    intersect, setdiff, setequal, union
+
+Warning message:
+package ‘dplyr’ was built under R version 4.4.3 
+Warning message:
+package ‘readr’ was built under R version 4.4.3 
+Warning message:
+package ‘stringr’ was built under R version 4.4.3 
+Warning message:
+package ‘purrr’ was built under R version 4.4.3 
+── Attaching core tidyverse packages ──────────────────────── tidyverse 2.0.0 ──
+✔ forcats   1.0.0     ✔ tibble    3.2.1
+✔ ggplot2   3.5.1     ✔ tidyr     1.3.1
+✔ lubridate 1.9.4     
+── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
+✖ dplyr::filter() masks stats::filter()
+✖ dplyr::lag()    masks stats::lag()
+ℹ Use the conflicted package (<http://conflicted.r-lib.org/>) to force all conflicts to become errors
+Warning messages:
+1: package ‘tidyverse’ was built under R version 4.4.3 
+2: package ‘tibble’ was built under R version 4.4.3 
+3: package ‘tidyr’ was built under R version 4.4.3 
+4: package ‘forcats’ was built under R version 4.4.3 
+5: package ‘lubridate’ was built under R version 4.4.3 
+Processing Chunk: 10 (Upper Half)
+Batch Range: 9501 to 10000
+Completed batch 9501
+Completed batch 9502
+Completed batch 9503
+Completed batch 9504
+Completed batch 9505
+Completed batch 9506
+Completed batch 9507

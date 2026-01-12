@@ -1,0 +1,132 @@
+openalexR v2.0.0 introduces breaking changes.
+See NEWS.md for details.
+
+To suppress this message, add `openalexR.message = suppressed` to your .Renviron file.
+Warning message:
+package ‘openalexR’ was built under R version 4.4.3 
+
+Attaching package: ‘dplyr’
+
+The following objects are masked from ‘package:stats’:
+
+    filter, lag
+
+The following objects are masked from ‘package:base’:
+
+    intersect, setdiff, setequal, union
+
+Warning message:
+package ‘dplyr’ was built under R version 4.4.3 
+Warning message:
+package ‘readr’ was built under R version 4.4.3 
+Warning message:
+package ‘stringr’ was built under R version 4.4.3 
+Warning message:
+package ‘purrr’ was built under R version 4.4.3 
+── Attaching core tidyverse packages ──────────────────────── tidyverse 2.0.0 ──
+✔ forcats   1.0.0     ✔ tibble    3.2.1
+✔ ggplot2   3.5.1     ✔ tidyr     1.3.1
+✔ lubridate 1.9.4     
+── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
+✖ dplyr::filter() masks stats::filter()
+✖ dplyr::lag()    masks stats::lag()
+ℹ Use the conflicted package (<http://conflicted.r-lib.org/>) to force all conflicts to become errors
+Warning messages:
+1: package ‘tidyverse’ was built under R version 4.4.3 
+2: package ‘tibble’ was built under R version 4.4.3 
+3: package ‘tidyr’ was built under R version 4.4.3 
+4: package ‘forcats’ was built under R version 4.4.3 
+5: package ‘lubridate’ was built under R version 4.4.3 
+Processing Chunk: 3
+Batch Range: 2001 to 3000
+Completed batch 2001
+Completed batch 2002
+Completed batch 2003
+Completed batch 2004
+Completed batch 2005
+Completed batch 2006
+Completed batch 2007
+Completed batch 2008
+Completed batch 2009
+Completed batch 2010
+Completed batch 2011
+Completed batch 2012
+Completed batch 2013
+Completed batch 2014
+Completed batch 2015
+Completed batch 2016
+Completed batch 2017
+Completed batch 2018
+Completed batch 2019
+Completed batch 2020
+Completed batch 2021
+Completed batch 2022
+Completed batch 2023
+Completed batch 2024
+Completed batch 2025
+Completed batch 2026
+Completed batch 2027
+Completed batch 2028
+Completed batch 2029
+Completed batch 2030
+Completed batch 2031
+Completed batch 2032
+Completed batch 2033
+Completed batch 2034
+Completed batch 2035
+Completed batch 2036
+Completed batch 2037
+Completed batch 2038
+Completed batch 2039
+Completed batch 2040
+Completed batch 2041
+Completed batch 2042
+Completed batch 2043
+Completed batch 2044
+Completed batch 2045
+Completed batch 2046
+Completed batch 2047
+Completed batch 2048
+Completed batch 2049
+Completed batch 2050
+Completed batch 2051
+Completed batch 2052
+Completed batch 2053
+Completed batch 2054
+Completed batch 2055
+Completed batch 2056
+Completed batch 2057
+Completed batch 2058
+Completed batch 2059
+Completed batch 2060
+Completed batch 2061
+Completed batch 2062
+Completed batch 2063
+Completed batch 2064
+Completed batch 2065
+Completed batch 2066
+Completed batch 2067
+Completed batch 2068
+Completed batch 2069
+Completed batch 2070
+Completed batch 2071
+Completed batch 2072
+Completed batch 2073
+Completed batch 2074
+Completed batch 2075
+Completed batch 2076
+Completed batch 2077
+Completed batch 2078
+Completed batch 2079
+Completed batch 2080
+Completed batch 2081
+Completed batch 2082
+Completed batch 2083
+Completed batch 2084
+Completed batch 2085
+Completed batch 2086
+Completed batch 2087
+Completed batch 2088
+Completed batch 2089
+Completed batch 2090
+Completed batch 2091

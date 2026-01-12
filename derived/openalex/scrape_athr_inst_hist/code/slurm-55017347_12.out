@@ -1,0 +1,154 @@
+openalexR v2.0.0 introduces breaking changes.
+See NEWS.md for details.
+
+To suppress this message, add `openalexR.message = suppressed` to your .Renviron file.
+Warning message:
+package ‘openalexR’ was built under R version 4.4.3 
+
+Attaching package: ‘dplyr’
+
+The following objects are masked from ‘package:stats’:
+
+    filter, lag
+
+The following objects are masked from ‘package:base’:
+
+    intersect, setdiff, setequal, union
+
+Warning message:
+package ‘dplyr’ was built under R version 4.4.3 
+Warning message:
+package ‘readr’ was built under R version 4.4.3 
+Warning message:
+package ‘stringr’ was built under R version 4.4.3 
+Warning message:
+package ‘purrr’ was built under R version 4.4.3 
+── Attaching core tidyverse packages ──────────────────────── tidyverse 2.0.0 ──
+✔ forcats   1.0.0     ✔ tibble    3.2.1
+✔ ggplot2   3.5.1     ✔ tidyr     1.3.1
+✔ lubridate 1.9.4     
+── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
+✖ dplyr::filter() masks stats::filter()
+✖ dplyr::lag()    masks stats::lag()
+ℹ Use the conflicted package (<http://conflicted.r-lib.org/>) to force all conflicts to become errors
+Warning messages:
+1: package ‘tidyverse’ was built under R version 4.4.3 
+2: package ‘tibble’ was built under R version 4.4.3 
+3: package ‘tidyr’ was built under R version 4.4.3 
+4: package ‘forcats’ was built under R version 4.4.3 
+5: package ‘lubridate’ was built under R version 4.4.3 
+Processing Chunk: 12
+Batch Range: 11001 to 12000
+Completed batch 11001
+API Error on batch 11002 : Argument 'txt' must be a JSON string, URL or file.
+Completed batch 11003
+Completed batch 11004
+Completed batch 11005
+Completed batch 11006
+Completed batch 11007
+Completed batch 11008
+Completed batch 11009
+Completed batch 11010
+Completed batch 11011
+Completed batch 11012
+Completed batch 11013
+Completed batch 11014
+Completed batch 11015
+Completed batch 11016
+Completed batch 11017
+Completed batch 11018
+Completed batch 11019
+Completed batch 11020
+Completed batch 11021
+Completed batch 11022
+Completed batch 11023
+Completed batch 11024
+Completed batch 11025
+Completed batch 11026
+Completed batch 11027
+Completed batch 11028
+Completed batch 11029
+Completed batch 11030
+Completed batch 11031
+Completed batch 11032
+Completed batch 11033
+Completed batch 11034
+Completed batch 11035
+Completed batch 11036
+Completed batch 11037
+Completed batch 11038
+Completed batch 11039
+Completed batch 11040
+Completed batch 11041
+Completed batch 11042
+Completed batch 11043
+Completed batch 11044
+Completed batch 11045
+Completed batch 11046
+Completed batch 11047
+Completed batch 11048
+Completed batch 11049
+Completed batch 11050
+Completed batch 11051
+Completed batch 11052
+Completed batch 11053
+Completed batch 11054
+Completed batch 11055
+Completed batch 11056
+Completed batch 11057
+Completed batch 11058
+Completed batch 11059
+Completed batch 11060
+Completed batch 11061
+Completed batch 11062
+Completed batch 11063
+Completed batch 11064
+Completed batch 11065
+Completed batch 11066
+Completed batch 11067
+Completed batch 11068
+Completed batch 11069
+Completed batch 11070
+Completed batch 11071
+Completed batch 11072
+Completed batch 11073
+Completed batch 11074
+Completed batch 11075
+Completed batch 11076
+Completed batch 11077
+Completed batch 11078
+Completed batch 11079
+Completed batch 11080
+Completed batch 11081
+Completed batch 11082
+Completed batch 11083
+Completed batch 11084
+Completed batch 11085
+Completed batch 11086
+Completed batch 11087
+Completed batch 11088
+Completed batch 11089
+Completed batch 11090
+Completed batch 11091
+Completed batch 11092
+Completed batch 11093
+Completed batch 11094
+Completed batch 11095
+Completed batch 11096
+Completed batch 11097
+Completed batch 11098
+Completed batch 11099
+Completed batch 11100
+Completed batch 11101
+Completed batch 11102
+Completed batch 11103
+Completed batch 11104
+Completed batch 11105
+Completed batch 11106
+Completed batch 11107
+Completed batch 11108
+Completed batch 11109
+Completed batch 11110
+Completed batch 11111
+Completed batch 11112
+Completed batch 11113

@@ -1,0 +1,117 @@
+openalexR v2.0.0 introduces breaking changes.
+See NEWS.md for details.
+
+To suppress this message, add `openalexR.message = suppressed` to your .Renviron file.
+Warning message:
+package ‘openalexR’ was built under R version 4.4.3 
+
+Attaching package: ‘dplyr’
+
+The following objects are masked from ‘package:stats’:
+
+    filter, lag
+
+The following objects are masked from ‘package:base’:
+
+    intersect, setdiff, setequal, union
+
+Warning message:
+package ‘dplyr’ was built under R version 4.4.3 
+Warning message:
+package ‘readr’ was built under R version 4.4.3 
+Warning message:
+package ‘stringr’ was built under R version 4.4.3 
+Warning message:
+package ‘purrr’ was built under R version 4.4.3 
+── Attaching core tidyverse packages ──────────────────────── tidyverse 2.0.0 ──
+✔ forcats   1.0.0     ✔ tibble    3.2.1
+✔ ggplot2   3.5.1     ✔ tidyr     1.3.1
+✔ lubridate 1.9.4     
+── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
+✖ dplyr::filter() masks stats::filter()
+✖ dplyr::lag()    masks stats::lag()
+ℹ Use the conflicted package (<http://conflicted.r-lib.org/>) to force all conflicts to become errors
+Warning messages:
+1: package ‘tidyverse’ was built under R version 4.4.3 
+2: package ‘tibble’ was built under R version 4.4.3 
+3: package ‘tidyr’ was built under R version 4.4.3 
+4: package ‘forcats’ was built under R version 4.4.3 
+5: package ‘lubridate’ was built under R version 4.4.3 
+Processing Chunk: 1
+Batch Range: 1 to 1000
+Completed batch 1
+Completed batch 2
+Completed batch 3
+Completed batch 4
+Completed batch 5
+Completed batch 6
+Completed batch 7
+Completed batch 8
+Completed batch 9
+Completed batch 10
+Completed batch 11
+Completed batch 12
+Completed batch 13
+Completed batch 14
+Completed batch 15
+Completed batch 16
+Completed batch 17
+Completed batch 18
+Completed batch 19
+Completed batch 20
+Completed batch 21
+Completed batch 22
+Completed batch 23
+Completed batch 24
+Completed batch 25
+Completed batch 26
+Completed batch 27
+Completed batch 28
+Completed batch 29
+Completed batch 30
+Completed batch 31
+Completed batch 32
+Completed batch 33
+Completed batch 34
+Completed batch 35
+Completed batch 36
+Completed batch 37
+Completed batch 38
+Completed batch 39
+Completed batch 40
+Completed batch 41
+Completed batch 42
+Completed batch 43
+Completed batch 44
+Completed batch 45
+Completed batch 46
+Completed batch 47
+Completed batch 48
+Completed batch 49
+Completed batch 50
+Completed batch 51
+Completed batch 52
+Completed batch 53
+Completed batch 54
+Completed batch 55
+Completed batch 56
+Completed batch 57
+Completed batch 58
+Completed batch 59
+Completed batch 60
+Completed batch 61
+Completed batch 62
+Completed batch 63
+Completed batch 64
+Completed batch 65
+Completed batch 66
+Completed batch 67
+Completed batch 68
+Completed batch 69
+Completed batch 70
+Completed batch 71
+Completed batch 72
+Completed batch 73
+Completed batch 74
+Completed batch 75
+Completed batch 76

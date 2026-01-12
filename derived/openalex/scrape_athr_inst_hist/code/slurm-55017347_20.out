@@ -1,0 +1,162 @@
+openalexR v2.0.0 introduces breaking changes.
+See NEWS.md for details.
+
+To suppress this message, add `openalexR.message = suppressed` to your .Renviron file.
+Warning message:
+package ‘openalexR’ was built under R version 4.4.3 
+
+Attaching package: ‘dplyr’
+
+The following objects are masked from ‘package:stats’:
+
+    filter, lag
+
+The following objects are masked from ‘package:base’:
+
+    intersect, setdiff, setequal, union
+
+Warning message:
+package ‘dplyr’ was built under R version 4.4.3 
+Warning message:
+package ‘readr’ was built under R version 4.4.3 
+Warning message:
+package ‘stringr’ was built under R version 4.4.3 
+Warning message:
+package ‘purrr’ was built under R version 4.4.3 
+── Attaching core tidyverse packages ──────────────────────── tidyverse 2.0.0 ──
+✔ forcats   1.0.0     ✔ tibble    3.2.1
+✔ ggplot2   3.5.1     ✔ tidyr     1.3.1
+✔ lubridate 1.9.4     
+── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
+✖ dplyr::filter() masks stats::filter()
+✖ dplyr::lag()    masks stats::lag()
+ℹ Use the conflicted package (<http://conflicted.r-lib.org/>) to force all conflicts to become errors
+Warning messages:
+1: package ‘tidyverse’ was built under R version 4.4.3 
+2: package ‘tibble’ was built under R version 4.4.3 
+3: package ‘tidyr’ was built under R version 4.4.3 
+4: package ‘forcats’ was built under R version 4.4.3 
+5: package ‘lubridate’ was built under R version 4.4.3 
+Processing Chunk: 20
+Batch Range: 19001 to 20000
+Completed batch 19001
+Completed batch 19002
+Completed batch 19003
+Completed batch 19004
+Completed batch 19005
+Completed batch 19006
+Completed batch 19007
+Completed batch 19008
+Completed batch 19009
+Completed batch 19010
+Completed batch 19011
+Completed batch 19012
+Completed batch 19013
+Completed batch 19014
+Completed batch 19015
+Completed batch 19016
+Completed batch 19017
+Completed batch 19018
+Completed batch 19019
+Completed batch 19020
+Completed batch 19021
+Completed batch 19022
+Completed batch 19023
+Completed batch 19024
+Completed batch 19025
+Completed batch 19026
+Completed batch 19027
+Completed batch 19028
+Completed batch 19029
+Completed batch 19030
+Completed batch 19031
+Completed batch 19032
+Completed batch 19033
+Completed batch 19034
+Completed batch 19035
+Completed batch 19036
+Completed batch 19037
+Completed batch 19038
+Completed batch 19039
+Completed batch 19040
+Completed batch 19041
+Completed batch 19042
+Completed batch 19043
+Completed batch 19044
+Completed batch 19045
+Completed batch 19046
+Completed batch 19047
+Completed batch 19048
+Completed batch 19049
+Completed batch 19050
+Completed batch 19051
+Completed batch 19052
+Completed batch 19053
+Completed batch 19054
+Completed batch 19055
+Completed batch 19056
+Completed batch 19057
+Completed batch 19058
+Completed batch 19059
+Completed batch 19060
+Completed batch 19061
+Completed batch 19062
+Completed batch 19063
+Completed batch 19064
+Completed batch 19065
+Completed batch 19066
+Completed batch 19067
+Completed batch 19068
+Completed batch 19069
+Completed batch 19070
+Completed batch 19071
+Completed batch 19072
+Completed batch 19073
+Completed batch 19074
+Completed batch 19075
+Completed batch 19076
+Completed batch 19077
+Completed batch 19078
+Completed batch 19079
+Completed batch 19080
+Completed batch 19081
+Completed batch 19082
+Completed batch 19083
+Completed batch 19084
+Completed batch 19085
+Completed batch 19086
+Completed batch 19087
+Completed batch 19088
+Completed batch 19089
+Completed batch 19090
+Completed batch 19091
+Completed batch 19092
+Completed batch 19093
+Completed batch 19094
+Completed batch 19095
+Completed batch 19096
+Completed batch 19097
+Completed batch 19098
+Completed batch 19099
+Completed batch 19100
+Completed batch 19101
+Completed batch 19102
+Completed batch 19103
+Completed batch 19104
+Completed batch 19105
+Completed batch 19106
+Completed batch 19107
+Completed batch 19108
+Completed batch 19109
+Completed batch 19110
+Completed batch 19111
+Completed batch 19112
+Completed batch 19113
+Completed batch 19114
+Completed batch 19115
+Completed batch 19116
+Completed batch 19117
+Completed batch 19118
+Completed batch 19119
+Completed batch 19120
+Completed batch 19121

@@ -1,0 +1,140 @@
+openalexR v2.0.0 introduces breaking changes.
+See NEWS.md for details.
+
+To suppress this message, add `openalexR.message = suppressed` to your .Renviron file.
+Warning message:
+package ‘openalexR’ was built under R version 4.4.3 
+
+Attaching package: ‘dplyr’
+
+The following objects are masked from ‘package:stats’:
+
+    filter, lag
+
+The following objects are masked from ‘package:base’:
+
+    intersect, setdiff, setequal, union
+
+Warning message:
+package ‘dplyr’ was built under R version 4.4.3 
+Warning message:
+package ‘readr’ was built under R version 4.4.3 
+Warning message:
+package ‘stringr’ was built under R version 4.4.3 
+Warning message:
+package ‘purrr’ was built under R version 4.4.3 
+── Attaching core tidyverse packages ──────────────────────── tidyverse 2.0.0 ──
+✔ forcats   1.0.0     ✔ tibble    3.2.1
+✔ ggplot2   3.5.1     ✔ tidyr     1.3.1
+✔ lubridate 1.9.4     
+── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
+✖ dplyr::filter() masks stats::filter()
+✖ dplyr::lag()    masks stats::lag()
+ℹ Use the conflicted package (<http://conflicted.r-lib.org/>) to force all conflicts to become errors
+Warning messages:
+1: package ‘tidyverse’ was built under R version 4.4.3 
+2: package ‘tibble’ was built under R version 4.4.3 
+3: package ‘tidyr’ was built under R version 4.4.3 
+4: package ‘forcats’ was built under R version 4.4.3 
+5: package ‘lubridate’ was built under R version 4.4.3 
+Processing Chunk: 7
+Batch Range: 6001 to 7000
+Completed batch 6001
+Completed batch 6002
+Completed batch 6003
+Completed batch 6004
+Completed batch 6005
+Completed batch 6006
+Completed batch 6007
+Completed batch 6008
+Completed batch 6009
+Completed batch 6010
+Completed batch 6011
+Completed batch 6012
+Completed batch 6013
+Completed batch 6014
+Completed batch 6015
+Completed batch 6016
+Completed batch 6017
+Completed batch 6018
+Completed batch 6019
+Completed batch 6020
+Completed batch 6021
+Completed batch 6022
+Completed batch 6023
+Completed batch 6024
+Completed batch 6025
+Completed batch 6026
+Completed batch 6027
+Completed batch 6028
+Completed batch 6029
+Completed batch 6030
+Completed batch 6031
+Completed batch 6032
+Completed batch 6033
+Completed batch 6034
+Completed batch 6035
+Completed batch 6036
+Completed batch 6037
+Completed batch 6038
+Completed batch 6039
+Completed batch 6040
+Completed batch 6041
+Completed batch 6042
+Completed batch 6043
+Completed batch 6044
+Completed batch 6045
+Completed batch 6046
+Completed batch 6047
+Completed batch 6048
+Completed batch 6049
+Completed batch 6050
+Completed batch 6051
+Completed batch 6052
+Completed batch 6053
+Completed batch 6054
+Completed batch 6055
+Completed batch 6056
+Completed batch 6057
+Completed batch 6058
+Completed batch 6059
+Completed batch 6060
+Completed batch 6061
+Completed batch 6062
+Completed batch 6063
+Completed batch 6064
+Completed batch 6065
+Completed batch 6066
+Completed batch 6067
+Completed batch 6068
+Completed batch 6069
+Completed batch 6070
+Completed batch 6071
+Completed batch 6072
+Completed batch 6073
+Completed batch 6074
+Completed batch 6075
+Completed batch 6076
+Completed batch 6077
+Completed batch 6078
+Completed batch 6079
+Completed batch 6080
+Completed batch 6081
+Completed batch 6082
+Completed batch 6083
+Completed batch 6084
+Completed batch 6085
+Completed batch 6086
+Completed batch 6087
+Completed batch 6088
+Completed batch 6089
+Completed batch 6090
+Completed batch 6091
+Completed batch 6092
+Completed batch 6093
+Completed batch 6094
+Completed batch 6095
+Completed batch 6096
+Completed batch 6097
+Completed batch 6098
+Completed batch 6099

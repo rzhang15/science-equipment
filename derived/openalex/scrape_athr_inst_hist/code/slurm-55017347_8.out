@@ -1,0 +1,141 @@
+openalexR v2.0.0 introduces breaking changes.
+See NEWS.md for details.
+
+To suppress this message, add `openalexR.message = suppressed` to your .Renviron file.
+Warning message:
+package ‘openalexR’ was built under R version 4.4.3 
+
+Attaching package: ‘dplyr’
+
+The following objects are masked from ‘package:stats’:
+
+    filter, lag
+
+The following objects are masked from ‘package:base’:
+
+    intersect, setdiff, setequal, union
+
+Warning message:
+package ‘dplyr’ was built under R version 4.4.3 
+Warning message:
+package ‘readr’ was built under R version 4.4.3 
+Warning message:
+package ‘stringr’ was built under R version 4.4.3 
+Warning message:
+package ‘purrr’ was built under R version 4.4.3 
+── Attaching core tidyverse packages ──────────────────────── tidyverse 2.0.0 ──
+✔ forcats   1.0.0     ✔ tibble    3.2.1
+✔ ggplot2   3.5.1     ✔ tidyr     1.3.1
+✔ lubridate 1.9.4     
+── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
+✖ dplyr::filter() masks stats::filter()
+✖ dplyr::lag()    masks stats::lag()
+ℹ Use the conflicted package (<http://conflicted.r-lib.org/>) to force all conflicts to become errors
+Warning messages:
+1: package ‘tidyverse’ was built under R version 4.4.3 
+2: package ‘tibble’ was built under R version 4.4.3 
+3: package ‘tidyr’ was built under R version 4.4.3 
+4: package ‘forcats’ was built under R version 4.4.3 
+5: package ‘lubridate’ was built under R version 4.4.3 
+Processing Chunk: 8
+Batch Range: 7001 to 8000
+Completed batch 7001
+Completed batch 7002
+Completed batch 7003
+Completed batch 7004
+Completed batch 7005
+Completed batch 7006
+Completed batch 7007
+Completed batch 7008
+Completed batch 7009
+Completed batch 7010
+Completed batch 7011
+Completed batch 7012
+Completed batch 7013
+Completed batch 7014
+Completed batch 7015
+Completed batch 7016
+Completed batch 7017
+Completed batch 7018
+Completed batch 7019
+Completed batch 7020
+Completed batch 7021
+Completed batch 7022
+Completed batch 7023
+Completed batch 7024
+Completed batch 7025
+Completed batch 7026
+Completed batch 7027
+Completed batch 7028
+Completed batch 7029
+Completed batch 7030
+Completed batch 7031
+Completed batch 7032
+Completed batch 7033
+Completed batch 7034
+Completed batch 7035
+Completed batch 7036
+Completed batch 7037
+Completed batch 7038
+Completed batch 7039
+Completed batch 7040
+Completed batch 7041
+Completed batch 7042
+Completed batch 7043
+Completed batch 7044
+Completed batch 7045
+Completed batch 7046
+Completed batch 7047
+Completed batch 7048
+Completed batch 7049
+Completed batch 7050
+Completed batch 7051
+Completed batch 7052
+Completed batch 7053
+Completed batch 7054
+Completed batch 7055
+Completed batch 7056
+Completed batch 7057
+Completed batch 7058
+Completed batch 7059
+Completed batch 7060
+Completed batch 7061
+Completed batch 7062
+Completed batch 7063
+Completed batch 7064
+Completed batch 7065
+Completed batch 7066
+Completed batch 7067
+Completed batch 7068
+Completed batch 7069
+Completed batch 7070
+Completed batch 7071
+Completed batch 7072
+Completed batch 7073
+Completed batch 7074
+Completed batch 7075
+Completed batch 7076
+Completed batch 7077
+Completed batch 7078
+Completed batch 7079
+Completed batch 7080
+Completed batch 7081
+Completed batch 7082
+Completed batch 7083
+Completed batch 7084
+Completed batch 7085
+Completed batch 7086
+Completed batch 7087
+Completed batch 7088
+Completed batch 7089
+Completed batch 7090
+Completed batch 7091
+Completed batch 7092
+Completed batch 7093
+Completed batch 7094
+Completed batch 7095
+Completed batch 7096
+Completed batch 7097
+Completed batch 7098
+Completed batch 7099
+Completed batch 7100

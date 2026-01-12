@@ -1,0 +1,161 @@
+openalexR v2.0.0 introduces breaking changes.
+See NEWS.md for details.
+
+To suppress this message, add `openalexR.message = suppressed` to your .Renviron file.
+Warning message:
+package ‘openalexR’ was built under R version 4.4.3 
+
+Attaching package: ‘dplyr’
+
+The following objects are masked from ‘package:stats’:
+
+    filter, lag
+
+The following objects are masked from ‘package:base’:
+
+    intersect, setdiff, setequal, union
+
+Warning message:
+package ‘dplyr’ was built under R version 4.4.3 
+Warning message:
+package ‘readr’ was built under R version 4.4.3 
+Warning message:
+package ‘stringr’ was built under R version 4.4.3 
+Warning message:
+package ‘purrr’ was built under R version 4.4.3 
+── Attaching core tidyverse packages ──────────────────────── tidyverse 2.0.0 ──
+✔ forcats   1.0.0     ✔ tibble    3.2.1
+✔ ggplot2   3.5.1     ✔ tidyr     1.3.1
+✔ lubridate 1.9.4     
+── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
+✖ dplyr::filter() masks stats::filter()
+✖ dplyr::lag()    masks stats::lag()
+ℹ Use the conflicted package (<http://conflicted.r-lib.org/>) to force all conflicts to become errors
+Warning messages:
+1: package ‘tidyverse’ was built under R version 4.4.3 
+2: package ‘tibble’ was built under R version 4.4.3 
+3: package ‘tidyr’ was built under R version 4.4.3 
+4: package ‘forcats’ was built under R version 4.4.3 
+5: package ‘lubridate’ was built under R version 4.4.3 
+Processing Chunk: 14
+Batch Range: 13001 to 14000
+Completed batch 13001
+Completed batch 13002
+Completed batch 13003
+Completed batch 13004
+Completed batch 13005
+Completed batch 13006
+Completed batch 13007
+Completed batch 13008
+Completed batch 13009
+Completed batch 13010
+Completed batch 13011
+Completed batch 13012
+Completed batch 13013
+Completed batch 13014
+Completed batch 13015
+Completed batch 13016
+Completed batch 13017
+Completed batch 13018
+Completed batch 13019
+Completed batch 13020
+Completed batch 13021
+Completed batch 13022
+Completed batch 13023
+Completed batch 13024
+Completed batch 13025
+Completed batch 13026
+Completed batch 13027
+Completed batch 13028
+Completed batch 13029
+Completed batch 13030
+Completed batch 13031
+Completed batch 13032
+Completed batch 13033
+Completed batch 13034
+Completed batch 13035
+Completed batch 13036
+Completed batch 13037
+Completed batch 13038
+Completed batch 13039
+Completed batch 13040
+Completed batch 13041
+Completed batch 13042
+Completed batch 13043
+Completed batch 13044
+Completed batch 13045
+Completed batch 13046
+Completed batch 13047
+Completed batch 13048
+Completed batch 13049
+Completed batch 13050
+Completed batch 13051
+Completed batch 13052
+Completed batch 13053
+Completed batch 13054
+Completed batch 13055
+Completed batch 13056
+Completed batch 13057
+Completed batch 13058
+Completed batch 13059
+Completed batch 13060
+Completed batch 13061
+Completed batch 13062
+Completed batch 13063
+Completed batch 13064
+Completed batch 13065
+Completed batch 13066
+Completed batch 13067
+Completed batch 13068
+Completed batch 13069
+Completed batch 13070
+Completed batch 13071
+Completed batch 13072
+Completed batch 13073
+Completed batch 13074
+Completed batch 13075
+Completed batch 13076
+Completed batch 13077
+Completed batch 13078
+Completed batch 13079
+Completed batch 13080
+Completed batch 13081
+API Error on batch 13082 : lexical error: malformed number, a digit is required after the decimal point.
+                                        {"meta":{"count":50,"db_respon
+                     (right here) ------^
+
+Completed batch 13083
+Completed batch 13084
+Completed batch 13085
+Completed batch 13086
+Completed batch 13087
+Completed batch 13088
+Completed batch 13089
+Completed batch 13090
+Completed batch 13091
+Completed batch 13092
+Completed batch 13093
+Completed batch 13094
+Completed batch 13095
+Completed batch 13096
+Completed batch 13097
+Completed batch 13098
+Completed batch 13099
+Completed batch 13100
+Completed batch 13101
+Completed batch 13102
+Completed batch 13103
+Completed batch 13104
+Completed batch 13105
+Completed batch 13106
+Completed batch 13107
+Completed batch 13108
+Completed batch 13109
+Completed batch 13110
+Completed batch 13111
+Completed batch 13112
+Completed batch 13113
+Completed batch 13114
+Completed batch 13115
+Completed batch 13116
+Completed batch 13117

@@ -8,6 +8,7 @@ version 17
 
 program main    
     clean_pi_id 
+    merge_ids_foia
 end
 
 program clean_pi_id 

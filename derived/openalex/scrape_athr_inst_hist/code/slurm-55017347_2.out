@@ -1,0 +1,124 @@
+openalexR v2.0.0 introduces breaking changes.
+See NEWS.md for details.
+
+To suppress this message, add `openalexR.message = suppressed` to your .Renviron file.
+Warning message:
+package ‘openalexR’ was built under R version 4.4.3 
+
+Attaching package: ‘dplyr’
+
+The following objects are masked from ‘package:stats’:
+
+    filter, lag
+
+The following objects are masked from ‘package:base’:
+
+    intersect, setdiff, setequal, union
+
+Warning message:
+package ‘dplyr’ was built under R version 4.4.3 
+Warning message:
+package ‘readr’ was built under R version 4.4.3 
+Warning message:
+package ‘stringr’ was built under R version 4.4.3 
+Warning message:
+package ‘purrr’ was built under R version 4.4.3 
+── Attaching core tidyverse packages ──────────────────────── tidyverse 2.0.0 ──
+✔ forcats   1.0.0     ✔ tibble    3.2.1
+✔ ggplot2   3.5.1     ✔ tidyr     1.3.1
+✔ lubridate 1.9.4     
+── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
+✖ dplyr::filter() masks stats::filter()
+✖ dplyr::lag()    masks stats::lag()
+ℹ Use the conflicted package (<http://conflicted.r-lib.org/>) to force all conflicts to become errors
+Warning messages:
+1: package ‘tidyverse’ was built under R version 4.4.3 
+2: package ‘tibble’ was built under R version 4.4.3 
+3: package ‘tidyr’ was built under R version 4.4.3 
+4: package ‘forcats’ was built under R version 4.4.3 
+5: package ‘lubridate’ was built under R version 4.4.3 
+Processing Chunk: 2
+Batch Range: 1001 to 2000
+Completed batch 1001
+Completed batch 1002
+Completed batch 1003
+Completed batch 1004
+Completed batch 1005
+Completed batch 1006
+Completed batch 1007
+Completed batch 1008
+Completed batch 1009
+Completed batch 1010
+Completed batch 1011
+Completed batch 1012
+Completed batch 1013
+Completed batch 1014
+Completed batch 1015
+Completed batch 1016
+Completed batch 1017
+Completed batch 1018
+Completed batch 1019
+Completed batch 1020
+Completed batch 1021
+Completed batch 1022
+Completed batch 1023
+Completed batch 1024
+Completed batch 1025
+Completed batch 1026
+Completed batch 1027
+Completed batch 1028
+Completed batch 1029
+Completed batch 1030
+Completed batch 1031
+Completed batch 1032
+Completed batch 1033
+Completed batch 1034
+Completed batch 1035
+Completed batch 1036
+Completed batch 1037
+Completed batch 1038
+Completed batch 1039
+Completed batch 1040
+Completed batch 1041
+Completed batch 1042
+Completed batch 1043
+Completed batch 1044
+Completed batch 1045
+Completed batch 1046
+Completed batch 1047
+Completed batch 1048
+Completed batch 1049
+Completed batch 1050
+Completed batch 1051
+Completed batch 1052
+Completed batch 1053
+Completed batch 1054
+Completed batch 1055
+Completed batch 1056
+Completed batch 1057
+Completed batch 1058
+Completed batch 1059
+Completed batch 1060
+Completed batch 1061
+Completed batch 1062
+Completed batch 1063
+Completed batch 1064
+Completed batch 1065
+Completed batch 1066
+Completed batch 1067
+Completed batch 1068
+Completed batch 1069
+Completed batch 1070
+Completed batch 1071
+Completed batch 1072
+Completed batch 1073
+Completed batch 1074
+Completed batch 1075
+Completed batch 1076
+Completed batch 1077
+Completed batch 1078
+Completed batch 1079
+Completed batch 1080
+Completed batch 1081
+Completed batch 1082
+Completed batch 1083

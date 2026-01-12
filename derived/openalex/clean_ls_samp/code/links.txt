@@ -1,1 +1,4 @@
 ./samp/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/pull_openalex/output 
+./top/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/make_jrnl_cuts/output 
+./patents/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/patents/pat_to_ppr/output 
+./inst_xw/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/unify_insts/output 

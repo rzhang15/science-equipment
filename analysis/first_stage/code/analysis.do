@@ -14,6 +14,25 @@ program main
 end
 
 program raw_plots
+    use ../external/merged/matched_category_panel, clear
+    collapse (mean) avg_log_price avg_log_qty avg_log_spend raw_price [aw = spend_2013], by(year treated)
+    foreach var in avg_log_price raw_price { 
+        gen trt_`var' = `var' if treated == 1
+        gen ctrl_`var' = `var' if treated == 0
+    }
+    foreach var in avg_log_price raw_price { 
+        if "`var'" == "avg_log_price" local yname "Avg. Log Price"
+        if "`var'" == "raw_price" local yname "Avg. Price"
+        if "`var'" == "avg_log_qty" local yname "Avg. Log Qty"
+        if "`var'" == "avg_log_spend" local yname "Avg. Log Spend"
+        qui sum trt_`var' if year == 2013 
+        qui replace trt_`var' = trt_`var' - r(mean)
+        qui sum ctrl_`var' if year == 2013 
+        qui replace ctrl_`var' = ctrl_`var' - r(mean)
+        qui tw connected trt_`var' year , lcolor(lavender) mcolor(lavender) || connected ctrl_`var' year , lcolor(dkorange%40) mcolor(dkorange%40) legend(on label(1 "Treated: `name'") label(2 "Control: `match_name'") ring(1) pos(6) rows(1) size(vsmall)) ytitle("`yname'", size(small)) yline(0, lcolor(gs10) lpattern(solid)) ylabel(#6, labsize(small)) xlabel(2010(1)2019, labsize(small)) xtitle("Year", size(small)) tline(2013.5, lpattern(shortdash) lcolor(gs4%80)) 
+        qui graph export "../output/figures/`var'_trends_pooled.pdf", replace
+    }
+    
     use ../external/merged/matched_mkts, clear
     qui glevelsof category, local(categories)
     foreach c in `categories' {
@@ -35,13 +54,14 @@ program raw_plots
         }
         qui keep if keep == 1 
         local name = strproper("`c'")
-        collapse (mean) avg_log_price avg_log_qty avg_log_spend [aw = spend_2013], by(year treated)
-        foreach var in avg_log_price { //avg_log_qty avg_log_spend  {
+        collapse (mean) avg_log_price avg_log_qty avg_log_spend raw_price [aw = spend_2013], by(year treated)
+        foreach var in avg_log_price raw_price { //avg_log_qty avg_log_spend  {
             gen trt_`var' = `var' if treated == 1
             gen ctrl_`var' = `var' if treated == 0
         }
-        foreach var in avg_log_price { //avg_log_qty avg_log_spend { 
+        foreach var in avg_log_price raw_price { //avg_log_qty avg_log_spend { 
             if "`var'" == "avg_log_price" local yname "Avg. Log Price"
+            if "`var'" == "raw_price" local yname "Avg. Price"
             if "`var'" == "avg_log_qty" local yname "Avg. Log Qty"
             if "`var'" == "avg_log_spend" local yname "Avg. Log Spend"
             qui sum trt_`var' if year == 2013 
@@ -152,6 +172,7 @@ end
 program event_study
     // naive event study
     use ../external/samp/uni_category_yr_tfidf, clear
+   * drop if cat == "us fbs"
     gen rel = year - 2014
     replace rel = . if treated == 0
     local fes uni_id mkt year
@@ -170,8 +191,8 @@ program event_study
         restore
     }
 
-    
     use ../external/merged/matched_uni_category_panel ,clear 
+   * drop if cat == "us fbs"
     gen rel = year - 2014
     replace rel = . if treated == 0
     local fes uni_id mkt year
@@ -198,7 +219,6 @@ program event_study
         manual_event_study, lag(5) lead(-4) yvar(avg_log_`yvar') ymin(-0.2) ymax(0.6) ygap(0.1) trt_mean(`trt_mean') ctrl_mean(`ctrl_mean')  name(`yname') fes(`fes') wt_var(spend_2013) cluster_var(mkt) file_suf("pooled")
         restore
     }
-
     forval i = 1/4 {
         foreach yvar in price qty spend {
             preserve
@@ -249,7 +269,6 @@ program event_study
             restore
         }
     }
-
     use "../temp/es_avg_log_price_estimateshhi1", replace
     gen group = 1 
     replace rel = rel - 0.24 

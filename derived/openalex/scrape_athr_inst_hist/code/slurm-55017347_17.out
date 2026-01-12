@@ -1,0 +1,155 @@
+openalexR v2.0.0 introduces breaking changes.
+See NEWS.md for details.
+
+To suppress this message, add `openalexR.message = suppressed` to your .Renviron file.
+Warning message:
+package ‘openalexR’ was built under R version 4.4.3 
+
+Attaching package: ‘dplyr’
+
+The following objects are masked from ‘package:stats’:
+
+    filter, lag
+
+The following objects are masked from ‘package:base’:
+
+    intersect, setdiff, setequal, union
+
+Warning message:
+package ‘dplyr’ was built under R version 4.4.3 
+Warning message:
+package ‘readr’ was built under R version 4.4.3 
+Warning message:
+package ‘stringr’ was built under R version 4.4.3 
+Warning message:
+package ‘purrr’ was built under R version 4.4.3 
+── Attaching core tidyverse packages ──────────────────────── tidyverse 2.0.0 ──
+✔ forcats   1.0.0     ✔ tibble    3.2.1
+✔ ggplot2   3.5.1     ✔ tidyr     1.3.1
+✔ lubridate 1.9.4     
+── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
+✖ dplyr::filter() masks stats::filter()
+✖ dplyr::lag()    masks stats::lag()
+ℹ Use the conflicted package (<http://conflicted.r-lib.org/>) to force all conflicts to become errors
+Warning messages:
+1: package ‘tidyverse’ was built under R version 4.4.3 
+2: package ‘tibble’ was built under R version 4.4.3 
+3: package ‘tidyr’ was built under R version 4.4.3 
+4: package ‘forcats’ was built under R version 4.4.3 
+5: package ‘lubridate’ was built under R version 4.4.3 
+Processing Chunk: 17
+Batch Range: 16001 to 17000
+Completed batch 16001
+Completed batch 16002
+Completed batch 16003
+Completed batch 16004
+Completed batch 16005
+Completed batch 16006
+Completed batch 16007
+Completed batch 16008
+Completed batch 16009
+Completed batch 16010
+Completed batch 16011
+Completed batch 16012
+Completed batch 16013
+Completed batch 16014
+Completed batch 16015
+Completed batch 16016
+Completed batch 16017
+Completed batch 16018
+Completed batch 16019
+Completed batch 16020
+Completed batch 16021
+Completed batch 16022
+Completed batch 16023
+Completed batch 16024
+Completed batch 16025
+Completed batch 16026
+Completed batch 16027
+Completed batch 16028
+Completed batch 16029
+Completed batch 16030
+Completed batch 16031
+Completed batch 16032
+Completed batch 16033
+Completed batch 16034
+Completed batch 16035
+Completed batch 16036
+Completed batch 16037
+Completed batch 16038
+Completed batch 16039
+Completed batch 16040
+Completed batch 16041
+Completed batch 16042
+Completed batch 16043
+Completed batch 16044
+Completed batch 16045
+Completed batch 16046
+Completed batch 16047
+Completed batch 16048
+Completed batch 16049
+Completed batch 16050
+Completed batch 16051
+Completed batch 16052
+Completed batch 16053
+Completed batch 16054
+Completed batch 16055
+Completed batch 16056
+Completed batch 16057
+Completed batch 16058
+Completed batch 16059
+Completed batch 16060
+Completed batch 16061
+Completed batch 16062
+Completed batch 16063
+Completed batch 16064
+Completed batch 16065
+Completed batch 16066
+Completed batch 16067
+Completed batch 16068
+Completed batch 16069
+Completed batch 16070
+Completed batch 16071
+Completed batch 16072
+Completed batch 16073
+Completed batch 16074
+Completed batch 16075
+Completed batch 16076
+Completed batch 16077
+Completed batch 16078
+Completed batch 16079
+Completed batch 16080
+Completed batch 16081
+Completed batch 16082
+Completed batch 16083
+Completed batch 16084
+Completed batch 16085
+Completed batch 16086
+Completed batch 16087
+Completed batch 16088
+Completed batch 16089
+Completed batch 16090
+Completed batch 16091
+Completed batch 16092
+Completed batch 16093
+Completed batch 16094
+Completed batch 16095
+Completed batch 16096
+Completed batch 16097
+Completed batch 16098
+Completed batch 16099
+Completed batch 16100
+Completed batch 16101
+Completed batch 16102
+Completed batch 16103
+Completed batch 16104
+Completed batch 16105
+Completed batch 16106
+Completed batch 16107
+Completed batch 16108
+Completed batch 16109
+Completed batch 16110
+Completed batch 16111
+Completed batch 16112
+Completed batch 16113
+Completed batch 16114

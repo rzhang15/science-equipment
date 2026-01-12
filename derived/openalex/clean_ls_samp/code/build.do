@@ -8,199 +8,24 @@ set seed 8975
 set maxvar 120000
 
 program main
-    aggregate_insts
+    // samp: all_jrnls_merged_1...6, top_jrnls
     /*clean_titles, samp(`samp')
     clean_samps, samp(`samp')
     clean_mesh, samp(`samp')
-    clean_concepts, samp(`samp')
-    split_sample*/
-end
-
-program aggregate_insts
-    clear
-        forval i = 1/16 {
-            cap append using ../external/samp/inst_geo_chars`i'
-        }
-
-    bys inst_id: gegen has_parent = max(associated_rel == "parent")
-    keep if has_parent == 0  | (has_parent == 1 & associated_rel == "parent" ) 
-    gen new_inst = ""
-    gen new_inst_id = ""
-    foreach var in inst inst_id {
-        replace new_`var' =  `var' if has_parent == 0
-        replace new_`var' = `var' if (((strpos(associated, "Universit")>0|strpos(associated, "College")|strpos(associated, "Higher Education")) & strpos(associated, "System")>0 & associated_type == "education" & (type == "education" | type == "healthcare")) | inlist(associated, "University of London", "Wellcome Trust") | (strpos(associated, "Health")>0 & strpos(associated, "System")>0 & associated_type == "healthcare" & (type == "education" | type == "healthcare")) | strpos(associated, "Ministry of") > 0 | strpos(associated, "Board of")>0 | strpos(associated, "Government of")>0 | (strpos(associated, "Department of")>0 & country != "Russia")) & !inlist(associated, "State Univerisity of New York", "City University of New York")
-        replace new_`var' = `var' if country_code != associated_country
-    }
-    replace associated = "" if !mi(new_inst)
-    replace associated_id = "" if !mi(new_inst_id)
-    gduplicates drop inst_id new_inst_id, force
-    foreach s in "" "_id" {
-        replace new_inst`s' = associated`s' if strpos(associated, "University")>0 & strpos(associated, "System")>0 & associated_type == "education" & (type != "education" & type != "healthcare")
-        replace new_inst`s' = associated`s' if inlist(associated, "Chinese Academy of Sciences", "Spanish National Research Council", "Max Planck Society", "National Research Council", "National Institutes of Health", "Harvard University")
-        replace new_inst`s' = associated`s' if inlist(associated, "Leibniz Association", "Aix-Marseille University", "Indian Council of Agricultural Research", "Inserm", "Polish Academy of Sciences", "National Research Institute for Agriculture, Food and Environment") 
-        replace new_inst`s' = associated`s' if inlist(associated, "Institut des Sciences Biologiques", "Institut de Chimie", "Institut des Sciences Humaines et Sociales", "Institut National des Sciences de l'Univers", "Institut des Sciences de l'Ingénierie et des Systèmes", "Institut Écologie et Environnement", "Institut de Physique", "Institut National des Sciences Mathématiques et de leurs Interactions")
-        replace new_inst`s' = associated`s' if inlist(associated, "Institut National de Physique Nucléaire et de Physique des Particules", "Institut des Sciences de l'Information et de leurs Interactions")
-        replace new_inst`s' = associated`s' if inlist(associated, "French National Centre for Scientific Research")
-        replace new_inst`s' = associated`s' if inlist(associated, "Fraunhofer Society", "Istituti di Ricovero e Cura a Carattere Scientifico",  "Claude Bernard University Lyon 1", "Atomic Energy and Alternative Energies Commission", "Japanese Red Cross Society, Japan") 
-        replace new_inst`s' = associated`s' if inlist(associated, "Islamic Azad University, Tehran", "National Oceanic and Atmospheric Administratio", "French Institute for Research in Computer Science and Automation", "National Academy of Sciences of Ukraine", "National Institute for Nuclear Physics", "Assistance Publique – Hôpitaux de Paris") 
-        replace new_inst`s' = associated`s' if inlist(associated, "Medical Research Council", "National Institute for Health Research", "Academia Sinica", "National Scientific and Technical Research Council","Czech Academy of Sciences", "Commonwealth Scientific and Industrial Research Organisation")
-        replace new_inst`s' = associated`s' if inlist(associated, "Slovak Academy of Sciences", "Indian Council of Medical Research", "Council of Scientific and Industrial Research", "National Institute for Astrophysics", "Bulgarian Academy of Sciences", "Centers for Disease Control and Prevention", "National Institute of Technology")
-        replace new_inst`s' = associated`s' if inlist(associated, "Helmholtz Association of German Research Centres", "Helios Kliniken", "Shriners Hospitals for Children", "Hungarian Academy of Sciences", "National Agriculture and Food Research Organization", "Australian Research Council")
-        replace new_inst`s' = associated`s' if inlist(associated, "Agro ParisTech", "Veterans Health Administration", "Institut de Recherche pour le Développement", "Austrian Academy of Sciences", "Institutos Nacionais de Ciência e Tecnologia", "Chinese Academy of Forestry", "Chinese Academy of Tropical Agricultural Sciences")
-        replace new_inst`s' = associated`s' if inlist(associated, "Instituto de Salud Carlos III", "National Aeronautics and Space Administration", "Ludwig Boltzmann Gesellschaft", "United States Air Force", "Centre Nouvelle Aquitaine-Bordeaux", "RIKEN", "Agricultural Research Council")
-        replace new_inst`s' = associated`s' if inlist(associated, "Centro Científico Tecnológico - La Plata", "National Research Council Canada", "Royal Netherlands Academy of Arts and Sciences","Defence Research and Development Organisation", "Canadian Institutes of Health Research", "Italian Institute of Technology", "United Nations University")
-        replace new_inst`s' = associated`s' if inlist(associated, "IBM Research - Thomas J. Watson Research Center", "Délégation Ile-de-France Sud","Grenoble Institute of Technology", "François Rabelais University", "Chinese Academy of Social Sciences", "National Science Foundation" , "Federal University of Toulouse Midi-Pyearénées")
-        replace new_inst`s' = associated`s' if inlist(associated, "Chinese Center For Disease Control and Prevention", "Johns Hopkins Medicine", "Cancer Research UK", "Centre Hospitalier Universitaire de Bordeaux", "Puglia Salute", "Hospices Civils de Lyon", "Ministry of Science and Technology", "Servicio de Salud de Castilla La Mancha")
-        replace new_inst`s' = associated`s' if inlist(associated, "Grenoble Alpes University","Arts et Metiers Institute of Technology", "University of Paris-Saclay", "Biomedical Research Council", "Senckenberg Society for Nature Research", "Centre Hospitalier Régional et Universitaire de Lille", "Schön Klinik Roseneck", "ESPCI Paris")
-        replace new_inst`s' = associated`s' if inlist(associated, "National Academy of Sciences of Armenia", "University of the Philippines System", "Madrid Institute for Advanced Studies", "CGIAR", "Ministry of Science, Technology and Innovation", "Institut Polytechnique de Bordeaux")
-
-        replace new_inst`s' = associated`s' if inlist(associated, "Department of Biological Sciences", "Department of Chemistry and Material Sciences", "Department of Energy, Engineering, Mechanics and Control Processes","Department of Agricultural Sciences", "Division of Historical and Philological Sciences", "Department of Mathematical Sciences", "Department of Physiological Sciences") & country == "Russia"
-        replace new_inst`s' = associated`s' if inlist(associated, "Department of Earth Sciences", "Physical Sciences Division", "Department of Global Issues and International Relations", "Department of Medical Sciences", "Department of Social Sciences") & country == "Russia" 
-        replace new_inst`s' = associated`s' if inlist(associated, "Russian Academy")
-        replace new_inst`s' = associated`s' if strpos(associated, "Agricultural Research Service -")>0
-    }
-    // merge national institutions together
-    replace new_inst = "French National Centre for Scientific Research" if inlist(inst,"Institut des Sciences Biologiques", "Institut de Chimie", "Institut des Sciences Humaines et Sociales", "Institut National des Sciences de l'Univers", "Institut des Sciences de l'Ingénierie et des Systèmes", "Institut Écologie et Environnement", "Institut de Physique", "Institut National des Sciences Mathématiques et de leurs Interactions") | inlist(inst,"Institut National de Physique Nucléaire et de Physique des Particules", "Institut des Sciences de l'Information et de leurs Interactions", "Centre National de la Recherche Scientifique")
-    replace new_inst = "French National Centre for Scientific Research" if inlist(new_inst,"Institut des Sciences Biologiques", "Institut de Chimie", "Institut des Sciences Humaines et Sociales", "Institut National des Sciences de l'Univers", "Institut des Sciences de l'Ingénierie et des Systèmes", "Institut Écologie et Environnement", "Institut de Physique", "Institut National des Sciences Mathématiques et de leurs Interactions") | inlist(new_inst,"Institut National de Physique Nucléaire et de Physique des Particules", "Institut des Sciences de l'Information et de leurs Interactions")
-    replace new_inst_id = "I1294671590" if new_inst =="French National Centre for Scientific Research"
-    replace new_inst = "Russian Academy" if inlist(inst, "Department of Biological Sciences", "Department of Chemistry and Material Sciences", "Department of Energy, Engineering, Mechanics and Control Processes","Department of Agricultural Sciences", "Division of Historical and Philological Sciences", "Department of Mathematical Sciences", "Department of Physiological Sciences") | inlist(inst, "Russian Academy of Sciences", "Department of Earth Sciences", "Physical Sciences Division", "Department of Global Issues and International Relations", "Department of Medical Sciences", "Department of Social Sciences") & country == "Russia"
-    replace new_inst = "Russian Academy" if inlist(new_inst, "Department of Biological Sciences", "Department of Chemistry and Material Sciences", "Department of Energy, Engineering, Mechanics and Control Processes","Department of Agricultural Sciences", "Division of Historical and Philological Sciences", "Department of Mathematical Sciences", "Department of Physiological Sciences") | inlist(new_inst,"Russian Academy of Sciences", "Department of Earth Sciences", "Physical Sciences Division", "Department of Global Issues and International Relations", "Department of Medical Sciences", "Department of Social Sciences") & country == "Russia"
-
-    replace new_inst_id = "I1313323035" if new_inst  == "Russian Academy"
-    replace new_inst  = "Agricultural Research Service" if strpos(inst, "Agricultural Research Service - ")>0
-    replace new_inst_id = "I1312222531" if new_inst == "Agricultural Research Service"
-    replace new_inst  = "Max Planck Society" if strpos(inst, "Max Planck")>0
-    replace new_inst  = "Max Planck Society" if strpos(associated, "Max Planck")>0
-    replace new_inst_id = "I149899117" if new_inst == "Max Planck Society"
-    replace new_inst = "Mass General Brigham" if inlist(inst, "Massachusetts General Hospital" , "Brigham and Women's Hospital")
-    replace new_inst_id = "I48633490" if new_inst == "Mass General Brigham"
-    replace new_inst = "Johns Hopkins University" if strpos(inst, "Johns Hopkins")>0
-    replace new_inst = "Johns Hopkins University" if strpos(associated, "Johns Hopkins")>0
-    replace new_inst_id = "I145311948" if new_inst == "Johns Hopkins University"
-    replace new_inst = "Stanford University" if inlist(inst, "Stanford Medicine", "Stanford Health Care", "Stanford Synchrotron Radiation Lightsource", "Stanford Blood Center")
-    replace new_inst = "Stanford University" if inlist(associated, "Stanford Medicine", "Stanford Health Care")
-    replace new_inst_id = "I97018004" if new_inst == "Stanford University"
-    replace new_inst = "Northwestern University" if inlist(inst, "Northwestern Medicine")
-    replace new_inst = "Northwestern University" if inlist(associated, "Northwestern Medicine")
-    replace new_inst_id = "I111979921" if new_inst == "Northwestern University"
-    replace new_inst = "Harvard University" if inlist(inst, "Harvard Global Health Institute", "Harvard Pilgrim Health Care", "Harvard Affiliated Emergency Medicine Residency", "Harvard NeuroDiscovery Center", "Harvard College Observatory")
-    replace new_inst_id = "I136199984" if new_inst == "Harvard University"
-    replace new_inst = "University of California, San Francisco" if inlist(inst, "Ernest Gallo Clinic and Research Center")
-    replace new_inst_id = "I180670191" if new_inst == "University of California, San Francisco"
-    
-    // health systems
-    replace new_inst = "University of Virginia" if strpos(inst, "University of Virginia") > 0 & (strpos(inst, "Hospital") >0 | strpos(inst, "Medical")>0 | strpos(inst, "Health")>0)
-    replace new_inst_id = "I51556381" if new_inst == "University of Virginia"
-    replace new_inst = "University of Missouri" if strpos(inst, "University of Missouri" ) > 0 & (strpos(inst, "Hospital") >0 | strpos(inst, "Medical")>0 | strpos(inst, "Health")>0)
-    replace new_inst_id = "I76835614" if new_inst == "University of Missouri"
-    replace new_inst = "Baylor University" if strpos(inst, "Baylor University Medical Center")>0
-    replace new_inst_id = "I157394403" if new_inst == "Baylor University"
-    replace new_inst = "Columbia University" if strpos(inst, "Columbia University")>0 
-    replace new_inst_id = "I78577930" if new_inst == "Columbia University"
-    replace new_inst = "Yale University" if strpos(inst, "Yale New Haven Health System")>0 | strpos(inst, "Yale New Haven Hospital")>0 | strpos(inst, "Yale Cancer Center") >0  
-    replace new_inst_id = "I32971472" if new_inst == "Yale University"
-    replace new_inst = "University of Florida" if strpos(inst, "UF Health")>0 | strpos(inst, "Florida Medical Entomology Laboratory")>0
-    replace new_inst_id = "I33213144" if new_inst == "University of Florida"
-    replace new_inst = "University of Wisconsin–Madison" if strpos(inst, "University of Wisconsin Carbone Cancer Center")>0 | strpos(inst, "UW Health")>0
-    replace new_inst_id = "I135310074" if new_inst == "University of Wisconsin–Madison"
-	replace new_inst = "Scripps Health" if inlist(inst, "Scripps Clinic Medical Group", "Scripps Clinic", "Scripps Laboratories (United States)")
-    replace new_inst_id = "I1311914864" if new_inst == "Scripps Health"
-	replace new_inst = "Scripps Research Institute" if inlist(inst, "Scripps (United States)")
-    replace new_inst_id = "I123431417" if new_inst == "Scripps Research Institute"
-	replace new_inst = "Duke University" if inlist(inst, "Duke Medical Center")
-	replace new_inst_id = "I170897317" if new_inst == "Duke University"
-	replace new_inst = "Washington University in St. Louis" if (inlist(inst, "Washington University") & city == "St Louis") 
-	replace new_inst_id = "I204465549" if new_inst == "Washington University in St. Louis" 
-
-	replace new_inst = "University of Michigan–Ann Arbor" if inst == "Michigan Medicine" | inst == "Michigan Center for Translational Pathology"
-	replace new_inst_id = "I27837315" if new_inst == "University of Michigan–Ann Arbor"
-	replace new_inst = "University of Pittsburgh" if strpos(inst, "UPMC")>0
-	replace new_inst_id = "I170201317" if new_inst == "University of Pittsburgh" 
-	replace new_inst = "Vanderbilt University" if inst == "Vanderbilt Health"
-	replace new_inst_id = "I200719446" if new_inst == "Vanderbilt University"ll
-	
-    // fix the UCs
-	replace new_inst = "University of California, San Francisco" if strpos(inst, "UCSF")>0 | inst == "University of California San Francisco"
-	replace new_inst_id = "I180670191" if new_inst == "University of California, San Francisco"
-	replace new_inst = "University of California, San Diego" if strpos(inst , "University of California San Diego") | strpos(inst, "UC San Diego") >0 | strpos(inst, "UCSD")>0
-	replace new_inst_id = "I36258959" if new_inst == "University of California, San Diego" 	
-
-    replace new_inst = "University of California, Davis" if inst == "University of California Davis"
-	replace new_inst_id = "I84218800" if new_inst == "University of California, Davis"
-	replace new_inst = "University of California, Los Angeles" if inst == "University of California Los Angeles" | strpos(inst , "UCLA") >0 
-	replace new_inst_id = "I161318765" if new_inst == "University of California, Los Angeles"
-	replace new_inst = "University of California, Berkeley" if inst == "University of California Berkeley"
-	replace new_inst_id = "I95457486" if new_inst == "University of California, Berkeley"
-	replace new_inst = "University of California, Davis" if strpos(inst, "UC Davis") > 0
-	replace new_inst_id = "I84218800" if new_inst ==  "University of California, Davis" 
-	replace new_inst = "University of California, Irvine" if strpos(inst, "UC Irvine") > 0
-	replace new_inst_id = "I204250578" if new_inst ==  "University of California, Irvine" 
-    
-    // agencies
-    replace new_inst = "Dana-Farber Cancer Institute" if strpos(inst, "Dana-Farber") > 0
-    replace new_inst_id = "I4210117453" if new_inst == "Dana-Farber Cancer Institute"
-    replace new_inst = "National Institute of Standards and Technology" if associated == "National Institute of Standards and Technology" &associated_rel == "parent"
-    replace new_inst_id = "I1321296531" if new_inst ==  "National Institute of Standards and Technology"
-	replace new_inst = "National Institutes of Health" if inst == "Center for Cancer Research" | inst == "National Center for Biotechnology Information"
-	replace new_inst_id = "I1299303238" if new_inst == "National Institutes of Health"
-	replace new_inst = "Carnegie Institution for Science" if associated == "Carnegie Institution for Science" & associated_rel == "parent"
-	replace new_inst_id = "I196817621" if new_inst == "Carnegie Institution for Science"
-    replace new_inst = "Allen Institute" if associated == "Allen Institute" & associated_rel == "parent"
-    replace new_inst = "Allen Institute" if inst == "Allen Institute for Artificial Intelligence"
-    replace new_inst_id = "I4210140341" if new_inst ==  "Allen Institute"
-    replace new_inst = "Abbott (United States)" if inst == "Abbott Fund"
-	replace new_inst_id = "I4210088555" if new_inst == "Abbott (United States)"
-
-    replace new_inst = "Synaptic Pharmaceutical Corporation" if inst_id == "I4210132327"
-    replace city = "Paramus" if inst_id == "I4210132327"
-    replace region = "New Jersey" if inst_id == "I4210132327"
-    replace new_inst = "Immunex" if inst_id == "I4210143161"
-    replace city = "Seattle" if inst_id == "I4210143161" 
-    replace region = "Washington" if inst_id == "I4210143161"
-    replace new_inst = "Genetics Institute" if inst_id == "I4210165860"
-    replace city = "Cambridge" if inst_id == "I4210165860"
-    replace region = "Massachusetts" if inst_id == "I4210165860"
-
-    gen edit = 0
-    foreach s in "Health System" "Clinic" "Hospital of the" "Hospital" "Medical Center" {
-        replace new_inst = subinstr(inst, "`s'", "", .) if (strpos(inst, "University")>0 | strpos(inst, "UC")>0) & strpos(inst, "`s'") > 0 & edit == 0 & country_code == "US" & strpos(new_inst, "`s'") > 0
-        replace edit = 1 if  (strpos(inst, "University")>0 | strpos(inst, "UC")>0) & strpos(inst, "`s'") > 0 &  country_code == "US" & strpos(new_inst, "`s'")
-    }
-    replace new_inst = strtrim(new_inst)
-    bys new_inst (edit) : replace new_inst_id = new_inst_id[_n-1] if edit == 1 & !mi(new_inst_id[_n-1])  & city == city[_n-1]
-    replace new_inst = associated if !mi(associated) & mi(new_inst) & has_parent == 1 & inlist(type,"facility", "other", "nonprofit", "healthcare") & associated_type == "education" & !inlist(associated, "State University of New York", "City University of New York")
-    replace new_inst_id = associated_id if !mi(associated_id) & mi(new_inst_id) & has_parent == 1 &  inlist(type,"facility", "other", "nonprofit", "healthcare") & associated_type == "education" & !inlist(associated, "State University of New York", "City University of New York")
-    replace new_inst = inst if mi(new_inst)
-    replace new_inst_id = inst_id if mi(new_inst_id)
-    gduplicates tag inst_id, gen(dup)
-    gen diff = inst_id != new_inst_id
-    bys inst_id : gegen has_new = max(diff)
-    drop if dup > 0 & diff == 0 & has_new == 1
-    drop dup 
-    gduplicates drop inst_id, force
-    keep inst_id inst new_inst new_inst_id region city country country_code type 
-    drop if mi(inst_id) 
-    gegen inst_grp = group(country city new_inst)
-    bys inst_grp:  replace new_inst_id = new_inst_id[_n-1] if new_inst_id != new_inst_id[_n-1] & inst_grp == inst_grp[_n-1]
-    save ../output/all_inst_geo_chars, replace
+    clean_concepts, samp(`samp')*/
 end
 
 program clean_titles
     syntax, samp(str) 
-    use pmid title id pub_type jrnl using ../external/openalex/openalex_`samp'_merged, clear
-    keep if pub_type == "article"
+    if "`samp'" == "top_jrnls" local fol top
+    if strpos("`samp'" , "all_jrnls")  > 0 local fol samp 
+    use pmid title id pub_type jrnl using ../external/`fol'/openalex_`samp', clear
     replace title = stritrim(title)
     contract title id pmid jrnl
     gduplicates drop pmid , force
     gduplicates drop id  , force
     cap drop _freq
     gisid id
-    if "`samp'" == "15jrnls" {
-        merge 1:1 pmid using ../external/pmids_jrnl/all_pmids, keep(3) nogen keepusing(pmid)
-    }
-    if "`samp'" == "clin_med" {
-        merge 1:1 pmid using ../external/pmids_jrnl/med_all_pmids, keep(3) nogen keepusing(pmid journal_abbr)
-    }
     drop if mi(title)
     gen lower_title = stritrim(subinstr(subinstr(subinstr(subinstr(strlower(title), `"""', "", .), ".", "",.)), " :", ":",.), "'", "", .)
     drop if strpos(lower_title, "accountable care")>0 | strpos(title, "ACOs")>0
@@ -231,13 +56,15 @@ program clean_titles
     save ../temp/possible_non_articles_`samp', replace
     restore
     merge m:1 pmid using ../temp/possible_non_articles_`samp', assert(1 3) keep(1) nogen
-    save ${temp}/openalex_`samp'_clean_titles, replace
+    save ../temp/openalex_`samp'_clean_titles, replace
 end
 
 program clean_samps
     syntax, samp(str) 
-    use id jrnl pmid using ${temp}/openalex_`samp'_clean_titles, clear
-    merge 1:m id using ../external/openalex/openalex_`samp'_merged, assert(2 3) keep(3) nogen 
+    if "`samp'" == "top_jrnls" local fol top
+    if strpos("`samp'" , "all_jrnls")  > 0 local fol samp 
+    use id jrnl pmid using ../temp/openalex_`samp'_clean_titles, clear
+    merge 1:m id using ../external/`fol'/openalex_`samp', assert(2 3) keep(3) nogen 
     merge m:1 id using ../external/patents/patent_ppr_cnt, assert(1 2 3) keep(1 3) nogen keepusing(patent_count front_only body_only)
     // clean date variables
     gen date = date(pub_date, "YMD")
@@ -251,27 +78,10 @@ program clean_samps
     gen pub_mnth = month(pub_date)
     gen year = year(pub_date)
     gen qrtr = qofd(pub_date)
-    keep if inrange(year, 1945, 2023)
-    // these OAIDs are misclassified or correspond to multiple pmids
-    drop if inlist(id , "W2016575029", "W2331065494", "W4290207833", "W4290198809" , "W4290206947" , "W4290293465")
-    drop if inlist(id , "W4290277360", "W4290357912", "W4214483051", "W1978139107" , "W2045742772" , "W2049314578")
-    drop if inlist(id, "W1994190235","W2580449060", "W2082429191", "W2022687771", "W2040385059" , "W4229906281")
-    drop if inlist(id, "W4255455244" , "W1980313477", "W3048657354", "W1980462544")
-    drop if inlist(id, "W2002595366", "W2102489389", "W2001810314", "W4231356616", "W4230789027", "W2080003482", "W2107959600", "W2400624566" )
-    drop if inlist(id, "W4236962498", "W2084870845", "W2784316575", "W2955291917", "W2474836229")
-    drop if inlist(pmid, 13297012,13741605,13854582,14394134,20241600,21065007)
-    replace pmid = 15164053 if id == "W2103225674"
-    replace pmid = 27768894 if id == "W4242360498"
-    replace pmid = 5963230 if id == "W3083842255"
-    replace pmid = 4290025 if id == "W2007714458"
-    replace pmid = 9157877 if id == "W1988665546"
-    replace pmid = 11689469 if id == "W2148194696" 
-    replace pmid = 12089445 if id == "W3205595473"
-    replace pmid = 13111194 if id == "W2737242062"
-    replace pmid = 13113233 if id == "W2050270632"
+    drop if year < 1945
     // fix some wrong institutions
     replace inst = "Johns Hopkins University" if strpos(raw_affl , "Bloomberg School of Public Health")>0 & inst == "Bloomberg (United States)"
-    merge m:1 inst_id using ../output/all_inst_geo_chars, assert(1 2 3) keep(1 3) nogen 
+    merge m:1 inst_id using ../external/inst_xw/all_inst_geo_chars, assert(1 2 3) keep(1 3) nogen 
     replace inst = new_inst if !mi(new_inst)
     replace inst_id = new_inst_id if !mi(new_inst)
     replace inst = "Johns Hopkins University" if  strpos(inst, "Johns Hopkins")>0
@@ -317,7 +127,7 @@ program clean_samps
     cap drop new_inst new_inst_id 
     merge m:1 athr_id year using ../external/year_insts/filled_in_panel_year, assert(1 2 3) keep(3) nogen
     gduplicates drop pmid athr_id inst_id, force
-    save ${temp}/cleaned_all_`samp'_prewt, replace
+    save ../temp/cleaned_all_`samp'_prewt, replace
 
     // wt_adjust articles 
     qui hashsort pmid which_athr which_affl
@@ -367,28 +177,6 @@ program clean_samps
     qui gen pat_adj_wt  = affl_wt * pat_wt * `articles'
     qui gen frnt_adj_wt  = affl_wt * frnt_wt * `articles'
     qui gen body_adj_wt  = affl_wt * body_wt * `articles'
-    // now give each article a weight based on their journal impact factor 
-    gen impact_fctr = . 
-    replace impact_fctr = 60.9 if jrnl == "Nature"
-    replace impact_fctr = 37.4 if jrnl == "Nature Genetics"
-    replace impact_fctr = 27.7 if jrnl == "Nature Neuroscience"
-    replace impact_fctr = 15.6 if jrnl == "Nature Chemical Biology"
-    replace impact_fctr = 26.6 if jrnl == "Nature Cell Biology"
-    replace impact_fctr = 59.1 if jrnl == "Nature Biotechnology"
-    replace impact_fctr = 69.4 if jrnl == "Nature Medicine"
-    replace impact_fctr = 54.5 if jrnl == "Science"
-    replace impact_fctr = 57.5 if jrnl == "Cell"
-    replace impact_fctr = 24.9 if jrnl == "Cell stem cell"
-    replace impact_fctr = 18.6 if jrnl == "Neuron"
-    replace impact_fctr = 8.8 if jrnl == "Oncogene"
-    replace impact_fctr = 5.2 if jrnl == "The FASEB Journal"
-    replace impact_fctr = 4.8 if jrnl == "Journal of Biological Chemistry"
-    replace impact_fctr = 3.8 if jrnl == "PLoS ONE"
-    replace impact_fctr = 35.3 if jrnl == "annals"
-    replace impact_fctr = 15.88 if jrnl == "bmj"
-    replace impact_fctr = 81.4 if jrnl == "jama"
-    replace impact_fctr = 118.1 if jrnl == "lancet"
-    replace impact_fctr = 115.7 if jrnl == "nejm"
    
     qui bys id: gen id_cntr = _n == 1
     qui bys jrnl: gen first_jrnl = _n == 1
@@ -411,10 +199,10 @@ program clean_samps
     local n = r(max)
     recast str`n' inst, force
     cap drop n mi_inst has_nonmi_inst population len
-    save ${temp}/pre_save, replace
+    save ../temp/pre_save, replace
     import delimited using ../external/geo/us_cities_states_counties.csv, clear varnames(1)
     glevelsof statefull , local(state_names)
-    use ${temp}/pre_save, clear
+    use ../temp/pre_save, clear
     replace country = "United States" if country_code == "US"
     replace country_code = "US" if country == "United States" 
     foreach s in `state_names' {
@@ -475,14 +263,14 @@ program clean_samps
     replace region = "Maryland" if inst_id == "I166416128"
     replace region = "Iowa" if inst == "Pioneer Hi-Bred"
     replace region = "Iowa" if inst == "WinnMed"
-    save ${temp}/fill_msa, replace
+    save ../temp/fill_msa, replace
 
     import delimited using ../external/geo/us_cities_states_counties.csv, clear varnames(1)
     gcontract stateshort statefull
     cap drop _freq
     drop if mi(stateshort)
     rename statefull region
-    merge 1:m region using ${temp}/fill_msa, assert(1 2 3) keep(2 3) nogen
+    merge 1:m region using ../temp/fill_msa, assert(1 2 3) keep(2 3) nogen
     replace stateshort =  "DC" if region == "District of Columbia"
     replace stateshort =  "VI" if region == "Virgin Islands, U.S."
     replace us_state = stateshort if country_code == "US" & mi(us_state)
@@ -506,7 +294,7 @@ program clean_samps
     preserve
     gcontract id pmid
     cap drop _freq
-    save ${temp}/pmid_id_xwalk_`samp', replace
+    save ../temp/pmid_id_xwalk_`samp', replace
     restore
 
     keep if inrange(pub_date, td(01jan2015), td(31dec2023)) & year >=2015
@@ -575,7 +363,7 @@ program clean_concepts
     syntax, samp(str) 
     use ../temp/15jrnls_pmids, clear 
     merge 1:m id using ../external/all/concepts_all_jrnls_merged, assert(1 2 3) keep(3) nogen
-    save ${temp}/concepts_`samp', replace
+    save ../temp/concepts_`samp', replace
     cap drop _freq
     save ../output/concepts_`samp', replace
     use ../output/concepts_`samp', clear
@@ -590,170 +378,4 @@ program clean_concepts
     save ../output/reshaped_concepts_`samp', replace
 end
 
-program split_sample
-    foreach samp in all last5yrs {
-        preserve
-        use ../output/cleaned_`samp'_15jrnls, clear
-        keep if inlist(jrnl, "Cell", "Science", "Nature")
-        drop cite_wt cite_affl_wt impact_wt impact_affl_wt impact_cite_wt impact_cite_affl_wt tot_cite_N reweight_N jrnl_N first_jrnl impact_shr pat_wt pat_adj_wt frnt_wt body_wt frnt_adj_wt body_adj_wt
-        qui sum avg_cite_yr
-        gen cite_wt = avg_cite_yr/r(sum)
-        qui sum avg_pat_yr
-        gen pat_wt = avg_pat_yr/r(sum)
-        qui sum avg_frnt_yr
-        gen frnt_wt = avg_frnt_yr/r(sum) 
-        qui sum avg_body_yr
-        gen body_wt = avg_body_yr/r(sum) 
-        bys jrnl: egen tot_cite_N = total(cite_wt)
-        gsort id cite_wt
-        qui bys id: replace cite_wt = cite_wt[_n-1] if mi(cite_wt)
-        gsort id pat_wt
-        qui bys id: replace pat_wt = pat_wt[_n-1] if mi(pat_wt)
-        gsort id frnt_wt
-        qui bys id: replace frnt_wt = frnt_wt[_n-1] if mi(frnt_wt)
-        gsort id body_wt
-        qui bys id: replace body_wt = body_wt[_n-1] if mi(body_wt)
-        gunique id 
-        local articles = r(unique)
-        qui gen cite_affl_wt = affl_wt * cite_wt * `articles'
-        qui gen pat_adj_wt  = affl_wt * pat_wt * `articles'
-        qui gen frnt_adj_wt  = affl_wt * frnt_wt * `articles'
-        qui gen body_adj_wt  = affl_wt * body_wt * `articles'
-        
-        qui bys jrnl: gen first_jrnl = _n == 1
-        qui by jrnl: gegen jrnl_N = total(id_cntr)
-        qui sum impact_fctr if first_jrnl == 1
-        gen impact_shr = impact_fctr/r(sum)
-        gen reweight_N = impact_shr * `articles'
-        replace  tot_cite_N = tot_cite_N * `articles'
-        gen impact_wt = reweight_N/jrnl_N
-        gen impact_affl_wt = impact_wt * affl_wt
-        gen impact_cite_wt = reweight_N * cite_wt / tot_cite_N * `articles'
-        gen impact_cite_affl_wt = impact_cite_wt * affl_wt
-
-        foreach wt in affl_wt cite_affl_wt impact_affl_wt impact_cite_affl_wt pat_adj_wt frnt_adj_wt body_adj_wt {
-           sum `wt'
-            assert round(r(sum)-`articles') == 0
-        }
-        save ../output/cleaned_`samp'_newfund_cns, replace
-        gcontract id
-        cap drop _freq
-        save ../output/list_of_ids_`samp'_newfund_cns, replace
-        restore
-
-        preserve
-        use ../output/cleaned_`samp'_15jrnls, clear
-        keep if inlist(jrnl, "Cell stem cell", "Nature Biotechnology", "Nature Cell Biology", "Nature Genetics", "Nature Medicine", "Nature Neuroscience", "Neuron", "Nature Chemical Biology")
-        drop cite_wt cite_affl_wt impact_wt impact_affl_wt impact_cite_wt impact_cite_affl_wt tot_cite_N reweight_N jrnl_N first_jrnl impact_shr pat_wt pat_adj_wt frnt_adj_wt body_adj_wt frnt_wt body_wt
-        qui sum avg_cite_yr
-        gen cite_wt = avg_cite_yr/r(sum)
-        qui sum avg_pat_yr
-        gen pat_wt = avg_pat_yr/r(sum)
-        qui sum avg_frnt_yr
-        gen frnt_wt = avg_frnt_yr/r(sum) 
-        qui sum avg_body_yr
-        gen body_wt = avg_body_yr/r(sum) 
-        bys jrnl: gegen tot_cite_N = total(cite_wt)
-        gsort id cite_wt
-        qui bys id: replace cite_wt = cite_wt[_n-1] if mi(cite_wt)
-        gsort id pat_wt
-        qui bys id: replace pat_wt = pat_wt[_n-1] if mi(pat_wt)
-        gsort id frnt_wt
-        qui bys id: replace frnt_wt = frnt_wt[_n-1] if mi(frnt_wt)
-        gsort id body_wt
-        qui bys id: replace body_wt = body_wt[_n-1] if mi(body_wt)
-        gunique id 
-        local articles = r(unique)
-        qui gen cite_affl_wt = affl_wt * cite_wt * `articles'
-        qui gen pat_adj_wt  = affl_wt * pat_wt * `articles'
-        qui gen frnt_adj_wt  = affl_wt * frnt_wt * `articles'
-        qui gen body_adj_wt  = affl_wt * body_wt * `articles'
-        
-        qui bys jrnl: gen first_jrnl = _n == 1
-        qui bys jrnl: gegen jrnl_N = total(id_cntr)
-        qui sum impact_fctr if first_jrnl == 1
-        gen impact_shr = impact_fctr/r(sum)
-        gen reweight_N = impact_shr * `articles'
-        replace  tot_cite_N = tot_cite_N * `articles'
-        gen impact_wt = reweight_N/jrnl_N
-        gen impact_affl_wt = impact_wt * affl_wt
-        gen impact_cite_wt = reweight_N * cite_wt / tot_cite_N * `articles'
-        gen impact_cite_affl_wt = impact_cite_wt * affl_wt
-
-        foreach wt in affl_wt cite_affl_wt impact_affl_wt impact_cite_affl_wt pat_adj_wt frnt_adj_wt body_adj_wt {
-            sum `wt'
-            assert round(r(sum)-`articles') == 0
-        }
-        save ../output/cleaned_`samp'_newfund_scisub, replace
-        gcontract id
-        cap drop _freq
-        save ../output/list_of_ids_`samp'_newfund_scisub, replace
-        restore
-
-        preserve
-        use ../output/cleaned_`samp'_15jrnls, clear
-        keep if inlist(jrnl, "The FASEB Journal", "Journal of Biological Chemistry", "Oncogene", "PLoS One")
-        drop cite_wt cite_affl_wt impact_wt impact_affl_wt impact_cite_wt impact_cite_affl_wt tot_cite_N reweight_N jrnl_N first_jrnl impact_shr pat_wt pat_adj_wt frnt_wt body_wt frnt_adj_wt body_adj_wt
-        qui sum avg_cite_yr
-        gen cite_wt = avg_cite_yr/r(sum)
-        qui sum avg_pat_yr
-        gen pat_wt = avg_pat_yr/r(sum)
-        qui sum avg_frnt_yr
-        gen frnt_wt = avg_frnt_yr/r(sum) 
-        qui sum avg_body_yr
-        gen body_wt = avg_body_yr/r(sum) 
-        bys jrnl: gegen tot_cite_N = total(cite_wt)
-        gsort id cite_wt
-        qui bys id: replace cite_wt = cite_wt[_n-1] if mi(cite_wt)
-        gsort id pat_wt
-        qui bys id: replace pat_wt = pat_wt[_n-1] if mi(pat_wt)
-        gsort id frnt_wt
-        qui bys id: replace frnt_wt = frnt_wt[_n-1] if mi(frnt_wt)
-        gsort id body_wt
-        qui bys id: replace body_wt = body_wt[_n-1] if mi(body_wt)
-        gunique id 
-        local articles = r(unique)
-        qui gen cite_affl_wt = affl_wt * cite_wt * `articles'
-        qui gen pat_adj_wt  = affl_wt * pat_wt * `articles'
-        qui gen frnt_adj_wt  = affl_wt * frnt_wt * `articles'
-        qui gen body_adj_wt  = affl_wt * body_wt * `articles'
-        
-        qui bys jrnl: gen first_jrnl = _n == 1
-        qui bys jrnl: gegen jrnl_N = total(id_cntr)
-        qui sum impact_fctr if first_jrnl == 1
-        gen impact_shr = impact_fctr/r(sum)
-        gen reweight_N = impact_shr * `articles'
-        replace  tot_cite_N = tot_cite_N * `articles'
-        gen impact_wt = reweight_N/jrnl_N
-        gen impact_affl_wt = impact_wt * affl_wt
-        gen impact_cite_wt = reweight_N * cite_wt / tot_cite_N * `articles'
-        gen impact_cite_affl_wt = impact_cite_wt * affl_wt
-
-        foreach wt in affl_wt cite_affl_wt impact_affl_wt impact_cite_affl_wt pat_adj_wt frnt_adj_wt body_adj_wt {
-            sum `wt'
-            assert round(r(sum)-`articles') == 0
-        }
-        save ../output/cleaned_`samp'_newfund_demsci, replace
-        gcontract id
-        cap drop _freq
-        save ../output/list_of_ids_`samp'_newfund_demsci, replace
-        restore
-	}
-    // split mesh terms
-	use ../output/contracted_gen_mesh_15jrnls, clear
-	foreach samp in cns scisub demsci {
-		preserve
-		merge m:1 id using ../output/list_of_ids_all_newfund_`samp', assert(1 2 3) keep(3) nogen
-		save ../output/contracted_gen_mesh_newfund_`samp', replace
-		restore
-	}
-   // split concepts 
-    use ../output/concepts_15jrnls, clear
-    foreach samp in cns scisub demsci {
-        preserve
-        merge m:1 id using ../output/list_of_ids_all_newfund_`samp', assert(1 2 3) keep(3) nogen
-        save ../output/concepts_newfund_`samp', replace
-        restore
-    }
-end
 main
