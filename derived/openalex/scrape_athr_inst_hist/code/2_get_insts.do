@@ -27,6 +27,7 @@ program append_files
         append using ../temp/inst`i'
         gduplicates drop
     }
+    fmerge 1:1 inst_id using ../external/openalex/list_of_insts, assert(1 3) keep(1) nogen
     save ../output/list_of_insts.dta, replace
 end
 main
