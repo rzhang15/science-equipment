@@ -7,10 +7,20 @@ pause on
 set seed 8975
 here, set
 set maxvar 120000
+
 program main
-    append_pprs
+    load_pprs
+    append_pprs, samp(6)
+    clear 
+    forval i = 1/6 {
+        append using "../output/list_of_works_`i'"
+        gduplicates drop
+    }
+    compress, nocoalesce
+    save ../output/list_of_works_all, replace
 end
-program append_pprs
+
+program load_pprs
     use ../external/ids/list_of_athrs, clear
     count
     local N = ceil(r(N)/500)
@@ -31,13 +41,19 @@ program append_pprs
         compress, nocoalesce
         save ../temp/works`i', replace
     }
+end
+
+program append_pprs
+    syntax, samp(int)
+    local start = (`samp'-1)*5000+1
+    local end = min(`samp'*5000 , 34158) 
     clear
-    forval i = 1/`N' {
+    forval i = `start'/`end' {
        append using ../temp/works`i'
        gduplicates drop
     }
-    fmerge 1:1 id using ../external/ids/list_of_works, assert(1 3) keep(1) nogen
-    save "../output/list_of_works", replace
+    fmerge 1:1 id using ../external/ids/list_of_works, assert(1 2 3) keep(1) nogen
+    save "../output/list_of_works_`samp'", replace
 end
 
 

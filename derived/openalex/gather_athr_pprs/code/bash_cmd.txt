@@ -1,1 +1,2 @@
-sbatch -p sapphire -t 3-00:00:00 --mem=25G --array=1-62 --wrap="Rscript 1_recovery.R"
+sbatch -p sapphire -t 3-00:00:00 --mem=25G --array=1-81 --wrap="Rscript 1_build_fast.R"
+sbatch -p sapphire -t 3-00:00:00 --mem=500G --array=1 --wrap="Rscript 2_merge_all.do"
