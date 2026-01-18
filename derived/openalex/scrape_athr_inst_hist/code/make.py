@@ -8,9 +8,9 @@ from gslab_make.modify_dir import *
 from gslab_make.write_logs import *
 #****************************************************
 # MAKE.PY STARTS
-clear_dir(['../output/', '../temp/'])
+#clear_dir(['../output/', '../temp/'])
 remove_dir(['../external/'])
-os.mkdir('../output/works/')
+#os.mkdir('../output/works/')
 paths = {'makelog' : '../output/make.log', 'external_dir' : '../external/'}
 start_makelog(paths)
 
