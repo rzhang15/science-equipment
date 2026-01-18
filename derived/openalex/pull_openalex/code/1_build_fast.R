@@ -82,7 +82,7 @@ extract_authors_long <- function(works_list) {
   }) %>% list_rbind()
 }
 
-for (q in 1963) {
+for (q in start_batch:end_batch) {
   batch_pmids <- split_pmid[[q]] %>% 
     mutate(pmid = as.character(pmid)) %>% 
     pull(pmid)
