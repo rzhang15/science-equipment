@@ -1,3 +1,4 @@
-./samp/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/pull_openalex/output 
+./ls_samp/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/pull_openalex/output 
+./samp/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/gather_athr_pprs/output 
 ./foia/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/grants/get_foia_pis/output 
 
