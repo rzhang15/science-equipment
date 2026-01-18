@@ -9,7 +9,7 @@ nr <- nrow(athrs)
 total_chunks <- ceiling(nr/500) 
 
 # 2. Find what you already have
-existing_files <- list.files("../output/", pattern = "works[0-9]+\\.csv")
+existing_files <- list.files("../output/works/", pattern = "works[0-9]+\\.csv")
 # Extract the numbers from the filenames
 existing_nums <- as.numeric(str_extract(existing_files, "[0-9]+"))
 

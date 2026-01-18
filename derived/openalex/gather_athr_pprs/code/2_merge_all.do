@@ -25,7 +25,7 @@ program load_pprs
     count
     local N = ceil(r(N)/500)
     forval i = 1/`N' {
-        import delimited using "../output/works`i'", clear
+        import delimited using "../output/works/works`i'", clear
         cap ds v2
         if _rc ==0 {
             keep v2
@@ -55,7 +55,4 @@ program append_pprs
     fmerge 1:1 id using ../external/ids/list_of_works, assert(1 2 3) keep(1) nogen
     save "../output/list_of_works_`samp'", replace
 end
-
-
-
 main
