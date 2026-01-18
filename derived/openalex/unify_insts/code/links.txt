@@ -1,1 +1,2 @@
 ./ls_samp/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/pull_openalex/output 
+./samp/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/scrape_athr_inst_hist/output 

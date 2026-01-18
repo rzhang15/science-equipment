@@ -17,6 +17,9 @@ program get_all_insts
     forval i = 1/16 {
         cap append using ../external/ls_samp/inst_geo_chars`i'
     }
+    forval i = 1/5 {
+        cap append using ../external/samp/inst_geo_chars`i'
+    }
     cap drop which_inst
     compress, nocoalesce
     save ../temp/all_insts, replace 
