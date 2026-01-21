@@ -1,1 +1,4 @@
-./samp/ | /n/netscratch/pakes_lab/Lab/sci_eq/hbsgrid/ 
+./abstracts/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/get_abstracts/output
+./ls_ppr/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/pull_openalex/output/works
+./ls_mesh/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/pull_openalex/output/mesh
+./appended/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/pull_openalex/output

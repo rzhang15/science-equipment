@@ -1,0 +1,5 @@
+Cluster 1 - Top 15 Terms: adverse_effect, etiolog, surgeri, mortal, drug_therapi, administration___dosag, epidemiolog, therapeutic_us, diagnosi, therapi, prevention___control, instrument, complic, diagnostic_imag, chemically_induc
+Cluster 2 - Top 15 Terms: diagnostic_imag, surgeri, therapi, patholog, drug_therapi, diagnosi, complic, etiolog, physiopatholog, therapeutic_us, mortal, carcinoma, adverse_effect, breast_neoplasm, genet
+Cluster 3 - Top 15 Terms: epidemiolog, diagnosi, psycholog, prevention___control, statistics___numerical_data, covid-19, complic, therapi, etiolog, drug_therapi, genet, hiv_infect, diabetes_mellitu, blood, therapeutic_us
+Cluster 4 - Top 15 Terms: genet, metabol, chemistri, physiolog, drug_effect, patholog, immunolog, microbiolog, isolation___purif, drug_therapi, water_pollut, toxic, blood, instrument, growth___develop
+Cluster 5 - Top 15 Terms: pharmacolog, chemistri, metabol, drug_effect, drug_therapi, therapeutic_us, genet, patholog, antineoplastic_ag, anti-bacterial_ag, administration___dosag, antagonists___inhibitor, isolation___purif, microbiolog, physiolog

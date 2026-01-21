@@ -1,0 +1,5 @@
+Cluster 1 - Top 15 Terms: diseas, diagnosi, therapi, surgeri, evalu, children, epidemiolog, infect, control, system, factor, outcom, function, complic, blood
+Cluster 2 - Top 15 Terms: pulmonari, lung, arteri, diseas, chronic, diagnosi, case, function, acut, complic, therapi, heart, surgeri, cell, increas
+Cluster 3 - Top 15 Terms: cell, protein, express, gene, human, metabol, cancer, genet, activ, receptor, rat, regul, inhibit, respons, function
+Cluster 4 - Top 15 Terms: case, report, diagnosi, tumor, diseas, syndrom, surgeri, rare, complic, review, carcinoma, surgic, lesion, infect, therapi
+Cluster 5 - Top 15 Terms: applic, product, acid, system, metabol, determin, evalu, cell, develop, potenti, chemistri, character, synthesi, human, detect
