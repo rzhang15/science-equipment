@@ -1,0 +1,6 @@
+./ls_samp/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/pull_openalex/output 
+./samp/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/gather_athr_pprs/output 
+./foia/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/grants/get_foia_pis/output 
+./fields/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/cluster_fields/output 
+./ml/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/first_stage/make_mkt_panel/temp
+./betas/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/analysis/first_stage/output
