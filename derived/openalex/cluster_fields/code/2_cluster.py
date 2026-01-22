@@ -26,7 +26,6 @@ pdf_ids = pd.read_parquet("../output/author_ids_aligned.parquet")
 
 # --- CLUSTERING ---
 print(f"Clustering into {NUM_CLUSTERS}...")
-# Increased batch_size and n_init slightly for better stability
 kmeans = MiniBatchKMeans(
     n_clusters=NUM_CLUSTERS,
     random_state=SEED,
@@ -37,7 +36,6 @@ kmeans.fit(matrix)
 
 # --- RESULTS ---
 print("Saving Results...")
-# Assign labels back to the author IDs
 pdf_ids['cluster_label'] = kmeans.labels_
 pdf_ids.to_csv(f"../output/author_static_clusters_{NUM_CLUSTERS}.csv", index=False)
 

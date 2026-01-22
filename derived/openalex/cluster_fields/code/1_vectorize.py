@@ -12,10 +12,7 @@ import scipy.sparse
 import pickle
 
 # --- STOPWORDS SETUP ---
-# (Included to ensure TF-IDF behaves exactly as your original script)
 nltk.download("stopwords", quiet=True)
-
-# [Your original lists - condensed for brevity, ensure all your lists are here]
 academic_stopwords = [
     "study", "studies", "result", "results", "conclusion", "conclusions", 
     "abstract", "introduction", "discussion", "background", "aim", "objective", 
@@ -125,10 +122,9 @@ custom_stopwords_list = list(custom_stopwords_set)
 
 # --- LOAD PRE-SAVED DATA ---
 print("Loading Parquet data...")
-# Loading the file you saved in the previous step
 pdf = pd.read_parquet("../output/cleaned_static_author_text.parquet")
 pdf = pdf.reset_index(drop=True)
-# --- CLUSTERING ---
+
 print("Vectorizing...")
 tfidf = TfidfVectorizer(
     stop_words=custom_stopwords_list,
@@ -143,5 +139,4 @@ scipy.sparse.save_npz("../output/tfidf_matrix.npz", matrix)
 with open("../output/feature_names.pkl", "wb") as f:
     pickle.dump(tfidf.get_feature_names_out(), f)
 
-# 3. Save the Author IDs (aligned to the matrix rows)
 pdf[['athr_id']].to_parquet("../output/author_ids_aligned.parquet")
