@@ -7,10 +7,10 @@ preliminaries
 version 17
 
 program main   
-   raw_plots
+   *raw_plots
    did
-   event_study
-   uni_fes
+   *event_study
+   *uni_fes
 end
 
 program raw_plots
@@ -146,6 +146,7 @@ program did
     gen lb = b - 1.96*se
     gen ub = b + 1.96*se
     hashsort b
+    save ../output/did_coefs, replace
     gen rank = _n
     labmask rank, values(category)
     count
