@@ -1,5 +1,0 @@
-Cluster 1 - Top 15 Terms: cell, cancer, carcinoma, express, induc, metabol, regul, protein, inhibit, activ, tumor, genet, gene, receptor, rat
-Cluster 2 - Top 15 Terms: human, cell, express, protein, gene, receptor, viru, cancer, activ, metabol, function, factor, respons, infect, character
-Cluster 3 - Top 15 Terms: diseas, genet, metabol, cancer, therapi, diagnosi, rat, protein, function, epidemiolog, surgeri, case, evalu, factor, gene
-Cluster 4 - Top 15 Terms: syndrom, case, acut, diagnosi, diseas, metabol, genet, complic, therapi, report, children, gene, epidemiolog, outcom, cell
-Cluster 5 - Top 15 Terms: detect, diagnosi, cancer, genet, human, viru, cell, evalu, chemistri, diseas, infect, gene, protein, blood, earli
