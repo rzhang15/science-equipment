@@ -8,11 +8,11 @@ set seed 8975
 set maxvar 120000
 
 program main
-    // samp: all_jrnls_merged_1...6, top_jrnls
-    /*clean_titles, samp(`samp')
+    // samp: all_jrnls_merged, _1...6, top_jrnls
+    local samp "all_jrnls_merged"
+    *clean_titles, samp(`samp')
     clean_samps, samp(`samp')
     clean_mesh, samp(`samp')
-    clean_concepts, samp(`samp')*/
 end
 
 program clean_titles
@@ -61,10 +61,10 @@ end
 
 program clean_samps
     syntax, samp(str) 
-    if "`samp'" == "top_jrnls" local fol top
+   /* if "`samp'" == "top_jrnls" local fol top
     if strpos("`samp'" , "all_jrnls")  > 0 local fol samp 
     use id jrnl pmid using ../temp/openalex_`samp'_clean_titles, clear
-    merge 1:m id using ../external/`fol'/openalex_`samp', assert(2 3) keep(3) nogen 
+    merge 1:m id using ../external/`fol'/openalex_`samp', assert(1 2 3) keep(3) nogen 
     merge m:1 id using ../external/patents/patent_ppr_cnt, assert(1 2 3) keep(1 3) nogen keepusing(patent_count front_only body_only)
     // clean date variables
     gen date = date(pub_date, "YMD")
@@ -110,7 +110,8 @@ program clean_samps
 *    replace cite_count = cite_count + 1
 *    assert cite_count > 0 
 
-    save ${temp}/cleaned_all_`samp', replace
+    save ../temp/cleaned_all_`samp', replace 
+    
     cap drop author_id 
     cap drop which_athr_counter num_which_athr min_which_athr which_athr2 
     bys pmid athr_id (which_athr which_affl): gen author_id = _n ==1
@@ -125,11 +126,12 @@ program clean_samps
     cap drop city 
     cap drop inst
     cap drop new_inst new_inst_id 
-    merge m:1 athr_id year using ../external/year_insts/filled_in_panel_year, assert(1 2 3) keep(3) nogen
+    merge m:1 athr_id year using ../external/year_insts/filled_in_panel_year_1945_2025, assert(1 2 3) keep(3) nogen
     gduplicates drop pmid athr_id inst_id, force
     save ../temp/cleaned_all_`samp'_prewt, replace
 
-    // wt_adjust articles 
+    use ../temp/cleaned_all_`samp'_prewt, clear
+    // wt_adjust articlesj
     qui hashsort pmid which_athr which_affl
     cap drop author_id
     bys pmid athr_id (which_athr which_affl): gen author_id = _n ==1
@@ -145,7 +147,7 @@ program clean_samps
     gen front_affl_wt = front_only * 1/num_affls * 1/num_athrs
 
     // now give each article a weight based on their ciatation count 
-    qui gen years_since_pub = 2023-year+1
+    qui gen years_since_pub = 2025-year+1
     qui gen avg_cite_yr = cite_count/years_since_pub
     qui gen avg_pat_yr = patent_count/years_since_pub
     qui gen avg_frnt_yr = front_only/years_since_pub
@@ -181,17 +183,17 @@ program clean_samps
     qui bys id: gen id_cntr = _n == 1
     qui bys jrnl: gen first_jrnl = _n == 1
     qui by jrnl: gegen jrnl_N = total(id_cntr)
-    qui sum impact_fctr if first_jrnl == 1
-    gen impact_shr = impact_fctr/r(sum) // weight that each journal gets
-    gen reweight_N = impact_shr * `articles' // adjust the N of each journal to reflect impact factor
-    replace  tot_cite_N = tot_cite_N * `articles'
-    gen impact_wt = reweight_N/jrnl_N // after adjusting each journal weight we divide by the number of articles in each journal to assign new weight to each paper
-    gen impact_affl_wt = impact_wt * affl_wt  
-    gen impact_cite_wt = reweight_N * cite_wt / tot_cite_N * `articles' 
-    gen impact_cite_affl_wt = impact_cite_wt * affl_wt 
-    foreach wt in affl_wt cite_affl_wt impact_affl_wt impact_cite_affl_wt pat_adj_wt frnt_adj_wt body_adj_wt {
-            sum `wt'
-            assert round(r(sum)-`articles') == 0
+    *qui sum impact_fctr if first_jrnl == 1
+    *gen impact_shr = impact_fctr/r(sum) // weight that each journal gets
+    *gen reweight_N = impact_shr * `articles' // adjust the N of each journal to reflect impact factor
+    *replace  tot_cite_N = tot_cite_N * `articles'
+    *gen impact_wt = reweight_N/jrnl_N // after adjusting each journal weight we divide by the number of articles in each journal to assign new weight to each paper
+    *gen impact_affl_wt = impact_wt * affl_wt  
+    *gen impact_cite_wt = reweight_N * cite_wt / tot_cite_N * `articles' 
+    *gen impact_cite_affl_wt = impact_cite_wt * affl_wt 
+    foreach wt in affl_wt cite_affl_wt pat_adj_wt { // frnt_adj_wt body_adj_wt { // impact_affl_wt impact_cite_affl_wt 
+        sum `wt'
+        assert round(r(sum)-`articles') == 0
     }
     compress, nocoalesce
     gen len = length(inst)
@@ -200,8 +202,10 @@ program clean_samps
     recast str`n' inst, force
     cap drop n mi_inst has_nonmi_inst population len
     save ../temp/pre_save, replace
+
     import delimited using ../external/geo/us_cities_states_counties.csv, clear varnames(1)
     glevelsof statefull , local(state_names)
+
     use ../temp/pre_save, clear
     replace country = "United States" if country_code == "US"
     replace country_code = "US" if country == "United States" 
@@ -295,10 +299,14 @@ program clean_samps
     gcontract id pmid
     cap drop _freq
     save ../temp/pmid_id_xwalk_`samp', replace
-    restore
+    restore*/
 
-    keep if inrange(pub_date, td(01jan2015), td(31dec2023)) & year >=2015
-    drop cite_wt cite_affl_wt impact_wt impact_affl_wt impact_cite_wt impact_cite_affl_wt tot_cite_N reweight_N jrnl_N first_jrnl impact_shr pat_wt pat_adj_wt frnt_wt body_wt frnt_adj_wt body_adj_wt
+    use ../output/cleaned_all_`samp', clear
+    keep if inrange(pub_date, td(01jan2005), td(31dec2025)) & year >=2005
+    drop cite_wt cite_affl_wt tot_cite_N first_jrnl pat_wt pat_adj_wt frnt_wt body_wt frnt_adj_wt body_adj_wt jrnl_N 
+    foreach var in impact_wt impact_affl_wt impact_cite_wt impact_cite_affl_wt impact_shr  reweight_N  {
+        cap drop `var'
+    }
     qui sum avg_cite_yr
     gen cite_wt = avg_cite_yr/r(sum)
     qui sum avg_pat_yr
@@ -325,57 +333,31 @@ program clean_samps
     
     qui bys jrnl: gen first_jrnl = _n == 1
     qui by jrnl: gegen jrnl_N = total(id_cntr)
-    qui sum impact_fctr if first_jrnl == 1
+   /* qui sum impact_fctr if first_jrnl == 1
     gen impact_shr = impact_fctr/r(sum)
     gen reweight_N = impact_shr * `articles'
     replace  tot_cite_N = tot_cite_N * `articles'
     gen impact_wt = reweight_N/jrnl_N
     gen impact_affl_wt = impact_wt * affl_wt
     gen impact_cite_wt = reweight_N * cite_wt / tot_cite_N * `articles'
-    gen impact_cite_affl_wt = impact_cite_wt * affl_wt
+    gen impact_cite_affl_wt = impact_cite_wt * affl_wt*/
 
-    foreach wt in affl_wt cite_affl_wt impact_affl_wt impact_cite_affl_wt pat_adj_wt frnt_adj_wt body_adj_wt {
+    foreach wt in affl_wt cite_affl_wt pat_adj_wt  { //frnt_adj_wt body_adj_wt { // impact_affl_wt impact_cite_affl_wt 
         qui sum `wt'
         assert round(r(sum)-`articles') == 0
     }
     compress, nocoalesce
-    save ../output/cleaned_last5yrs_`samp', replace
+    save ../output/cleaned_last20yrs_`samp', replace
 end
 
 program clean_mesh  
     syntax, samp(str) 
-    local end = cond("`samp'" == "15jrnls", 143, 51)
-    local suf = cond("`samp'" == "15jrnls", "" ,"_clin")
-    use ../external/openalex/openalex_15jrnls_merged, clear
-    gcontract id
-    cap drop _freq
-    save ../temp/15jrnls_pmids, replace
-    merge 1:m id using ../external/all/contracted_gen_mesh_all_jrnls, assert(1 2 3) keep(3) nogen
-    cap drop _freq
-    save ../output/contracted_gen_mesh_`samp', replace
+    if "`samp'" == "top_jrnls" local fol top
+    if strpos("`samp'" , "all_jrnls")  > 0 local fol samp 
+    use ../external/`fol'/contracted_gen_mesh_`samp', clear
     bys id: gen n = _n
-    greshape wide qualifier_name gen_mes, i(id) j(n)
+    greshape wide qualifier_name gen_mesh, i(id) j(n)
     gduplicates drop id, force
     save ../output/reshaped_gen_mesh_`samp', replace
 end
-
-program clean_concepts
-    syntax, samp(str) 
-    use ../temp/15jrnls_pmids, clear 
-    merge 1:m id using ../external/all/concepts_all_jrnls_merged, assert(1 2 3) keep(3) nogen
-    save ../temp/concepts_`samp', replace
-    cap drop _freq
-    save ../output/concepts_`samp', replace
-    use ../output/concepts_`samp', clear
-    drop concept_id 
-    gsort id -score
-    destring which_concept, replace
-    by id: replace which_concept  = _n
-    compress, nocoalesce
-    greshape wide term level score, i(id) j(which_concept)
-    drop level*
-    drop score*
-    save ../output/reshaped_concepts_`samp', replace
-end
-
 main

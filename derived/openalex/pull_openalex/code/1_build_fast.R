@@ -17,8 +17,8 @@ batch_size <- 1000
 
 #start_batch <- ((chunk_id - 1) * batch_size) + 1
 #end_batch   <- chunk_id * batch_size
-start_batch <- 4988 
-end_batch <-  4988 
+start_batch <- 2543 
+end_batch <-  2543 
 
 message(paste("Processing Chunk:", chunk_id))
 message(paste("Batch Range:", start_batch, "to", end_batch))

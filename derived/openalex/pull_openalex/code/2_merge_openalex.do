@@ -48,7 +48,16 @@ program main
         append using ../output/openalex_all_jrnls_merged_`i'
     }
     compress, nocoalesce
+    gduplicates drop id which_athr which_affl, force
+    drop if mi(athr_id)
+    drop if mi(pub_date)
     save ../output/openalex_all_jrnls_merged, replace
+    clear
+    forval i = 1/6 {
+        append using ../output/contracted_gen_mesh_all_jrnls_`i'
+    }
+    compress, nocoalesce
+    save ../output/contracted_gen_mesh_all_jrnls, replace
 end
 
 program upload_files

@@ -7,111 +7,38 @@ pause on
 set seed 8975
 
 program main
-    foreach s in newfund_cns { //15jrnls newfund_cns {
-        foreach t in year { 
-            create_mesh_xw, time(`t') samp(`s')
-            *make_panel, time(`t') second(1) samp(`s') us(0) 
-            make_panel, time(`t') second(1) samp(`s') us(1) 
-            make_panel, time(`t') firstlast(1) samp(`s') us(1) 
-            make_panel, time(`t') firstlast(1) samp(`s') us(0) 
-            make_panel, time(`t') last(1) samp(`s') us(1)
-            make_panel, time(`t') first(1) samp(`s') us(1)
-            make_panel, time(`t') samp(`s') us(1) 
-        }
+    foreach s in all_jrnls { //15jrnls newfund_cns {
+        local t year 
+        make_panel, time(`t') last(1) samp(`s') us(1)
     }
-end
-
-program create_mesh_xw
-    syntax, time(string) samp(str)
-    use id pmid athr_id athr_name year pub_date using ../external/openalex/cleaned_all_`samp', clear
-    gen qrtr = qofd(pub_date)
-    gcontract id athr_id `time' 
-    drop _freq
-    save ../temp/athr_pmid_xw_`time'_`samp', replace
-    use ../external/openalex/concepts_`samp'.dta, clear
-    joinby id using  ../temp/athr_pmid_xw_`time'_`samp'
-    cap destring score, replace
-    preserve
-    collapse (sum) score , by(athr_id `time' term)
-    hashsort athr_id `time' -score
-    bys athr_id `time': gen drop = _n > 2 
-    drop if drop == 1
-    by athr_id `time' : gen which = _n
-    drop score drop
-    reshape wide term, i(athr_id `time') j(which)
-    save ../temp/athr_concept_`time'_`samp', replace
-    restore
-    use ../external/openalex/contracted_gen_mesh_`samp'.dta, clear
-    joinby id using  ../temp/athr_pmid_xw_`time'_`samp'
-    preserve
-    gcontract athr_id qualifier `time'
-    hashsort athr_id `time' -_freq
-    bys athr_id `time': gen drop = _n > 2 
-    drop if drop == 1
-    by athr_id `time' : gen which = _n
-    drop _freq drop
-    reshape wide qualifier, i(athr_id `time') j(which)
-    save ../temp/athr_qualifier_`time'_`samp', replace
-    restore
-    preserve
-    gcontract athr_id gen_mesh `time'
-    hashsort athr_id `time' -_freq
-    bys athr_id `time': gen drop = _n > 2 
-    drop if drop == 1
-    by athr_id `time' : gen which = _n
-    drop _freq drop
-    reshape wide gen_mesh, i(athr_id `time') j(which)
-    save ../temp/athr_mesh_`time'_`samp', replace
-    restore
 end
 
 program make_panel
     syntax, time(string) samp(str) [, firstlast(int 0) last(int 0) first(int 0) us(int 0) second(int 0)] 
-    import delimited ../external/clusters/text4_1.csv, clear
-    cap drop cluster_name
-    replace athr_id = subinstr(athr_id, "A", "", .)
-    destring athr_id, replace
-    tsset athr_id year
-    tsfill
-    replace year_bin = "1945-1964" if inrange(year, 1945, 1964)
-    replace year_bin = "1965-1984" if inrange(year, 1965, 1984)
-    replace year_bin = "1985-2004" if inrange(year, 1985, 2004)
-    replace year_bin = "2005-2024" if inrange(year, 2005, 2024)
-    tostring athr_id, replace
-    replace athr_id = "A" + athr_id
-    gen mi= mi(cluster)
-    bys athr_id year_bin: egen all_missing  = min(mi)
-    drop if all_missing == 1 
-    bys athr_id year_bin (year): replace cluster = cluster[_n-1] if mi(cluster) & !mi(cluster[_n-1])
-    gen rev_year = -year
-    bys athr_id year_bin (rev_year): replace cluster = cluster[_n-1] if mi(cluster) & !mi(cluster[_n-1])
-    drop rev_year mi all_missing
+    import delimited ../external/clusters/author_static_clusters.csv, clear
     save ../temp/clusters, replace
 
-    use id pmid which_athr which_affl pub_date year jrnl cite_count athr_id athr_name impact_fctr country_code msa_comb msa_c_world inst inst_id msacode using ../external/openalex/cleaned_all_`samp', clear
+    use id pmid which_athr which_affl pub_date year jrnl cite_count athr_id athr_name country_code msa_comb msa_c_world inst inst_id msacode using ../external/openalex/cleaned_all_`samp', clear
     local suf = "" 
     if `firstlast' == 1 {
-        use id pmid which_athr which_affl pub_date year jrnl cite_count athr_id athr_name impact_fctr country_code msa_comb msa_c_world inst inst_id msacode using ../external/sub_athrs/firstlast/cleaned_all_`samp', clear
+        use id pmid which_athr which_affl pub_date year jrnl cite_count athr_id athr_name country_code msa_comb msa_c_world inst inst_id msacode using ../external/sub_athrs/firstlast/cleaned_all_`samp', clear
 
         local suf = "_firstlast" 
     }
     if `second' == 1 {
-        use id pmid which_athr which_affl pub_date year jrnl cite_count athr_id athr_name impact_fctr country_code msa_comb msa_c_world inst inst_id msacode using ../external/sub_athrs/second/cleaned_all_`samp', clear
+        use id pmid which_athr which_affl pub_date year jrnl cite_count athr_id athr_name country_code msa_comb msa_c_world inst inst_id msacode using ../external/sub_athrs/second/cleaned_all_`samp', clear
 
         local suf = "_second" 
     }
     if `last' == 1 {
-        use id pmid which_athr which_affl pub_date year jrnl cite_count athr_id athr_name impact_fctr country_code msa_comb msa_c_world inst inst_id msacode using ../external/sub_athrs/last/cleaned_all_`samp', clear
+        use id pmid which_athr which_affl pub_date year jrnl cite_count athr_id athr_name  country_code msa_comb msa_c_world inst inst_id msacode using ../external/sub_athrs/last/cleaned_all_`samp', clear
 
         local suf = "_last" 
     }
     if `first' == 1 {
-        use id pmid which_athr which_affl pub_date year jrnl cite_count athr_id athr_name impact_fctr country_code msa_comb msa_c_world inst inst_id msacode using ../external/sub_athrs/first/cleaned_all_`samp', clear
+        use id pmid which_athr which_affl pub_date year jrnl cite_count athr_id athr_name country_code msa_comb msa_c_world inst inst_id msacode using ../external/sub_athrs/first/cleaned_all_`samp', clear
 
         local suf = "_first" 
-    }
-    if "`samp'" == "newfund_cns" {
-        local suf = "`suf'_cns"
     }
     if `us' == 0 local suf "`suf'_global"
     gen cns = inlist(jrnl, "Cell", "Nature", "Science") 
@@ -178,15 +105,15 @@ program make_panel
     qui bys pmid: gen pmid_cntr = _n == 1
     qui bys jrnl: gen first_jrnl = _n == 1
     qui by jrnl: gegen jrnl_N = total(pmid_cntr)
-    qui sum impact_fctr if first_jrnl == 1
+    /*qui sum impact_fctr if first_jrnl == 1
     gen impact_shr = impact_fctr/r(sum)
     gen reweight_N = impact_shr * `articles'
     replace  tot_cite_N = tot_cite_N * `articles'
     gen impact_wt = reweight_N/jrnl_N
     gen impact_affl_wt = impact_wt * affl_wt
     gen impact_cite_wt = reweight_N * cite_wt / tot_cite_N * `articles'
-    gen impact_cite_affl_wt = impact_cite_wt * affl_wt
-    foreach v in affl_wt cite_affl_wt pat_adj_wt impact_affl_wt impact_cite_affl_wt frnt_adj_wt body_adj_wt {
+    gen impact_cite_affl_wt = impact_cite_wt * affl_wt*/
+    foreach v in affl_wt cite_affl_wt pat_adj_wt { //impact_affl_wt impact_cite_affl_wt frnt_adj_wt body_adj_wt 
        qui sum `v'
        assert round(r(sum)-`articles') == 0
     }

@@ -1,0 +1,219 @@
+[?1h=
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Unicode is supported; see help unicode_advice.
+      2. More than 2 billion observations are allowed; see help obs_advice.
+      3. Maximum number of variables is set to 5,000; see help set_maxvar.
+
+. do "build.do" 
+
+. set more off
+
+. clear all
+
+. capture log close
+
+. program drop _all
+
+. set scheme modern
+
+. pause on
+
+. set seed 8975
+
+. here, set
+/n/holylabs/pakes_lab/Lab/sci_eq/derived/openalex/make_athr_subsamples/code/
+
+. set maxvar 120000
+
+
+. program main
+  1. 
+. foreach samp in firstlast last first second {
+  2.     create_athr_split, samp(all_jrnls) cut(`samp')
+  3. }
+  4. end
+
+. 
+. program create_athr_split
+  1.     syntax, samp(str) cut(str)
+  2.     cap mkdir "../output/`cut'"
+  3.     use id pmid which_athr which_affl pub_date year jrnl cite_count front_
+> only body_only patent_count athr_id athr_name  stateshort region inst_id coun
+> try_code country city us_state msacode msatitle msa_comb msa_c_world inst usi
+> ng ../external/openalex/cleaned_all_`samp', clear
+  4.     bys id: egen first_athr = min(which_athr)
+  5.     bys id: egen last_athr = max(which_athr)
+  6.     if "`cut'" == "firstlast" {
+  7.         keep if which_athr == first_athr | which_athr == last_athr
+  8.     }
+  9.     if "`cut'" == "second" {
+ 10.         keep if which_athr == first_athr | which_athr == last_athr | which
+> _athr = first_athr + 1 | which_athr = last_athr - 1
+ 11.     }
+ 12.     if "`cut'" == "last" {
+ 13.         keep if which_athr == last_athr
+ 14.     }
+ 15.     if "`cut'" == "first" {
+ 16.         keep if which_athr == first_athr
+ 17.     }
+ 18.     qui hashsort id which_athr which_affl
+ 19.     cap drop author_id 
+ 20.     cap drop num_athrs 
+ 21.     bys id athr_id (which_athr which_affl): gen author_id = _n ==1
+ 22.     bys id (which_athr which_affl): gen which_athr2 = sum(author_id)
+ 23.     replace which_athr = which_athr2
+ 24.     drop which_athr2
+ 25.     cap drop num_affls
+ 26.     bys id which_athr: gen num_affls = _N
+ 27.     bys id: egen num_athrs = max(which_athr)
+ 28.     if "`cut'" == "firstlast" {
+ 29.         assert num_affls == 1
+ 30.         qui sum num_athrs
+ 31.         assert r(max) == 2
+ 32.     }
+ 33.     if "`cut'" == "last" | "`cut'" == "first" {
+ 34.         assert num_affls == 1
+ 35.         qui sum num_athrs
+ 36.         assert r(max) == 1
+ 37.     }
+ 38.     gen affl_wt = 1/num_affls * 1/num_athrs
+ 39.     gen pat_affl_wt = patent_count * 1/num_affls * 1/num_athrs
+ 40.     gen body_affl_wt = body_only * 1/num_affls * 1/num_athrs
+ 41.     gen front_affl_wt = front_only * 1/num_affls * 1/num_athrs
+ 42.     qui gen years_since_pub = 2022-year+1
+ 43.     qui gen avg_cite_yr = cite_count/years_since_pub
+ 44.     qui gen avg_pat_yr = patent_count/years_since_pub
+ 45.     qui gen avg_frnt_yr = front_only/years_since_pub
+ 46.     qui gen avg_body_yr = body_only/years_since_pub
+ 47.     qui bys id: replace avg_cite_yr = . if _n != 1
+ 48.     qui bys id: replace avg_pat_yr = . if _n != 1
+ 49.     qui bys id: replace avg_frnt_yr = . if _n != 1
+ 50.     qui bys id: replace avg_body_yr = . if _n != 1
+ 51.     qui sum avg_cite_yr
+ 52.     gen cite_wt = avg_cite_yr/r(sum) // each article is no longer weighted
+>  1 
+ 53.     qui sum avg_pat_yr
+ 54.     gen pat_wt = avg_pat_yr/r(sum)
+ 55.     qui sum avg_frnt_yr
+ 56.     gen frnt_wt = avg_frnt_yr/r(sum)
+ 57.     qui sum avg_body_yr
+ 58.     gen body_wt = avg_body_yr/r(sum)
+ 59.     bys jrnl: egen tot_cite_N = total(cite_wt)
+ 60.     gsort id cite_wt
+ 61.     qui bys id: replace cite_wt = cite_wt[_n-1] if mi(cite_wt)
+ 62.     gsort id pat_wt
+ 63.     qui bys id: replace pat_wt = pat_wt[_n-1] if mi(pat_wt)
+ 64.     gsort id frnt_wt
+ 65.     qui bys id: replace frnt_wt = frnt_wt[_n-1] if mi(frnt_wt)
+ 66.     gsort id body_wt
+ 67.     qui bys id: replace body_wt = body_wt[_n-1] if mi(body_wt)
+ 68. 
+.     qui gunique id
+ 69.     local articles = r(unique)
+ 70.     qui gen cite_affl_wt = affl_wt * cite_wt * `articles'
+ 71.     qui gen pat_adj_wt = affl_wt * pat_wt * `articles'
+ 72.     qui gen frnt_adj_wt  = affl_wt * frnt_wt * `articles'
+ 73.     qui gen body_adj_wt  = affl_wt * body_wt * `articles'
+ 74. 
+.     qui bys id: gen id_cntr = _n == 1
+ 75.     qui bys jrnl: gen first_jrnl = _n == 1
+ 76.     qui bys jrnl: egen jrnl_N = total(id_cntr)
+ 77. /*    qui sum impact_fctr if first_jrnl == 1
+>     gen impact_shr = impact_fctr/r(sum) // weight that each journal gets
+>     gen reweight_N = impact_shr * `articles' // adjust the N of each journal 
+> to reflect impact factor
+>     replace  tot_cite_N = tot_cite_N * `articles'
+>     gen impact_wt = reweight_N/jrnl_N // after adjusting each journal weight 
+> we divide by the number of articles in each journal to assign new weight to e
+> ach paper
+>     gen impact_affl_wt = impact_wt * affl_wt  
+>     gen impact_cite_wt = reweight_N * cite_wt / tot_cite_N * `articles' 
+>     gen impact_cite_affl_wt = impact_cite_wt * affl_wt */
+.     foreach wt in affl_wt cite_affl_wt pat_adj_wt { // impact_affl_wt impact_
+> cite_affl_wt pat_adj_wt  frnt_adj_wt body_adj_wt
+ 78.         sum `wt'
+ 79.         assert round(r(sum)-`articles') == 0
+ 80.     }
+ 81.     compress, nocoalesce
+ 82.     cap drop len
+ 83.     gen len = length(inst)
+ 84.     qui sum len
+ 85.     local n = r(max)
+ 86.     recast str`n' inst, force
+ 87.     save ../output/`cut'/cleaned_all_`samp', replace
+ 88. 
+.     keep if inrange(pub_date, td(01jan2005), td(31dec2025)) & year >=2005
+ 89.     drop cite_wt cite_affl_wt tot_cite_N jrnl_N first_jrnl  pat_wt pat_adj
+> _wt frnt_wt body_wt frnt_adj_wt body_adj_wt
+ 90.     cap  drop impact_wt impact_affl_wt impact_cite_wt impact_cite_affl_wt 
+> impact_shr  reweight_N
+ 91.     qui sum avg_cite_yr
+ 92.     gen cite_wt = avg_cite_yr/r(sum)
+ 93.     qui sum avg_pat_yr
+ 94.     gen pat_wt = avg_pat_yr/r(sum)
+ 95.     qui sum avg_frnt_yr
+ 96.     gen frnt_wt = avg_frnt_yr/r(sum)
+ 97.     qui sum avg_body_yr
+ 98.     gen body_wt = avg_body_yr/r(sum)
+ 99.     bys jrnl: egen tot_cite_N = total(cite_wt)
+100.     gsort id cite_wt
+101.     qui bys id: replace cite_wt = cite_wt[_n-1] if mi(cite_wt)
+102.     gsort id pat_wt
+103.     qui bys id: replace pat_wt = pat_wt[_n-1] if mi(pat_wt)
+104.     gsort id frnt_wt
+105.     qui bys id: replace frnt_wt = frnt_wt[_n-1] if mi(frnt_wt)
+106.     gsort id body_wt
+107.     qui bys id: replace body_wt = body_wt[_n-1] if mi(body_wt)
+108.     gunique id 
+109.     local articles = r(unique)
+110.     qui gen cite_affl_wt = affl_wt * cite_wt * `articles'
+111.     qui gen pat_adj_wt = affl_wt * pat_wt * `articles'
+112.     qui gen frnt_adj_wt  = affl_wt * frnt_wt * `articles'
+113.     qui gen body_adj_wt  = affl_wt * body_wt * `articles'
+114.     
+.     qui bys jrnl: gen first_jrnl = _n == 1
+115.     qui bys jrnl: egen jrnl_N = total(id_cntr)
+116.     /*qui sum impact_fctr if first_jrnl == 1
+>     gen impact_shr = impact_fctr/r(sum)
+>     gen reweight_N = impact_shr * `articles'
+>     replace  tot_cite_N = tot_cite_N * `articles'
+>     gen impact_wt = reweight_N/jrnl_N
+>     gen impact_affl_wt = impact_wt * affl_wt
+>     gen impact_cite_wt = reweight_N * cite_wt / tot_cite_N * `articles'
+>     gen impact_cite_affl_wt = impact_cite_wt * affl_wt*/
+. 
+.     foreach wt in affl_wt cite_affl_wt pat_adj_wt {
+117.         sum `wt'
+118.         assert round(r(sum)-`articles') == 0
+119.     }
+120.     compress, nocoalesce
+121.     save ../output/`cut'/cleaned_last5yrs_`samp', replace
+122. end
+
+. 
+. main
+file ../external/openalex/cleaned_all_all_jrnls.dta not found
+r(601);
+
+end of do-file
+
+r(601);
+
+
+. [?1l>

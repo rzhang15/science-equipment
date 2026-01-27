@@ -1,3 +1,5 @@
 ./geo/ | /n/netscratch/pakes_lab/Lab/sci_eq/geo 
-./pprs/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/scrape_athr_inst_hist/output 
+./inst/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/unify_insts/output
+./pprs/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/scrape_athr_inst_hist/output/works
 ./athrs/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/pull_openalex/output 
+./ls_pprs/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/pull_openalex/output/works

@@ -1,0 +1,577 @@
+[?1h=
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Unicode is supported; see help unicode_advice.
+      2. More than 2 billion observations are allowed; see help obs_advice.
+      3. Maximum number of variables is set to 5,000; see help set_maxvar.
+
+. do "build.do" 
+
+. set more off
+
+. clear all
+
+. capture log close
+
+. program drop _all
+
+. set scheme modern
+
+. pause on
+
+. set seed 8975
+
+. set maxvar 120000
+
+
+. 
+. program main
+  1.     // samp: all_jrnls_merged, _1...6, top_jrnls
+.     local samp "all_jrnls_merged"
+  2.     *clean_titles, samp(`samp')
+.     clean_samps, samp(`samp')
+  3.     clean_mesh, samp(`samp')
+  4. end
+
+. 
+. program clean_titles
+  1.     syntax, samp(str) 
+  2.     if "`samp'" == "top_jrnls" local fol top
+  3.     if strpos("`samp'" , "all_jrnls")  > 0 local fol samp 
+  4.     use pmid title id pub_type jrnl using ../external/`fol'/openalex_`samp
+> ', clear
+  5.     replace title = stritrim(title)
+  6.     contract title id pmid jrnl
+  7.     gduplicates drop pmid , force
+  8.     gduplicates drop id  , force
+  9.     cap drop _freq
+ 10.     gisid id
+ 11.     drop if mi(title)
+ 12.     gen lower_title = stritrim(subinstr(subinstr(subinstr(subinstr(strlowe
+> r(title), `"""', "", .), ".", "",.)), " :", ":",.), "'", "", .)
+ 13.     drop if strpos(lower_title, "accountable care")>0 | strpos(title, "ACO
+> s")>0
+ 14.     drop if lower_title == "response"
+ 15.     drop if strpos(lower_title , "nuts")>0 & strpos(lower_title, "bolts")>
+> 0
+ 16.     foreach s in "economic" "economy" "public health" "hallmarks" "governm
+> ent" "reform" "equity" "payment" "politics" "policy" "policies" "comment" "gu
+> ideline" "profession's" "interview" "debate" "professor" "themes:"  "professi
+> onals" "physician" "workforce" "medical-education"  "medical education" "fund
+> ing" "conference" "insurance" "fellowship" "ethics" "legislation" "the editor
+> " "response : " "letters" "this week" "notes" "news " "a note" "obituary"  "r
+> eview" "perspectives" "scientists" "book" "institution" "meeting" "university
+> " "universities" "journals" "publication" "recent " "costs" "challenges" "res
+> earchers" "perspective" "reply" " war" " news" "a correction" "academia" "soc
+> iety" "academy of" "nomenclature" "teaching" "education" "college" "academics
+> "  "political" "association for" "association of" "response by" "societies" "
+> health care" "health-care"  "abstracts" "journal club" "curriculum" "women in
+>  science" "report:" "letter:" "editorial:" "lesson" "awards" "doctor" "nurse"
+>  "health workers" " story"  "case report" "a brief history" "lecture " "caree
+> r" "finance" "criticism" "critique" "discussion" "world health" "workload" "c
+> ompensation" "educators" "war" "announces" "training programmes" "nhs" "nih" 
+> "national institutes of health" "address" "public sector" "private sector" "g
+> overnment" "price" "reflections" "health care" "healthcare" "health-care" " l
+> aw" "report" "note on" "insurer" "health service research" "error" "quality o
+> f life" {
+ 17.         drop if strpos(lower_title, "`s'")>0
+ 18.     }
+ 19.     gen strp = substr(lower_title, 1, strpos(lower_title, ": ")) if strpos
+> (lower_title, ": ") > 0
+ 20.     bys strp jrnl : gen tot_strp = _N
+ 21.     foreach s in "letter:" "covid-19:" "snapshot:" "editorial:" "david oli
+> ver:" "offline:" "helen salisbury:" "margaret mccartney:" "book:" "response:"
+>  "letter from chicago:" "a memorable patient:" "<i>response</i> :" "reading f
+> or pleasure:" "partha kar" "venus:" "matt morgan:" "bad medicine:" "nota bene
+> :" "cohort profile:" "size matters:" "usa:" "cell of the month:" "living on t
+> he edge:" "enhanced snapshot:" "world view:" "science careers:" "clare gerada
+> :" "rammya mathew:" "endpiece:" "role model:" "quick uptakes:" "webiste of th
+> e week:" "tv:" "press:" "brief communication:" "essay:" "clinical update:" "a
+> ssisted dying:" "controversies in management:" "health agencies update:" "the
+>  bmj awards 2020:" "lesson of the week:" "ebola:" "media:" "management for do
+> ctors:" "monkeypox:" "profile:" "the bmj awards 2017:" "the world in medicine
+> :" "the bmj awards 2021:" "when i use a word . . .:" "personal paper:"  "clin
+> ical decision making:" "how to do it:" "10-minute consultation:" "frontline:"
+>  "when i use a word:" "medicine as a science:" "personal papers:" "miscellane
+> a:" "the lancet technology:" {
+ 22.         drop if strpos(lower_title, "`s'") == 1 & tot_strp > 1
+ 23.     }
+ 24.     drop if inlist(lower_title, "random samples", "sciencescope", "through
+>  the glass lightly", "equipment", "women in science",  "correction", "the met
+> ric system")
+ 25.     drop if inlist(lower_title, "convocation week","the new format", "seco
+> nd-quarter biotech job picture", "gmo roundup")
+ 26.     drop if strpos(lower_title, "annals ")==1
+ 27.     drop if strpos(lower_title, "a fatal case of")==1
+ 28.     drop if strpos(lower_title, "a case of ")==1
+ 29.     drop if strpos(lower_title, "case ")==1
+ 30.     drop if strpos(lower_title, "a day ")==1
+ 31.     drop if strpos(lower_title,"?")>0
+ 32.     preserve
+ 33.     contract lower_title jrnl  pmid
+ 34.     gduplicates tag lower_title jrnl, gen(dup)
+ 35.     keep if dup> 0 & jrnl != "jbc"
+ 36.     keep pmid
+ 37.     gduplicates drop
+ 38.     save ../temp/possible_non_articles_`samp', replace
+ 39.     restore
+ 40.     merge m:1 pmid using ../temp/possible_non_articles_`samp', assert(1 3)
+>  keep(1) nogen
+ 41.     save ../temp/openalex_`samp'_clean_titles, replace
+ 42. end
+
+. 
+. program clean_samps
+  1.     syntax, samp(str) 
+  2.    /* if "`samp'" == "top_jrnls" local fol top
+>     if strpos("`samp'" , "all_jrnls")  > 0 local fol samp 
+>     use id jrnl pmid using ../temp/openalex_`samp'_clean_titles, clear
+>     merge 1:m id using ../external/`fol'/openalex_`samp', assert(1 2 3) keep(
+> 3) nogen 
+>     merge m:1 id using ../external/patents/patent_ppr_cnt, assert(1 2 3) keep
+> (1 3) nogen keepusing(patent_count front_only body_only)
+>     // clean date variables
+>     gen date = date(pub_date, "YMD")
+>     format %td date
+>     drop pub_date
+>     bys id: gegen min_date = min(date)
+>     replace date =min_date
+>     drop min_date
+>     cap drop author_id
+>     rename date pub_date
+>     gen pub_mnth = month(pub_date)
+>     gen year = year(pub_date)
+>     gen qrtr = qofd(pub_date)
+>     drop if year < 1945
+>     // fix some wrong institutions
+>     replace inst = "Johns Hopkins University" if strpos(raw_affl , "Bloomberg
+>  School of Public Health")>0 & inst == "Bloomberg (United States)"
+>     merge m:1 inst_id using ../external/inst_xw/all_inst_geo_chars, assert(1 
+> 2 3) keep(1 3) nogen 
+>     replace inst = new_inst if !mi(new_inst)
+>     replace inst_id = new_inst_id if !mi(new_inst)
+>     replace inst = "Johns Hopkins University" if  strpos(inst, "Johns Hopkins
+> ")>0
+>     replace inst_id = "I145311948" if inst == "Johns Hopkins University"
+>     replace inst = "Stanford University" if inlist(inst, "Stanford Medicine",
+>  "Stanford Health Care")
+>     replace inst = "Northwestern University" if inlist(inst, "Northwestern Me
+> dicine")
+>     replace inst = "National Institutes of Health" if  inlist(inst, "National
+>  Cancer Institute", "National Eye Institute", "National Heart, Lung, and Bloo
+> d Institute", "National Human Genome Research Institute") | ///
+>               inlist(inst, "National Institute on Aging", "National Institute
+>  on Alcohol Abuse and Alcoholism", "National Institute of Allergy and Infecti
+> ous Diseases", "National Institute of Arthritis and Musculoskeletal and Skin 
+> Diseases") | ///
+>                         inlist(inst, "National Institute of Biomedical Imagin
+> g and Bioengineering", "National Institute of Child Health and Human Developm
+> ent", "National Institute of Dental and Craniofacial Research") | ///
+>                                   inlist(inst, "National Institute of Diabete
+> s and Digestive and Kidney Diseases", "National Institute on Drug Abuse", "Na
+> tional Institute of Environmental Health Sciences", "National Institute of Ge
+> neral Medical Sciences", "National Institute of Mental Health", "National Ins
+> titute on Minority Health and Health Disparities") | ///
+>                                             inlist(inst, "National Institute 
+> of Neurological Disorders and Stroke", "National Institute of Nursing Researc
+> h", "National Library of Medicine", "National Heart Lung and Blood Institute"
+> , "National Institutes of Health")
+>     // drop any authors that are journals - these are probably reviews 
+>     gen is_lancet = strpos(raw_affl, "The Lancet")>0
+>     gen is_london = raw_affl == "London, UK." |  raw_affl == "London."
+>     gen is_bmj = (strpos(raw_affl, "BMJ")>0 | strpos(raw_affl, "British Medic
+> al Journal")>0)
+>     gen is_jama = strpos(raw_affl, " JAMA")>0 & mi(inst)
+>     gen is_editor = strpos(raw_affl, " Editor")>0 | strpos(raw_affl, "Editor 
+> ")>0
+>     bys pmid: gegen has_lancet = max(is_lancet)
+>     by pmid: gegen has_london = max(is_london)
+>     by pmid: gegen has_bmj = max(is_bmj)
+>     by pmid: gegen has_jama = max(is_jama)
+>     by pmid: gegen has_editor = max(is_jama)
+>     drop if has_lancet == 1 | has_london == 1 | has_bmj == 1 | has_jama == 1 
+> | has_editor == 1
+>     drop is_lancet is_london is_bmj is_jama is_editor has_lancet has_london h
+> as_bmj has_jama has_editor
+>     // add in cite_ct
+> *    replace cite_count = cite_count + 1
+> *    assert cite_count > 0 
+> 
+>     save ../temp/cleaned_all_`samp', replace 
+>     
+>     cap drop author_id 
+>     cap drop which_athr_counter num_which_athr min_which_athr which_athr2 
+>     bys pmid athr_id (which_athr which_affl): gen author_id = _n ==1
+>     bys pmid (which_athr which_affl): gen which_athr2 = sum(author_id)
+>     replace which_athr = which_athr2
+>     drop which_athr2
+>     bys pmid which_athr: gen num_affls = _N
+>     cap drop region 
+>     cap drop inst_id 
+>     cap drop country
+>     cap drop country_code
+>     cap drop city 
+>     cap drop inst
+>     cap drop new_inst new_inst_id 
+>     merge m:1 athr_id year using ../external/year_insts/filled_in_panel_year_
+> 1945_2025, assert(1 2 3) keep(3) nogen
+>     gduplicates drop pmid athr_id inst_id, force
+>     save ../temp/cleaned_all_`samp'_prewt, replace
+> 
+>     use ../temp/cleaned_all_`samp'_prewt, clear
+>     // wt_adjust articlesj
+>     qui hashsort pmid which_athr which_affl
+>     cap drop author_id
+>     bys pmid athr_id (which_athr which_affl): gen author_id = _n ==1
+>     bys pmid (which_athr which_affl): gen which_athr2 = sum(author_id)
+>     replace which_athr = which_athr2
+>     drop which_athr2
+>     bys pmid which_athr: replace num_affls = _N
+>     assert num_affls == 1
+>     bys pmid: gegen num_athrs = max(which_athr)
+>     gen affl_wt = 1/num_affls * 1/num_athrs // this just divides each paper b
+> y the # of authors on the paper
+>     gen pat_affl_wt = patent_count * 1/num_affls * 1/num_athrs
+>     gen body_affl_wt = body_only * 1/num_affls * 1/num_athrs
+>     gen front_affl_wt = front_only * 1/num_affls * 1/num_athrs
+> 
+>     // now give each article a weight based on their ciatation count 
+>     qui gen years_since_pub = 2025-year+1
+>     qui gen avg_cite_yr = cite_count/years_since_pub
+>     qui gen avg_pat_yr = patent_count/years_since_pub
+>     qui gen avg_frnt_yr = front_only/years_since_pub
+>     qui gen avg_body_yr = body_only/years_since_pub
+>     qui bys pmid: replace avg_cite_yr = . if _n != 1
+>     qui bys pmid: replace avg_pat_yr = . if _n != 1
+>     qui bys pmid: replace avg_frnt_yr = . if _n != 1
+>     qui bys pmid: replace avg_body_yr = . if _n != 1
+>     qui sum avg_cite_yr
+>     gen cite_wt = avg_cite_yr/r(sum) // each article is no longer weighted 1 
+>     qui sum avg_pat_yr
+>     gen pat_wt = avg_pat_yr/r(sum) 
+>     qui sum avg_frnt_yr
+>     gen frnt_wt = avg_frnt_yr/r(sum) 
+>     qui sum avg_body_yr
+>     gen body_wt = avg_body_yr/r(sum) 
+>     bys jrnl: gegen tot_cite_N = total(cite_wt)
+>     gsort pmid cite_wt
+>     qui bys pmid: replace cite_wt = cite_wt[_n-1] if mi(cite_wt)
+>     gsort pmid pat_wt
+>     qui bys pmid: replace pat_wt = pat_wt[_n-1] if mi(pat_wt)
+>     gsort pmid frnt_wt
+>     qui bys pmid: replace frnt_wt = frnt_wt[_n-1] if mi(frnt_wt)
+>     gsort pmid body_wt
+>     qui bys pmid: replace body_wt = body_wt[_n-1] if mi(body_wt)
+>     qui gunique pmid
+>     local articles = r(unique)
+>     qui gen cite_affl_wt = affl_wt * cite_wt * `articles'
+>     qui gen pat_adj_wt  = affl_wt * pat_wt * `articles'
+>     qui gen frnt_adj_wt  = affl_wt * frnt_wt * `articles'
+>     qui gen body_adj_wt  = affl_wt * body_wt * `articles'
+>    
+>     qui bys id: gen id_cntr = _n == 1
+>     qui bys jrnl: gen first_jrnl = _n == 1
+>     qui by jrnl: gegen jrnl_N = total(id_cntr)
+>     *qui sum impact_fctr if first_jrnl == 1
+>     *gen impact_shr = impact_fctr/r(sum) // weight that each journal gets
+>     *gen reweight_N = impact_shr * `articles' // adjust the N of each journal
+>  to reflect impact factor
+>     *replace  tot_cite_N = tot_cite_N * `articles'
+>     *gen impact_wt = reweight_N/jrnl_N // after adjusting each journal weight
+>  we divide by the number of articles in each journal to assign new weight to 
+> each paper
+>     *gen impact_affl_wt = impact_wt * affl_wt  
+>     *gen impact_cite_wt = reweight_N * cite_wt / tot_cite_N * `articles' 
+>     *gen impact_cite_affl_wt = impact_cite_wt * affl_wt 
+>     foreach wt in affl_wt cite_affl_wt pat_adj_wt { // frnt_adj_wt body_adj_w
+> t { // impact_affl_wt impact_cite_affl_wt 
+>         sum `wt'
+>         assert round(r(sum)-`articles') == 0
+>     }
+>     compress, nocoalesce
+>     gen len = length(inst)
+>     qui sum len
+>     local n = r(max)
+>     recast str`n' inst, force
+>     cap drop n mi_inst has_nonmi_inst population len
+>     save ../temp/pre_save, replace
+> 
+>     import delimited using ../external/geo/us_cities_states_counties.csv, cle
+> ar varnames(1)
+>     glevelsof statefull , local(state_names)
+> 
+>     use ../temp/pre_save, clear
+>     replace country = "United States" if country_code == "US"
+>     replace country_code = "US" if country == "United States" 
+>     foreach s in `state_names' {
+>         replace region = "`s'" if mi(region) & country_code == "US" & strpos(
+> inst, "`s'")>0
+>     }
+>     replace region = "Pennsylvania" if country_code == "US" & inlist(city, "P
+> ittsburgh" , "Philadelphia", "Radnor", "Swarthmore", "Meadville", "Lancaster"
+>  , "Wilkes-Barre")  
+>     replace region = "California" if country_code == "US" & inlist(city, "Sta
+> nford", "Los Angeles", "San Diego", "La Jolla", "Berkeley", "San Francisco", 
+> "Thousand Oaks", "Mountain View", "Sunnyvale")
+>     replace region = "California" if country_code == "US" & inlist(city, "Cup
+> ertino", "Malibu", "Torrance", "San Carlos", "Escondido")
+>     replace region = "California" if country_code == "US" & inlist(city, "Nov
+> ato", "Arcata", "Claremont", "Santa Clara", "Castroville", "Pomona", "Emeryvi
+> lle", "Redwood City", "Santa Barbara")
+>     replace region = "California" if country_code == "US" & inlist(city, "San
+>  Jose", "South San Francisco", "Pasadena", "Irving", "La Cañada Flintridge", 
+> "Duarte", "Menlo Park", "Livermore")
+>     replace region = "Massachusetts" if country_code == "US" & inlist(city, "
+> Boston", "Cambridge", "Medford", "Wellesley", "Falmouth", "Woods Hole", "Fram
+> ingham", "Plymouth", "Worcester")
+>     replace region = "Massachusetts" if country_code == "US" & inlist(city, "
+> Amherst", "Amherst Center", "Waltham", "Northampton", "South Hadley", "Andove
+> r", "Natick", "Newton")
+>     replace region = "Maryland" if country_code == "US" & inlist(city, "Bethe
+> sda", "Baltimore", "Silver Spring", "Greenbelt", "Gaithersburg", "Frederick",
+>  "Riverdale Park", "Rockville", "Annapolis")
+>     replace region = "Maryland" if country_code == "US" & inlist(city, "Towso
+> n", "College Park", "Edgewater")
+>     replace region = "Ohio" if country_code == "US" & inlist(city, "Toledo", 
+> "Dayton", "Oxford", "Cleveland", "Ardmore", "Oberlin", "Cincinnati", "Columbu
+> s")
+>     replace region = "New Jersey" if country_code == "US" & inlist(city, "New
+>  Brunswick", "Bridgewater", "Hoboken", "Raritan", "Glassboro", "Whippany", " 
+> Woodcliff Lake", "South Plainfield")
+>     replace region = "New Jersey" if country_code == "US" & inlist(city, "Mon
+> tclair", "Princeton", "Woodcliff Lake")
+>     replace region = "Iowa" if country_code == "US" & inlist(city, "Ames", "D
+> es Moines")
+>     replace region = "Nevada" if country_code == "US" & inlist(city, "Reno")
+>     replace region = "Nebraska" if country_code == "US" & inlist(city, "Omaha
+> ")
+>     replace region = "Oklahoma" if country_code == "US" & inlist(city, "Tulsa
+> ")
+>     replace region = "Arizona" if country_code == "US" & inlist(city, "Phoeni
+> x", "Tucson")
+>     replace region = "Illinois" if country_code == "US" & inlist(city, "Chica
+> go", "Evanston", "Downers Grove", "Hines")
+>     replace region = "Indiana" if country_code == "US" & inlist(city, "West L
+> afayette", "Notre Dame", "Indianapolis", "Fort Wayne")
+>     replace region = "New York" if country_code == "US" & inlist(city, "New Y
+> ork", "Ithaca", "Bronx", "Rochester", "Cold Spring Harbor", "Syracuse", "Upto
+> n", "Albany", "Manhasset")
+>     replace region = "New York" if country_code == "US" & inlist(city,  "Broo
+> klyn", "Potsdam", "Tarrytown", "Town of Poughkeepsie", "Saratoga Springs", "M
+> illbrook", "Utica")
+>     replace region = "New York" if country_code == "US" & inlist(city, "Bingh
+> amton", "Brookville", "Hempstead", "Saranac Lake", "New Hyde Park", "Poughkee
+> psie", "Buffalo", "Niskayuna")
+>     replace region = "Connecticut" if country_code == "US" & inlist(city, "Ne
+> w Haven", "West Haven", "Fairfield", "Stamford", "West Hartford")
+>     replace region = "Oregon" if country_code == "US" & inlist(city, "Portlan
+> d")
+>     replace region = "Alabama" if country_code == "US" & inlist(city, "Tuskeg
+> ee", "Mobile")
+>     replace region = "District of Columbia" if country_code == "US" & inlist(
+> city, "Washington")
+>     replace region = "North Carolina" if country_code == "US" & inlist(city, 
+> "Durham", "Asheville", "Chapel Hill", "Winston Salem", "Boone", "Charlotte")
+>     replace region = "South Carolina" if country_code == "US" & inlist(city, 
+> "Greenville", "Aiken", "Charleston")
+>     replace region = "Wisconsin" if country_code == "US" & inlist(city, "Madi
+> son", "Milwaukee")
+>     replace region = "Florida" if country_code == "US" & inlist(city, "Coral 
+> Gables", "Miami", "Sarasota", "Orlando", "Tampa")
+>     replace region = "Maine" if country_code == "US" & inlist(city, "Lewiston
+> ", "Bar Harbor", "Brunswick")
+>     replace region = "Washington" if country_code == "US" & inlist(city, "Sea
+> ttle", "Richland", "Bothell", "Redmond")
+>     replace region = "Colorado" if country_code == "US" & inlist(city, "Denve
+> r", "Boulder", "Fort Collins", "Golden")
+>     replace region = "Louisiana" if country_code == "US" & inlist(city, "New 
+> Orleans", "Houma")
+>     replace region = "Delaware" if country_code == "US" & inlist(city, "Wilmi
+> ngton")
+>     replace region = "Tennessee" if country_code == "US" & inlist(city, "Memp
+> his", "Oak Ridge", "Nashville")
+>     replace region = "Georgia" if country_code == "US" & inlist(city, "Atlant
+> a", "Augusta", "Macon", "Decatur", "Kennesaw")
+>     replace region = "Texas" if country_code == "US" & inlist(city, "Houston"
+> , "Dallas", "San Antonio", "The Woodlands", "Austin")
+>     replace region = "New Mexico" if country_code == "US" & inlist(city, "Los
+>  Alamos", "Carlsbad", "Albuquerque", "Santa Fe")
+>     replace region = "Michigan" if country_code == "US" & inlist(city, "Ann A
+> rbor", "Detroit", "Flint", "Midland", "Royal Oak", "Grand Rapids")
+>     replace region = "Rhode Island" if country_code == "US" & inlist(city, "P
+> rovidence")
+>     replace region = "Hawaii" if country_code == "US" & inlist(city, "Honolul
+> u")
+>     replace region = "Missouri" if country_code == "US" & inlist(city, "St Lo
+> uis", "Kirksville")
+>     replace region = "Mississippi" if country_code == "US" & inlist(city, "Vi
+> cksburg")
+>     replace region = "Minnesota" if country_code == "US" & inlist(city, "Minn
+> eapolis", "Saint Paul")
+>     replace region = "Virginia" if country_code == "US" & inlist(city, "Resto
+> n", "Williamsburg", "North Laurel", "Arlington", "Richmond", "Harrisonburg", 
+> "Front Royal", "Falls Church", "Charlottesville")
+>     replace region = "Virginia" if country_code == "US" & inlist(city, "Tyson
+> s Corner", "Fairfax", "Ashburn", "Alexandria")
+>     replace region = "New Hampshire" if country_code == "US" & inlist(city, "
+> Hanover", "Lebanon")
+>     replace region = "Illinois" if country_code == "US" & inlist(city, "Lemon
+> t", "North Chicago")
+>     replace region = "Utah" if country_code == "US" & inlist(city, "Provo", "
+> Salt Lake City")
+>     replace region = "Missouri" if inst_id == "I4210102181"
+>     replace region = "New Jersey" if inst_id == "I150569930"
+>     replace region = "Maryland" if inst_id == "I166416128"
+>     replace region = "Iowa" if inst == "Pioneer Hi-Bred"
+>     replace region = "Iowa" if inst == "WinnMed"
+>     save ../temp/fill_msa, replace
+> 
+>     import delimited using ../external/geo/us_cities_states_counties.csv, cle
+> ar varnames(1)
+>     gcontract stateshort statefull
+>     cap drop _freq
+>     drop if mi(stateshort)
+>     rename statefull region
+>     merge 1:m region using ../temp/fill_msa, assert(1 2 3) keep(2 3) nogen
+>     replace stateshort =  "DC" if region == "District of Columbia"
+>     replace stateshort =  "VI" if region == "Virgin Islands, U.S."
+>     replace us_state = stateshort if country_code == "US" & mi(us_state)
+>     replace city = "Saint Louis" if city == "St Louis"
+>     replace city = "Winston Salem" if city == "Winston-Salem"
+>     merge m:1 city us_state using ../external/geo/city_msa, assert(1 2 3) kee
+> p(1 3) nogen
+>     replace msatitle = "Washington-Arlington-Alexandria, DC-VA-MD-WV"  if us_
+> state == "DC"
+>     replace msatitle = "New York-Newark-Jersey City, NY-NJ-PA" if city == "Th
+> e Bronx" & us_state == "NY"
+>     replace msatitle = "Miami-Fort Lauderdale-West Palm Beach, FL" if city ==
+>  "Coral Gables" & us_state == "FL"
+>     replace msatitle = "Springfield, MA" if city == "Amherst Center"
+>     replace msatitle = "Hartford-West Hartford-East Hartford, CT" if city == 
+> "Storrs" & us_state == "CT"
+>     replace msatitle = "Tampa-St. Petersburg-Clearwater, FL" if city == "Temp
+> le Terrace" & us_state == "FL"
+>     replace msatitle = "San Francisco-Oakland-Hayward, CA" if city == "Foster
+>  City" & us_state == "CA"
+>     replace msa_comb = msatitle if mi(msa_comb)
+>     replace  msa_comb = "Research Triangle Park, NC" if msa_comb == "Durham-C
+> hapel Hill, NC" | msa_comb == "Raleigh, NC" | city == "Res Triangle Pk" | cit
+> y == "Research Triangle Park" | city == "Res Triangle Park"
+>     replace  msa_comb = "Bay Area, CA" if inlist(msa_comb, "San Francisco-Oak
+> land-Hayward, CA", "San Jose-Sunnyvale-Santa Clara, CA")
+>     replace msa_c_world = msa_comb if mi(msa_c_world)
+>     replace msa_c_world = substr(msa_c_world, 1, strpos(msa_c_world, ", ")-1)
+>  + ", US" if country == "United States" & !mi(msa_c_world)
+>     replace msa_c_world = city + ", " + country_code if country_code != "US" 
+> & !mi(city) & !mi(country_code)
+>     save ../output/cleaned_all_`samp', replace
+>     preserve
+>     gcontract id pmid
+>     cap drop _freq
+>     save ../temp/pmid_id_xwalk_`samp', replace
+>     restore*/
+. 
+.     use ../output/cleaned_all_`samp', clear
+  3.     keep if inrange(pub_date, td(01jan2005), td(31dec2025)) & year >=2005
+  4.     drop cite_wt cite_affl_wt tot_cite_N first_jrnl pat_wt pat_adj_wt frnt
+> _wt body_wt frnt_adj_wt body_adj_wt jrnl_N 
+  5.     foreach var in impact_wt impact_affl_wt impact_cite_wt impact_cite_aff
+> l_wt impact_shr  reweight_N  {
+  6.         cap drop `var'
+  7.     }
+  8.     qui sum avg_cite_yr
+  9.     gen cite_wt = avg_cite_yr/r(sum)
+ 10.     qui sum avg_pat_yr
+ 11.     gen pat_wt = avg_pat_yr/r(sum)
+ 12.     qui sum avg_frnt_yr
+ 13.     gen frnt_wt = avg_frnt_yr/r(sum) 
+ 14.     qui sum avg_body_yr
+ 15.     gen body_wt = avg_body_yr/r(sum) 
+ 16.     bys jrnl: gegen tot_cite_N = total(cite_wt)
+ 17.     gsort pmid cite_wt
+ 18.     qui bys pmid: replace cite_wt = cite_wt[_n-1] if mi(cite_wt)
+ 19.     gsort pmid pat_wt
+ 20.     qui bys pmid: replace pat_wt = pat_wt[_n-1] if mi(pat_wt)
+ 21.     gsort pmid frnt_wt
+ 22.     qui bys pmid: replace frnt_wt = frnt_wt[_n-1] if mi(frnt_wt)
+ 23.     gsort pmid body_wt
+ 24.     qui bys pmid: replace body_wt = body_wt[_n-1] if mi(body_wt)
+ 25.     gunique pmid 
+ 26.     local articles = r(unique)
+ 27.     qui gen cite_affl_wt = affl_wt * cite_wt * `articles'
+ 28.     qui gen pat_adj_wt  = affl_wt * pat_wt * `articles'
+ 29.     qui gen frnt_adj_wt  = affl_wt * frnt_wt * `articles'
+ 30.     qui gen body_adj_wt  = affl_wt * body_wt * `articles'
+ 31.     
+.     qui bys jrnl: gen first_jrnl = _n == 1
+ 32.     qui by jrnl: gegen jrnl_N = total(id_cntr)
+ 33.    /* qui sum impact_fctr if first_jrnl == 1
+>     gen impact_shr = impact_fctr/r(sum)
+>     gen reweight_N = impact_shr * `articles'
+>     replace  tot_cite_N = tot_cite_N * `articles'
+>     gen impact_wt = reweight_N/jrnl_N
+>     gen impact_affl_wt = impact_wt * affl_wt
+>     gen impact_cite_wt = reweight_N * cite_wt / tot_cite_N * `articles'
+>     gen impact_cite_affl_wt = impact_cite_wt * affl_wt*/
+. 
+.     foreach wt in affl_wt cite_affl_wt pat_adj_wt  { //frnt_adj_wt body_adj_w
+> t { // impact_affl_wt impact_cite_affl_wt 
+ 34.         qui sum `wt'
+ 35.         assert round(r(sum)-`articles') == 0
+ 36.     }
+ 37.     compress, nocoalesce
+ 38.     save ../output/cleaned_last20yrs_`samp', replace
+ 39. end
+
+. 
+. program clean_mesh  
+  1.     syntax, samp(str) 
+  2.     if "`samp'" == "top_jrnls" local fol top
+  3.     if strpos("`samp'" , "all_jrnls")  > 0 local fol samp 
+  4.     use ../external/`fol'/contracted_gen_mesh_`samp', clear
+  5.     bys id: gen n = _n
+  6.     greshape wide qualifier_name gen_mesh, i(id) j(n)
+  7.     gduplicates drop id, force
+  8.     save ../output/reshaped_gen_mesh_`samp', replace
+  9. end
+
+. main
+(27,102,772 observations deleted)
+(58,395,191 missing values generated)
+(58,395,191 missing values generated)
+(58,395,191 missing values generated)
+(58,395,191 missing values generated)
+N = 69,115,153; 10,719,962 unbalanced groups of sizes 1 to 100
+  variable patent_count was long now int
+  variable first_jrnl was float now byte
+  variable population was double now long
+  variable jrnl_N was double now long
+  variable region was str30 now str28
+  variable msatitle was str50 now str46
+  (1,313,187,907 bytes saved)
+(file ../output/cleaned_last20yrs_all_jrnls_merged.dta not found)
+file ../output/cleaned_last20yrs_all_jrnls_merged.dta saved
+file ../external/samp/contracted_gen_mesh_all_jrnls_merged.dta not found
+r(601);
+
+end of do-file
+
+r(601);
+
+
+. [?1l>

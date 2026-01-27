@@ -1,4 +1,6 @@
 ./samp/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/pull_openalex/output 
+./geo/ | /n/netscratch/pakes_lab/Lab/sci_eq/geo
 ./top/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/make_jrnl_cuts/output 
+./year_insts/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/clean_athr_inst_hist/output 
 ./patents/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/patents/pat_to_ppr/output 
 ./inst_xw/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/unify_insts/output 

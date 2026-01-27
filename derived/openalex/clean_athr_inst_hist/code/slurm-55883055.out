@@ -1,0 +1,1144 @@
+[?1h=
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Unicode is supported; see help unicode_advice.
+      2. More than 2 billion observations are allowed; see help obs_advice.
+      3. Maximum number of variables is set to 5,000; see help set_maxvar.
+
+. do "build.do" 
+
+. set more off
+
+. clear all
+
+. capture log close
+
+. program drop _all
+
+. set scheme modern
+
+. pause on
+
+. set seed 8975
+
+. set maxvar 120000
+
+
+. program main
+  1.    * load_files, samp(3)
+.    * append_files
+.     clean_panel, time(year)
+  2.    * clean_panel, time(qrtr)
+.    * convert_year_to_qrtr
+. end
+
+. 
+. program load_files
+  1.     syntax, samp(int)
+  2.     di "`samp'"
+  3.     // append ls files
+.    /* forval i = 1/5473 {
+>         di "`i'"
+>         qui {
+>             cap import delimited ../external/ls_pprs/openalex_authors`i', str
+> ingcols(_all) clear varn(1) bindquotes(strict) maxquotedrows(unlimited) delim
+> iters(",")
+>             if _rc == 0 {
+>                 gen date = date(pub_date, "YMD")
+>                 format date %td
+>                 gen qrtr = qofd(date)
+>                 gcontract athr_id  qrtr inst_id, freq(num_times)
+>                 drop if mi(inst_id)
+>                 drop if mi(athr_id) | athr_id == "A9999999999"
+>                 count
+>                 if r(N) > 0 {
+>                     fmerge m:1 athr_id using ../external/athrs/list_of_athrs,
+>  assert(1 2 3) keep(3) nogen
+>                 }
+>                 compress, nocoalesce
+>                 save ../temp/ppr`i', replace
+> 
+>             }
+>         }
+>     }*/
+.     // 20260
+.     local start = (`samp'-1)*500  + 1
+  4.     local end = `samp'*500 
+  5.     *forval i = `start'/`end' {
+.     forval i = 475/500 {
+  6.         di "`i'"
+  7.         qui {
+  8.             cap import delimited ../external/pprs/openalex_authors`i', str
+> ingcols(_all) clear varn(1) bindquotes(strict) maxquotedrows(unlimited) delim
+> iters(",")
+  9.             if _rc == 0 {
+ 10.                 gen date = date(pub_date, "YMD")
+ 11.                 format date %td
+ 12.                 gen qrtr = qofd(date)
+ 13.                 gcontract athr_id  qrtr inst_id, freq(num_times)
+ 14.                 drop if mi(inst_id)
+ 15.                 drop if mi(athr_id) | athr_id == "A9999999999"
+ 16.                 count
+ 17.                 if r(N) > 0 {
+ 18.                     fmerge m:1 athr_id using ../external/athrs/list_of_ath
+> rs, assert(1 2 3) keep(3) nogen
+ 19.                 }
+ 20.                 compress, nocoalesce
+ 21.                 save ../temp/othr_ppr`i', replace
+ 22. 
+.             }
+ 23.         }
+ 24.     }
+ 25. end
+
+. 
+. program append_files 
+  1. /*    clear
+>     forval i = 1/5473 {
+>         di "`i'"
+>         cap append using ../temp/ppr`i'
+>     }
+>     gcollapse (sum) num_times, by(athr_id inst_id qrtr)
+>     compress, nocoalesce
+>     save ../temp/appended_pprs_1, replace
+>     clear*/
+.     forval i = 1/5000 {
+  2.         di "`i'"
+  3.         cap append using ../temp/othr_ppr`i'
+  4.     }
+  5.     gcollapse (sum) num_times, by(athr_id inst_id qrtr)
+  6.     compress, nocoalesce
+  7.     save ../temp/appended_pprs_2, replace
+  8.     /*clear
+>     forval i = 5001/10000 {
+>         di "`i'"
+>         cap append using ../temp/othr_ppr`i'
+>     }
+>     gcollapse (sum) num_times, by(athr_id inst_id qrtr)
+>     compress, nocoalesce
+>     save ../temp/appended_pprs_3, replace*/
+.     /*clear
+>     forval i = 10001/15000 {
+>         di "`i'"
+>         cap append using ../temp/othr_ppr`i'
+>     }
+>     gcollapse (sum) num_times, by(athr_id inst_id qrtr)
+>     compress, nocoalesce
+>     save ../temp/appended_pprs_4, replace*/
+. /*    clear
+>     forval i = 15001/20000 {
+>         di "`i'"
+>         cap append using ../temp/othr_ppr`i'
+>     }
+>     gcollapse (sum) num_times, by(athr_id inst_id qrtr)
+>     compress, nocoalesce
+>     save ../temp/appended_pprs_5, replace*/
+.    /* clear
+>     forval i = 20001/20260 {
+>         di "`i'"
+>         cap append using ../temp/othr_ppr`i'
+>     }
+>     gcollapse (sum) num_times, by(athr_id inst_id qrtr)
+>     compress, nocoalesce
+>     save ../temp/appended_pprs_6, replace*/
+.     clear
+  9.     forval i = 1/6 {
+ 10.         append using ../temp/appended_pprs_`i'
+ 11.     }
+ 12.     gduplicates drop
+ 13.     compress, nocoalesce
+ 14.     save ../temp/appended_pprs, replace
+ 15. end
+
+. 
+. program clean_panel
+  1.     syntax, time(str)
+  2.     use ../temp/appended_pprs, clear
+  3.     gen year = yofd(dofq(qrtr))
+  4.     drop if mi(`time')
+  5.     if "`time'" == "year" {
+  6.         gcollapse (sum) num_times, by(athr_id inst_id `time')
+  7.     }
+  8.     fmerge m:1 inst_id using ../external/inst/all_inst_geo_chars, assert(1
+>  2 3) keep(3) nogen
+  9.     replace inst_id = new_inst_id 
+ 10.     replace inst = new_inst 
+ 11.     gen broad_affl = inst == "Broad Institute"
+ 12.     gen hhmi_affl = inst == "Howard Hughes Medical Institute"
+ 13.     gen wrong = inst  == "Molecular Oncology (United States)"
+ 14.     gen funder = (strpos(inst, "Trust")> 0 | strpos(inst, "Foundation")>0 
+> | strpos(inst, "Fund")>0) & !inlist(type, "education", "facility", "healthcar
+> e")
+ 15.     gduplicates tag athr_id inst_id `time', gen(dup_entry)
+ 16.     bys athr_id inst_id `time': gegen tot_times = sum(num_times) 
+ 17.     replace num_times = tot_times
+ 18.     drop if dup_entry > 0 & mi(new_inst)
+ 19.     bys athr_id `time': gen num_affls = _N 
+ 20.     drop if (num_affls > 1 & (funder == 1 | broad_affl == 1 | hhmi_affl ==
+>  1 ))| wrong == 1 
+ 21.     drop if inst == "Howard Hughes Medical Institute"
+ 22.     drop if inst_id == "I1344073410"
+ 23.     drop new_inst new_inst_id dup_entry tot_times type
+ 24.     gsort athr_id inst_id `time' country city
+ 25.     gduplicates drop athr_id inst_id `time', force
+ 26.     // keep inst with the largest num_times in a  year
+.     cap drop N
+ 27.     bys athr_id `time' : gen N = _N 
+ 28.     bys athr_id `time': gegen max_num_times = max(num_times)
+ 29.     drop if num_times != max_num_times & N <= 10
+ 30.     drop max_num_times
+ 31.     gunique athr_id `time' 
+ 32.     local N = r(unique)
+ 33.     // imputation process
+.     foreach loc in inst_id inst_id inst_id { //inst_id inst_id {
+ 34.         cap drop has_mult 
+ 35.         cap drop same_as_after 
+ 36.         cap drop same_as_before 
+ 37.         cap drop has_before has_after 
+ 38.         cap drop N
+ 39.         bys athr_id `time' : gen N = _N 
+ 40.         if "`time'" == "year" local range 5 
+ 41.         if "`time'" == "qrtr" local range 20 
+ 42.         // if there are mult in a  but sandwiched by the same, then choose
+>  that one 
+.         bys athr_id `time': gen has_mult = _N > 1
+ 43.         bys athr_id `loc' (`time'): gen same_as_after = `time'[_n+1]-`time
+> ' <= `range' & has_mult[_n+1]==0
+ 44.         by athr_id `loc' (`time'): gen same_as_before = `time' - `time'[_n
+> -1] <= `range'  & has_mult[_n-1]==0
+ 45.         gen sandwiched = has_mult == 1 & same_as_after == 1 & same_as_befo
+> re == 1
+ 46.         bys athr_id `time': gegen has_sandwich = max(sandwiched)
+ 47.         drop if has_sandwich ==1 & sandwiched == 0 & N<=10 
+ 48.         drop sandwiched has_sandwich
+ 49.         bys athr_id `time': replace has_mult = _N > 1
+ 50.        
+.         // now we prioritize the  before
+.         bys athr_id `loc' (`time'): replace same_as_after = `time'[_n+1]-`tim
+> e' <= `range' & has_mult[_n+1]==0
+ 51.         by athr_id `loc' (`time'): replace same_as_before = `time' - `time
+> '[_n-1] <= `range'  & has_mult[_n-1]==0
+ 52.         bys athr_id `time': gegen has_before = max(same_as_before)
+ 53.         drop if has_mult == 1 & has_before == 1 & same_as_before == 0  & N
+> <=10
+ 54.         bys athr_id `time': replace has_mult = _N > 1
+ 55.         // now do same for the `time' after 
+.         bys athr_id `loc' (`time'): replace same_as_after = `time'[_n+1]-`tim
+> e' <= `range' & has_mult[_n+1]==0
+ 56.         by athr_id `loc' (`time'): replace same_as_before = `time' - `time
+> '[_n-1] <= `range'  & has_mult[_n-1]==0
+ 57.         bys athr_id `time': gegen has_after = max(same_as_after)
+ 58.         drop if has_mult == 1 & has_after == 1 & same_as_after == 0  & N <
+> = 10
+ 59.         bys athr_id `time': replace has_mult = _N > 1
+ 60.     }
+ 61.     bys athr_id: gegen has_genentech = max(inst_id == "I183934855")
+ 62.     replace inst_id = "I183934855" if has_genentech == 1 & inst_id == "I42
+> 10150208"
+ 63.     cap drop N
+ 64.     bys athr_id `time' : gen N = _N 
+ 65.     // if there are sandwiched insts no mater what the `time' gap is
+.     hashsort athr_id `time'
+ 66.     gen prev_inst = inst_id[_n-1]
+ 67.     gen post_inst = inst_id[_n+1]
+ 68. 
+.     gen sandwich = prev_inst == post_inst & prev_inst != inst_id if athr_id[_
+> n-1] == athr_id[_n+1] & athr[_n-1] == athr_id 
+ 69.     replace inst_id = prev_inst if sandwich == 1 & sandwich[_n-1] != 1  & 
+> N <=10 
+ 70.     replace inst = inst[_n-1] if sandwich == 1 & sandwich[_n-1] != 1  & N 
+> <=10 
+ 71.     drop sandwich prev_inst post_inst
+ 72. 
+.     hashsort athr_id `time'
+ 73.     gen prev_inst = inst_id[_n-1]
+ 74.     gen post_inst = inst_id[_n+1]
+ 75. 
+.     gen sandwich = prev_inst == post_inst & prev_inst != inst_id if athr_id[_
+> n-1] == athr_id[_n+1] & athr[_n-1] == athr_id 
+ 76.     replace inst_id = prev_inst if sandwich == 1 & sandwich[_n-1] != 1  & 
+> N<=10
+ 77.     replace inst = inst[_n-1] if sandwich == 1 & sandwich[_n-1] != 1 & N<=
+> 10
+ 78.     drop sandwich prev_inst post_inst
+ 79. 
+.     bys athr_id: gegen modal_inst = mode(inst_id)
+ 80.     by athr_id `time': replace has_mult = _N > 1
+ 81.     gen mode_match = inst_id == modal_inst
+ 82.     bys athr_id `time': gegen has_mode_match = max(mode_match)
+ 83.     gen mode_yr = year if mode_match == 1
+ 84.     bys athr_id : gegen min_mode_yr = min(mode_yr) 
+ 85.     by athr_id : gegen max_mode_yr = max(mode_yr) 
+ 86.     drop if has_mult == 1 & has_mode_match == 1 & mode_match == 0 & inrang
+> e(year, min_mode_yr, max_mode_yr) & N <= 10
+ 87. 
+.     gen rand = rnormal(0,1)
+ 88.     gsort athr_id `time' rand
+ 89.     gduplicates tag athr_id `time',gen(dup)
+ 90.     gunique athr_id `time' if  dup > 0
+ 91.     gduplicates drop athr_id `time', force
+ 92.     gunique athr_id `time'
+ 93.     assert r(unique) == `N'
+ 94.     drop if mi(`time')
+ 95.     gisid athr_id `time'
+ 96.     hashsort athr_id `time'
+ 97.     gen prev_inst = inst_id[_n-1]
+ 98.     gen post_inst = inst_id[_n+1]
+ 99. 
+.     gen sandwich = prev_inst == post_inst & prev_inst != inst_id if athr_id[_
+> n-1] == athr_id[_n+1] & athr[_n-1] == athr_id 
+100.     replace inst_id = prev_inst if sandwich == 1 & sandwich[_n-1] != 1  
+101.     replace inst = inst[_n-1] if sandwich == 1 & sandwich[_n-1] != 1 
+102.     drop sandwich prev_inst post_inst
+103.     keep athr_id inst_id `time' num_times inst country_code country city r
+> egion broad_affl hhmi_affl
+104. 
+.     // do some final cleaning
+.     cap gen year  = yofd(dofq(qrtr))
+105.     save ../temp/imputed_athr_panel, replace
+106.     
+.     import delimited using ../external/geo/us_cities_states_counties.csv, cle
+> ar varnames(1)
+107.     glevelsof statefull , local(state_names)
+108. 
+.     use ../temp/imputed_athr_panel, clear
+109.     foreach s in `state_names' {
+110.         replace region = "`s'" if mi(region) & country_code == "US" & strp
+> os(inst, "`s'")>0
+111.     }
+112.     replace region = "Pennsylvania" if country_code == "US" & inlist(city,
+>  "Pittsburgh" , "Philadelphia", "Radnor", "Swarthmore", "Meadville", "Lancast
+> er" , "Wilkes-Barr") 
+113.     replace region = "California" if country_code == "US" & inlist(city, "
+> Stanford", "Los Angeles", "San Diego", "La Jolla", "Berkeley", "San Francisco
+> ", "Thousand Oaks", "Mountain View", "Sunnyvale")
+114.     replace region = "California" if country_code == "US" & inlist(city, "
+> Cupertino", "Malibu")
+115.     replace region = "California" if country_code == "US" & inlist(city, "
+> Novato", "Arcata", "Claremont", "Santa Clara", "Castroville", "Pomona", "Emer
+> yville", "Redwood City", "Santa Barbara")
+116.     replace region = "California" if country_code == "US" & inlist(city, "
+> San Jose", "South San Francisco", "Pasadena", "Irving", "La Cañada Flintridge
+> ", "Duarte", "Menlo Park", "Livermore")
+117.     replace region = "Massachusetts" if country_code == "US" & inlist(city
+> , "Boston", "Cambridge", "Medford", "Wellesley", "Falmouth", "Woods Hole", "F
+> ramingham", "Plymouth", "Worcester")
+118.     replace region = "Massachusetts" if country_code == "US" & inlist(city
+> , "Amherst", "Amherst Center", "Waltham", "Northampton", "South Hadley", "And
+> over", "Natick", "Newton")
+119.     replace region = "Maryland" if country_code == "US" & inlist(city, "Be
+> thesda", "Baltimore", "Silver Spring", "Greenbelt", "Gaithersburg", "Frederic
+> k", "Riverdale Park", "Rockville", "Annapolis")
+120.     replace region = "Maryland" if country_code == "US" & inlist(city, "To
+> wson", "College Park")
+121.     replace region = "Ohio" if country_code == "US" & inlist(city, "Toledo
+> ", "Dayton", "Oxford", "Cleveland", "Ardmore", "Oberlin", "Cincinnati")
+122.     replace region = "New Jersey" if country_code == "US" & inlist(city, "
+> New Brunswick", "Bridgewater", "Hoboken", "Raritan", "Glassboro", "Whippany",
+>  " Woodcliff Lake", "South Plainfield")
+123.     replace region = "New Jersey" if country_code == "US" & inlist(city, "
+> Montclair", "Princeton")
+124.     replace region = "Iowa" if country_code == "US" & inlist(city, "Ames",
+>  "Des Moines")
+125.     replace region = "Nevada" if country_code == "US" & inlist(city, "Reno
+> ")
+126.     replace region = "Oklahoma" if country_code == "US" & inlist(city, "Tu
+> lsa")
+127.     replace region = "Arizona" if country_code == "US" & inlist(city, "Pho
+> enix", "Tucson")
+128.     replace region = "Illinois" if country_code == "US" & inlist(city, "Ch
+> icago", "Evanston", "Downers Grove", "Hines")
+129.     replace region = "New York" if country_code == "US" & inlist(city, "Ne
+> w York", "Ithaca", "Bronx", "Rochester", "Cold Spring Harbor", "Syracuse", "U
+> pton", "Albany", "Manhasset")
+130.     replace region = "New York" if country_code == "US" & inlist(city, "Bi
+> nghamton", "Brookville", "Hempstead", "Saranac Lake", "New Hyde Park", "Pough
+> keepsie", "Buffalo", "Niskayuna")
+131.     replace region = "Connecticut" if country_code == "US" & inlist(city, 
+> "New Haven", "West Haven", "Fairfield", "Stamford")
+132.     replace region = "Oregon" if country_code == "US" & inlist(city, "Port
+> land")
+133.     replace region = "Alabama" if country_code == "US" & inlist(city, "Tus
+> kegee")
+134.     replace region = "District of Columbia" if country_code == "US" & inli
+> st(city, "Washington")
+135.     replace region = "North Carolina" if country_code == "US" & inlist(cit
+> y, "Durham", "Asheville", "Chapel Hill")
+136.     replace region = "South Carolina" if country_code == "US" & inlist(cit
+> y, "Greenville", "Aiken")
+137.     replace region = "Wisconsin" if country_code == "US" & inlist(city, "M
+> adison", "Milwaukee")
+138.     replace region = "Florida" if country_code == "US" & inlist(city, "Cor
+> al Gables", "Miami", "Sarasota", "Orlando", "Tampa")
+139.     replace region = "Maine" if country_code == "US" & inlist(city, "Lewis
+> ton")
+140.     replace region = "Washington" if country_code == "US" & inlist(city, "
+> Seattle", "Richland", "Bothell")
+141.     replace region = "Colorado" if country_code == "US" & inlist(city, "De
+> nver", "Boulder", "Fort Collins")
+142.     replace region = "Louisiana" if country_code == "US" & inlist(city, "N
+> ew Orleans")
+143.     replace region = "Delaware" if country_code == "US" & inlist(city, "Wi
+> lmington")
+144.     replace region = "Tennessee" if country_code == "US" & inlist(city, "M
+> emphis", "Oak Ridge", "Nashville")
+145.     replace region = "Georgia" if country_code == "US" & inlist(city, "Atl
+> anta", "Augusta", "Macon", "Decatur")
+146.     replace region = "Texas" if country_code == "US" & inlist(city, "Houst
+> on", "Dallas", "San Antonio", "The Woodlands", "Austin")
+147.     replace region = "New Mexico" if country_code == "US" & inlist(city, "
+> Los Alamos", "Carlsbad", "Albuquerque", "Santa Fe")
+148.     replace region = "Michigan" if country_code == "US" & inlist(city, "An
+> n Arbor", "Detroit", "Flint")
+149.     replace region = "Rhode Island" if country_code == "US" & inlist(city,
+>  "Providence")
+150.     replace region = "Hawaii" if country_code == "US" & inlist(city, "Hono
+> lulu")
+151.     replace region = "Missouri" if country_code == "US" & inlist(city, "St
+>  Louis", "Kirksville")
+152.     replace region = "Minnesota" if country_code == "US" & inlist(city, "M
+> inneapolis", "Saint Paul") 
+153.     replace region = "Minnesota" if country_code == "US" & inlist(city, "R
+> ochester") & strpos(inst, "Mayo Clinic")>0 
+154.     replace region = "Virginia" if country_code == "US" & inlist(city, "Re
+> ston", "Williamsburg", "North Laurel", "Arlington", "Richmond", "Harrisonburg
+> ", "Front Royal", "Falls Church", "Charlottesville")
+155.     replace region = "Virginia" if country_code == "US" & inlist(city, "Ty
+> sons Corner", "Fairfax")
+156.     replace region = "New Hampshire" if country_code == "US" & inlist(city
+> , "Hanover")
+157.     replace region = "Illinois" if country_code == "US" & inlist(city, "Le
+> mont", "North Chicago")
+158.     replace region = "Utah" if country_code == "US" & inlist(city, "Provo"
+> , "Salt Lake City")
+159.     replace region = "Missouri" if inst_id == "I4210102181"
+160.     replace region = "New Jersey" if inst_id == "I150569930"
+161.     replace region = "Maryland" if inst_id == "I166416128"
+162.     save ../temp/post_state_athr_panel, replace
+163. 
+.     import delimited using ../external/geo/us_cities_states_counties.csv, cle
+> ar varnames(1)
+164.     gcontract stateshort statefull
+165.     drop _freq
+166.     drop if mi(stateshort)
+167.     rename statefull region
+168.     merge 1:m region using ../temp/post_state_athr_panel, assert(1 2 3) ke
+> ep(2 3) nogen
+169.     replace stateshort =  "DC" if region == "District of Columbia"
+170.     replace stateshort =  "VI" if region == "Virgin Islands, U.S."
+171.     gen us_state = stateshort if country_code == "US"
+172.     replace city = "Saint Louis" if city == "St Louis"
+173.     replace city = "Winston Salem" if city == "Winston-Salem"
+174.     merge m:1 city us_state using ../external/geo/city_msa, assert(1 2 3) 
+> keep(1 3) nogen
+175.     replace msatitle = "Washington-Arlington-Alexandria, DC-VA-MD-WV"  if 
+> us_state == "DC"
+176.     replace msatitle = "New York-Newark-Jersey City, NY-NJ-PA" if city == 
+> "The Bronx" & us_state == "NY"
+177.     replace msatitle = "Miami-Fort Lauderdale-West Palm Beach, FL" if city
+>  == "Coral Gables" & us_state == "FL"
+178.     replace msatitle = "Springfield, MA" if city == "Amherst Center"
+179.     replace msatitle = "Hartford-West Hartford-East Hartford, CT" if city 
+> == "Storrs" & us_state == "CT"
+180.     replace msatitle = "Tampa-St. Petersburg-Clearwater, FL" if city == "T
+> emple Terrace" & us_state == "FL"
+181.     replace msatitle = "San Francisco-Oakland-Hayward, CA" if city == "Fos
+> ter City" & us_state == "CA"
+182.     gen msa_comb = msatitle
+183.     replace  msa_comb = "Research Triangle Park, NC" if msa_comb == "Durha
+> m-Chapel Hill, NC" | msa_comb == "Raleigh, NC" | city == "Res Triangle Pk" | 
+> city == "Research Triangle Park" | city == "Res Triangle Park"
+184.     replace  msa_comb = "Bay Area, CA" if inlist(msa_comb, "San Francisco-
+> Oakland-Hayward, CA", "San Jose-Sunnyvale-Santa Clara, CA")
+185.     gen msa_c_world = msa_comb
+186.     replace msa_c_world = substr(msa_c_world, 1, strpos(msa_c_world, ", ")
+> -1) + ", US" if country == "United States" & !mi(msa_c_world)
+187.     replace msa_c_world = city + ", " + country_code if country_code != "U
+> S" & !mi(city) & !mi(country_code)
+188.     compress, nocoalesce
+189.     // if there are sandwiched msas no mater what the `time' gap is
+.     hashsort athr_id `time'
+190.     gen prev_msa = msa_comb[_n-1]
+191.     gen post_msa = msa_comb[_n+1]
+192.     gen sandwich = prev_msa == post_msa & prev_msa != msa_comb if athr_id[
+> _n-1] == athr_id[_n+1] & athr[_n-1] == athr_id
+193.     replace msa_comb = prev_msa if sandwich == 1
+194.     drop sandwich prev_msa post_msa
+195.     save ../temp/athr_panel, replace
+196. 
+.     replace athr_id = subinstr(athr_id, "A", "", .)
+197.     destring athr_id, replace
+198.     tsset athr_id `time'
+199.     tsfill
+200.     foreach var in inst_id {
+201.         bys athr_id (`time'): replace  `var' = `var'[_n-1] if mi(`var') & 
+> !mi(`var'[_n-1])
+202.     }
+203.     tostring athr_id, replace
+204.     replace athr_id = "A" + athr_id
+205.     keep athr_id inst_id year broad_affl hhmi_affl
+206.     fmerge m:1 inst_id using ../external/inst/all_inst_geo_chars, assert(1
+>  2 3) keep(3) nogen
+207.     drop new_inst new_inst_id type 
+208.     foreach s in `state_names' {
+209.         replace region = "`s'" if mi(region) & country_code == "US" & strp
+> os(inst, "`s'")>0
+210.     }
+211.     replace region = "Pennsylvania" if country_code == "US" & inlist(city,
+>  "Pittsburgh" , "Philadelphia", "Radnor", "Swarthmore", "Meadville", "Lancast
+> er" , "Wilkes-Barr") 
+212.     replace region = "California" if country_code == "US" & inlist(city, "
+> Stanford", "Los Angeles", "San Diego", "La Jolla", "Berkeley", "San Francisco
+> ", "Thousand Oaks", "Mountain View", "Sunnyvale")
+213.     replace region = "California" if country_code == "US" & inlist(city, "
+> Cupertino", "Malibu")
+214.     replace region = "California" if country_code == "US" & inlist(city, "
+> Novato", "Arcata", "Claremont", "Santa Clara", "Castroville", "Pomona", "Emer
+> yville", "Redwood City", "Santa Barbara")
+215.     replace region = "California" if country_code == "US" & inlist(city, "
+> San Jose", "South San Francisco", "Pasadena", "Irving", "La Cañada Flintridge
+> ", "Duarte", "Menlo Park", "Livermore")
+216.     replace region = "Massachusetts" if country_code == "US" & inlist(city
+> , "Boston", "Cambridge", "Medford", "Wellesley", "Falmouth", "Woods Hole", "F
+> ramingham", "Plymouth", "Worcester")
+217.     replace region = "Massachusetts" if country_code == "US" & inlist(city
+> , "Amherst", "Amherst Center", "Waltham", "Northampton", "South Hadley", "And
+> over", "Natick", "Newton")
+218.     replace region = "Maryland" if country_code == "US" & inlist(city, "Be
+> thesda", "Baltimore", "Silver Spring", "Greenbelt", "Gaithersburg", "Frederic
+> k", "Riverdale Park", "Rockville", "Annapolis")
+219.     replace region = "Maryland" if country_code == "US" & inlist(city, "To
+> wson", "College Park")
+220.     replace region = "Ohio" if country_code == "US" & inlist(city, "Toledo
+> ", "Dayton", "Oxford", "Cleveland", "Ardmore", "Oberlin", "Cincinnati")
+221.     replace region = "New Jersey" if country_code == "US" & inlist(city, "
+> New Brunswick", "Bridgewater", "Hoboken", "Raritan", "Glassboro", "Whippany",
+>  " Woodcliff Lake", "South Plainfield")
+222.     replace region = "New Jersey" if country_code == "US" & inlist(city, "
+> Montclair", "Princeton")
+223.     replace region = "Iowa" if country_code == "US" & inlist(city, "Ames",
+>  "Des Moines")
+224.     replace region = "Nevada" if country_code == "US" & inlist(city, "Reno
+> ")
+225.     replace region = "Oklahoma" if country_code == "US" & inlist(city, "Tu
+> lsa")
+226.     replace region = "Arizona" if country_code == "US" & inlist(city, "Pho
+> enix", "Tucson")
+227.     replace region = "Illinois" if country_code == "US" & inlist(city, "Ch
+> icago", "Evanston", "Downers Grove", "Hines")
+228.     replace region = "New York" if country_code == "US" & inlist(city, "Ne
+> w York", "Ithaca", "Bronx", "Rochester", "Cold Spring Harbor", "Syracuse", "U
+> pton", "Albany", "Manhasset")
+229.     replace region = "New York" if country_code == "US" & inlist(city, "Bi
+> nghamton", "Brookville", "Hempstead", "Saranac Lake", "New Hyde Park", "Pough
+> keepsie", "Buffalo", "Niskayuna")
+230.     replace region = "Connecticut" if country_code == "US" & inlist(city, 
+> "New Haven", "West Haven", "Fairfield", "Stamford")
+231.     replace region = "Oregon" if country_code == "US" & inlist(city, "Port
+> land")
+232.     replace region = "Alabama" if country_code == "US" & inlist(city, "Tus
+> kegee")
+233.     replace region = "District of Columbia" if country_code == "US" & inli
+> st(city, "Washington")
+234.     replace region = "North Carolina" if country_code == "US" & inlist(cit
+> y, "Durham", "Asheville", "Chapel Hill")
+235.     replace region = "South Carolina" if country_code == "US" & inlist(cit
+> y, "Greenville", "Aiken")
+236.     replace region = "Wisconsin" if country_code == "US" & inlist(city, "M
+> adison", "Milwaukee")
+237.     replace region = "Florida" if country_code == "US" & inlist(city, "Cor
+> al Gables", "Miami", "Sarasota", "Orlando", "Tampa")
+238.     replace region = "Maine" if country_code == "US" & inlist(city, "Lewis
+> ton")
+239.     replace region = "Washington" if country_code == "US" & inlist(city, "
+> Seattle", "Richland", "Bothell")
+240.     replace region = "Colorado" if country_code == "US" & inlist(city, "De
+> nver", "Boulder", "Fort Collins")
+241.     replace region = "Louisiana" if country_code == "US" & inlist(city, "N
+> ew Orleans")
+242.     replace region = "Delaware" if country_code == "US" & inlist(city, "Wi
+> lmington")
+243.     replace region = "Tennessee" if country_code == "US" & inlist(city, "M
+> emphis", "Oak Ridge", "Nashville")
+244.     replace region = "Georgia" if country_code == "US" & inlist(city, "Atl
+> anta", "Augusta", "Macon", "Decatur")
+245.     replace region = "Texas" if country_code == "US" & inlist(city, "Houst
+> on", "Dallas", "San Antonio", "The Woodlands", "Austin")
+246.     replace region = "New Mexico" if country_code == "US" & inlist(city, "
+> Los Alamos", "Carlsbad", "Albuquerque", "Santa Fe")
+247.     replace region = "Michigan" if country_code == "US" & inlist(city, "An
+> n Arbor", "Detroit", "Flint")
+248.     replace region = "Rhode Island" if country_code == "US" & inlist(city,
+>  "Providence")
+249.     replace region = "Hawaii" if country_code == "US" & inlist(city, "Hono
+> lulu")
+250.     replace region = "Missouri" if country_code == "US" & inlist(city, "St
+>  Louis", "Kirksville")
+251.     replace region = "Minnesota" if country_code == "US" & inlist(city, "M
+> inneapolis", "Saint Paul")
+252.     replace region = "Minnesota" if country_code == "US" & inlist(city, "R
+> ochester") & strpos(inst, "Mayo Clinic")>0 
+253.     replace region = "Virginia" if country_code == "US" & inlist(city, "Re
+> ston", "Williamsburg", "North Laurel", "Arlington", "Richmond", "Harrisonburg
+> ", "Front Royal", "Falls Church", "Charlottesville")
+254.     replace region = "Virginia" if country_code == "US" & inlist(city, "Ty
+> sons Corner", "Fiarfax")
+255.     replace region = "New Hampshire" if country_code == "US" & inlist(city
+> , "Hanover")
+256.     replace region = "Illinois" if country_code == "US" & inlist(city, "Le
+> mont", "North Chicago")
+257.     replace region = "Utah" if country_code == "US" & inlist(city, "Provo"
+> , "Salt Lake City")
+258.     replace region = "Missouri" if inst_id == "I4210102181"
+259.     replace region = "New Jersey" if inst_id == "I150569930"
+260.     replace region = "Maryland" if inst_id == "I166416128"
+261.     compress, nocoalesce
+262.     save ../temp/pre_fill_msa_`time', replace
+263. 
+.     import delimited using ../external/geo/us_cities_states_counties.csv, cle
+> ar varnames(1)
+264.     gcontract stateshort statefull
+265.     drop _freq
+266.     drop if mi(stateshort)
+267.     rename statefull region
+268.     merge 1:m region using ../temp/pre_fill_msa_`time', assert(1 2 3) keep
+> (2 3) nogen
+269.     replace stateshort =  "DC" if region == "District of Columbia"
+270.     replace stateshort =  "VI" if region == "Virgin Islands, U.S."
+271.     gen us_state = stateshort if country_code == "US"
+272.     replace city = "Saint Louis" if city == "St Louis"
+273.     replace city = "Winston Salem" if city == "Winston-Salem"
+274.     merge m:1 city us_state using ../external/geo/city_msa, assert(1 2 3) 
+> keep(1 3) nogen
+275.     replace msatitle = "Washington-Arlington-Alexandria, DC-VA-MD-WV"  if 
+> us_state == "DC"
+276.     replace msatitle = "New York-Newark-Jersey City, NY-NJ-PA" if city == 
+> "The Bronx" & us_state == "NY"
+277.     replace msatitle = "Miami-Fort Lauderdale-West Palm Beach, FL" if city
+>  == "Coral Gables" & us_state == "FL"
+278.     replace msatitle = "Springfield, MA" if city == "Amherst Center"
+279.     replace msatitle = "Hartford-West Hartford-East Hartford, CT" if city 
+> == "Storrs" & us_state == "CT"
+280.     replace msatitle = "Tampa-St. Petersburg-Clearwater, FL" if city == "T
+> emple Terrace" & us_state == "FL"
+281.     replace msatitle = "San Francisco-Oakland-Hayward, CA" if city == "Fos
+> ter City" & us_state == "CA"
+282.     gen msa_comb = msatitle
+283.     replace  msa_comb = "Research Triangle Park, NC" if msa_comb == "Durha
+> m-Chapel Hill, NC" | msa_comb == "Raleigh, NC" | city == "Res Triangle Pk" | 
+> city == "Research Triangle Park" | city == "Res Triangle Park"
+284.     replace  msa_comb = "Bay Area, CA" if inlist(msa_comb, "San Francisco-
+> Oakland-Hayward, CA", "San Jose-Sunnyvale-Santa Clara, CA")
+285.     replace msa_comb = "Rochester, MN" if strpos(inst, "Mayo Clinic") > 0 
+> & city == "Rochester" 
+286.     gen msa_c_world = msa_comb
+287.     replace msa_c_world = substr(msa_c_world, 1, strpos(msa_c_world, ", ")
+> -1) + ", US" if country == "United States" & !mi(msa_c_world)
+288.     replace msa_c_world = city + ", " + country_code if country_code != "U
+> S" & !mi(city) & !mi(country_code)
+289.     compress, nocoalesce
+290.     save "../output/filled_in_panel_all_`time'", replace
+291.     keep if inrange(year, 1945, 2025)
+292.     save "../output/filled_in_panel_`time'_1945_2025", replace
+293. end
+
+. 
+. program convert_year_to_qrtr
+  1.     use ../temp/appended_pprs, clear
+  2.     gen year = yofd(dofq(qrtr))
+  3.     keep if inrange(year, 1945, 2023)
+  4.     drop if mi(qrtr) | mi(year)
+  5.     gcontract athr_id qrtr year
+  6.     drop _freq
+  7.     merge m:1 athr_id year using ../output/filled_in_panel_year_1945_2025,
+>  keep(1 3) keepusing(country country_code city inst_id inst msatitle msa_comb
+>  msacode) nogen
+  8.     replace athr_id = subinstr(athr_id, "A", "", .)
+  9.     destring athr_id, replace
+ 10.     tsset athr_id qrtr 
+ 11.     tsfill
+ 12.     tostring athr_id, replace
+ 13.     replace athr_id = "A" + athr_id
+ 14.     replace year = yofd(dofq(qrtr)) 
+ 15.     foreach var in inst_id inst country_code country city msatitle msa_com
+> b msatitle msacode {
+ 16.         bys athr_id (qrtr) : replace  `var' = `var'[_n-1] if mi(`var') & !
+> mi(`var'[_n-1])
+ 17.     }
+ 18.     save "../output/filled_in_panel_qrtr_1945_2025", replace
+ 19. end
+
+. main
+(36,759 missing values generated)
+(36,759 observations deleted)
+
+    Result                           # of obs.
+    -----------------------------------------
+    not matched                             0
+    matched                       172,912,948  
+    -----------------------------------------
+(13,121,151 real changes made)
+(14,556,511 real changes made)
+
+Duplicates in terms of athr_id inst_id year
+(10,596,453 real changes made)
+(0 observations deleted)
+(912,990 observations deleted)
+(4,220 observations deleted)
+(0 observations deleted)
+
+Duplicates in terms of athr_id inst_id year
+
+(5,691,498 observations deleted)
+(43,717,383 observations deleted)
+N = 122,586,857; 89,067,815 unbalanced groups of sizes 1 to 552
+(3,633,556 observations deleted)
+(2,647,402 real changes made)
+(2,686,700 real changes made)
+(2,689,435 real changes made)
+(5,506,411 observations deleted)
+(3,652,167 real changes made)
+(3,748,093 real changes made)
+(1,373,040 real changes made)
+(4,016,599 observations deleted)
+(2,770,740 real changes made)
+(229,024 observations deleted)
+(198,398 real changes made)
+(201,958 real changes made)
+(201,532 real changes made)
+(965,142 observations deleted)
+(647,859 real changes made)
+(651,095 real changes made)
+(275,628 real changes made)
+(741,865 observations deleted)
+(532,558 real changes made)
+(47,202 observations deleted)
+(43,467 real changes made)
+(44,141 real changes made)
+(44,068 real changes made)
+(291,721 observations deleted)
+(201,601 real changes made)
+(201,879 real changes made)
+(102,115 real changes made)
+(232,292 observations deleted)
+(172,064 real changes made)
+(0 real changes made)
+(already sorted)
+(7,094 missing values generated)
+(7,094 missing values generated)
+(25,177,236 missing values generated)
+(3,345,415 real changes made)
+(3,337,969 real changes made)
+(already sorted)
+(6,816 missing values generated)
+(6,816 missing values generated)
+(25,177,236 missing values generated)
+(247,659 real changes made)
+(247,168 real changes made)
+mode() is not a gtools function; will hash and use egen
+Warning: at least one group contains all missing values or contains multiple
+modes.  Generating missing values for the mode of these groups.  Use the
+missing, maxmode, minmode, or nummode() options to control this behavior.
+(11940253 missing values generated)
+(0 real changes made)
+(47,485,797 missing values generated)
+(2,297,115 observations deleted)
+
+Duplicates in terms of athr_id year
+N = 21,840,307; 6,282,192 unbalanced groups of sizes 2 to 552
+
+Duplicates in terms of athr_id year
+
+(15,558,115 observations deleted)
+N = 89,067,815; 89,067,815 balanced groups of size 1
+(0 observations deleted)
+(already sorted)
+(5,309 missing values generated)
+(5,309 missing values generated)
+(24,399,175 missing values generated)
+(825,512 real changes made)
+(824,393 real changes made)
+(file ../temp/imputed_athr_panel.dta not found)
+file ../temp/imputed_athr_panel.dta saved
+(encoding automatically selected: ISO-8859-1)
+(5 vars, 63,211 obs)
+`"Alabama"' `"Alaska"' `"American Samoa"' `"Arizona"' `"Arkansas"' `"California
+> "' `"Colorado"' `"Connecticut"' `"Delaware"' `"Federated States of Micronesia
+> "' `"Florida"' `"Georgia"' `"Guam"' `"Hawaii"' `"Idaho"' `"Illinois"' `"India
+> na"' `"Iowa"' `"Kansas"' `"Kentucky"' `"Louisiana"' `"Maine"' `"Marshall Isla
+> nds"' `"Maryland"' `"Massachusetts"' `"Michigan"' `"Minnesota"' `"Mississippi
+> "' `"Missouri"' `"Montana"' `"Nebraska"' `"Nevada"' `"New Hampshire"' `"New J
+> ersey"' `"New Mexico"' `"New York"' `"North Carolina"' `"North Dakota"' `"Nor
+> thern Mariana Islands"' `"Ohio"' `"Oklahoma"' `"Oregon"' `"Palau"' `"Pennsylv
+> ania"' `"Puerto Rico"' `"Rhode Island"' `"South Carolina"' `"South Dakota"' `
+> "Tennessee"' `"Texas"' `"US Armed Forces Europe"' `"US Armed Forces Pacific"'
+>  `"Utah"' `"Vermont"' `"Virgin Islands"' `"Virginia"' `"Washington"' `"Washin
+> gton, D.C."' `"West Virginia"' `"Wisconsin"' `"Wyoming"'
+(152,188 real changes made)
+(14,713 real changes made)
+(8 real changes made)
+(236,742 real changes made)
+(42,318 real changes made)
+(1,428,196 real changes made)
+(229,795 real changes made)
+(60,746 real changes made)
+(33,889 real changes made)
+(0 real changes made)
+(381,237 real changes made)
+(163,616 real changes made)
+(8 real changes made)
+(18,944 real changes made)
+(25,590 real changes made)
+(280,259 real changes made)
+(131,689 real changes made)
+(198,926 real changes made)
+(118,502 real changes made)
+(91,381 real changes made)
+(100,034 real changes made)
+(13,064 real changes made)
+(0 real changes made)
+(178,601 real changes made)
+(227,465 real changes made)
+(421,954 real changes made)
+(199,406 real changes made)
+(47,414 real changes made)
+(91,604 real changes made)
+(31,970 real changes made)
+(98,279 real changes made)
+(38,175 real changes made)
+(13,351 real changes made)
+(118,849 real changes made)
+(65,915 real changes made)
+(315,284 real changes made)
+(285,783 real changes made)
+(16,605 real changes made)
+(0 real changes made)
+(187,213 real changes made)
+(60,312 real changes made)
+(150,732 real changes made)
+(2 real changes made)
+(334,822 real changes made)
+(207 real changes made)
+(27,596 real changes made)
+(100,372 real changes made)
+(20,165 real changes made)
+(63,803 real changes made)
+(723,577 real changes made)
+(0 real changes made)
+(0 real changes made)
+(143,575 real changes made)
+(37,257 real changes made)
+(29 real changes made)
+(261,582 real changes made)
+(498,763 real changes made)
+(0 real changes made)
+(0 real changes made)
+(295,254 real changes made)
+(16,474 real changes made)
+(526,344 real changes made)
+(498,554 real changes made)
+(4,677 real changes made)
+(36,064 real changes made)
+(95,303 real changes made)
+(886,077 real changes made)
+(44,795 real changes made)
+(805,211 real changes made)
+(7,584 real changes made)
+(202,417 real changes made)
+(44,029 real changes made)
+(65,388 real changes made)
+(5,506 real changes made)
+(894 real changes made)
+(1,285 real changes made)
+(24,933 real changes made)
+(410,321 real changes made)
+(1,313,832 real changes made)
+(68,689 real changes made)
+(216,768 real changes made)
+(24,170 real changes made)
+(2,830 real changes made)
+(319,418 real changes made)
+(240,462 real changes made)
+(34,586 real changes made)
+(33,206 real changes made)
+(139,853 real changes made)
+(1,923 real changes made)
+(105,513 real changes made)
+(31,962 real changes made)
+(58,547 real changes made)
+(28,177 real changes made)
+(141,760 real changes made)
+(269,034 real changes made)
+(256,697 real changes made)
+(62,350 real changes made)
+(112,064 real changes made)
+(71,455 real changes made)
+(36,101 real changes made)
+(208,011 real changes made)
+(19,512 real changes made)
+(113,582 real changes made)
+(132,588 real changes made)
+(18,035 real changes made)
+(35,616 real changes made)
+(51,435 real changes made)
+(40,355 real changes made)
+(7,757 real changes made)
+(135 real changes made)
+(6,595 real changes made)
+(file ../temp/post_state_athr_panel.dta not found)
+file ../temp/post_state_athr_panel.dta saved
+(encoding automatically selected: ISO-8859-1)
+(5 vars, 63,211 obs)
+(1 observation deleted)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                    68,599,047
+        from master                         0  
+        from using                 68,599,047  
+
+    Matched                        20,468,768  
+    -----------------------------------------
+(484,865 real changes made)
+(0 real changes made)
+(68,114,360 missing values generated)
+(234,047 real changes made)
+(68,890 real changes made)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                    69,205,619
+        from master                69,205,619  
+        from using                          0  
+
+    Matched                        19,862,196  
+    -----------------------------------------
+(165,454 real changes made)
+(1,705 real changes made)
+(107,710 real changes made)
+(46,823 real changes made)
+(53,816 real changes made)
+(7,879 real changes made)
+(8,395 real changes made)
+(68,813,837 missing values generated)
+(545,248 real changes made)
+(1,017,738 real changes made)
+(68,813,837 missing values generated)
+(20,253,978 real changes made)
+(66,543,190 real changes made)
+  variable year was float now int
+  variable broad_affl was float now byte
+  variable hhmi_affl was float now byte
+  variable num_times was double now long
+  variable population was double now long
+  variable region was str30 now str28
+  variable city was str58 now str45
+  variable msatitle was str50 now str46
+  (3,117,373,525 bytes saved)
+(68,813,837 missing values generated)
+(68,813,837 missing values generated)
+(24,399,175 missing values generated)
+(1,373,415 real changes made)
+(file ../temp/athr_panel.dta not found)
+file ../temp/athr_panel.dta saved
+(89,067,815 real changes made)
+athr_id: all characters numeric; replaced as double
+
+Panel variable: athr_id (unbalanced)
+ Time variable: year, 1000 to 2041, but with gaps
+         Delta: 1 unit
+(80,764,327 real changes made)
+athr_id was double now str10
+variable athr_id was str10 now str11
+(169,833,746 real changes made)
+
+    Result                           # of obs.
+    -----------------------------------------
+    not matched                             0
+    matched                       169,822,693  
+    -----------------------------------------
+(267,607 real changes made)
+(27,648 real changes made)
+(0 real changes made)
+(433,087 real changes made)
+(109,494 real changes made)
+(2,923,063 real changes made)
+(425,975 real changes made)
+(125,200 real changes made)
+(62,729 real changes made)
+(0 real changes made)
+(702,419 real changes made)
+(302,728 real changes made)
+(0 real changes made)
+(48,115 real changes made)
+(52,238 real changes made)
+(604,846 real changes made)
+(268,006 real changes made)
+(433,008 real changes made)
+(252,885 real changes made)
+(188,143 real changes made)
+(113,432 real changes made)
+(27,196 real changes made)
+(0 real changes made)
+(348,444 real changes made)
+(460,048 real changes made)
+(860,989 real changes made)
+(431,836 real changes made)
+(138,722 real changes made)
+(205,802 real changes made)
+(64,279 real changes made)
+(195,917 real changes made)
+(68,630 real changes made)
+(27,344 real changes made)
+(239,130 real changes made)
+(137,437 real changes made)
+(726,808 real changes made)
+(545,388 real changes made)
+(30,988 real changes made)
+(0 real changes made)
+(398,130 real changes made)
+(134,931 real changes made)
+(298,928 real changes made)
+(0 real changes made)
+(721,032 real changes made)
+(0 real changes made)
+(59,454 real changes made)
+(192,745 real changes made)
+(41,396 real changes made)
+(137,147 real changes made)
+(1,377,495 real changes made)
+(0 real changes made)
+(0 real changes made)
+(290,685 real changes made)
+(1,402 real changes made)
+(0 real changes made)
+(607,578 real changes made)
+(1,016,304 real changes made)
+(0 real changes made)
+(0 real changes made)
+(604,690 real changes made)
+(33,210 real changes made)
+(1,066,645 real changes made)
+(925,223 real changes made)
+(14,725 real changes made)
+(69,898 real changes made)
+(185,365 real changes made)
+(1,818,778 real changes made)
+(99,433 real changes made)
+(1,842,301 real changes made)
+(10,566 real changes made)
+(439,886 real changes made)
+(80,865 real changes made)
+(133,257 real changes made)
+(10,524 real changes made)
+(728 real changes made)
+(942 real changes made)
+(39,490 real changes made)
+(999,525 real changes made)
+(2,725,122 real changes made)
+(135,273 real changes made)
+(442,877 real changes made)
+(51,080 real changes made)
+(7,631 real changes made)
+(896,896 real changes made)
+(444,221 real changes made)
+(92,208 real changes made)
+(62,548 real changes made)
+(276,126 real changes made)
+(4,473 real changes made)
+(181,796 real changes made)
+(50,212 real changes made)
+(135,064 real changes made)
+(66,436 real changes made)
+(260,762 real changes made)
+(564,128 real changes made)
+(459,970 real changes made)
+(111,835 real changes made)
+(232,656 real changes made)
+(138,852 real changes made)
+(71,057 real changes made)
+(416,447 real changes made)
+(30,384 real changes made)
+(223,589 real changes made)
+(360,704 real changes made)
+(1,539 real changes made)
+(68,941 real changes made)
+(39,935 real changes made)
+(71,533 real changes made)
+(17,751 real changes made)
+(0 real changes made)
+(11,137 real changes made)
+  variable city was str58 now str45
+  (2,207,695,009 bytes saved)
+(file ../temp/pre_fill_msa_year.dta not found)
+file ../temp/pre_fill_msa_year.dta saved
+(encoding automatically selected: ISO-8859-1)
+(5 vars, 63,211 obs)
+(1 observation deleted)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                   127,117,687
+        from master                         0  
+        from using                127,117,687  
+
+    Matched                        42,705,006  
+    -----------------------------------------
+(1,309,137 real changes made)
+(0 real changes made)
+(125,808,550 missing values generated)
+(483,577 real changes made)
+(136,263 real changes made)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                   128,120,150
+        from master               128,120,150  
+        from using                          0  
+
+    Matched                        41,702,543  
+    -----------------------------------------
+(412,241 real changes made)
+(5,192 real changes made)
+(222,150 real changes made)
+(97,542 real changes made)
+(108,240 real changes made)
+(20,100 real changes made)
+(13,727 real changes made)
+(127,240,958 missing values generated)
+(1,036,550 real changes made)
+(2,117,511 real changes made)
+(3 real changes made)
+(127,240,955 missing values generated)
+(42,581,738 real changes made)
+(122,892,661 real changes made)
+  variable population was double now long
+  variable region was str30 now str28
+  variable msatitle was str50 now str46
+  (1,698,226,930 bytes saved)
+(file ../output/filled_in_panel_all_year.dta not found)
+file ../output/filled_in_panel_all_year.dta saved
+(1,461,870 observations deleted)
+(file ../output/filled_in_panel_year_1945_2025.dta not found)
+file ../output/filled_in_panel_year_1945_2025.dta saved
+
+. 
+end of do-file
+
+
+. [?1l>
