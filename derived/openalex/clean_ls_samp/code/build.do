@@ -9,8 +9,8 @@ set maxvar 120000
 
 program main
     // samp: all_jrnls_merged, _1...6, top_jrnls
-    local samp "all_jrnls_merged"
-    *clean_titles, samp(`samp')
+    local samp "all_jrnls"
+    clean_titles, samp(`samp')
     clean_samps, samp(`samp')
     clean_mesh, samp(`samp')
 end
@@ -19,7 +19,7 @@ program clean_titles
     syntax, samp(str) 
     if "`samp'" == "top_jrnls" local fol top
     if strpos("`samp'" , "all_jrnls")  > 0 local fol samp 
-    use pmid title id pub_type jrnl using ../external/`fol'/openalex_`samp', clear
+    use pmid title id pub_type jrnl using ../external/`fol'/openalex_`samp'_merged, clear
     replace title = stritrim(title)
     contract title id pmid jrnl
     gduplicates drop pmid , force
@@ -61,10 +61,10 @@ end
 
 program clean_samps
     syntax, samp(str) 
-   /* if "`samp'" == "top_jrnls" local fol top
+    if "`samp'" == "top_jrnls" local fol top
     if strpos("`samp'" , "all_jrnls")  > 0 local fol samp 
     use id jrnl pmid using ../temp/openalex_`samp'_clean_titles, clear
-    merge 1:m id using ../external/`fol'/openalex_`samp', assert(1 2 3) keep(3) nogen 
+    merge 1:m id using ../external/`fol'/openalex_`samp'_merged, assert(1 2 3) keep(3) nogen 
     merge m:1 id using ../external/patents/patent_ppr_cnt, assert(1 2 3) keep(1 3) nogen keepusing(patent_count front_only body_only)
     // clean date variables
     gen date = date(pub_date, "YMD")
@@ -294,14 +294,14 @@ program clean_samps
     replace msa_c_world = msa_comb if mi(msa_c_world)
     replace msa_c_world = substr(msa_c_world, 1, strpos(msa_c_world, ", ")-1) + ", US" if country == "United States" & !mi(msa_c_world)
     replace msa_c_world = city + ", " + country_code if country_code != "US" & !mi(city) & !mi(country_code)
-    save ../output/cleaned_all_`samp', replace
+    save ../output/cleaned_`samp', replace
     preserve
     gcontract id pmid
     cap drop _freq
     save ../temp/pmid_id_xwalk_`samp', replace
-    restore*/
+    restore
 
-    use ../output/cleaned_all_`samp', clear
+    use ../output/cleaned_`samp', clear
     keep if inrange(pub_date, td(01jan2005), td(31dec2025)) & year >=2005
     drop cite_wt cite_affl_wt tot_cite_N first_jrnl pat_wt pat_adj_wt frnt_wt body_wt frnt_adj_wt body_adj_wt jrnl_N 
     foreach var in impact_wt impact_affl_wt impact_cite_wt impact_cite_affl_wt impact_shr  reweight_N  {
