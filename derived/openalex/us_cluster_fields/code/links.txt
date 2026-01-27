@@ -1,0 +1,8 @@
+./abstracts/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/get_abstracts/output
+./ls_ppr/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/pull_openalex/output/works
+./ls_mesh/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/pull_openalex/output/mesh
+./ls_samp/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/pull_openalex/output
+./appended/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/pull_openalex/output
+./appended_text/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/cluster_fields/output
+./athrs/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/clean_athr_inst_hist/output
+./foia/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/grants/get_foia_pis/output
