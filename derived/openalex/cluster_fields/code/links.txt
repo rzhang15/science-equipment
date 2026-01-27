@@ -1,4 +1,6 @@
 ./abstracts/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/get_abstracts/output
 ./ls_ppr/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/pull_openalex/output/works
+./ls_samp/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/pull_openalex/output
 ./ls_mesh/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/pull_openalex/output/mesh
 ./appended/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/pull_openalex/output
+./foia/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/grants/get_foia_pis/output
