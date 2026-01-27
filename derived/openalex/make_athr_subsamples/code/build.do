@@ -17,7 +17,7 @@ end
 program create_athr_split
     syntax, samp(str) cut(str)
     cap mkdir "../output/`cut'"
-    use id pmid which_athr which_affl pub_date year jrnl cite_count front_only body_only patent_count athr_id athr_name  stateshort region inst_id country_code country city us_state msacode msatitle msa_comb msa_c_world inst using ../external/openalex/cleaned_all_`samp'_merged, clear
+    use id pmid which_athr which_affl pub_date year jrnl cite_count front_only body_only patent_count athr_id athr_name  stateshort region inst_id country_code country city us_state msacode msatitle msa_comb msa_c_world inst using ../external/openalex/cleaned_`samp', clear
     bys id: egen first_athr = min(which_athr)
     bys id: egen last_athr = max(which_athr)
     if "`cut'" == "firstlast" {
@@ -111,7 +111,7 @@ program create_athr_split
     qui sum len
     local n = r(max)
     recast str`n' inst, force
-    save ../output/`cut'/cleaned_all_`samp', replace
+    save ../output/`cut'/cleaned_`samp', replace
 
     keep if inrange(pub_date, td(01jan2005), td(31dec2025)) & year >=2005
     drop cite_wt cite_affl_wt tot_cite_N jrnl_N first_jrnl  pat_wt pat_adj_wt frnt_wt body_wt frnt_adj_wt body_adj_wt
