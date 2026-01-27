@@ -9,7 +9,7 @@ here, set
 set maxvar 120000
 program main
 
-foreach samp in firstlast last first second {
+foreach samp in second { //} last first second {
     create_athr_split, samp(all_jrnls) cut(`samp')
 }
 end
@@ -17,7 +17,7 @@ end
 program create_athr_split
     syntax, samp(str) cut(str)
     cap mkdir "../output/`cut'"
-    use id pmid which_athr which_affl pub_date year jrnl cite_count front_only body_only patent_count athr_id athr_name  stateshort region inst_id country_code country city us_state msacode msatitle msa_comb msa_c_world inst using ../external/openalex/cleaned_all_`samp', clear
+    use id pmid which_athr which_affl pub_date year jrnl cite_count front_only body_only patent_count athr_id athr_name  stateshort region inst_id country_code country city us_state msacode msatitle msa_comb msa_c_world inst using ../external/openalex/cleaned_all_`samp'_merged, clear
     bys id: egen first_athr = min(which_athr)
     bys id: egen last_athr = max(which_athr)
     if "`cut'" == "firstlast" {
@@ -156,7 +156,7 @@ program create_athr_split
         assert round(r(sum)-`articles') == 0
     }
     compress, nocoalesce
-    save ../output/`cut'/cleaned_last5yrs_`samp', replace
+    save ../output/`cut'/cleaned_last20yrs_`samp', replace
 end
 
 main
