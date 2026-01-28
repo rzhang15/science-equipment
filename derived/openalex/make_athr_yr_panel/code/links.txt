@@ -2,4 +2,5 @@
 ./clusters/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/cluster_fields/output  
 ./patents/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/patents/pat_to_ppr/output  
 ./year_insts/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/clean_athr_inst_hist/output  
+./sub_athrs/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/make_athr_subsamples/output  
  
