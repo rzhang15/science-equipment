@@ -388,7 +388,8 @@ keyword_groups:
 market_rules:
   # --- Restriction Enzymes (Highly Specific) ---
   - name: "restriction enzymes"
-    exact_any_of:
+    case_sensitive: true
+    any_of:
       - $RESTRICTION_ENZYME
 
   # --- Antibodies (Specific) ---
@@ -533,6 +534,20 @@ market_rules:
       - "master"
   - name: "first-strand cdna synthesis systems"
     all_of:
+      - "first-strand"
+      - "system"
+      - "rt"
+  - name: "first-strand cdna synthesis systems"
+    all_of:
+      - "iscript"
+      - "supermix"
+  - name: "first-strand cdna synthesis systems"
+    all_of:
+      - "all-in-one"
+      - "master"
+      - "mix"
+  - name: "first-strand cdna synthesis systems"
+    all_of:
       - "primescript"
       - "rt"
       - "master"
@@ -608,8 +623,21 @@ market_rules:
       - "stains-all"
   - name: "nucleic acid gel stains"
     all_of:
-      - "diamidino"
-      - "phenylin"
+      - "diamidino*"
+      - "phenylin*"
+  - name: "nucleic acid gel stains"
+    all_of:
+      - "thiazole orange"
+  - name: "nucleic acid gel stains"
+    all_of:
+      - "ethidium"
+      - "brmide"
+  - name: "nucleic acid gel stains"
+    all_of:
+      - "gelgreen"
+  - name: "nucleic acid gel stains"
+    all_of:
+      - "hoechst"
   - name: "nucleic acid gel stains"
     all_of:
       - "hoechst"
@@ -904,6 +932,14 @@ market_rules:
       - "sequence"
 
   # --- Protein Work Reagents (BSA, Buffers, Detergents, Membranes, Ladders) ---
+  - name: "bovine serum albumin"
+    all_of:
+      - "bsa"
+  - name: "bovine serum albumin"
+    all_of:
+      - "bovine"
+      - "serum"
+      - "album*"
   - name: "bovine serum albumin"
     all_of:
       - "bovine"

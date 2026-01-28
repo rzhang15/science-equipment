@@ -151,7 +151,12 @@ def main(gatekeeper_name: str, expert_choice: str, source_abbrev: str = None):
             df_new.loc[expert_scores.index, 'similarity_score'] = expert_scores # Store initial score
 
         print("  - Step 4: Applying final market override rules...")
-        overrides = descriptions.apply(rule_categorizer.get_market_override)
+        overrides = df_new.apply(
+        lambda row: rule_categorizer.get_market_override(
+            clean_description=str(row[config.CLEAN_DESC_COL]), 
+            raw_description=str(row[config.RAW_DESC_COL]) # or row['product_desc']
+        ), axis=1
+        )
         valid_overrides = overrides.dropna()
         y_pred.update(valid_overrides)
         print(f"  - Applied {len(valid_overrides)} market override rules.")

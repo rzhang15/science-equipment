@@ -13,8 +13,14 @@ class RuleBasedCategorizer:
         try:
             with open(rules_filepath, 'r') as f:
                 raw_rules = yaml.safe_load(f)
-            
             self.aliases = {f"${k}": v for k, v in raw_rules.get('keyword_groups', {}).items()}
+
+            # NEW: Auto-wildcard restriction enzymes to handle underscores
+            if '$RESTRICTION_ENZYME' in self.aliases:
+                self.aliases['$RESTRICTION_ENZYME'] = [
+                    f"*{e}*" if not (e.startswith('*') and e.endswith('*')) else e 
+                    for e in self.aliases['$RESTRICTION_ENZYME']
+                ]
             self.override_rules = raw_rules.get('market_rules', [])
             self.veto_rules = raw_rules.get('required_keywords', {})
             self.hierarchical_veto_rules = raw_rules.get('hierarchical_veto_rules', [])
@@ -29,11 +35,9 @@ class RuleBasedCategorizer:
             print(f"❌ Error parsing market rules file: {e}")
             self.override_rules, self.veto_rules, self.hierarchical_veto_rules = [], {}, []
 
-    # MODIFIED: This function now accepts an 'exact_match' flag
-    def _get_regex(self, keyword, exact_match=False):
-        """Creates and caches regex objects with improved word boundary logic."""
-        # Use a tuple as the key to cache both normal and exact-match regexes
-        cache_key = (keyword, exact_match)
+    def _get_regex(self, keyword, exact_match=False, ignore_case=True):
+        # Cache key must include ignore_case to support the case_sensitive toggle
+        cache_key = (keyword, exact_match, ignore_case)
         if cache_key in self._compiled_regexes:
             return self._compiled_regexes[cache_key]
         
@@ -44,66 +48,60 @@ class RuleBasedCategorizer:
         pattern_str = r'[\s-]?'.join(parts)
         
         if exact_match:
-            # New: Anchor the pattern to the start (^) and end ($) of the string
             final_pattern = r'^' + pattern_str + r'$'
         elif is_substring:
+            # Substring mode: Matches inside strings like "F_SacI"
             final_pattern = pattern_str
         else:
+            # Standard mode: Uses word boundaries
             final_pattern = r'(?<!\w)' + pattern_str + r'(?!\w)'
             
-        compiled_regex = re.compile(final_pattern, re.IGNORECASE)
+        flags = re.IGNORECASE if ignore_case else 0
+        compiled_regex = re.compile(final_pattern, flags)
         self._compiled_regexes[cache_key] = compiled_regex
         return compiled_regex
 
-    # MODIFIED: This function now checks for the new 'exact_any_of' condition
-    def get_market_override(self, description):
-        if not isinstance(description, str) or not self.override_rules:
+    def get_market_override(self, clean_description, raw_description=None):
+        if not isinstance(clean_description, str) or not self.override_rules:
             return None
         
         for rule in self.override_rules:
-            # Check 'none_of' first to quickly reject a rule
+            # Toggle source text and case-sensitivity based on the rule flag
+            case_sensitive = rule.get('case_sensitive', False)
+            text_to_search = raw_description if (case_sensitive and raw_description) else clean_description
+            ignore_case = not case_sensitive
+
+            # 1. Check 'none_of' (Veto)
             if 'none_of' in rule:
                 expanded_none_of = [kw for alias in rule['none_of'] for kw in self.aliases.get(alias, [alias])]
-                if any(self._get_regex(kw).search(description) for kw in expanded_none_of):
+                if any(self._get_regex(kw, ignore_case=ignore_case).search(text_to_search) for kw in expanded_none_of):
                     continue
 
-            # --- Condition Checks ---
-            # Set a flag to ensure at least one positive condition was met
-            condition_found = False
-
-            # All_of must be true if it exists
+            # 2. All_of check (Requirement)
             if 'all_of' in rule:
-                condition_found = True
                 all_conditions_met = True
                 for condition in rule['all_of']:
-                    if condition in self.aliases:
-                        if not any(self._get_regex(kw).search(description) for kw in self.aliases[condition]):
-                            all_conditions_met = False
-                            break
-                    else:
-                        if not self._get_regex(condition).search(description):
-                            all_conditions_met = False
-                            break
+                    keywords = self.aliases.get(condition, [condition])
+                    if not any(self._get_regex(kw, ignore_case=ignore_case).search(text_to_search) for kw in keywords):
+                        all_conditions_met = False
+                        break
                 if not all_conditions_met:
                     continue
+                # If all_of is the only condition and it's met, we can return
+                if 'any_of' not in rule and 'exact_any_of' not in rule:
+                    return rule['name']
 
-            # Any_of must be true if it exists
+            # 3. Any_of check (Match anywhere)
             if 'any_of' in rule:
-                condition_found = True
-                expanded_any_of = [kw for alias in rule['any_of'] for kw in self.aliases.get(alias, [alias])]
-                if not any(self._get_regex(kw).search(description) for kw in expanded_any_of):
-                    continue
-            
-            # New: Exact_any_of must be true if it exists
-            if 'exact_any_of' in rule:
-                condition_found = True
-                expanded_exact_any = [kw for alias in rule['exact_any_of'] for kw in self.aliases.get(alias, [alias])]
-                if not any(self._get_regex(kw, exact_match=True).search(description) for kw in expanded_exact_any):
-                    continue
+                expanded = [kw for alias in rule['any_of'] for kw in self.aliases.get(alias, [alias])]
+                if any(self._get_regex(kw, ignore_case=ignore_case).search(text_to_search) for kw in expanded):
+                    return rule['name']
 
-            # If any positive condition was found and not vetoed, return the rule name
-            if condition_found:
-                 return rule['name']
+            # 4. Exact_any_of check (Must match full string)
+            if 'exact_any_of' in rule:
+                expanded_exact_any = [kw for alias in rule['exact_any_of'] for kw in self.aliases.get(alias, [alias])]
+                if any(self._get_regex(kw, exact_match=True, ignore_case=ignore_case).search(text_to_search) for kw in expanded_exact_any):
+                    return rule['name']
 
         return None
 
