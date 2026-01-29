@@ -73,6 +73,8 @@ program merge_foias
     foreach v in fund_id purchaser supplier_id supplier purchase_id sku funder {
         replace `v' = "" if `v' == "."
     }
+    rename supplier suppliername
+    replace suppliername = strlower(suppliername)
     save ../output/merged_foias, replace
 end
 

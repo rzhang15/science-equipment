@@ -14,7 +14,7 @@ global treated_products  "$cell_culture $mol_bio $protein_bio"
 
 
 program main
-    *foia_pis
+    foia_pis
     clean_foia_data
 end
 
@@ -23,12 +23,12 @@ program foia_pis
     merge 1:1 athr_id using ../external/ls_samp/list_of_athrs, assert(1 2 3) keep(3) nogen
     save ../output/foia_athrs, replace
 
-    foreach i in 10 15 20 25 30 40 50 100 {
+    /*foreach i in 10 15 20 25 30 40 50 100 {
         import delimited using ../external/fields/author_static_clusters_`i', clear varnames(1)
         merge 1:1 athr_id using ../output/foia_athrs, assert(1 2 3) keep(3) nogen 
         save ../output/foia_athrs_with_clusters_`i', replace
         tab cluster_label
-    }
+    }*/
 end
 program clean_foia_data
     use ../external/foia/merged_foias_with_pis, clear
@@ -59,55 +59,92 @@ program clean_foia_data
         "nasco" "fluorescent bulb" "edition" "accidence" "teaching" "sport" "timer" "ssd" "screw" "wall" "file" "business" "mesh" ///
         "mask aligner" "karl suss" "procedure" "transmitter" "dues" "ura system" "accessory" "pbs detector" "billed" "monthly" "ethovision" ///
         "generator" "accessories" "handheld" "detector" "basement" "survey" "asbestos" "vicryl plus" "ejector" "maint." ///
-        "chamber" {
+        "chamber" "toner cartridge" {
         drop if strpos(clean_desc, "`v'") > 0
     }
     drop if (strpos(clean_desc, "plate") > 0 | strpos(clean_desc, "card")) & category == "synthetic dna oligonucleotide" 
-
-    gen avg_log_spend = spend
-    gen avg_log_qty = qty 
-    gen avg_log_price = price 
+    foreach k in "xpedx" "rent" "event" "travel" "audio" "xerox"  "acct" "cardinal health 411 inc" ///
+        "henry ford health system" "illumina" "sports" "sales" "communications" "printing" ///
+        "design" "photography" "music" "education" "john" "robert" "graphics" "management" ///
+        "community" "publishing" "environmental" "productions" "marketing" "safety" "hour" "hardware" ///
+        "investments" "entertainment" "promotional" "maintenance" "american rock salt" "lowes" "equipment" "mailing" ///
+        "fire protection" "price waterhouse coopers" "hp" "radio" "cisco systems" "sanitation strategies" "network solutions" ///
+        "college board" "proquest" "hill rom" "painting" "warehouse" "assurance" "blind" "davol" "atricure" "media associates" ///
+         "cbord group" "united healthcare" "dimension data" "nwn" "farm" "heating" "drainage" "media" ///
+         "aviation" "travel" "airline" "defense" "freight" "lumber" "floor" "clean" "construct" "blackboard" ///
+         "oil" "commercial products" "kintetsu" "buhler" "nalco" "truck" "milestone" "eckert and ziegler" "newport"  ///
+         "engineering" "spectroglyph"  "backup technology" "gerdau" "datadirect" "network" ///
+         "plumbing" "hvac" "seating" "sprinkler" "nortrax" "marine"  "insurance" "campus" ///
+         "building" "finance" "fitness" "engineering" "airport" "touring" ///
+         "meeting" "commercial" "university" "college" "somanetics" "neurotune" "centerplate" "sport" ///
+         "cse" "interiors" "sheraton" "film" "pentax" "fire" "machine" "tko" "brow" "lithographing" ///
+        "twitchell" "ibm" "athletic" "lenovo" "immigration" "law enforcement" "school" "hotel" ///
+         "publication" "advtsng" "backflow" "lymphedema" "gas" "ferguson enterprise"  "valve" "cargo" ///
+        "weld" "flagcraft" "henry schein" "dental" "practicon" "alchip" "semiconductor" ///
+        "canyon materials" "photo" "display" "broadcasting" "stevesongs" " press" "bioquell" "gle associates" "medrad" ///
+        "psychological association" "mechanical" "3m unitek" "roofing" "print" "repair" "trophies" "trophy" "award" ///
+        "cater" "repair" "book" "coffee" "auto" "optical" "beauty" "bldg" "mower" "body shop" "eye supply" "golf"  ///
+        "fuel" "cdw government" "lma north america" "hamamatsu" "feed" "techniplast" "percival scientific" "zimmer" ///
+        "veterinary" "teleflex" "biomet" "waste" "surgical" "surgery" "anesthesia" "salt" "orfit" "endocare" ///
+       "medical" "waterpik" "imaging" "optic" "microscopy" "nurse" "urological" "nano"  "shipment" ///
+       "animal" "petroleum" "dermatology" "nano" "environment" "manufacturing" "resort" "uniform" "hospital" ///
+       "devices" "architectural" "pools" "use " "packaging" "revenue" "verizon" "art gallery" "team apparel" ///
+       "fashion" "gardens" "art suppies" "cellular" "unifirst" "tractor" "toyota" "traffic" "foods"  "deli" "tiger" "thyssenkrupp" "accounting" {
+        drop if strpos(suppliername, "`k'") > 0
+    }
+    foreach k in "cem" "na" {
+        drop if suppliername == "`k'"
+    }
+    drop if mi(suppliername)
+    drop if similarity_score <= 0.10 & prediction_source == "Expert Model"
     gen year = year(date(date, "YMD"))    
     gen treated = 0
     foreach c of global treated_products {
         replace treated = 1 if strpos(category, "`c'") > 0 
     }
     keep if year <= 2013
-    gcollapse (sum) spend (mean) treated, by(athr_id category)
-    bys athr_id: egen tot_lab_spend = total(spend)
-    gen lab_spend_shr = spend / tot_lab_spend * 100  
+    merge m:1 athr_id using ../output/foia_athrs_with_clusters_25, assert(1 2 3) keep(3) nogen
+    gcollapse (sum) spend (mean) treated cluster_label, by(athr_id year category)
+    bys athr_id year: egen tot_lab_spend = total(spend)
+    gen lab_spend_shr = spend / tot_lab_spend   
+    gcollapse (mean) lab_spend_shr treated cluster_label (sum) spend, by(athr_id category)
     merge m:1 category using ../external/betas/did_coefs, assert(1 2 3) keep(1 3)
     rename _merge has_beta
     replace has_beta = 0 if has_beta == 1
     replace has_beta = 1 if has_beta == 3
-    preserve
-    gen athr_exposure = b*lab_spend_shr/100
-    gcollapse (mean) athr_exposure, by(athr_id)
-    drop if mi(athr_exposure)
-    save ../output/foia_athr_exposure, replace
-    restore
-    merge m:1 athr_id using ../output/foia_athrs_with_clusters_100, assert(1 2 3) keep(3) nogen
-    glevelsof cluster_label, local(clusters)
-    foreach cl in `clusters' {
-        preserve
-        keep if cluster_label == `cl'
-        graph hbox lab_spend_shr if has_beta == 1, over(category, label(labsize(tiny))) 
-        graph export ../output/pi_spread_cluster_`cl'.pdf, replace
-        restore 
-    }  
+    gen exposure = b*lab_spend_shr
+
     sum cluster_label
     local maxcl = r(max)
-    gcollapse (mean) lab_spend_shr treated has_beta (firstnm) b, by(cluster_label category)  
-    tostring cluster_labe, replace
-    gen exposure =  b*lab_spend_shr/100
-    drop if mi(exposure)
-    hashsort -exposure
-    heatplot lab_spend_shr cluster_label category if has_beta==1, keylabels(, range(1))  cuts(0(5)30) xlabel(, angle(90) labsize(tiny)) ylabel(, angle(0) labsize(vsmall))  colors(Greens)
-    graph export ../output/foia_heatmap.pdf, replace
+    tostring cluster_label, replace
+    heatplot lab_spend_shr cluster_label category if has_beta==1, keylabels(, range(1))  cuts(0(.05).4) xlabel(, angle(90) labsize(tiny)) ylabel(, angle(0) labsize(vsmall))  colors(Greens)
+    graph export ../output/figures/cluster_mkt_heatmap.pdf, replace
 
+    collapse (sum) exposure (firstnm) cluster_label, by(athr_id)
+    drop if mi(exposure)
+     sum exposure , d 
+    local mean : di %4.3f r(mean) 
+    local sd: di %4.3f r(sd) 
+    local p25: di %4.3f r(p25) 
+    local p50: di %4.3f r(p50) 
+    local p75: di %4.3f r(p75)
+    local max: di %4.3f  r(max) 
+    local min: di %4.3f r(min) 
+    local fes athr_id year 
+
+    tw kdensity exposure, xtitle("Imputed Exposure Score", size(small)) ytitle("Density", size(small)) ///
+        ylab(, labsize(vsmall)) xlab(#15, labsize(vsmall)) ///
+        legend(on order(- "Min: `min'" "Q1 = `p25'" "Median = `p50'" "Mean: `mean'" "SD = `sd'" "Q3 = `p75'" "Max = `max'") pos(1) ring(0) size(vsmall))
+    graph export ../output/figures/exposure_density.pdf, replace
+    save ../output/athr_exposure, replace
+    preserve
+    contract athr_id
+    drop _freq
+    save ../output/athr_exposure_list, replace
+    restore
     hashsort -exposure
-    gcollapse (sum)  exposure ,by(cluster_label)
-    save ../output/exposure_measure, replace
+    gcollapse (mean) exposure ,by(cluster_label)
+    save ../output/cluster_exposure, replace
 end
 
 

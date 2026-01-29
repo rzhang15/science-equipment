@@ -1,197 +1,91 @@
-# --- 1. Load Libraries and Data ---
+# -----------------------------------------------------------
+# SCM Trend Plotting Script: Treated vs. Synthetic
+# -----------------------------------------------------------
 library(tidyverse)
-library(fixest)
-library(here)
-library(haven)
 library(Synth)
-library(SCtools)
-library(skimr)
+library(haven)
 
-# setwd("~/sci_eq/derived/first_stage/match_control/code")
-dir.create("../output/figures", recursive = TRUE, showWarnings = FALSE)
+# Setup Paths
+setwd("~/sci_eq/derived/first_stage/match_control/code")
+DATA_INPUT  <- "../external/samp/category_yr_tfidf.dta"
+OUTPUT_DIR  <- "../output/figures/"
+dir.create(OUTPUT_DIR, recursive = TRUE, showWarnings = FALSE)
 
-panel_raw <- read_dta("../external/samp/category_yr_tfidf.dta")
-
-# --- 2. Prepare Data ---
-panel <- panel_raw %>% 
-  mutate(category = as.character(category),
-         mkt_id = as.numeric(as.factor(category)))
-
-# Compute linear time trend coefficients
-trends_pre <- panel %>%
-  filter(year <= 2013) %>% 
+# Load and Prep
+panel <- read_dta(DATA_INPUT) %>%
+  mutate(category_num = as.numeric(as.factor(category)),
+         treated = as.numeric(treated)) %>%
+  filter(year >= 2010) %>%
   group_by(category) %>%
-  summarise(
-    coef_log_price = possibly(~coef(lm(avg_log_price ~ year, .x, weights = spend_2013))[2], otherwise = NA_real_)(cur_data()),
-    coef_log_spend = possibly(~coef(lm(avg_log_spend ~ year, .x, weights = spend_2013))[2], otherwise = NA_real_)(cur_data()),
-    .groups = "drop"
+  filter(!any(is.na(avg_log_price))) %>%
+  ungroup()
+
+treated_categories <- unique(panel$category[panel$treated == 1])
+control_ids <- unique(panel$category_num[panel$treated == 0])
+
+# --- Main Loop ---
+for (mkt in treated_categories) {
+  curr_id <- unique(panel$category_num[panel$category == mkt])
+  
+  # 1. Synth Data Setup
+  dp_out <- tryCatch({
+    dataprep(
+      foo = as.data.frame(panel),
+      predictors = c("spend_2013"),
+      predictors.op = "mean",
+      time.predictors.prior = 2010:2013,
+      special.predictors = list(list("avg_log_price", 2010:2013, "mean")),
+      dependent = "avg_log_price",
+      unit.variable = "category_num",
+      unit.names.variable = "category",
+      time.variable = "year",
+      treatment.identifier = curr_id,
+      controls.identifier = control_ids,
+      time.optimize.ssr = 2010:2013,
+      time.plot = 2010:2019
+    )
+  }, error = function(e) return(NULL))
+  
+  if (is.null(dp_out)) next
+  
+  # 2. Run Synth
+  s_out <- tryCatch({ synth(dp_out) }, error = function(e) return(NULL))
+  if (is.null(s_out)) next
+  
+  # 3. Extract Values for ggplot
+  # Observed (Treated) values
+  observed <- dp_out$Y1plot
+  # Synthetic values (Matrix multiplication of control outcomes and SCM weights)
+  synthetic <- dp_out$Y0plot %*% s_out$solution.w
+  
+  plot_df <- data.frame(
+    year = as.numeric(rownames(observed)),
+    observed = as.numeric(observed),
+    synthetic = as.numeric(synthetic)
   ) %>%
-  ungroup() # <-- FIX 1: Add ungroup() after summarise
-
-# Join the trends back in
-panel <- panel %>% 
-  left_join(trends_pre, by="category") %>%
-  ungroup() # <-- FIX 2: Add ungroup() after join
-
-# --- 3. Clean Data and Finalize Format ---
-panel_clean <- panel %>%
-  filter(
-    !is.na(mkt_id) &            
-      !is.na(avg_log_price) &   
-      !is.na(coef_log_price) &  
-      !is.na(raw_spend)
-  ) %>%
-  ungroup() %>% # <-- FIX 3: Add a final ungroup()
-  as.data.frame() # <-- FIX 4: Convert from tibble to a classic data.frame
-
-# --- 4. Create Unit Lists for the Loop (use panel_clean) ---
-treated_mkts_list <- panel_clean %>% 
-  filter(treated == 1) %>% 
-  distinct(mkt_id) %>%
-  pull(mkt_id)
-
-ctrl_mkts_list <- panel_clean %>% 
-  filter(treated == 0) %>% 
-  distinct(mkt_id) %>%
-  pull(mkt_id)
-# --- 5. Loop Through Each Treated Market ---
-
-all_synth_results <- list()
-all_synth_plots <- list() # This will now store just the one path plot per market
-
-print(paste("Starting synth loop for", length(treated_mkts_list), "treated markets..."))
-
-for (current_treated_id in treated_mkts_list) {
+    pivot_longer(cols = c(observed, synthetic), names_to = "group", values_to = "price")
   
-  market_name <- panel_clean %>% 
-    filter(mkt_id == current_treated_id) %>% 
-    distinct(category) %>% 
-    pull(category)
+  # 4. Calculate Match Quality (Pre-treatment RMSPE)
+  pre_data <- plot_df %>% filter(year <= 2013) %>% pivot_wider(names_from = group, values_from = price)
+  rmspe <- sqrt(mean((pre_data$observed - pre_data$synthetic)^2))
   
-  print(paste("--- Running for:", market_name, "(ID:", current_treated_id, ") ---"))
+  # 5. Generate ggplot
+  p <- ggplot(plot_df, aes(x = year, y = price, color = group, linetype = group)) +
+    geom_line(size = 1.2) +
+    geom_point() +
+    geom_vline(xintercept = 2013.5, linetype = "dashed", color = "darkred") +
+    scale_color_manual(values = c("observed" = "black", "synthetic" = "blue"),
+                       labels = c("Actual Market", "Synthetic Control")) +
+    scale_linetype_manual(values = c("observed" = "solid", "synthetic" = "dashed"),
+                          labels = c("Actual Market", "Synthetic Control")) +
+    labs(title = paste("SCM Fit for Market:", mkt),
+         subtitle = paste("Pre-treatment RMSPE:", round(rmspe, 5)),
+         x = "Year", y = "Avg Log Price",
+         caption = "Red dashed line indicates start of treatment period.") +
+    theme_minimal() +
+    theme(legend.position = "bottom", legend.title = element_blank())
   
-  # 1. Run dataprep 
-  dataprep.out <- dataprep(
-    foo = panel_clean,
-    predictors = c("coef_log_price"),
-    time.predictors.prior = 2010:2013,
-    special.predictors = list(
-      list("raw_spend", 2013:2013, "mean")
-    ),
-    dependent = "avg_log_spend", # <-- Outcome is avg_log_spend
-    unit.variable = "mkt_id",         
-    unit.names.variable = "category", 
-    time.variable = "year", 
-    treatment.identifier =  current_treated_id, 
-    controls.identifier = ctrl_mkts_list,     
-    time.optimize.ssr = 2010:2013,
-    time.plot = 2010:2019
-  )
-  
-  # 2. Run the synth model
-  synth.out <- try(synth(
-    data.prep.obj = dataprep.out,
-    method = "BFGS" 
-  ), silent = TRUE)
-  
-  # 3. Check for success, print weights, and PLOT
-  if (!"try-error" %in% class(synth.out)) {
-    
-    print("Synth successful. Generating plot...")
-    
-    all_synth_results[[as.character(current_treated_id)]] <- synth.out
-    
-    # --- Print Control Weights ---
-    synth.tables <- synth.tab(dataprep.res = dataprep.out, synth.res = synth.out)
-    controls_used <- as_tibble(synth.tables$tab.w) %>%
-      filter(w.weights > 0.0001) %>%
-      arrange(desc(w.weights))
-    
-    print("--- Control Market Weights: ---")
-    print(controls_used)
-    print("-------------------------------")
-    
-    
-    # --- ------------------------------------------ ---
-    # --- 1. Prepare Data for Plotting             ---
-    # --- ------------------------------------------ ---
-    
-    # Create a vector of the years
-    years_vec <- as.numeric(rownames(dataprep.out$Y1plot))
-    
-    # Get the treated unit's data (Y1) as a simple vector
-    treated_Y_vec <- as.vector(dataprep.out$Y1plot)
-    
-    # Get the synthetic unit's data (Y0 * Weights) as a simple vector
-    synth_Y_vec <- as.vector(dataprep.out$Y0plot %*% synth.out$solution.w)
-    
-    # Find the 2013 values for adjustment
-    treated_2013_val <- treated_Y_vec[years_vec == 2013]
-    synth_2013_val   <- synth_Y_vec[years_vec == 2013]
-    
-    # Create the ADJUSTED data
-    treated_Y_adj <- treated_Y_vec - treated_2013_val
-    synth_Y_adj   <- synth_Y_vec - synth_2013_val
-    
-    # Create a safe filename (replaces spaces/symbols with _)
-    safe_market_name <- str_replace_all(market_name, "[^A-Za-z0-9]", "_")
-    
-    # --- ------------------------------------------ ---
-    # --- 2. Generate PLOT 1: Path Plot (Adjusted)   ---
-    # --- ------------------------------------------ ---
-    
-    path_plot_data <- tibble(
-      year = years_vec,
-      !!market_name := treated_Y_adj, # Adjusted Treated
-      `Synthetic Control` = synth_Y_adj   # Adjusted Synthetic
-    ) %>%
-      pivot_longer(
-        cols = -year,
-        names_to = "group_label",
-        values_to = "outcome_val"
-      )
-    
-    p_path <- ggplot(path_plot_data, aes(x = year, y = outcome_val, color = group_label)) +
-      geom_line(linewidth = 1) + 
-      geom_point() +
-      geom_vline(xintercept = 2013.5, linetype = "dashed", color = "gray40") +
-      geom_hline(yintercept = 0, linetype = "dotted", color = "gray20") +
-      labs(
-        title = paste("Synthetic Control (Path Plot):", market_name),
-        subtitle = "Treated Market vs. Synthetic Control Trend (Adjusted to 0 at 2013)",
-        x = "Year",
-        y = "Average Log Spend (Adjusted to 2013)",
-        color = "Market Group"
-      ) +
-      theme_minimal(base_size = 12) +
-      scale_x_continuous(breaks = seq(min(path_plot_data$year), max(path_plot_data$year), 1)) +
-      theme(
-        legend.position = "bottom",
-        plot.title = element_text(face = "bold")
-      )
-    
-    # Save the path plot
-    ggsave(paste0("../output/figures/synth_PATH_plot_adj_", safe_market_name, ".pdf"), plot = p_path, width = 10, height = 7)
-    
-    # --- ------------------------------------------ ---
-    # --- 3. (Gaps Plot Code Removed)              ---
-    # --- ------------------------------------------ ---
-    
-    # --- ------------------------------------------ ---
-    # --- 4. Print & Store Plot                    ---
-    # --- ------------------------------------------ ---
-    
-    # Print the path plot to your RStudio Plots pane
-    print(p_path)
-    
-    # Store the plot object
-    all_synth_plots[[as.character(current_treated_id)]] <- p_path
-    
-  } else {
-    # If synth failed, print the error
-    print(paste("Synth FAILED for", market_name))
-    print(synth.out)
-  }
+  # 6. Save
+  ggsave(filename = paste0(OUTPUT_DIR, "/trend_", mkt, ".pdf"), plot = p, width = 8, height = 5)
+  print(p) # Show in RStudio
 }
-
-print("--- Synthetic control loop complete. ---")

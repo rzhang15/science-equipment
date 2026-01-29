@@ -9,7 +9,7 @@ set maxvar 120000
 
 program main
     // samp: all_jrnls_merged, _1...6, top_jrnls
-    local samp "all_jrnls"
+    local samp "top_jrnls"
     clean_titles, samp(`samp')
     clean_samps, samp(`samp')
     clean_mesh, samp(`samp')

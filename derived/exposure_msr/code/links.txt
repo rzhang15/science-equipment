@@ -4,3 +4,5 @@
 ./fields/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/cluster_fields/output 
 ./ml/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/first_stage/make_mkt_panel/temp
 ./betas/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/analysis/first_stage/output
+./sup/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/process_foias/fuzzy_match_suppliers/output/
+

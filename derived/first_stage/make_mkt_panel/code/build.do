@@ -11,10 +11,10 @@ global protein_bio `" "pre-cast" "pre-stained" "protein gel stains" "acrylamide/
 global treated_products  "$cell_culture $mol_bio $protein_bio"
 
 program main 
-    import_suppliers
+    *import_suppliers
     foreach t in tfidf {
-        select_good_categories, embed(`t')
-        clean_raw, embed(`t')
+        *select_good_categories, embed(`t')
+        *clean_raw, embed(`t')
         make_panels, embed(`t')
     }
 end
@@ -211,7 +211,7 @@ program make_panels
     preserve
     collapse (max) treated (mean) *price num_suppliers (sum) obs_cnt *raw_qty *raw_spend (firstnm) suppliername mkt , by(supplier_id category year)
     save ../output/supplier_category_yr_`embed', replace
-    preserve
+  /*  preserve
     // quick fbs
     keep if category == "us fbs"
     replace suppliername = "thermo fisher scientific" if suppliername == "hyclone lab" & year <= 2014
@@ -226,7 +226,7 @@ program make_panels
     graph export ../output/fbs_spend.pdf, replace
     tw line raw_qty year , by(suppliername) xline(2014) xlab(2010(2)2019) xtitle("Year", size(small)) ytitle("QTY of FBS", size(small)) legend(off pos(1) ring(0))
     graph export ../output/fbs_qty.pdf, replace
-    restore
+    restore*/
 
     gen pre_period = year < 2014
     keep if inrange(year, 2012,2013) | inrange(year, 2015, 2016)
@@ -241,7 +241,7 @@ program make_panels
     bys category (simulated_hhi): replace simulated_hhi = simulated_hhi[_n-1] if mi(simulated_hhi) & pre_period == 0
     replace mkt_shr = mkt_shr * mkt_shr
     gcollapse (sum) obs_cnt hhi = mkt_shr (firstnm) simulated_hhi treated mkt, by(category pre_period)
-    ashsort category -pre_period
+    hashsort category -pre_period
     by category : gen delta_hhi = hhi - hhi[_n-1] if pre_period == 0
     bys category: gegen tot_cnt = total(obs_cnt)
     bys category (delta_hhi): replace delta_hhi = delta_hhi[_n-1] if mi(delta_hhi) 

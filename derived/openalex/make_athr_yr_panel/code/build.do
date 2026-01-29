@@ -7,7 +7,7 @@ pause on
 set seed 8975
 
 program main
-    foreach s in all_jrnls { 
+    foreach s in top_jrnls { 
         local t year 
         make_panel, time(`t') last(1) samp(`s') us(1)
     }
@@ -208,7 +208,7 @@ program make_panel
 /*    foreach var in term1 term2 gen_mesh1 gen_mesh2 qualifier_name1 qualifier_name2 {
         bys athr_id (`time') : replace `var' = `var'[_n-1] if mi(`var') & !mi(`var'[_n-1])
     }*/
-    save ../output/athr_panel_full_comb_`time'`suf', replace
+    save ../output/athr_panel_full_comb_`time'`suf'_`samp', replace
     restore
     preserve
     if "`time'" == "year" {
@@ -253,7 +253,7 @@ program make_panel
 /*    foreach var in term1 term2 gen_mesh1 gen_mesh2 qualifier_name1 qualifier_name2 {
         bys athr_id (`time') : replace `var' = `var'[_n-1] if mi(`var') & !mi(`var'[_n-1])
     }*/
-    save ../output/athr_panel_full_`time'`suf', replace
+    save ../output/athr_panel_full_`time'`suf'_`samp', replace
     restore
 end
 

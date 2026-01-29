@@ -1,6 +1,0 @@
-./openalex/ | /export/projects4/achandra_basicscience/derived/science_geo/openalex/15jrnls/clean_15jrnls_fund/output 
-./clusters/ | /export/projects4/achandra_basicscience/derived/science_geo/openalex/15jrnls/cluster_fields_15jrnls/output 
-./sub_athrs/ | /export/projects4/achandra_basicscience/derived/science_geo/openalex/15jrnls/create_athr_samples/output 
-./patents/ | /export/projects4/achandra_basicscience/derived/science_geo/patent_ppr_data/output
-./year_insts/ | /export/projects4/achandra_basicscience/derived/science_geo/openalex/15jrnls/clean_athr_inst_hist_15jrnls/output
-./secondary/ | /export/projects4/achandra_basicscience/derived/science_geo/openalex/15jrnls/inst_hist_secondary_affls/output

@@ -7,9 +7,9 @@ preliminaries
 version 17
 
 program main   
-   *raw_plots
+   raw_plots
    did
-   *event_study
+   event_study
    *uni_fes
 end
 

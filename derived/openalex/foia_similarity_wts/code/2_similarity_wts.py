@@ -1,65 +1,63 @@
 import pandas as pd
 import numpy as np
 import scipy.sparse
-from scipy.sparse import csr_matrix
 
 # --- CONFIGURATION ---
 UNIVERSE_MATRIX = "../output/tfidf_universe.npz"
 FOIA_MATRIX = "../output/tfidf_foia.npz"
-OUTPUT_WEIGHTS = "../output/precomputed_similarity_weights.npz"
+OUTPUT_WEIGHTS = "../output/weight_matrix.npz"
 
-BATCH_SIZE = 100_000
-SIMILARITY_THRESHOLD = 0.01  # Drop connections < 1% similarity to save massive space
+BATCH_SIZE = 50000 
+SIMILARITY_THRESHOLD = 0.01  # Minimum similarity to even consider (keeps matrix sparse)
 
-# --- LOAD ---
+K_NEIGHBORS = 5 
+
+# --- LOAD DATA ---
 print("Loading TF-IDF Matrices...")
 X_univ = scipy.sparse.load_npz(UNIVERSE_MATRIX)
 X_foia = scipy.sparse.load_npz(FOIA_MATRIX)
-n_univ = X_univ.shape[0]
-n_foia = X_foia.shape[0]
 
-print(f"Dimensions: Universe {X_univ.shape}, FOIA {X_foia.shape}")
+n_users = X_univ.shape[0]
+n_pis = X_foia.shape[0]
 
-# --- COMPUTE & NORMALIZE (Batched) ---
-print("Computing Normalized Similarity Matrix...")
+print(f"Universe Authors: {n_users}")
+print(f"FOIA PIs (Targets): {n_pis}")
+print(f"Computing weights for {n_users} authors (Batch Size: {BATCH_SIZE})...")
 
-# List to hold sparse blocks
-sparse_blocks = []
+row_ind = []
+col_ind = []
+data_val = []
 
-for start in range(0, n_univ, BATCH_SIZE):
-    end = min(start + BATCH_SIZE, n_univ)
+for i in range(0, n_users, BATCH_SIZE):
+    end = min(i + BATCH_SIZE, n_users)
     
-    # 1. Compute Raw Similarity (Batch x 174)
-    # Result is dense because 174 is small
-    batch_sim = X_univ[start:end].dot(X_foia.T).toarray()
+    batch_X = X_univ[i:end]
+    batch_sim = batch_X.dot(X_foia.T).toarray()
     
-    # 2. Thresholding (Make it sparse)
-    # If an author is <1% similar to a PI, treat it as 0. 
-    # This reduces file size and noise.
+    if K_NEIGHBORS < n_pis:
+        for r in range(batch_sim.shape[0]):
+            row = batch_sim[r, :]
+            if np.count_nonzero(row) > K_NEIGHBORS:
+                cutoff_value = np.partition(row, -K_NEIGHBORS)[-K_NEIGHBORS]
+                row[row < cutoff_value] = 0
+                batch_sim[r, :] = row
     batch_sim[batch_sim < SIMILARITY_THRESHOLD] = 0
-    
-    # 3. Row-Normalization (The Math Trick)
-    # Sum of weights for each author
     row_sums = batch_sim.sum(axis=1, keepdims=True)
-    
-    # Avoid division by zero (if author has 0 similarity to ALL PIs)
-    # We set these rows to 0 temporarily
     row_sums[row_sums == 0] = 1.0 
-    
-    # Divide by sum so weights add up to 1
     batch_norm = batch_sim / row_sums
-    
-    # 4. Convert to Sparse and Append
-    sparse_blocks.append(scipy.sparse.csr_matrix(batch_norm))
-    
-    if start % 1_000_000 == 0:
-        print(f"Processed {end}/{n_univ}...")
+    rows, cols = batch_norm.nonzero()
+    row_ind.extend(rows + i)
+    col_ind.extend(cols)
+    data_val.extend(batch_norm[rows, cols])
+    if i % 500000 == 0:
+        print(f"Processed {i} authors...")
 
-# --- STACK & SAVE ---
-print("Stacking blocks...")
-W_final = scipy.sparse.vstack(sparse_blocks)
+print("Constructing Final Sparse Weight Matrix...")
+W = scipy.sparse.coo_matrix(
+    (data_val, (row_ind, col_ind)), 
+    shape=(n_users, n_pis)
+)
 
-print(f"Saving Weights Matrix ({W_final.shape})...")
-scipy.sparse.save_npz(OUTPUT_WEIGHTS, W_final)
-
-print("Done! You can now delete the TF-IDF matrices if you want to save space.")
+print("Saving to .npz...")
+scipy.sparse.save_npz(OUTPUT_WEIGHTS, W)
+print("Done. Weights precomputed.")

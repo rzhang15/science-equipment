@@ -9,8 +9,8 @@ here, set
 set maxvar 120000
 program main
 
-foreach samp in second { //} last first second {
-    create_athr_split, samp(all_jrnls) cut(`samp')
+foreach samp in last firstlast first { //} last first second {
+    create_athr_split, samp(top_jrnls) cut(`samp')
 }
 end
 

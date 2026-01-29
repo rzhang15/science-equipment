@@ -2,22 +2,12 @@ import pandas as pd
 import os
 
 # --- PATHS ---
-foia_path = '../external/foia/foia_athrs.dta'
-ls_samp_path = '../external/ls_samp/list_of_athrs.dta'
-text_data_path = '../external/appended_text/cleaned_static_author_text_pre.parquet' # The big file from Script 2
+foia_path = '../external/exposure_wts/athr_exposure_list.dta'
+text_data_path = '../external/us_appended_text/cleaned_static_author_text_pre_us.parquet' # The big file from Script 2
 output_path = '../output/foia_author_text_final.csv'
 
 print("Loading FOIA and Sample lists...")
-df_foia = pd.read_stata(foia_path)
-df_ls = pd.read_stata(ls_samp_path)
-
-df_foia_valid = pd.merge(
-    df_foia, 
-    df_ls, 
-    on='athr_id', 
-    how='inner', 
-    validate='one_to_one'
-)
+df_foia_valid = pd.read_stata(foia_path)
 
 print(f"FOIA Authors identified: {len(df_foia_valid)}")
 
