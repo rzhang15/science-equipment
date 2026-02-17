@@ -13,14 +13,14 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report
 
 import config
-from classifier import HybridClassifier, load_keywords_and_build_automaton
+from classifier import HybridClassifier, load_keywords_and_build_automaton, extract_market_keywords_and_build_automaton
 
 def main(embedding_name: str):
     print(f"--- Training Hybrid Model with '{embedding_name}' Embeddings ---")
 
     embedding_path = os.path.join(config.OUTPUT_DIR, f"embeddings_{embedding_name}.joblib")
     if not os.path.exists(embedding_path):
-        print(f"â Embeddings file not found: {embedding_path}. Run 1b_create_text_embeddings.py first.")
+        print(f"Embeddings file not found: {embedding_path}. Run 1b_create_text_embeddings.py first.")
         return
 
     print("  - Loading data...")
@@ -35,7 +35,7 @@ def main(embedding_name: str):
     # Save the 20% hold-out DataFrame for potential use in later scripts
     holdout_path = os.path.join(config.OUTPUT_DIR, "holdout_data_for_validation.parquet")
     df_test.to_parquet(holdout_path, index=False)
-    print(f"â Hold-out data for validation saved to: {holdout_path}")
+    print(f"Hold-out data for validation saved to: {holdout_path}")
 
     # Create the corresponding embedding and label arrays for training
     X_train = X[df_train.index]
@@ -55,24 +55,26 @@ def main(embedding_name: str):
     elif embedding_name == 'bert':
         model_object_path = os.path.join(config.OUTPUT_DIR, "model_object_all-MiniLM-L6-v2.joblib")
         vectorizer = joblib.load(model_object_path)
-    
+
     seed_automaton = load_keywords_and_build_automaton(config.SEED_KEYWORD_YAML)
     anti_seed_automaton = load_keywords_and_build_automaton(config.ANTI_SEED_KEYWORD_YAML)
+    market_rule_automaton = extract_market_keywords_and_build_automaton(config.MARKET_RULES_YAML)
 
     hybrid_model = HybridClassifier(
         ml_model=clf,
         vectorizer=vectorizer,
         seed_automaton=seed_automaton,
-        anti_seed_automaton=anti_seed_automaton
+        anti_seed_automaton=anti_seed_automaton,
+        market_rule_automaton=market_rule_automaton
     )
 
     model_path = os.path.join(config.OUTPUT_DIR, f"hybrid_classifier_{embedding_name}.joblib")
     joblib.dump(hybrid_model, model_path)
-    print(f"â HybridClassifier saved to: {model_path}")
+    print(f"HybridClassifier saved to: {model_path}")
 
     # --- 3. Evaluate the HYBRID MODEL on the UT Dallas portion of the hold-out set ---
     print("\n--- Evaluating Hybrid Model on UT Dallas Hold-Out Data (20%) ---")
-    
+
     # Filter the test set to get only the UT Dallas items
     df_test_utdallas = df_test[df_test['data_source'] == 'ut_dallas'].copy()
 
@@ -80,7 +82,7 @@ def main(embedding_name: str):
         print(f"  - Found {len(df_test_utdallas)} UT Dallas items in the hold-out set.")
         descriptions_utdallas = df_test_utdallas[config.CLEAN_DESC_COL].fillna('')
         y_true_utdallas = df_test_utdallas['label']
-        
+
         # Get predictions from the full hybrid model
         y_pred_utdallas = hybrid_model.predict(descriptions_utdallas)
 
@@ -89,9 +91,9 @@ def main(embedding_name: str):
         print("\nClassification Report (UT Dallas Hold-Out):")
         print(utdallas_report)
 
-        # --- ADDED CODE START ---
+        # --- Identify and save misclassifications ---
         print("\n  - Identifying and saving misclassifications...")
-        
+
         # Add predictions to the dataframe to make filtering easy
         df_results = df_test_utdallas.copy()
         df_results['predicted_label'] = y_pred_utdallas
@@ -107,7 +109,6 @@ def main(embedding_name: str):
         fn_path = os.path.join(config.OUTPUT_DIR, "false_negatives.csv")
         df_fn.to_csv(fn_path, index=False)
         print(f"    - Saved {len(df_fn)} False Negatives to: {fn_path}")
-        # --- ADDED CODE END ---
 
     else:
         print("  - No UT Dallas items were found in the hold-out set for this run.")
