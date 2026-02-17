@@ -16,7 +16,6 @@ if not os.path.exists(USER_EXPOSURE_FILE):
 
 print("Loading Pre-Computed Weights...")
 W = scipy.sparse.load_npz(WEIGHTS_FILE) # Shape: (15M, 174)
-
 print("Loading IDs...")
 df_univ_ids = pd.read_parquet(UNIVERSE_IDS_FILE)
 df_foia_ids = pd.read_csv(FOIA_IDS_FILE) # Must be the exact order used in Step 1

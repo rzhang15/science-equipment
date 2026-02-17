@@ -1,0 +1,11 @@
+--- Starting Leave-One-Out Validation ---
+Loading data...
+Mapping Universe Rows to FOIA Columns...
+Found 93 of 94 FOIA authors in the Universe dataset.
+Calculating Leave-One-Out predictions...
+------------------------------
+Validation Results (N=93):
+Correlation (r): 0.2639
+R-Squared:       0.0247
+------------------------------
+Plot saved to ../output/validation_plot.png

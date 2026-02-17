@@ -8,23 +8,23 @@ version 17
 
 program main   
    raw_plots
-   did
-   event_study
+   *did
+   *event_study
    *uni_fes
 end
 
 program raw_plots
     use ../external/merged/matched_category_panel, clear
-    collapse (mean) avg_log_price avg_log_qty avg_log_spend raw_price [aw = spend_2013], by(year treated)
-    foreach var in avg_log_price raw_price { 
+    collapse (mean) avg_log_price avg_log_qty avg_log_spend raw_price (sum) raw_spend raw_qty [aw = spend_2013], by(year treated)
+    gen log_qty = log(raw_qty)
+    gen log_spend = log(raw_spend)
+    foreach var in avg_log_price raw_price raw_qty raw_spend log_qty log_spend { 
         gen trt_`var' = `var' if treated == 1
         gen ctrl_`var' = `var' if treated == 0
     }
-    foreach var in avg_log_price raw_price { 
+    foreach var in avg_log_price raw_price raw_qty raw_spend log_qty log_spend { 
         if "`var'" == "avg_log_price" local yname "Avg. Log Price"
         if "`var'" == "raw_price" local yname "Avg. Price"
-        if "`var'" == "avg_log_qty" local yname "Avg. Log Qty"
-        if "`var'" == "avg_log_spend" local yname "Avg. Log Spend"
         qui sum trt_`var' if year == 2013 
         qui replace trt_`var' = trt_`var' - r(mean)
         qui sum ctrl_`var' if year == 2013 
@@ -32,6 +32,7 @@ program raw_plots
         qui tw connected trt_`var' year , lcolor(lavender) mcolor(lavender) || connected ctrl_`var' year , lcolor(dkorange%40) mcolor(dkorange%40) legend(on label(1 "Treated: `name'") label(2 "Control: `match_name'") ring(1) pos(6) rows(1) size(vsmall)) ytitle("`yname'", size(small)) yline(0, lcolor(gs10) lpattern(solid)) ylabel(#6, labsize(small)) xlabel(2010(1)2019, labsize(small)) xtitle("Year", size(small)) tline(2013.5, lpattern(shortdash) lcolor(gs4%80)) 
         qui graph export "../output/figures/`var'_trends_pooled.pdf", replace
     }
+    stop j
     
     use ../external/merged/matched_mkts, clear
     qui glevelsof category, local(categories)
@@ -55,11 +56,11 @@ program raw_plots
         qui keep if keep == 1 
         local name = strproper("`c'")
         collapse (mean) avg_log_price avg_log_qty avg_log_spend raw_price [aw = spend_2013], by(year treated)
-        foreach var in avg_log_price raw_price { //avg_log_qty avg_log_spend  {
+        foreach var in avg_log_price raw_price { 
             gen trt_`var' = `var' if treated == 1
             gen ctrl_`var' = `var' if treated == 0
         }
-        foreach var in avg_log_price raw_price { //avg_log_qty avg_log_spend { 
+        foreach var in avg_log_price raw_price { 
             if "`var'" == "avg_log_price" local yname "Avg. Log Price"
             if "`var'" == "raw_price" local yname "Avg. Price"
             if "`var'" == "avg_log_qty" local yname "Avg. Log Qty"
@@ -85,6 +86,7 @@ program did
         di "`name'"
         reghdfe `var' posttreat [aw=spend_2013], cluster(mkt) absorb(year uni_id mkt) 
     }
+
     // pooled did 
     use ../external/merged/matched_uni_category_panel, clear
     gen post = 0 
@@ -94,7 +96,7 @@ program did
         di "`name'"
         reghdfe `var' posttreat [aw=spend_2013], cluster(mkt) absorb(year uni_id mkt) 
     }
-    
+   // unexpanded panel pool version 
     use ../external/merged/matched_category_panel, clear
     gen post = 0 
     replace post = 1 if year >= 2014
@@ -103,7 +105,7 @@ program did
         di "`name'"
         reghdfe `var' posttreat [aw=spend_2013], cluster(mkt) absorb(year mkt) 
     }
- 
+    // indiv did
     use ../external/merged/matched_mkts, clear
     qui glevelsof category, local(categories)
 	foreach c in `categories' {
@@ -173,7 +175,8 @@ end
 program event_study
     // naive event study
     use ../external/samp/uni_category_yr_tfidf, clear
-   * drop if cat == "us fbs"
+    replace raw_price = raw_spend/raw_qty
+    gen log_raw_price = log(raw_price)
     gen rel = year - 2014
     replace rel = . if treated == 0
     local fes uni_id mkt year
@@ -192,21 +195,14 @@ program event_study
         restore
     }
 
+    // main pooled result
     use ../external/merged/matched_uni_category_panel ,clear 
-   * drop if cat == "us fbs"
+    replace raw_price = raw_spend/raw_qty
+    gen log_raw_price = log(raw_price)
     gen rel = year - 2014
     replace rel = . if treated == 0
     local fes uni_id mkt year
     bys category: gen cat_id = _n == 1
-    sum delta_hhi if cat_id == 1, d
-    local p25 = r(p25)
-    local p50 = r(p50)
-    local p75 = r(p75)
-
-    gen hhi1 = delta_hhi <= `p25' 
-    gen hhi2 = inrange(delta_hhi, `p25', `p50')
-    gen hhi3 = inrange(delta_hhi, `p50', `p75')
-    gen hhi4 = delta_hhi >= `p75' 
     foreach yvar in price qty spend {
         preserve
         mat drop _all
@@ -218,8 +214,43 @@ program event_study
         qui sum raw_`yvar' if treated == 0 & year == 2013
         local ctrl_mean : dis %6.3f r(mean)
         manual_event_study, lag(5) lead(-4) yvar(avg_log_`yvar') ymin(-0.2) ymax(0.6) ygap(0.1) trt_mean(`trt_mean') ctrl_mean(`ctrl_mean')  name(`yname') fes(`fes') wt_var(spend_2013) cluster_var(mkt) file_suf("pooled")
+        manual_event_study, lag(5) lead(-4) yvar(log_raw_`yvar') ymin(-0.2) ymax(0.6) ygap(0.1) trt_mean(`trt_mean') ctrl_mean(`ctrl_mean')  name(`yname') fes(`fes') wt_var(spend_2013) cluster_var(mkt) file_suf("pooled")
         restore
     }
+    foreach yvar in raw_qty { //avg_log_qty {
+        preserve
+        mat drop _all
+        local yname "Log Total Qty"
+        qui sum `yvar' if treated == 1 & year == 2013
+        local trt_mean :  dis %6.3f r(mean)
+        qui sum `yvar' if treated == 0 & year == 2013
+        local ctrl_mean : dis %6.3f r(mean)
+        manual_event_study, lag(5) lead(-4) yvar(`yvar') ymin(-100) ymax(1000) ygap(50) trt_mean(`trt_mean') ctrl_mean(`ctrl_mean')  name(`yname') fes(`fes') wt_var(spend_2013) cluster_var(mkt) file_suf("pooled")
+        restore
+    }
+    foreach yvar in raw_spend { //avg_log_spend {
+        preserve
+        mat drop _all
+        local yname "Total Spend"
+        qui sum `yvar' if treated == 1 & year == 2013
+        local trt_mean :  dis %6.3f r(mean)
+        qui sum `yvar' if treated == 0 & year == 2013
+        local ctrl_mean : dis %6.3f r(mean)
+        manual_event_study, lag(5) lead(-4) yvar(`yvar') ymin(-600) ymax(6000) ygap(750) trt_mean(`trt_mean') ctrl_mean(`ctrl_mean')  name(`yname') fes(`fes') wt_var(spend_2013) cluster_var(mkt) file_suf("pooled")
+        restore
+    }
+stop
+    // hhi
+    /*
+    sum delta_hhi if cat_id == 1, d
+    local p25 = r(p25)
+    local p50 = r(p50)
+    local p75 = r(p75)
+
+    gen hhi1 = delta_hhi <= `p25' 
+    gen hhi2 = inrange(delta_hhi, `p25', `p50')
+    gen hhi3 = inrange(delta_hhi, `p50', `p75')
+    gen hhi4 = delta_hhi >= `p75' 
     forval i = 1/4 {
         foreach yvar in price qty spend {
             preserve
@@ -235,7 +266,7 @@ program event_study
             manual_event_study, lag(5) lead(-4) yvar(avg_log_`yvar') ymin(-0.2) ymax(0.6) ygap(0.1) trt_mean(`trt_mean') ctrl_mean(`ctrl_mean')  name("`yname' HHI Quartile `i'") fes(`fes') wt_var(spend_2013) cluster_var(mkt) file_suf("hhi`i'")
             restore
         }
-    }
+    }*/
 
     qui glevelsof category if treated == 1, local(categories)
 	foreach c in `categories' {
@@ -270,7 +301,8 @@ program event_study
             restore
         }
     }
-    use "../temp/es_avg_log_price_estimateshhi1", replace
+    /*
+    use "../temp/es_avg_log_price_estimateshhi1", clear 
     gen group = 1 
     replace rel = rel - 0.24 
     append using ../temp/es_avg_log_price_estimateshhi2
@@ -295,9 +327,9 @@ program event_study
           yline(0, lcolor(black) lpattern(solid)) ///
           legend(on order(2 "Delta HHI Q1" 4 "Delta HHI Q2" 6 "Delta HHI Q3" 8 "Delta HHI Q4") pos(11) rows(2) ring(0) size(vsmall) region(fcolor(none))) xtitle("Relative Year", size(small)) ytitle("Avg. Log Price", size(small)) plotregion(margin(sides))
     graph export ../output/figures/es_estimates_hhi.pdf, replace
-
+    */
     // combined plots
-    use "../temp/es_avg_log_spend_estimatespooled", replace
+    use "../temp/es_avg_log_spend_estimatespooled", clear
     gen group = "spend"
     replace rel = rel - 0.2 
     sum b if group == "spend" & rel > 0
@@ -322,33 +354,6 @@ program event_study
           yline(0, lcolor(black) lpattern(solid)) ///
           legend(on order(2 "Spending (Post Period Avg: `spend_mean')" 4 "Price (Post Period Avg: `price_mean')" 6 "Quantity (Post Period Avg: `qty_mean')") pos(11) ring(0) size(small) region(fcolor(none))) xtitle("Relative Year", size(small)) ytitle("Log Estimates", size(small)) plotregion(margin(sides))
     graph export ../output/figures/es_estimatespooled.pdf, replace
-
-    // combined plots
-    use "../temp/es_avg_log_spend_estimatesus fbs", replace
-    gen group = "spend"
-    replace rel = rel - 0.2 
-    sum b if group == "spend" & rel > 0
-    local spend_mean : dis %4.3f r(mean)
-    append using "../temp/es_avg_log_price_estimatesus fbs"
-    replace group = "price" if mi(group)
-    sum b if group == "price" & rel > 0
-    local price_mean : dis %4.3f r(mean)
-    append using "../temp/es_avg_log_qty_estimatesus fbs"
-    replace group = "qty" if mi(group)
-    replace rel = rel + 0.2 if group == "qty"
-    sum b if group == "qty" & rel >0.2
-    local qty_mean : dis %4.3f r(mean)
-    tw rcap ub lb rel if rel != -1.2 & group == "spend",  lcolor(lavender%70) msize(small) || ///
-       scatter b rel if group == "spend", mcolor(lavender%70) msize(small) || ///
-       rcap ub lb rel if rel != -1.0 & group == "price",  lcolor(orange%70) msize(small) || ///
-       scatter b rel if group == "price", mcolor(orange%70) msymbol(smdiamond) msize(small) || /// 
-       rcap ub lb rel if rel != -0.8 & group == "qty",  lcolor(ebblue%70) msize(small) || ///
-       scatter b rel if group == "qty", mcolor(ebblue%70) msymbol(smsquare) msize(small) || /// 
-       scatteri 0.6 -0.3 0.6 0.3 , bcolor(gs12%30) recast(area) base(-0.2) ///
-       xlab(-4(1)5, labsize(small)) ylab(-0.2(0.1)0.6, labsize(vsmall)) ///
-          yline(0, lcolor(black) lpattern(solid)) ///
-          legend(on order(2 "Spending (Post Period Avg: `spend_mean')" 4 "Price (Post Period Avg: `price_mean')" 6 "Quantity (Post Period Avg: `qty_mean')") pos(11) ring(0) size(small) region(fcolor(none))) xtitle("Relative Year", size(small)) ytitle("Log Estimates", size(small)) plotregion(margin(sides))
-    graph export ../output/figures/es_estimatesusfbs_pooled.pdf, replace
 
 end
 

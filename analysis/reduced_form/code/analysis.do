@@ -18,16 +18,43 @@ program event_study
 
     use ../external/samp/athr_panel_full_year_last_all_jrnls,clear 
     bys athr_id: egen min_year = min(year)
-    keep if min_year <= 2013
+    gen age = 2025-min_year + 25 
     merge m:1 athr_id using ../temp/exposure, assert(1 2 3) keep(3) nogen
     merge m:1 athr_id using ../external/real_exposure/athr_exposure, assert(1 2 3) keep(1 3) nogen
     replace imputed = exposure if !mi(exposure)
+    sum exposure , d 
+    local mean : di %4.3f r(mean) 
+    local sd: di %4.3f r(sd) 
+    local p25: di %4.3f r(p25) 
+    local p50: di %4.3f r(p50) 
+    local p75: di %4.3f r(p75)
+    local max: di %4.3f  r(max) 
+    local min: di %4.3f r(min) 
+    local fes athr_id year 
+    sum imputed, d 
+    local imputed_mean : di %4.3f r(mean) 
+    local imputed_sd: di %4.3f r(sd) 
+    local imputed_p25: di %4.3f r(p25) 
+    local imputed_p50: di %4.3f r(p50) 
+    local imputed_p75: di %4.3f r(p75)
+    local imputed_max: di %4.3f  r(max) 
+    local imputed_min: di %4.3f r(min) 
+    tw kdensity exposure || kdensity imputed, xtitle("Exposure Measure", size(small)) ytitle("Density", size(small)) ///
+        ylab(, labsize(vsmall)) xlab(#15, labsize(vsmall)) ///
+        legend(on label(1 "FOIA PI Observed Exposure (mean = `mean', sd = `sd')") label(2 "Imputed Exposure (mean = `imputed_mean', sd = `imputed_sd')") pos(1) ring(0) size(vsmall))
+    graph export ../output/figures/exposure_dist.pdf, replace
+    keep if min_year <= 2013
+    keep if inrange(year, 2009, 2019)
     drop exposure
     rename imputed exposure
-    keep if inrange(year, 2009, 2019)
+    gen q1 = exposure < `p25'
+    gen q2 = inrange(exposure , `p25', `p50')
+    gen q3 = inrange(exposure , `p50', `p75')
+    gen q4 = exposure >= `p75'
+    gen median = exposure >= `p50'
     bys athr_id: gen num_yrs = _N
     gegen athr= group(athr_id)
-    /*xtset athr year
+    xtset athr year
     tsfill
     hashsort athr year
     foreach var in athr_id exposure {
@@ -35,7 +62,7 @@ program event_study
     }
     foreach var in cite_affl_wt ppr_cnt {
         replace `var' = 0 if mi(`var')    
-    }*/
+    }
     gen rel = year - 2014 
     qui sum rel, d
     local abs_lag = abs(r(max))
@@ -66,31 +93,16 @@ program event_study
         local lags `lags' lag`i'
         local int_lags `int_lags' int_lag`i'
     }
-    gen ln_cite_affl_wt = ln(1+cite_affl_wt)
-    gen ln_ppr_cnt = ln(1+ppr_cnt)
-    sum exposure , d 
-    local mean : di %4.3f r(mean) 
-    local sd: di %4.3f r(sd) 
-    local p25: di %4.3f r(p25) 
-    local p50: di %4.3f r(p50) 
-    local p75: di %4.3f r(p75)
-    local max: di %4.3f  r(max) 
-    local min: di %4.3f r(min) 
-    local fes athr_id year 
-
-    tw kdensity exposure, xtitle("Imputed Exposure Score", size(small)) ytitle("Density", size(small)) ///
-        ylab(, labsize(vsmall)) xlab(#15, labsize(vsmall)) ///
-        legend(on order(- "Min: `min'" "Q1 = `p25'" "Median = `p50'" "Mean: `mean'" "SD = `sd'" "Q3 = `p75'" "Max = `max'") pos(1) ring(0) size(vsmall))
-    graph export ../output/figures/exposure_dist.pdf, replace
-
-    foreach yvar in ln_cite_affl_wt cite_affl_wt ln_ppr_cnt ppr_cnt {
-        if "`yvar'" == "ln_cite_affl_wt" local var_name = "Log Citation Weighted Output" 
+    foreach v in cite_affl_wt ppr_cnt {
+        gen ln_`v' = ln(1+`v')
+    }
+    foreach yvar in cite_affl_wt ppr_cnt {
         if "`yvar'" == "cite_affl_wt" local var_name = "Citation Weighted Output" 
-        if "`yvar'" == "ln_ppr_cnt" local var_name = "Log Publication Count" 
+        if "`yvar'" == "cite_affl_wt" local gap  1 
         if "`yvar'" == "ppr_cnt" local var_name = "Publication Count" 
+        if "`yvar'" == "ppr_cnt" local gap 0.5 
 
         preserve
-        gen median = exposure >= `p50'
         bys year: egen avg = mean(`yvar')
         gcollapse (mean) avg `yvar', by(year median)
         tw line avg year , lcolor(ebblue) || line `yvar' year if med == 1, lcolor(lavender) || line `yvar' year if med == 0, lcolor(dkorange) ///
@@ -101,6 +113,8 @@ program event_study
 
         preserve
         mat drop _all 
+        sum `yvar' if rel <= -1 & exposure > 0, d
+        local pre_mean : dis %4.3f r(mean)
         reghdfe `yvar' `int_leads' `int_lags' int_lead1, absorb(`fes') vce(cluster athr_id)
         foreach var in `int_leads' `int_lags' int_lead1 {
             mat row = _b[`var'], _se[`var']
@@ -109,26 +123,37 @@ program event_study
             }
             mat es = nullmat(es) \ row
         }
-         svmat es
+        svmat es
         keep es1 es2
         drop if mi(es1)
         rename (es1 es2) (b se)
         gen ub = b + 1.96*se
+        sum ub, d
+        local ymax =round(r(max),`gap')
         gen lb = b - 1.96*se
+        sum lb, d
+        local ymin = min(-2.5,round(r(min),`gap'))
         gen rel = -5 if _n == 1
         replace rel = rel[_n-1]+1 if _n > 1
         replace rel = rel + 1 if rel >= -1 
         replace rel = -1 if rel == `abs_lag' + 1
         gen year = rel + 2014
         hashsort rel
-        tw rcap ub lb rel if rel != -1 , lcolor(ebblue%70) msize(vsmall) || scatter b rel, mcolor(ebblue) xlab(-5(1)5, labsize(vsmall)) xtitle("Relative Year", size(small)) ytitle("`var_name'", size(small)) ylab(#8, labsize(vsmall)) yline(0, lcolor(gs10) lpattern(solid)) xline(-0.5 , lcolor(gs12) lpattern(dash))  legend(off)
+        tw rcap ub lb rel if rel != -1 , lcolor(ebblue%70) msize(vsmall) || ///
+          scatter b rel, mcolor(ebblue) || ///
+          scatteri `ymax' -0.25 `ymax' 0.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
+          xlab(-5(1)5, labsize(vsmall)) xtitle("Relative Year", size(small)) ///
+          ytitle("`var_name'", size(small)) ylab(#8, labsize(vsmall)) ///
+          yline(0, lcolor(gs10) lpattern(solid)) ///
+          legend(on order(- "Pre-Period Avg : `pre_mean'") pos(7) ring(0) rows(2)) plotregion(margin(sides))
         graph export ../output/figures/es_`yvar'.pdf, replace
         save ../temp/es_`yvar', replace
         restore
 
         preserve
         mat drop _all 
-        reghdfe `yvar' `int_leads' `int_lags' int_lead1 if inrange(exposure , `min', `p25'), absorb(`fes') vce(cluster athr_id)
+        *ppmlhdfe `yvar' `int_leads' `int_lags' int_lead1, absorb(`fes') vce(cluster athr_id)
+        reghdfe ln_`yvar' `int_leads' `int_lags' int_lead1, absorb(`fes') vce(cluster athr_id)
         foreach var in `int_leads' `int_lags' int_lead1 {
             mat row = _b[`var'], _se[`var']
             if "`var'" == "int_lead1" {
@@ -141,100 +166,64 @@ program event_study
         drop if mi(es1)
         rename (es1 es2) (b se)
         gen ub = b + 1.96*se
+        sum ub, d
+        local ymax = round(r(max),.1)
         gen lb = b - 1.96*se
+        sum lb, d
+        local ymin = round(r(min),.1)
         gen rel = -5 if _n == 1
         replace rel = rel[_n-1]+1 if _n > 1
         replace rel = rel + 1 if rel >= -1 
         replace rel = -1 if rel == `abs_lag' + 1
         gen year = rel + 2014
         hashsort rel
-        tw rcap ub lb rel if rel != -1 , lcolor(ebblue%70) msize(vsmall) || scatter b rel, mcolor(ebblue) xlab(-5(1)5, labsize(vsmall)) xtitle("Relative Year", size(small)) ytitle("`var_name'", size(small)) ylab(, labsize(vsmall)) yline(0, lcolor(gs10) lpattern(solid)) xline(-0.5 , lcolor(gs12) lpattern(dash))  legend(off)
-        graph export ../output/figures/es_`yvar'_q1.pdf, replace
-        save ../temp/es_`yvar'_q1, replace
+        tw rcap ub lb rel if rel != -1 , lcolor(ebblue%70) msize(vsmall) || ///
+          scatter b rel, mcolor(ebblue) || ///
+        scatteri 1 -0.25 1 0.25 , bcolor(gs12%10) recast(area) base(-1) ///
+          xlab(-5(1)5, labsize(vsmall)) xtitle("Relative Year", size(small)) ///
+          ytitle("`var_name'", size(small)) ylab(-1(.2)1, labsize(vsmall)) ///
+          yline(0, lcolor(gs10) lpattern(solid))  legend(off) plotregion(margin(sides))
+        graph export ../output/figures/es_ln_`yvar'.pdf, replace
+        save ../temp/es_ln_`yvar', replace
         restore
-        
-        preserve
-        mat drop _all 
-        reghdfe `yvar' `int_leads' `int_lags' int_lead1 if inrange(exposure ,`p25', `p50'), absorb(`fes') vce(cluster athr_id)
-        foreach var in `int_leads' `int_lags' int_lead1 {
-            mat row = _b[`var'], _se[`var']
-            if "`var'" == "int_lead1" {
-                mat row = 0,0
+
+        forval i = 1/4 {
+            preserve
+            mat drop _all 
+            reghdfe `yvar' `int_leads' `int_lags' int_lead1 if q`i' == 1, absorb(`fes') vce(cluster athr_id)
+            foreach var in `int_leads' `int_lags' int_lead1 {
+                mat row = _b[`var'], _se[`var']
+                if "`var'" == "int_lead1" {
+                    mat row = 0,0
+                }
+                mat es = nullmat(es) \ row
             }
-            mat es = nullmat(es) \ row
-        }
-        svmat es
-        keep es1 es2
-        drop if mi(es1)
-        rename (es1 es2) (b se)
-        gen ub = b + 1.96*se
-        gen lb = b - 1.96*se
-        gen rel = -5 if _n == 1
-        replace rel = rel[_n-1]+1 if _n > 1
-        replace rel = rel + 1 if rel >= -1 
-        replace rel = -1 if rel == `abs_lag' + 1
-        gen year = rel + 2014
-        hashsort rel
-        tw rcap ub lb rel if rel != -1 , lcolor(ebblue%70) msize(vsmall) || scatter b rel, mcolor(ebblue) xlab(-5(1)5, labsize(vsmall)) xtitle("Relative Year", size(small)) ytitle("`var_name'", size(small)) ylab(, labsize(vsmall)) yline(0, lcolor(gs10) lpattern(solid)) xline(-0.5 , lcolor(gs12) lpattern(dash))  legend(off)
-        graph export ../output/figures/es_`yvar'_q2.pdf, replace
-        save ../temp/es_`yvar'_q2, replace
-        restore
-        
-        
-        preserve
-        mat drop _all 
-        reghdfe `yvar' `int_leads' `int_lags' int_lead1 if inrange(exposure ,`p50', `p75'), absorb(`fes') vce(cluster athr_id)
-        foreach var in `int_leads' `int_lags' int_lead1 {
-            mat row = _b[`var'], _se[`var']
-            if "`var'" == "int_lead1" {
-                mat row = 0,0
-            }
-            mat es = nullmat(es) \ row
-        }
-        svmat es
-        keep es1 es2
-        drop if mi(es1)
-        rename (es1 es2) (b se)
-        gen ub = b + 1.96*se
-        gen lb = b - 1.96*se
-        gen rel = -5 if _n == 1
-        replace rel = rel[_n-1]+1 if _n > 1
-        replace rel = rel + 1 if rel >= -1 
-        replace rel = -1 if rel == `abs_lag' + 1
-        gen year = rel + 2014
-        hashsort rel
-        tw rcap ub lb rel if rel != -1 , lcolor(ebblue%70) msize(vsmall) || scatter b rel, mcolor(ebblue) xlab(-5(1)5, labsize(vsmall)) xtitle("Relative Year", size(small)) ytitle("`var_name'", size(small)) ylab(, labsize(vsmall)) yline(0, lcolor(gs10) lpattern(solid)) xline(-0.5 , lcolor(gs12) lpattern(dash))  legend(off)
-        graph export ../output/figures/es_`yvar'_q3.pdf, replace
-        save ../temp/es_`yvar'_q3, replace
-        restore
-        
-        
-        preserve
-        mat drop _all 
-        reghdfe `yvar' `int_leads' `int_lags' int_lead1 if inrange(exposure ,`p75', `max'), absorb(`fes') vce(cluster athr_id)
-        foreach var in `int_leads' `int_lags' int_lead1 {
-            mat row = _b[`var'], _se[`var']
-            if "`var'" == "int_lead1" {
-                mat row = 0,0
-            }
-            mat es = nullmat(es) \ row
-        }
-        svmat es
-        keep es1 es2
-        drop if mi(es1)
-        rename (es1 es2) (b se)
-        gen ub = b + 1.96*se
-        gen lb = b - 1.96*se
-        gen rel = -5 if _n == 1
-        replace rel = rel[_n-1]+1 if _n > 1
-        replace rel = rel + 1 if rel >= -1 
-        replace rel = -1 if rel == `abs_lag' + 1
-        gen year = rel + 2014
-        hashsort rel
-        tw rcap ub lb rel if rel != -1 , lcolor(ebblue%70) msize(vsmall) || scatter b rel, mcolor(ebblue) xlab(-5(1)5, labsize(vsmall)) xtitle("Relative Year", size(small)) ytitle("`var_name'", size(small)) ylab(, labsize(vsmall)) yline(0, lcolor(gs10) lpattern(solid)) xline(-0.5 , lcolor(gs12) lpattern(dash))  legend(off)
-        graph export ../output/figures/es_`yvar'_q4.pdf, replace
-        save ../temp/es_`yvar'_q4, replace
-        restore
+            svmat es
+            keep es1 es2
+            drop if mi(es1)
+            rename (es1 es2) (b se)
+            gen ub = b + 1.96*se
+            sum ub, d
+            local ymax = round(r(max),`gap')
+            gen lb = b - 1.96*se
+            sum lb, d
+            local ymin =  round(r(min),`gap')
+            gen rel = -5 if _n == 1
+            replace rel = rel[_n-1]+1 if _n > 1
+            replace rel = rel + 1 if rel >= -1 
+            replace rel = -1 if rel == `abs_lag' + 1
+            gen year = rel + 2014
+            hashsort rel
+            tw rcap ub lb rel if rel != -1 , lcolor(ebblue%70) msize(vsmall) || ///
+              scatter b rel, mcolor(ebblue) || ///
+            scatteri `ymax' -0.25 `ymax' 0.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
+              xlab(-5(1)5, labsize(vsmall)) xtitle("Relative Year", size(small)) ///
+              ytitle("`var_name'", size(small)) ylab(`ymin'(`gap')`ymax', labsize(vsmall)) ///
+              yline(0, lcolor(gs10) lpattern(solid)) legend(off) plotregion(margin(sides))
+            graph export ../output/figures/es_`yvar'_q`i'.pdf, replace
+            save ../temp/es_`yvar'_q`i', replace
+            restore
+        } 
         
         preserve
         use "../temp/es_`yvar'_q1", replace                                         

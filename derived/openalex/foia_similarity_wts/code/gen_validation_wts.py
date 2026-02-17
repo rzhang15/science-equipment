@@ -3,14 +3,14 @@ import numpy as np
 import scipy.sparse
 
 # --- CONFIGURATION ---
+# We use the same inputs, but we will filter the rows to ONLY FOIA authors
 UNIVERSE_IDS_FILE = "../output/universe_ids.parquet"
 FOIA_IDS_FILE = "../output/foia_ids_ordered.csv" 
 UNIVERSE_MATRIX = "../output/tfidf_universe.npz"
 FOIA_MATRIX = "../output/tfidf_foia.npz"
-# Save this as a SEPARATE validation file so you don't overwrite your main weights
-OUTPUT_VAL_WEIGHTS = "../output/validation_weights_k50.npz" 
+OUTPUT_VAL_WEIGHTS = "../output/validation_weights_k50.npz"
 
-K_HIGH = 50  # We keep 50 to allow testing K=10, 20, etc.
+K_HIGH = 50  # Keep 50 so we can test K=5, 10, 20, etc. later
 
 # --- LOAD DATA ---
 print("Loading IDs...")
@@ -24,17 +24,16 @@ foia_row_indices = [univ_id_to_idx[aid] for aid in df_foia['athr_id'] if aid in 
 
 print(f"Loading Universe Matrix and slicing {len(foia_row_indices)} FOIA rows...")
 X_univ_all = scipy.sparse.load_npz(UNIVERSE_MATRIX)
-# Only keep the rows for FOIA authors (very fast)
-X_foia_rows = X_univ_all[foia_row_indices, :] 
+X_foia_rows = X_univ_all[foia_row_indices, :] # Only keep the rows we need for validation
 
 print("Loading Target Matrix...")
 X_targets = scipy.sparse.load_npz(FOIA_MATRIX)
 
-print("Computing Similarity (Dense)...")
-# Since 94x94 is tiny, we can compute the dense matrix directly
+print("Computing Similarity...")
+# This will be small (94 x 94), so we can do it in one shot without batches
 sim_matrix = X_foia_rows.dot(X_targets.T).toarray()
 
-# --- FILTER TO TOP 50 ---
+# --- APPLY K_HIGH FILTER ---
 print(f"Filtering to Top {K_HIGH} neighbors...")
 for r in range(sim_matrix.shape[0]):
     row = sim_matrix[r, :]
@@ -44,10 +43,11 @@ for r in range(sim_matrix.shape[0]):
         row[row < cutoff] = 0
         sim_matrix[r, :] = row
 
-# Normalize rows to sum to 1
+# Normalize
 row_sums = sim_matrix.sum(axis=1, keepdims=True)
 row_sums[row_sums == 0] = 1.0
 W_val = scipy.sparse.csr_matrix(sim_matrix / row_sums)
 
 print(f"Saving validation weights to {OUTPUT_VAL_WEIGHTS}...")
 scipy.sparse.save_npz(OUTPUT_VAL_WEIGHTS, W_val)
+

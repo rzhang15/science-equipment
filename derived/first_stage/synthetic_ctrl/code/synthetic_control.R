@@ -6,7 +6,7 @@ library(Synth)
 library(haven)
 
 # Setup Paths
-setwd("~/sci_eq/derived/first_stage/match_control/code")
+setwd("~/sci_eq/derived/first_stage/synthetic_ctrl/code")
 DATA_INPUT  <- "../external/samp/category_yr_tfidf.dta"
 OUTPUT_DIR  <- "../output/figures/"
 dir.create(OUTPUT_DIR, recursive = TRUE, showWarnings = FALSE)
@@ -22,7 +22,7 @@ panel <- read_dta(DATA_INPUT) %>%
 
 treated_categories <- unique(panel$category[panel$treated == 1])
 control_ids <- unique(panel$category_num[panel$treated == 0])
-
+stack_list <- list()
 # --- Main Loop ---
 for (mkt in treated_categories) {
   curr_id <- unique(panel$category_num[panel$category == mkt])
@@ -51,7 +51,20 @@ for (mkt in treated_categories) {
   # 2. Run Synth
   s_out <- tryCatch({ synth(dp_out) }, error = function(e) return(NULL))
   if (is.null(s_out)) next
+  control_weights <- data.frame(
+    category_num = as.numeric(rownames(s_out$solution.w)), # The Control Unit IDs
+    weight = as.numeric(s_out$solution.w)
+  )
+  control_weights <- control_weights %>% filter(weight > 0.001)
+  treated_row <- data.frame(
+    category_num = curr_id,
+    weight = 1
+  )
+  stack_data <- bind_rows(treated_row, control_weights) %>%
+    mutate(stack_id = curr_id) # Using the treated unit's ID as the unique Stack ID
   
+  # E. Store in the list
+  stack_list[[mkt]] <- stack_data
   # 3. Extract Values for ggplot
   # Observed (Treated) values
   observed <- dp_out$Y1plot
@@ -89,3 +102,31 @@ for (mkt in treated_categories) {
   ggsave(filename = paste0(OUTPUT_DIR, "/trend_", mkt, ".pdf"), plot = p, width = 8, height = 5)
   print(p) # Show in RStudio
 }
+
+# 1. Combine all stacks into one long "Weights" dataframe
+weights_df <- bind_rows(stack_list)
+
+# 2. Merge back with the original panel data (Prices, Spend, etc.)
+# We do an inner_join because we only want the units that are part of a stack
+synth_panel <- inner_join(panel, weights_df, by = "category_num")
+
+# 3. Create the necessary variables for DiD / Event Study
+synth_panel <- synth_panel %>%
+  mutate(
+    # Identify if this row is the Treated Unit IN THIS STACK
+    is_treated_in_stack = (category_num == stack_id),
+    
+    # Event Study Time (Relative Year)
+    rel_year = year - 2014, # Adjust to your actual event year
+    
+    # Post Dummy
+    post = as.numeric(year >= 2014),
+    
+    # Interaction for standard DiD
+    treat_post = is_treated_in_stack * post
+  )
+
+# 4. Save for Stata/R Analysis
+write_dta(synth_panel, paste0("../output/synth_stacked_panel.dta"))
+
+print("Panel construction complete. Ready for fixest/reghdfe.")

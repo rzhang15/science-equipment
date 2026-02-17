@@ -63,3 +63,6 @@ df_universe[['athr_id']].to_parquet(f"{OUTPUT_DIR}universe_ids.parquet", index=F
 df_foia[['athr_id']].to_csv(f"{OUTPUT_DIR}foia_ids_ordered.csv", index=False)
 
 print("Vectorization Complete.")
+print("Saving Feature Names (Vocabulary)...")
+with open(f"{OUTPUT_DIR}feature_names.pkl", "wb") as f:
+    pickle.dump(tfidf.get_feature_names_out(), f)

@@ -14,7 +14,7 @@ global treated_products  "$cell_culture $mol_bio $protein_bio"
 
 
 program main
-    foia_pis
+*    foia_pis
     clean_foia_data
 end
 
@@ -103,7 +103,8 @@ program clean_foia_data
         replace treated = 1 if strpos(category, "`c'") > 0 
     }
     keep if year <= 2013
-    merge m:1 athr_id using ../output/foia_athrs_with_clusters_25, assert(1 2 3) keep(3) nogen
+    merge m:1 athr_id using ../output/foia_athrs_with_clusters_10, assert(1 2 3) keep(3) nogen
+    tab cluster_label
     gcollapse (sum) spend (mean) treated cluster_label, by(athr_id year category)
     bys athr_id year: egen tot_lab_spend = total(spend)
     gen lab_spend_shr = spend / tot_lab_spend   

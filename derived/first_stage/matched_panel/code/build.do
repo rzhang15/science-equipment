@@ -42,6 +42,31 @@ program merge_matched
     gcontract  category spend_2013
     drop _freq
     save ../output/spend_xw, replace
+
+    // create stacked mkt-year panel
+    use ../external/samp/category_yr_tfidf, clear
+    keep if treated == 1
+    glevelsof category, local(treated_cats)
+    foreach c in `treated_cats' {
+        preserve
+        keep if category == "`c'"
+        save "../temp/cat_`c'", replace
+        use ../output/matched_pairs, clear
+        keep if category == "`c'"
+        contract control_market
+        drop _freq
+        rename control_market category
+        merge 1:m category using ../external/samp/category_yr_tfidf, assert(2 3) keep(3) nogen
+        append using "../temp/cat_`c'"
+        gen experiment = "`c'"
+        save "../output/cat_`c'", replace
+        restore
+    }
+    clear
+    foreach c in `treated_cats' {
+        cap append using "../output/cat_`c'", force        
+    }
+    save ../output/stacked_matched_category_panel, replace
     
     // create matched uni-mkt-year panel
     use ../external/samp/uni_category_yr_tfidf, clear
@@ -57,5 +82,30 @@ program merge_matched
         gen ctrl_`var' = `var' if treated == 0
     }
     save ../output/matched_uni_category_panel , replace
+
+    // create stacked uni-mkt-year panel
+    use ../external/samp/uni_category_yr_tfidf, clear
+    keep if treated == 1
+    glevelsof category, local(treated_cats)
+    foreach c in `treated_cats' {
+        preserve
+        keep if category == "`c'"
+        save "../temp/uni_cat_`c'", replace               
+        use ../output/matched_pairs, clear
+        keep if category == "`c'"
+        contract control_market
+        drop _freq          
+        rename control_market category
+        merge 1:m category using ../external/samp/uni_category_yr_tfidf, assert(2 3) keep(3) nogen
+        append using "../temp/uni_cat_`c'"
+        gen experiment = "`c'"
+        save "../output/uni_cat_`c'", replace
+        restore 
+    }
+    clear
+    foreach c in `treated_cats' {
+        append using "../output/uni_cat_`c'", force
+    }
+    save ../output/stacked_matched_uni_category_panel, replace
 end
 main

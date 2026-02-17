@@ -14,8 +14,8 @@ program main
     *import_suppliers
     foreach t in tfidf {
         *select_good_categories, embed(`t')
-        *clean_raw, embed(`t')
-        make_panels, embed(`t')
+        clean_raw, embed(`t')
+        *make_panels, embed(`t')
     }
 end
 
@@ -86,9 +86,10 @@ program clean_raw
     bys poid clean_desc: gegen has_neg = max(qty<0)
     drop if has_neg == 1 & dup_order > 0
     drop if price <= 0 | qty <= 0 | spend <= 0
-    drop if category == "Non-Lab"
-    drop if category == "unclassified"
-    drop if spend > 100000 | price > 100000
+    *drop if category == "Non-Lab"
+    *drop if category == "unclassified"
+    *drop if spend > 100000 | price > 100000
+    stop 
     foreach v in "furnace" "vacuum" "lighting" "truck" "pump" "student" ///
         "graduate" "cfx" "table" "library" "appliance" "charger" "dtba1d1" ///
         "gasket"  "reader" "alfalfa" "chemidoc" "rfp" "red cross" ///
@@ -107,9 +108,10 @@ program clean_raw
         "nasco" "fluorescent bulb" "edition" "accidence" "teaching" "sport" "timer" "ssd" "screw" "wall" "file" "business" "mesh" ///
         "mask aligner" "karl suss" "procedure" "transmitter" "dues" "ura system" "accessory" "pbs detector" "billed" "monthly" "ethovision" ///
         "generator" "accessories" "handheld" "detector" "basement" "survey" "asbestos" "vicryl plus" "ejector" "maint." ///
-        "chamber" {
+        "chamber" "2010" "2011" "2012" "2013" "2014" "2015" "2016" "2017" "2018" "2019" "etching" {
         drop if strpos(clean_desc, "`v'") > 0
     }
+    stop 
     drop if (strpos(clean_desc, "plate") > 0 | strpos(clean_desc, "card")) & category == "synthetic dna oligonucleotide" 
     merge m:1 suppliername using ../temp/supplier_map, assert(1 2 3) keep(3) nogen
     rename (suppliername new_suppliername) (old_suppliername suppliername)
@@ -207,27 +209,14 @@ end
 program make_panels
     syntax, embed(string)
     use ../temp/item_level_`embed', clear
+    bys uni_id year: gen cnt = _n == 1
+    bys uni_id : egen num_years = total(cnt)
+    drop if num_years != 10
     gegen mkt = group(category)
+   
     preserve
     collapse (max) treated (mean) *price num_suppliers (sum) obs_cnt *raw_qty *raw_spend (firstnm) suppliername mkt , by(supplier_id category year)
     save ../output/supplier_category_yr_`embed', replace
-  /*  preserve
-    // quick fbs
-    keep if category == "us fbs"
-    replace suppliername = "thermo fisher scientific" if suppliername == "hyclone lab" & year <= 2014
-    replace suppliername = "atcc" if suppliername == "american type culture collec"
-    replace suppliername = "ge healthcare" if suppliername == "hyclone lab" & year > 2014
-    bys suppliername year: gen sup_year = _n == 1
-    bys suppliername : egen num_yrs = total(sup_year)
-    keep if num_yrs == 10  
-    tw line raw_price year , by(suppliername) xline(2014) xlab(2010(2)2019) xtitle("Year", size(small)) ytitle("Price of FBS", size(small)) legend(off pos(1) ring(0))
-    graph export ../output/fbs_prices.pdf, replace
-    tw line raw_spend year , by(suppliername) xline(2014) xlab(2010(2)2019) xtitle("Year", size(small)) ytitle("Spend of FBS", size(small)) legend(off pos(1) ring(0))
-    graph export ../output/fbs_spend.pdf, replace
-    tw line raw_qty year , by(suppliername) xline(2014) xlab(2010(2)2019) xtitle("Year", size(small)) ytitle("QTY of FBS", size(small)) legend(off pos(1) ring(0))
-    graph export ../output/fbs_qty.pdf, replace
-    restore*/
-
     gen pre_period = year < 2014
     keep if inrange(year, 2012,2013) | inrange(year, 2015, 2016)
     collapse (sum) raw_spend obs_cnt (firstnm) suppliername treated , by(supplier_id category pre_period)
@@ -259,19 +248,26 @@ program make_panels
     bys category : replace spend_2013 = spend_2013[_n-1] if mi(spend_2013)
     hashsort category obs_2013
     bys category : replace obs_2013 = obs_2013[_n-1] if mi(obs_2013)
-
     gen avg_log_spend = spend
     gen avg_log_qty = qty 
     gen avg_log_price = price 
-
     save ../output/item_level_`embed', replace
+
     preserve
-    collapse (max) treated (mean) raw_spend raw_price raw_qty avg_log_price avg_log_spend avg_log_qty num_suppliers precision recall spend_2013 (sum) obs_cnt (firstnm) suppliername agencyname mkt , by(uni_id category year)
+    collapse (max) treated (sum) raw_spend raw_qty obs_cnt (mean) raw_price avg_log_price avg_log_spend avg_log_qty num_suppliers precision recall spend_2013 (firstnm) suppliername agencyname mkt , by(uni_id category year)
+    gen log_raw_spend = ln(raw_spend)
+    gen log_raw_qty = ln(raw_qty)
     save ../output/uni_category_yr_`embed', replace
     restore
-    collapse (max) treated (mean) raw_spend raw_price raw_qty avg_log_price avg_log_spend avg_log_qty num_suppliers precision recall spend_2013  (firstnm) mkt (sum) obs_cnt , by(category year)
+
+    collapse (max) treated (mean) raw_price avg_log_price avg_log_spend avg_log_qty num_suppliers precision recall spend_2013  (firstnm) mkt (sum) raw_spend raw_qty obs_cnt , by(category year)
     save "../output/category_yr_`embed'", replace 
+                
+    use ../output/uni_category_yr_`embed', clear
     keep if category == "us fbs"
+    bys uni_id: gen num_years = _N
+    keep if num_years == 10
+    collapse (sum) raw_spend raw_qty (mean) raw_price , by(year)
     tw line raw_price year , xline(2014) xlab(2010(2)2019) xtitle("Year", size(small)) ytitle("Price of FBS", size(small)) legend(off pos(1) ring(0))
     graph export ../output/figures/fbs_price_over_time.pdf, replace      
     tw line raw_spend year , xline(2014) xlab(2010(2)2019) xtitle("Year", size(small)) ytitle("Spend of FBS", size(small)) legend(off pos(1) ring(0))
