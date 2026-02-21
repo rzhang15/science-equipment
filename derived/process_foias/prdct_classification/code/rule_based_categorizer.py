@@ -9,7 +9,7 @@ import re
 
 class RuleBasedCategorizer:
     def __init__(self, rules_filepath):
-        print("ℹ️ Initializing RuleBasedCategorizer with upgraded logic...")
+        print("Initializing RuleBasedCategorizer with upgraded logic...")
         try:
             with open(rules_filepath, 'r') as f:
                 raw_rules = yaml.safe_load(f)
@@ -32,7 +32,7 @@ class RuleBasedCategorizer:
             print(f"  - Loaded {len(self.hierarchical_veto_rules)} hierarchical veto rules.")
 
         except Exception as e:
-            print(f"❌ Error parsing market rules file: {e}")
+            print(f"ERROR:Error parsing market rules file: {e}")
             self.override_rules, self.veto_rules, self.hierarchical_veto_rules = [], {}, []
 
     def _get_regex(self, keyword, exact_match=False, ignore_case=True):
@@ -40,13 +40,19 @@ class RuleBasedCategorizer:
         cache_key = (keyword, exact_match, ignore_case)
         if cache_key in self._compiled_regexes:
             return self._compiled_regexes[cache_key]
-        
+
         is_substring = keyword.startswith('*') and keyword.endswith('*')
         cleaned_keyword = keyword.strip('*')
-        
-        parts = [re.escape(part) for part in cleaned_keyword.split()]
-        pattern_str = r'[\s-]?'.join(parts)
-        
+
+        # Handle internal wildcards: split on '*' first, then on spaces within each segment
+        segments = cleaned_keyword.split('*')
+        segment_patterns = []
+        for segment in segments:
+            parts = [re.escape(part) for part in segment.split()]
+            segment_patterns.append(r'[\s-]?'.join(parts))
+        # Join segments with .* to represent the internal wildcards
+        pattern_str = r'.*'.join(segment_patterns)
+
         if exact_match:
             final_pattern = r'^' + pattern_str + r'$'
         elif is_substring:
@@ -55,7 +61,7 @@ class RuleBasedCategorizer:
         else:
             # Standard mode: Uses word boundaries
             final_pattern = r'(?<!\w)' + pattern_str + r'(?!\w)'
-            
+
         flags = re.IGNORECASE if ignore_case else 0
         compiled_regex = re.compile(final_pattern, flags)
         self._compiled_regexes[cache_key] = compiled_regex

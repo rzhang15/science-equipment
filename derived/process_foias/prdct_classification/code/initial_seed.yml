@@ -10,7 +10,6 @@ keywords:
   - barrier tip
   - beveled-tip
   - beveled tip
-  - tip bulk
   - bevldtip
   
   - channel-pipette
@@ -153,7 +152,6 @@ keywords:
   - hitrap
   - hplc column
   - nativemark
-  - percoll
   - puradisc
   - redisep
   - sephadex
@@ -211,6 +209,13 @@ keywords:
   - cryodot
   - cryolabel
   - kimwipe
+  - kimwipes
+  - kim wipe
+  - kimtech
+  - kaydry
+  - wypall
+  - task wiper
+  - delicate task
   - parafilm
   - pap pen
   - sealing film
@@ -245,8 +250,7 @@ keywords:
   - temed
   - tris
   - tween
-  - accutase
-  
+
   # Solvents & Bulk Chemicals
   - methylenebisacrylamide
   - bleach
@@ -343,6 +347,13 @@ keywords:
   - mini-prep
   - midi-prep
   - maxi-prep
+  - trizol
+  - tri-reagent
+  - qiazol
+  - pmsf
+  - trypsin inhibitor
+  - dynabeads
+  - optical seal
   - mutagenesis
   - nucleofector
   - nucleospin
@@ -385,6 +396,12 @@ keywords:
   - anti-mouse
   - anti-rabbit
   - anti-rat
+  - anti-human
+  - anti-goat
+  - anti-histone
+  - anti-phospho
+  - monoclonal
+  - polyclonal
   - bca
   - biotin
   - bradford
@@ -477,7 +494,6 @@ keywords:
   - glutamn
   - glutmn
   - sodium pyruvt
-  - digitonin
   - sodium deoxycholate
   - lysozyme
   # Antibiotics & Small Molecules

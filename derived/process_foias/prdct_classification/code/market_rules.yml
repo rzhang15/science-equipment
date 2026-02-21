@@ -28,6 +28,64 @@ required_keywords:
     any_of:
       - "polyclonal"
       - "pab"
+      - "*antibod*"
+      - "anti-"
+      - "*igg*"
+      - "*serum*"
+  "enzyme activity assay":
+    any_of:
+      - "*enzyme*"
+      - "*activity*"
+      - "*assay*"
+  "dna shearing tube":
+    any_of:
+      - "*g-tube*"
+  "sterile filtered pipette tips":
+    any_of:
+      - "*filter*"
+      - "*fltr*"
+      - "*filt*"
+      - "*barrier*"
+      - "*tubeguard*"
+      - "*tubegard*"
+      - "*dualfilter*"
+      - "*softfit*"
+      - "*sftfitl*"
+      - "*softfitl*"
+      - "*avantguard*"
+  "low retention pipette tips":
+    any_of:
+      - "*low ret*"
+      - "*lw ret*"
+      - "*loret*"
+      - "*lort*"
+      - "*lobind*"
+      - "*lo bind*"
+      - "*lowbind*"
+      - "*lwbnd*"
+      - "*low bind*"
+      - "*low-ret*"
+      - "*low-bind*"
+      - "lr"
+      - "*lowretention*"
+      - "*rpt*"
+      - "*slick*"
+  "extended length pipette tips":
+    any_of:
+      - "*xl*"
+      - "*extended*"
+      - "*elongated*"
+      - "*xlng*"
+      - "*xlong*"
+      - "*x-long*"
+      - "*reach*"
+  "gel loading pipette tips":
+    any_of:
+      - "*gel*"
+      - "*loading*"
+      - "*round*"
+      - "*rnd*"
+
 
 # ==============================================================================
 # ALIASES: keyword_groups
@@ -64,6 +122,7 @@ keyword_groups:
     - "*ntl*"
     - "*nitr*"
     - "*ntrl*"
+    - "*ntr*"
   GLOVES:
     - "*glove*"
     - "*glv*"
@@ -93,6 +152,11 @@ keyword_groups:
     - "*fetal bovine serum*"
     - "*fetal calf serum*"
     - "fcs"
+    - "fb essence"
+    - "usda tested serum"
+    - "fbs500"
+    - "usda approved origin"
+    - "fetalclone"
   RESTRICTION_ENZYME:
     - AclI
     - HindIII-HF
@@ -387,19 +451,198 @@ keyword_groups:
 # ==============================================================================
 market_rules:
   # --- Restriction Enzymes (Highly Specific) ---
+  # Exclude synthetic oligos/plasmids: Sigma-Aldrich cloning primers contain
+  # RE site names in their primer name (e.g. "Pdzd2 SalI For") and have
+  # "ConfigurationID", "Synthesis Scale", or long DNA sequences in the
+  # description. True RE products are short descriptions like "EcoRI 10,000U".
+  # NOTE: case_sensitive applies to ALL fields including none_of, so use
+  # exact case matching for exclusion terms.
   - name: "restriction enzymes"
     case_sensitive: true
     any_of:
       - $RESTRICTION_ENZYME
+    none_of:
+      - "*ConfigurationID*"
+      - "*Synthesis Scale*"
+      - "*DNA Oligo*"
+      - "*Oligo Name*"
+      - "*Sequence (5*"
+      - "*Cloning site*"
+      - "*cloning site*"
+      - "*Gene Synthesis*"
+      - "*gene synthesis*"
 
   # --- Antibodies (Specific) ---
+  # IMPORTANT: Order matters! Most specific rules first.
+  # 1. Explicit secondary (text says "secondary")
+  # 2. Alexa Fluor secondaries (species host signals: donkey/goat anti-X)
+  # 3. Alexa Fluor monoclonal primaries (CD markers)
+  # 4. Alkaline phosphatase conjugated secondaries
+  # 5. Other conjugated secondaries (IRDye, HRP)
+  # 6. Anti-mouse IgG secondaries (whole molecule patterns)
+  # 7. Explicit polyclonal primary
+  # 8. Explicit monoclonal primary
+  # 9. "rabbit mab" catch-all for monoclonal
+
+  # --- 1. Explicit secondary antibodies ---
+  - name: "monoclonal secondary antibody"
+    all_of: ["secondary", "antibody", "monoclonal"]
   - name: "polyclonal secondary antibody"
     all_of: ["secondary", "antibody"]
+    none_of: ["monoclonal"]
+
+  # --- 2. Alexa Fluor conjugated secondary antibodies ---
+  # These are labeled by host species producing the antibody (donkey/goat/chicken)
+  # targeting another species' IgG. The "alexa fluor" + host species pattern
+  # distinguishes them from Alexa Fluor-conjugated primary antibodies.
+  - name: "polyclonal secondary antibody"
+    all_of: ["*alexa fluor*", "*donkey*"]
+    any_of: ["*anti-mouse*", "*anti-rabbit*", "*anti-rat*", "*anti-goat*", "*anti-human*", "*anti-sheep*", "*anti-chicken*"]
+    none_of: ["monoclonal", "*phalloidin*"]
+  - name: "polyclonal secondary antibody"
+    all_of: ["*alexa fluor*", "*goat*"]
+    any_of: ["*anti-mouse*", "*anti-rabbit*", "*anti-rat*", "*anti-human*", "*anti-chicken*"]
+    none_of: ["monoclonal", "*phalloidin*"]
+  - name: "polyclonal secondary antibody"
+    all_of: ["*alexa fluor*", "*chicken*"]
+    any_of: ["*anti-mouse*", "*anti-rabbit*", "*anti-rat*", "*anti-goat*", "*anti-human*"]
+    none_of: ["monoclonal", "*phalloidin*"]
+  # Alexa Fluor + f(ab) fragment = secondary
+  - name: "polyclonal secondary antibody"
+    all_of: ["*alexa fluor*", "*f(ab*"]
+    none_of: ["monoclonal", "*phalloidin*"]
+  # Alexa Fluor + IgG (H+L) = secondary
+  - name: "polyclonal secondary antibody"
+    all_of: ["*alexa fluor*", "*igg*"]
+    any_of: ["*anti-mouse*", "*anti-rabbit*", "*anti-rat*", "*anti-goat*", "*anti-human*"]
+    none_of: ["monoclonal", "*phalloidin*", "*cd*"]
+
+  # --- 3. Alexa Fluor conjugated monoclonal PRIMARY antibodies ---
+  # Flow cytometry antibodies: Alexa Fluor + anti-mouse/human CD markers
+  - name: "monoclonal primary antibody"
+    all_of: ["*alexa fluor*", "*anti-mouse*"]
+    any_of: ["*cd*", "*ly-*", "*ly6*", "*ter-*", "*nk*", "*gl7*", "*f4/80*"]
+    none_of: ["*igg*", "*igm*", "*secondary*", "*donkey*", "*goat*", "*chicken*"]
+  - name: "monoclonal primary antibody"
+    all_of: ["*alexa fluor*", "*anti-human*"]
+    any_of: ["*cd*"]
+    none_of: ["*igg*", "*igm*", "*secondary*", "*donkey*", "*goat*", "*chicken*"]
+  - name: "monoclonal primary antibody"
+    all_of: ["*alexa fluor*", "*anti-mu*"]
+    any_of: ["*cd*", "*ly-*", "*ly6*", "*ter-*", "*nk*", "*gl7*", "*f4/80*"]
+    none_of: ["*igg*", "*igm*", "*secondary*", "*donkey*", "*goat*", "*chicken*"]
+
+  # --- Remaining Alexa Fluor secondary rules (no host species specified) ---
+  - name: "polyclonal secondary antibody"
+    all_of: ["*alexa fluor*", "*anti-mouse*"]
+    none_of: ["monoclonal", "*phalloidin*", "*cd*", "*ly-*", "*ly6*", "*ter-*", "*nk*", "*gl7*", "*f4/80*"]
+  - name: "polyclonal secondary antibody"
+    all_of: ["*alexa fluor*", "*anti-rabbit*"]
+    none_of: ["monoclonal", "*phalloidin*"]
+  - name: "polyclonal secondary antibody"
+    all_of: ["*alexa fluor*", "*anti-rat*"]
+    none_of: ["monoclonal", "*phalloidin*"]
+  - name: "polyclonal secondary antibody"
+    all_of: ["*alexa fluor*", "*anti-human*"]
+    none_of: ["monoclonal", "*phalloidin*", "*cd*"]
+  - name: "polyclonal secondary antibody"
+    all_of: ["*alexa fluor*", "*anti-goat*"]
+    none_of: ["monoclonal", "*phalloidin*"]
+
+  # --- 4. Alkaline phosphatase conjugated secondary antibodies ---
+  - name: "polyclonal secondary antibody"
+    all_of: ["*alkaline phosphatase*", "*anti-*"]
+    any_of: ["*igg*", "*goat*", "*donkey*", "*rabbit*", "*mouse*"]
+    none_of: ["monoclonal"]
+  - name: "polyclonal secondary antibody"
+    all_of: ["*ap*", "*anti-*", "*igg*"]
+    any_of: ["*goxmo*", "*goat*", "*donkey*"]
+    none_of: ["monoclonal"]
+
+  # --- 5. Other conjugated secondary antibodies ---
+  - name: "polyclonal secondary antibody"
+    all_of: ["*irdye*", "*anti-*"]
+    none_of: ["monoclonal"]
+  - name: "polyclonal secondary antibody"
+    all_of: ["*hrp*", "*anti-*", "*igg*"]
+    none_of: ["monoclonal"]
+  - name: "polyclonal secondary antibody"
+    all_of: ["*hrp*", "*anti-*"]
+    any_of: ["*goat*", "*donkey*", "*rabbit*", "*chicken*"]
+    none_of: ["monoclonal"]
+  # anti-mouse IgG (whole molecule) patterns = secondary
+  - name: "polyclonal secondary antibody"
+    all_of: ["*anti-mouse*", "*igg*"]
+    any_of: ["*whole*", "*h+l*", "*handl*", "*h&l*", "*f(ab*"]
+    none_of: ["monoclonal", "*cd*"]
+  - name: "polyclonal secondary antibody"
+    all_of: ["*anti-rabbit*", "*igg*"]
+    any_of: ["*whole*", "*h+l*", "*handl*", "*h&l*", "*f(ab*"]
+    none_of: ["monoclonal"]
+  # Donkey/goat anti-X igg without conjugate label = still secondary
+  - name: "polyclonal secondary antibody"
+    all_of: ["*donkey*", "*anti-*", "*igg*"]
+    none_of: ["monoclonal"]
+  - name: "polyclonal secondary antibody"
+    all_of: ["*goat*", "*anti-*", "*igg*"]
+    none_of: ["monoclonal", "*polyclonal*", "*pab*"]
+
+  # --- Monoclonal primary: flow cytometry conjugated antibodies ---
+  # These contain fluorophore + anti-mouse CD markers. They are directly conjugated
+  # monoclonal primaries, NOT secondaries. Must come BEFORE secondary rules.
+  - name: "monoclonal primary antibody"
+    all_of: ["*anti-mouse*", "*cd*"]
+    any_of: ["*fitc*", "*pe *", "*apc*", "*percp*", "*brilliant violet*", "*bv*", "*pacific blue*"]
+    none_of: ["*igg*", "*igm*", "*secondary*"]
+  - name: "monoclonal primary antibody"
+    all_of: ["*anti-human*", "*cd*"]
+    any_of: ["*fitc*", "*pe *", "*apc*", "*percp*", "*brilliant violet*", "*bv*", "*pacific blue*"]
+    none_of: ["*igg*", "*igm*", "*secondary*"]
+  - name: "monoclonal primary antibody"
+    all_of: ["*anti-mouse*"]
+    any_of: ["*pure*", "*purified*"]
+    none_of: ["*igg*", "*igm*", "*secondary*", "*alexa fluor*", "*hrp*", "*irdye*"]
+  # Flow cytometry: fluorophore + anti-mouse + cytokine/interleukin/marker targets
+  # These are BioLegend-style conjugated monoclonal primaries (NOT secondaries)
+  - name: "monoclonal primary antibody"
+    any_of: ["*fitc*", "*pe *", "*apc*", "*percp*", "*brilliant violet*", "*bv*", "*pacific blue*"]
+    all_of: ["*anti-mouse*"]
+    none_of: ["*igg*", "*igm*", "*secondary*", "*donkey*", "*goat*", "*chicken*"]
+  - name: "monoclonal primary antibody"
+    any_of: ["*fitc*", "*pe *", "*apc*", "*percp*", "*brilliant violet*", "*bv*", "*pacific blue*"]
+    all_of: ["*anti-human*"]
+    none_of: ["*igg*", "*igm*", "*secondary*", "*donkey*", "*goat*", "*chicken*", "*cd*"]
+  # Flow cytometry anti-mouse markers without explicit fluorophore
+  - name: "monoclonal primary antibody"
+    all_of: ["*anti-m*", "*f4/80*"]
+    none_of: ["*igg*", "*secondary*"]
+  - name: "monoclonal primary antibody"
+    all_of: ["*anti-mu*"]
+    any_of: ["*cd*", "*ly-*", "*ly6*", "*ter-*", "*nk*", "*gl7*", "*f4/80*"]
+    none_of: ["*igg*", "*igm*", "*secondary*", "*donkey*", "*goat*"]
+  - name: "monoclonal primary antibody"
+    all_of: ["*apc*", "*anti-mu*"]
+    none_of: ["*igg*", "*igm*", "*secondary*"]
+  # TruStain / Fc block antibodies = monoclonal primary
+  - name: "monoclonal primary antibody"
+    any_of: ["*trustain*", "*fc block*", "*fcx*"]
+    all_of: ["*anti-*"]
+    none_of: ["*secondary*"]
+
+  # --- 6. Polyclonal primary antibody ---
   - name: "polyclonal primary antibody"
-    all_of: "antibody"
+    all_of: ["antibody"]
     any_of:
       - "polyclonal"
       - "pab"
+  - name: "polyclonal primary antibody"
+    all_of: ["*rabbit polyclonal*"]
+  - name: "polyclonal primary antibody"
+    all_of: ["*goat polyclonal*"]
+  - name: "polyclonal primary antibody"
+    all_of: ["*rabbit polyab*"]
+
+  # --- 7. Monoclonal primary antibody ---
   - name: "monoclonal primary antibody"
     all_of:
       - "monoclonal"
@@ -410,7 +653,112 @@ market_rules:
       - "anti"
   - name: "monoclonal primary antibody"
     all_of:
+      - "*mouse mono*"
+  - name: "monoclonal primary antibody"
+    all_of:
+      - "*rabbit mono*"
+  - name: "monoclonal primary antibody"
+    all_of:
       - "mab"
+    none_of:
+      - "*secondary*"
+      - "*alexa fluor*"
+      - "*irdye*"
+      - "*hrp*"
+      - "*anti-static*"
+      - "*zerostat*"
+  - name: "monoclonal primary antibody"
+    all_of:
+      - "*clone*"
+      - "*antibod*"
+  # --- "rabbit mab" pattern: dominant monoclonal format (64% of correct items) ---
+  - name: "monoclonal primary antibody"
+    all_of:
+      - "*rabbit mab*"
+    none_of:
+      - "*secondary*"
+      - "*alexa fluor*"
+      - "*irdye*"
+      - "*hrp*"
+
+  # --- 8. Target-name and clone-code rules for mono vs poly disambiguation ---
+  # EPR/EP clone codes (Abcam recombinant monoclonal): 18 mono / 1 poly in data
+  - name: "monoclonal primary antibody"
+    all_of: ["*antibod*"]
+    any_of: ["*epr*", "*ep1*", "*ep2*"]
+    none_of: ["*secondary*", "*polyclonal*", "*pab*"]
+  # Safe monoclonal targets (100% mono in gold data, no poly collisions)
+  - name: "monoclonal primary antibody"
+    all_of: ["*antibod*", "*f4/80*"]
+    none_of: ["*secondary*", "*polyclonal*", "*pab*"]
+  - name: "monoclonal primary antibody"
+    all_of: ["*antibod*", "*pd-l1*"]
+    none_of: ["*secondary*", "*polyclonal*", "*pab*"]
+  - name: "monoclonal primary antibody"
+    all_of: ["*antibod*", "*cd68*"]
+    none_of: ["*secondary*", "*polyclonal*", "*pab*"]
+  - name: "monoclonal primary antibody"
+    all_of: ["*antibod*", "*cd62l*"]
+    none_of: ["*secondary*", "*polyclonal*", "*pab*"]
+  - name: "monoclonal primary antibody"
+    all_of: ["*antibod*", "*vdac*"]
+    none_of: ["*secondary*", "*polyclonal*", "*pab*"]
+  - name: "monoclonal primary antibody"
+    all_of: ["*antibod*", "*cox-2*"]
+    none_of: ["*secondary*", "*polyclonal*", "*pab*"]
+  - name: "monoclonal primary antibody"
+    all_of: ["*antibod*", "*tmem119*"]
+    none_of: ["*secondary*", "*polyclonal*", "*pab*"]
+  # anti-F4/80 without "antibody" (BioLegend flow cytometry items)
+  - name: "monoclonal primary antibody"
+    all_of: ["*anti-f4/80*"]
+    none_of: ["*secondary*", "*polyclonal*", "*igg*"]
+  # anti-PD-L1 / anti pd l1 without "antibody"
+  - name: "monoclonal primary antibody"
+    any_of: ["*anti-pd-l1*", "*anti pd l1*"]
+    none_of: ["*secondary*", "*polyclonal*"]
+  # anti-CD markers without "antibody" (flow cytometry primaries)
+  - name: "monoclonal primary antibody"
+    all_of: ["*anti-cd68*"]
+    none_of: ["*secondary*", "*polyclonal*", "*igg*"]
+  - name: "monoclonal primary antibody"
+    all_of: ["*anti-cd62l*"]
+    none_of: ["*secondary*", "*polyclonal*", "*igg*"]
+
+  # --- 9. Antibody rescue rules for items falling to Non-Lab ---
+  # "anti-" prefix + "antibod" keyword = definitely an antibody (not anti-static etc.)
+  # These go polyclonal as the safe default (polyclonal is the "unmarked" category)
+  - name: "polyclonal primary antibody"
+    all_of: ["*anti-*", "*antibod*"]
+    none_of:
+      - "*secondary*"
+      - "*monoclonal*"
+      - "*mab*"
+      - "*digoxigenin*"
+      - "*mouse monoclonal*"
+      - "*duolink*"
+      - "*pla probe*"
+      - "*immpress*"
+  # "anti-phospho-" pattern = phospho-specific antibody (polyclonal primary)
+  - name: "polyclonal primary antibody"
+    all_of: ["*anti-phospho*"]
+    none_of: ["*secondary*", "*monoclonal*", "*mab*"]
+  # "anti-histone" pattern
+  - name: "polyclonal primary antibody"
+    all_of: ["*anti-histone*"]
+    none_of: ["*secondary*", "*monoclonal*", "*mab*"]
+  # "anti-acetyl-" pattern
+  - name: "polyclonal primary antibody"
+    all_of: ["*anti-acetyl*"]
+    none_of: ["*secondary*", "*monoclonal*", "*mab*"]
+  # MA5-xxxxx = Invitrogen/Thermo catalog prefix for antibodies (13/15 are polyclonal primary)
+  - name: "polyclonal primary antibody"
+    any_of: ["*ma542*", "*ma534*", "*ma532*", "*ma536*"]
+    none_of: ["*cable*", "*adapter*"]
+  # "developed in rabbit/goat" without "antibody" keyword = polyclonal primary
+  - name: "polyclonal primary antibody"
+    all_of: ["*anti-*", "*developed*"]
+    none_of: ["*secondary*", "*monoclonal*"]
 
   # --- PCR, qPCR & Molecular Biology Reagents ---
   - name: "rnase inhibitors"
@@ -424,6 +772,12 @@ market_rules:
     all_of:
       - "*rnase*"
       - "*inhib*"
+    none_of:
+      - "*iscript*"
+      - "*pcr tube*"
+      - "*pcr tb*"
+      - "*tempassure*"
+      - "*pyrogen*"
   - name: "high-fidelity dna polymerases"
     all_of:
       - "ventsupreg"
@@ -540,6 +894,11 @@ market_rules:
   - name: "first-strand cdna synthesis systems"
     all_of:
       - "iscript"
+    none_of:
+      - "*rnase*"
+  - name: "first-strand cdna synthesis systems"
+    all_of:
+      - "iscript"
       - "supermix"
   - name: "first-strand cdna synthesis systems"
     all_of:
@@ -565,7 +924,13 @@ market_rules:
       - "sirna"
       - "predesigned"
   - name: "synthetic peptides"
-    all_of: "peptides"
+    all_of: ["peptides"]
+    any_of:
+      - "synthetic"
+      - "custom"
+      - "synthesis"
+      - "fmoc"
+      - "boc"
   - name: "synthetic sirna" 
     all_of:
       - "sirna"
@@ -583,8 +948,45 @@ market_rules:
       - "*oligo*"
       - "rna"
   - name: "transfection reagents"
-    all_of:
+    any_of:
       - "lipofectamine"
+      - "*lipofectamin*"
+      - "*fugene*"
+      - "*effectene*"
+      - "*cellfectin*"
+      - "*xfect*"
+      - "*polybrene*"
+      - "*jetprime*"
+      - "*turbofect*"
+      - "*transfect*"
+    none_of:
+      - "*sirna*"
+      - "*shrna*"
+      - "*rnai*"
+  - name: "viability stains"
+    any_of:
+      - "*trypan blue*"
+      - "*propidium iodide*"
+      - "*calcein*"
+      - "*live*dead*"
+      - "*livedead*"
+      - "*zombie*"
+      - "*mitotracker*"
+  - name: "viability stains"
+    all_of:
+      - "*annexin*"
+      - "*dead*"
+  - name: "nitrogen"
+    all_of:
+      - "nitrogen"
+      - "*purity*"
+    none_of:
+      - "*liquid*"
+      - "*urea*"
+      - "*carbon*"
+      - "*element*"
+      - "*yeast*"
+      - "*cylinder*"
   - name: "histology & cell stains"
     any_of:
       - "schiffs reagent"
@@ -615,9 +1017,6 @@ market_rules:
   - name: "protein gel stains"
     all_of:
       - "gelstar"
-  - name: "protein gel stains"
-    all_of:
-      - "gelcode"
   - name: "protein gel stains"
     all_of:
       - "stains-all"
@@ -931,10 +1330,68 @@ market_rules:
     none_of:
       - "sequence"
 
+  # --- RNA Extraction ---
+  - name: "rna extraction reagents"
+    any_of:
+      - "*trizol*"
+      - "*tri-reagent*"
+      - "*tri reagent*"
+      - "*qiazol*"
+
+  # --- Magnetic Beads ---
+  - name: "magnetic polystyrene beads"
+    any_of:
+      - "*dynabeads*"
+    none_of:
+      - "*streptavidin*"
+      - "*protein a*"
+      - "*protein g*"
+      - "*anti-*"
+      - "*oligo*"
+
+  # --- Protease Inhibitors (individual, not cocktails) ---
+  - name: "protease inhibitors"
+    any_of:
+      - "*trypsin inhibitor*"
+      - "*pmsf*"
+      - "*phenylmethylsulfonyl*"
+      - "*aprotinin*"
+      - "*leupeptin*"
+      - "*pepstatin*"
+    none_of:
+      - "*cocktail*"
+
+  # --- Microplate Sealing ---
+  - name: "microplate sealing films and tapes"
+    all_of:
+      - "*seal*"
+      - "*tape*"
+    none_of:
+      - "*pipet*"
+  - name: "microplate sealing films and tapes"
+    all_of:
+      - "*seal*"
+      - "*film*"
+      - "*plate*"
+  - name: "microplate sealing films and tapes"
+    all_of:
+      - "*optical*"
+      - "*seal*"
+
+  # --- Sodium Sulfate ---
+  - name: "sodium sulfate"
+    any_of:
+      - "*sodium sulfate*"
+      - "*sod sulft*"
+      - "*na2so4*"
+      - "*sodium sulphate*"
+
   # --- Protein Work Reagents (BSA, Buffers, Detergents, Membranes, Ladders) ---
   - name: "bovine serum albumin"
     all_of:
       - "bsa"
+    none_of:
+      - $BUFFER
   - name: "bovine serum albumin"
     all_of:
       - "bovine"
@@ -948,11 +1405,11 @@ market_rules:
   - name: "laemmli sample buffer"
     all_of:
       - "laemmli"
-      - "buffer"
+      - $BUFFER
   - name: "laemmli sample buffer"
     all_of:
       - "laemmli"
-      - "buf"
+      - $BUFFER
   - name: "pvdf blotting membranes"
     all_of:
       - "pvdf"
@@ -1030,18 +1487,31 @@ market_rules:
   - name: "acidic ph buffers"
     all_of:
       - "ph"
-      - "buffer"
+      - $BUFFER
       - "4"
   - name: "basic ph buffers"
     all_of:
       - "ph"
-      - "buffer"
+      - $BUFFER
       - "10"
   - name: "neutral ph buffers"
     all_of:
       - "ph"
-      - "buffer"
+      - $BUFFER
       - "7"
+  - name: "hepes buffer"
+    all_of:
+      - "hepes"
+      - "sodium"
+      - "salt"
+  - name: "hepes buffer"
+    all_of:
+      - "hepes"
+      - $BUFFER
+  - name: "phosphate-buffered saline (pbs) buffer"
+    all_of:
+      - "fta hemaglutn"
+      - "7.2"
   - name: "cell lysis detergents"
     all_of: 
       - "sodium" 
@@ -1165,6 +1635,45 @@ market_rules:
   - name: "pre-stained protein molecular-weight ladder"
     all_of: ["*ladder*"]
     any_of: ["*spectra*", "*seeblue*", "pageruler", "precision plus", "ez-run", "novex"]
+  - name: "Non-Lab"
+    all_of:
+      - "*mini-protean*"
+      - "*plate*"
+  - name: "Non-Lab"
+    all_of:
+      - "*mini-protean*"
+      - "*cassette*"
+  - name: "Non-Lab"
+    all_of:
+      - "*mini-protean*"
+      - "*comb*"
+  - name: "Non-Lab"
+    all_of:
+      - "*mini-protean*"
+      - "*cooling unit*"
+  - name: "pre-cast bis-tris gels"
+    any_of:
+      - "*nupage*"
+      - "*bolt*bis*tris*"
+    none_of:
+      - "*buffer*"
+      - "*stain*"
+  - name: "pre-cast bis-tris gels"
+    all_of:
+      - "*bis*tris*"
+      - "*gel*"
+    none_of:
+      - "*buffer*"
+      - "*stain*"
+  - name: "protease inhibitor cocktails"
+    any_of:
+      - "*complete mini*"
+      - "*complete ultra*"
+      - "*halt protease*"
+      - "*protease inhibitor cocktail*"
+      - "*protease inhib cock*"
+    none_of:
+      - "*phosphatase*"
   - name: "pre-cast tris-glycine gels"
     all_of:
       - "*tgx*"
@@ -1174,53 +1683,201 @@ market_rules:
       - "*tri*"
       - "*gly*"
       - "*gel*"
+  - name: "pre-cast tris-tricine gels"
+    all_of:
+      - "*tris*"
+      - "*tricine*"
+      - "*gel*"
   - name: "pre-cast tris-glycine gels"
     all_of:
       - "*tg*"
       - "*novex*"
+    none_of:
+      - "*hand casting*"
   - name: "nucleic acid modifying enzymes"
     any_of: ["t5 exonuclease", "alkaline phosphatase", "t4 polynucleotide kinase", "terminal transferase", "t5 exonuclease" , "t4 dna ligase"]
 
   # --- Cell Culture Media & Reagents ---
-  - name: "liquid basal media, not chemically defined"
+  # MOST SPECIFIC media rules first, then general catch-alls at the end.
+
+  # --- Specific media formulations (place before general DMEM/EMEM rules) ---
+  - name: "hams f12"
+    any_of:
+      - "*ham*f*12*"
+      - "*f-12*"
+      - "*f 12 nutrient*"
+    none_of:
+      - "*dmem*"
+      - "*dme*f*12*"
+
+  - name: "mccoys 5a"
     all_of:
       - "*mccoy*"
       - "5a"
-  - name: "liquid basal media, not chemically defined"
-    all_of:
+
+  - name: "leibovitz l15 media"
+    any_of:
       - "*leibovitz*"
-      - "med"
-  - name: "liquid basal media, not chemically defined"
-    all_of:
-      - "rhtgf-b1"
-  - name: "liquid basal media, not chemically defined"
+      - "*l-15 medium*"
+      - "*l-15 medi*"
+    none_of:
+      - "*kimwipe*"
+      - "*kim wipe*"
+
+  - name: "neurobasal medium"
+    any_of:
+      - "*neurobasal*"
+
+  - name: "imdm"
+    any_of:
+      - "*imdm*"
+      - "*iscove*"
+
+  - name: "insect cell media"
+    any_of:
+      - "*sf 900*"
+      - "*sf900*"
+      - "*sf-900*"
+      - "*schneider*drosophila*"
+      - "*ex-cell*"
+      - "*excell*"
+      - "*sfx insect*"
+      - "*insect*medium*"
+      - "*insect*media*"
+      - "formula 4-24"
+
+  - name: "stem cell media"
+    any_of:
+      - "*stempro*"
+      - "*mtesr*"
+      - "*stemline*"
+      - "*matrigel*organ*"
+
+  - name: "bme"
     all_of:
       - "bme"
-      - "glutamine"
-  - name: "liquid basal media, not chemically defined"
+    none_of:
+      - "*dmem*"
+      - "*imdm*"
+      - "*emem*"
+
+  - name: "bme"
     all_of:
-      - "basal"
+      - "basal medium eagle"
+
+  - name: "medium 199"
+    any_of:
+      - "*med*199*"
+      - "*medium 199*"
+
+  - name: "tyrodes solution"
+    any_of:
+      - "*tyrode*"
+
+  - name: "smem"
+    all_of:
+      - "smem"
+
+  - name: "liver media"
+    any_of:
+      - "*liver digest*"
+      - "*liver perfusion*"
+    none_of:
+      - "*williams*"
+
+  - name: "liver media"
+    all_of:
+      - "*williams*"
       - "med"
-  - name: "liquid basal media, not chemically defined"
+
+  - name: "keratinocyte tissue media"
+    any_of:
+      - "*keratinocyte*sfm*"
+      - "*keratinocyte*medium*"
+
+  - name: "cardiomyocyte tissue media"
+    any_of:
+      - "*claycomb*"
+
+  - name: "corneal tissue media"
+    any_of:
+      - "*corneal*epithelial*growth*"
+
+  - name: "neural media"
+    any_of:
+      - "*hibernate*"
+      - "*neurocult*"
+
+  - name: "prostate breast media"
+    any_of:
+      - "*brff*"
+
+  # --- Major media formulations ---
+  # DMEM includes DMEM/F-12 mixes (these are DMEM variants with Ham's F-12 supplement)
+  - name: "dmem"
+    any_of:
+      - "*dmem*"
+      - "*dulbecco*modified*"
+    none_of:
+      - "*buf*"
+  - name: "dmem"
+    all_of:
+      - "*dme*"
+      - "*f-12*"
+
+  - name: "dmem"
+    all_of:
+      - "*dme*"
+      - "*f 12*"
+
+  - name: "dmem"
     all_of:
       - "*dme*"
       - "media"
-  - name: "liquid basal media, not chemically defined"
-    all_of:
-      - "*dmem*"
-  - name: "liquid basal media, not chemically defined"
-    all_of:
-      - "*dulbecco*"
-      - "modified"
-  - name: "liquid basal media, not chemically defined"
-    all_of:
-      - "rpmi 1640"
-  - name: "liquid basal media, not chemically defined"
-    all_of:
+    none_of:
+      - "*f-12*"
+      - "*f 12*"
+
+  - name: "rpmi"
+    any_of:
+      - "*rpmi*"
+
+  - name: "emem"
+    any_of:
       - "*emem*"
-  - name: "liquid basal media, not chemically defined"
+      - "*eagle*medi*"
+      - "*eagle*minimum*essential*"
+    none_of:
+      - "*dulbecco*"
+      - "*dmem*"
+
+  - name: "dme"
     all_of:
-      - "*eagle medi*"
+      - "dme"
+    none_of:
+      - "*dmem*"
+      - "*emem*"
+      - "*imdm*"
+      - "*f-12*"
+      - "*f 12*"
+
+  # --- Transforming Growth Factor (previously misclassified as basal media) ---
+  - name: "transforming growth factor"
+    any_of:
+      - "rhtgf-b1"
+
+  # --- General catch-all for unclassified basal media ---
+  - name: "dry basal media, not chemically defined"
+    all_of:
+      - "basal"
+      - "med"
+    none_of:
+      - "*neurobasal*"
+      - "*dmem*"
+      - "*emem*"
+      - "*rpmi*"
+      - "*imdm*"
+      - "bme"
   - name: "dehydrated bacterial broth"
     all_of: 
       - "soc"
@@ -1302,7 +1959,7 @@ market_rules:
     all_of:
       - "egs"
   - name: "crosslinking reagents"
-    all_Zall_of:
+    all_of:
       - "edc"
   - name: "crosslinking reagents"
     all_of:
@@ -1342,10 +1999,21 @@ market_rules:
       - "hexane"
   - name: "tris base"
     all_of: ["tris", "base"]
-    non_of: "("
+    none_of: ["("]
   - name: "slide mounting medium"
-    all_of:
+    any_of:
       - "*fluoromount*"
+      - "*fluoro-gel*"
+      - "*vectashield*"
+      - "*vector shield*"
+      - "*histomount*"
+      - "*prolong gold*"
+      - "*prolong glass*"
+      - "*prolong diamond*"
+      - "*antifade mount*"
+      - "*dpx mountant*"
+      - "*crystal bond*"
+      - "*mounting medi*"
 
   # --- Specific Labware (Filters, Concentrators) ---
   - name: "syringe filters"
@@ -1395,6 +2063,257 @@ market_rules:
   - name: "bottle top filters"
     all_of: ["*aspirator*", "*pes*"]
 
+  # --- Cuvettes (electroporation BEFORE generic spectrophotometer) ---
+  - name: "electroporation cuvettes"
+    all_of:
+      - "*cuvet*"
+      - "*gap*"
+  - name: "electroporation cuvettes"
+    all_of:
+      - "*cuvet*"
+      - "*electro*"
+  - name: "fluorescence cuvettes"
+    all_of:
+      - "*cuvet*"
+      - "*fluorescen*"
+  - name: "spectrophotometer cuvettes"
+    all_of:
+      - "*cuvet*"
+    none_of:
+      - "*electro*"
+      - "*fluorescen*"
+      - "*gap*"
+      - "*rack*"
+      - "*holder*"
+
+  # --- Competent Cells ---
+  - name: "chemically competent cells"
+    any_of:
+      - "*one shot*"
+      - "*oneshot*"
+      - "*subcloning*"
+    none_of:
+      - "*electrocomp*"
+  - name: "chemically competent cells"
+    all_of:
+      - "*competent*"
+      - "*cell*"
+    none_of:
+      - "*electrocomp*"
+      - "*expression*"
+
+  # --- Wash Bottles ---
+  - name: "wash bottles"
+    any_of:
+      - "*wash bottle*"
+      - "*bottle wash*"
+      - "*wb ez-sqz*"
+      - "*wash btl*"
+      - "*washbtl*"
+
+  # --- Colorimetric Substrates ---
+  - name: "colorimetric substrates"
+    any_of:
+      - "*griess reagent*"
+      - "*tetrazolium*"
+      - "*onpg*"
+      - "*o-nitrophenyl*"
+      - "*pnpp*"
+      - "*p-nitrophenyl*"
+      - "*tmb substrate*"
+      - "*abts substrate*"
+
+  # --- Glass Beakers ---
+  - name: "glass beakers"
+    all_of:
+      - "*beaker*"
+      - "*glass*"
+  - name: "glass beakers"
+    all_of:
+      - "*beaker*"
+      - "*pyrex*"
+  - name: "glass beakers"
+    all_of:
+      - "*beaker*"
+      - "*griffin*"
+
+  # --- Boiling Flasks ---
+  - name: "boiling flasks"
+    all_of:
+      - $FLASK
+      - "*boil*"
+  - name: "boiling flasks"
+    all_of:
+      - $FLASK
+      - "*round*"
+      - "*bottom*"
+    none_of:
+      - "*cell*"
+      - "*culture*"
+      - "*glass bottom dish*"
+  - name: "boiling flasks"
+    all_of:
+      - $FLASK
+      - "*rb*"
+      - "*24/40*"
+
+  # --- Cell Culture Dishes ---
+  - name: "cell culture dishes"
+    all_of:
+      - "*dish*"
+      - "*glass bottom*"
+  - name: "cell culture dishes"
+    all_of:
+      - "*dish*"
+      - "*tc*"
+    none_of:
+      - "*crystalliz*"
+      - "*petri*"
+
+  # --- Cell Culture Plates ---
+  - name: "cell culture plates"
+    all_of:
+      - $PLATE
+      - "*well*"
+      - "*tc*"
+    none_of:
+      - "*no-tc*"
+      - "*non-tc*"
+  - name: "cell culture plates"
+    all_of:
+      - $PLATE
+      - "*well*"
+      - "*tissue culture*"
+    none_of:
+      - "*no-tc*"
+      - "*non-tc*"
+
+  # --- Cell Culture Flasks (catch T-flask patterns before general flask rules) ---
+  - name: "cell culture flasks"
+    all_of:
+      - $FLASK
+    any_of:
+      - "*canted*"
+      - "*vented*"
+      - "*nunclon*"
+      - "*nunc*"
+      - "*cellstar*"
+      - "*t25*"
+      - "*t75*"
+      - "*t150*"
+      - "*t175*"
+      - "*t225*"
+
+  # --- Microcentrifuge Tubes ---
+  - name: "microcentrifuge tubes"
+    all_of:
+      - "*microcent*"
+      - "*tube*"
+  - name: "microcentrifuge tubes"
+    all_of:
+      - "*microfuge*"
+      - "*tube*"
+  - name: "microcentrifuge tubes"
+    any_of:
+      - "*microtube*"
+      - "*micro tube*"
+    none_of:
+      - "*rack*"
+      - "*centrifuge tube*"
+  - name: "microcentrifuge tubes"
+    all_of:
+      - "*eppendorf*"
+      - "*tube*"
+    none_of:
+      - "*rack*"
+      - "*pcr*"
+      - "*configurationid*"
+
+  # --- PCR Tubes ---
+  - name: "pcr tube strips"
+    all_of:
+      - "*pcr*"
+      - "*tube*"
+      - "*strip*"
+    none_of:
+      - "*rack*"
+      - "*configurationid*"
+  - name: "pcr tube strips"
+    all_of:
+      - "*pcr*"
+      - "*strp*"
+    none_of:
+      - "*rack*"
+      - "*tip*"
+      - "*configurationid*"
+  - name: "pcr tubes"
+    all_of:
+      - "*pcr*"
+      - "*tube*"
+    none_of:
+      - "*strip*"
+      - "*rack*"
+      - "*tip*"
+      - "*configurationid*"
+      - "*oligo*"
+      - "*sequence*"
+      - "*cap*"
+
+  # --- Sample Vials ---
+  - name: "sample vials"
+    all_of:
+      - "*vial*"
+    any_of:
+      - "*headspace*"
+      - "*headspc*"
+      - "*amber*"
+      - "*reaction*"
+      - "*sample*"
+      - "*dram*"
+      - "*snap cap*"
+    none_of:
+      - "*scintillation*"
+      - "*scntl*"
+
+  # --- Centrifuge Conical Tubes ---
+  - name: "centrifuge conical tubes"
+    all_of:
+      - "*conical*"
+      - "*tube*"
+    none_of:
+      - "*centrifuge tube*"
+      - "*micro*"
+      - "*configurationid*"
+      - "*oligo*"
+      - "*sequence*"
+  - name: "centrifuge conical tubes"
+    any_of:
+      - "*50mltbe*"
+      - "*15mltbe*"
+
+  # --- Hypodermic Needles ---
+  - name: "medical syringes"
+    all_of:
+      - "*syr*"
+      - "*inge*"
+    none_of:
+      - "*needle*"  
+  - name: "hypodermic needles"
+    all_of:
+      - "*needle*"
+      - "*gauge*"
+    none_of:
+      - "*holder*"
+      - "*syringe*"
+      - "*syr*"
+  - name: "hypodermic needles"
+    all_of:
+      - "*needle*"
+      - "*ga*"
+      - "*strl*"
+    none_of:
+      - "*holder*"
+
   # --- General Labware & Consumables (Moved to End) ---
   - name: "weigh boats"
     all_of:
@@ -1420,6 +2339,10 @@ market_rules:
     all_of: ["*cvr*", "*glas*"]
   - name: "coverslips"
     all_of: ["*cvr*", "*gls*"]
+  - name: "coverslips"
+    all_of: ["*cvr*", "*slip*"]
+  - name: "coverslips"
+    all_of: ["*cover*", "*slip*"]
   - name: "cryogenic and freezer boxes"
     all_of: ["container", "*freez*"]
   - name: "cryogenic and freezer boxes"
@@ -1471,6 +2394,22 @@ market_rules:
     all_of:
       - $PIPETTE
       - "*strpet*"
+  - name: "serological pipettes"
+    all_of:
+      - "*strpette*"
+  - name: "serological pipettes"
+    all_of:
+      - "*stripette*"
+  - name: "serological pipettes"
+    all_of:
+      - $PIPETTE
+      - "*sterile*"
+    none_of:
+      - "*tip*"
+      - "*filter*"
+      - "*flt*"
+      - "*needle*"
+      - "*syringe*"
   - name: "pasteur pipettes"
     all_of: 
       - $PIPETTE
@@ -1479,38 +2418,10 @@ market_rules:
     all_of: 
       - $PIPETTE
       - "*disp*"
-  - name: "sterile filtered pipette tips"
+  - name: "low retention pipette tips"
     all_of:
       - "*tip*"
-      - "*fil*"
-    none_of:
-      - "lw reten"
-      - "low reten"
-      - "low"
-  - name: "sterile filtered pipette tips"
-    all_of:
-      - "*tip*"
-      - "*fitl*"
-    none_of:
-      - "lw reten"
-      - "low reten"
-      - "low"
-  - name: "sterile filtered pipette tips"
-    all_of:
-      - "*tip*"
-      - "*fltr*"
-    none_of:
-      - "lw reten"
-      - "low reten"
-      - "low"
-  - name: "sterile filtered pipette tips"
-    all_of:
-      - "*tip*"
-      - "*barrier*"
-    none_of:
-      - "lw reten"
-      - "low reten"
-      - "low"
+      - "low ret"
   - name: "low retention pipette tips"
     all_of:
       - "*tip*"
@@ -1527,14 +2438,271 @@ market_rules:
     all_of:
       - "*tip*"
       - "lr"
+    none_of:
+      - "*fil*"
+      - "*fltr*"
+      - "*filt*"
+      - "*barrier*"
+  - name: "low retention pipette tips"
+    all_of:
+      - "*tip*"
+      - "*lowbind*"
+  - name: "low retention pipette tips"
+    all_of:
+      - "*tip*"
+      - "*lwbnd*"
+  - name: "low retention pipette tips"
+    all_of:
+      - "*tip*"
+      - "*lo bind*"
+  - name: "low retention pipette tips"
+    all_of:
+      - "*tip*"
+      - "*lobind*"
+  - name: "low retention pipette tips"
+    all_of:
+      - "*tip*"
+      - "*low-ret*"
+  - name: "low retention pipette tips"
+    all_of:
+      - "*tip*"
+      - "*low-bind*"
+  - name: "low retention pipette tips"
+    all_of:
+      - "*tip*"
+      - "*low bind*"
+  - name: "low retention pipette tips"
+    all_of:
+      - "*tip*"
+      - "*lowretention*"
+  - name: "low retention pipette tips"
+    all_of:
+      - "*eplort*"
+  - name: "low retention pipette tips"
+    all_of:
+      - "*tip*"
+      - "*rpt*"
+    none_of:
+      - "*fil*"
+      - "*fltr*"
+      - "*barrier*"
+  - name: "low retention pipette tips"
+    all_of:
+      - "*tip*"
+      - "*slick*"
+  - name: "low retention pipette tips"
+    all_of:
+      - "*tip*"
+      - "*zap*"
+  - name: "low retention pipette tips"
+    all_of:
+      - "*pipette*"
+      - "*gps*"
+  # --- Gel loading pipette tips ---
   - name: "gel loading pipette tips"
     all_of:
       - "*tip*"
       - "gel load"
+  - name: "gel loading pipette tips"
+    all_of:
+      - "*tip*"
+      - "*gel*"
+      - "*load*"
+  - name: "gel loading pipette tips"
+    all_of:
+      - "*tip*"
+      - "*gel*"
+      - "*round*"
+  # "flex rnd" = flexible round gel loading tips (no "tip"/"gel" in description)
+  # Must require both "flex" AND "rnd" to avoid false positives on balloons/cryotubes
+  - name: "gel loading pipette tips"
+    all_of:
+      - "*flex*"
+      - "*rnd*"
+    none_of:
+      - "*balloon*"
+      - "*ballon*"
+      - "*cryotube*"
+      - "*cryovial*"
+  # "pipet tip ,gel," comma-separated format
+  - name: "gel loading pipette tips"
+    all_of:
+      - "*pipet*"
+      - "*gel*"
+    none_of:
+      - "*agarose*"
+      - "*electrophor*"
+  # --- Extended length BEFORE filtered (xl items with filter/barrier should be extended) ---
   - name: "extended length pipette tips"
     all_of:
       - "*tip*"
       - "*xl*"
+  - name: "extended length pipette tips"
+    all_of:
+      - "*tip*"
+      - "*extended*"
+  - name: "extended length pipette tips"
+    all_of:
+      - "*tip*"
+      - "*elongated*"
+  - name: "extended length pipette tips"
+    all_of:
+      - "*tip*"
+      - "*xlng*"
+  - name: "extended length pipette tips"
+    all_of:
+      - "*tip*"
+      - "*xlong*"
+  - name: "extended length pipette tips"
+    all_of:
+      - "*tip*"
+      - "*x-long*"
+  - name: "extended length pipette tips"
+    all_of:
+      - "*tip*"
+      - "*reach*"
+    none_of:
+      - "*syringe*"
+      - "*srng*"
+  - name: "extended length pipette tips"
+    all_of:
+      - "*pipet*"
+      - "*xl*"
+  - name: "extended length pipette tips"
+    all_of:
+      - "*pipet*"
+      - "*extended*"
+  - name: "extended length pipette tips"
+    all_of:
+      - "*pipet*"
+      - "*elongated*"
+  # --- Sterile filtered brand-name rules (no "tip" required) ---
+  # Eppendorf Dualfilter T.I.P.S. -- often concatenated without spaces
+  - name: "sterile filtered pipette tips"
+    any_of:
+      - "*epdualfilter*"
+      - "*ep dualfilter*"
+      - "*dualfilter*t.i.p*"
+  # TubeGard/TubeGuard brand = filtered tips
+  - name: "sterile filtered pipette tips"
+    any_of:
+      - "*tubegard*"
+      - "*tubeguard*"
+  # Hamilton HLT SoftFit-L = filtered tips
+  - name: "sterile filtered pipette tips"
+    all_of:
+      - "*hlt*"
+    any_of:
+      - "*softfit*"
+      - "*sftfitl*"
+      - "*softfitl*"
+      - "*rld*"
+  # AvantGuard brand = barrier/filtered tips
+  - name: "sterile filtered pipette tips"
+    all_of:
+      - "*avantguard*"
+  # ART brand tips (Aerosol Resistant Tips = filtered)
+  - name: "sterile filtered pipette tips"
+    all_of:
+      - "*tip*"
+      - "*art*"
+      - "*stl*"
+    none_of:
+      - "*xl*"
+      - "*xlng*"
+      - "*extended*"
+  # --- Standard sterile filtered rules (with "tip" required) ---
+  - name: "sterile filtered pipette tips"
+    all_of:
+      - "*tip*"
+      - "*fil*"
+    none_of:
+      - "lw reten"
+      - "low reten"
+      - "low"
+      - "*refil*"
+      - "*syringe*"
+      - "*srng*"
+      - "*syr *"
+      - "*xl*"
+      - "*xlng*"
+      - "*extended*"
+      - "*elongated*"
+      - "*needle*"
+      - "*dispensing*"
+  - name: "sterile filtered pipette tips"
+    all_of:
+      - "*tip*"
+      - "*fitl*"
+    none_of:
+      - "lw reten"
+      - "low reten"
+      - "low"
+      - "*refil*"
+      - "*syringe*"
+      - "*srng*"
+      - "*syr *"
+      - "*xl*"
+      - "*xlng*"
+      - "*extended*"
+      - "*elongated*"
+      - "*needle*"
+      - "*dispensing*"
+  - name: "sterile filtered pipette tips"
+    all_of:
+      - "*tip*"
+      - "*fltr*"
+    none_of:
+      - "lw reten"
+      - "low reten"
+      - "low"
+      - "*refil*"
+      - "*syringe*"
+      - "*srng*"
+      - "*syr *"
+      - "*xl*"
+      - "*xlng*"
+      - "*extended*"
+      - "*elongated*"
+      - "*needle*"
+      - "*dispensing*"
+  - name: "sterile filtered pipette tips"
+    all_of:
+      - "*tip*"
+      - "*barrier*"
+    none_of:
+      - "lw reten"
+      - "low reten"
+      - "low"
+      - "*refil*"
+      - "*syringe*"
+      - "*srng*"
+      - "*syr *"
+      - "*xl*"
+      - "*xlng*"
+      - "*extended*"
+      - "*elongated*"
+      - "*needle*"
+      - "*dispensing*"
+  - name: "standard pipette tips"
+    all_of:
+      - "*tip*"
+      - "*refil*"
+    none_of:
+      - "*fil*"
+      - "*syringe*"
+  - name: "standard pipette tips"
+    all_of:
+      - "*tip*"
+      - "*reload*"
+  - name: "standard pipette tips"
+    all_of:
+      - "*tip*"
+      - "*rload*"
+    none_of:
+      - "*eplort*"
+      - "*loret*"
+      - "*low ret*"
   - name: "standard pipette tips" # General catch-all for tips
     all_of:
       - "*tip*"
@@ -1548,6 +2716,213 @@ market_rules:
       - "strpet"
       - "gel load"
       - "low reten"
+      - "*syringe*"
+      - "*srng*"
+
+  # --- Standard pipette tip brand-name rules ---
+  # These catch heavily abbreviated descriptions without "pipette" keyword.
+  # ClipTip brand (Thermo Scientific) -- 25 items misclassified
+  - name: "standard pipette tips"
+    all_of:
+      - "*cliptip*"
+    none_of:
+      - "*fil*"
+      - "*fltr*"
+      - "*barrier*"
+      - "*low ret*"
+      - "*lr*"
+  # "bevldtip" and "beveldtip" abbreviations (yellow/clear beveled tips)
+  - name: "standard pipette tips"
+    any_of:
+      - "*bevldtip*"
+      - "*beveldtip*"
+    none_of:
+      - "*fil*"
+      - "*fltr*"
+      - "*barrier*"
+  # Eclipse brand tips
+  - name: "standard pipette tips"
+    all_of:
+      - "*eclipse*"
+    any_of:
+      - "*non-sterile*"
+      - "*sterile*"
+      - "*ns*"
+    none_of:
+      - "*fil*"
+      - "*fltr*"
+      - "*barrier*"
+  # Biohit brand tips (concatenated "biohittip")
+  - name: "standard pipette tips"
+    all_of:
+      - "*biohit*"
+    none_of:
+      - "*fil*"
+      - "*fltr*"
+      - "*barrier*"
+      - "*pipette*"
+  # Finntip brand (when not caught by pipette rule)
+  - name: "standard pipette tips"
+    any_of:
+      - "*finntip*"
+      - "*finntp*"
+      - "*fintip*"
+    none_of:
+      - "*fil*"
+      - "*fltr*"
+      - "*barrier*"
+  # TipOne brand (USA Scientific)
+  - name: "standard pipette tips"
+    all_of:
+      - "*tipone*"
+    none_of:
+      - "*fil*"
+      - "*fltr*"
+      - "*barrier*"
+      - "*low ret*"
+      - "*lr*"
+      - "*xl*"
+      - "*extended*"
+      - "*gel*"
+  # SureGrip brand tips
+  - name: "standard pipette tips"
+    all_of:
+      - "*suregrip*"
+    none_of:
+      - "*fil*"
+      - "*fltr*"
+      - "*barrier*"
+  # "tip" alone with color/packaging context (catches "tip yel", "tip clear", "tip bg")
+  - name: "standard pipette tips"
+    all_of:
+      - "*tip*"
+      - "*bulk*"
+    none_of:
+      - "*fil*"
+      - "*fltr*"
+      - "*filt*"
+      - "*barrier*"
+      - "*low ret*"
+      - "*lr*"
+      - "*syringe*"
+      - "*srng*"
+      - "*gel*"
+      - "*xl*"
+      - "*extended*"
+      - "*ser*"
+      - "*past*"
+      - "*cotton*"
+      - "*q-tip*"
+  # "tip" + "rack/racked" (catches "tip pk/rk", "ylw beveldtip rack")
+  - name: "standard pipette tips"
+    all_of:
+      - "*tip*"
+      - "*rack*"
+    none_of:
+      - "*fil*"
+      - "*fltr*"
+      - "*filt*"
+      - "*barrier*"
+      - "*low ret*"
+      - "*lr*"
+      - "*syringe*"
+      - "*srng*"
+      - "*gel*"
+      - "*xl*"
+      - "*extended*"
+      - "*ser*"
+      - "*past*"
+      - "*test tube*"
+      - "*microtube*"
+      - "*pcr*"
+  # "tip" + "rk" (shortened rack)
+  - name: "standard pipette tips"
+    all_of:
+      - "*tip*"
+      - "rk"
+    none_of:
+      - "*fil*"
+      - "*fltr*"
+      - "*filt*"
+      - "*barrier*"
+      - "*low ret*"
+      - "*lr*"
+      - "*syringe*"
+      - "*srng*"
+      - "*gel*"
+      - "*xl*"
+      - "*extended*"
+      - "*ser*"
+      - "*past*"
+  # "tip" + "nat"/"natural" (catches "nat ultra micro", "natural beveled")
+  - name: "standard pipette tips"
+    all_of:
+      - "*tip*"
+    any_of:
+      - "*nat*"
+      - "*natural*"
+      - "*beveled*"
+      - "*bevld*"
+    none_of:
+      - "*fil*"
+      - "*fltr*"
+      - "*filt*"
+      - "*barrier*"
+      - "*low ret*"
+      - "*lr*"
+      - "*syringe*"
+      - "*srng*"
+      - "*gel*"
+      - "*xl*"
+      - "*extended*"
+      - "*ser*"
+      - "*past*"
+      - "*alternative*"
+      - "*national*"
+  # ept.i.p.s. = Eppendorf T.I.P.S. (standard tips)
+  - name: "standard pipette tips"
+    any_of:
+      - "*ept.i.p*"
+      - "*ep t.i.p*"
+    none_of:
+      - "*dualfilter*"
+      - "*filter*"
+      - "*fltr*"
+      - "*loret*"
+      - "*low ret*"
+  # "pure sftfitl" = Thermo Finntip Pure SoftFit-L (standard tips, no "tip" in desc)
+  - name: "standard pipette tips"
+    all_of:
+      - "*sftfitl*"
+    none_of:
+      - "*hlt*"
+      - "*fil*"
+      - "*fltr*"
+      - "*barrier*"
+  - name: "standard pipette tips"
+    all_of:
+      - "*softfitl*"
+    none_of:
+      - "*hlt*"
+      - "*fil*"
+      - "*fltr*"
+      - "*barrier*"
+  - name: "standard pipette tips"
+    all_of:
+      - "*softfit-l*"
+    none_of:
+      - "*hlt*"
+      - "*fil*"
+      - "*fltr*"
+      - "*barrier*"
+  - name: "latex gloves"
+    all_of:
+      - "*latex*"
+      - $GLOVES
+  - name: "latex gloves"
+    all_of:
+      - "*ltx*"
+      - $GLOVES
   - name: "nitrile gloves"
     all_of:
       - $NITRILE
@@ -1597,6 +2972,11 @@ market_rules:
     all_of:
       - $TUBE
       - "*cent*"
+    none_of:
+      - "*configurationid*"
+      - "*oligo*"
+      - "*sequence*"
+      - "*concentration*"
   - name: "centrifuge conical tubes"
     all_of:
       - $TUBE
@@ -1605,14 +2985,22 @@ market_rules:
     all_of:
       - $TUBE
       - "*cnt*"
+    none_of:
+      - "*configurationid*"
+      - "*oligo*"
+      - "*sequence*"
   - name: "centrifuge conical tubes"
     all_of:
       - $TUBE
       - "*conic*"
+    none_of:
+      - "*configurationid*"
+      - "*oligo*"
+      - "*sequence*"
   - name: "centrifuge conical tubes"
     all_of:
       - "cap"
-      - "cb" 
+      - "cb"
       - "ct"
   - name: "centrifuge conical tubes"
     all_of:
@@ -1622,10 +3010,19 @@ market_rules:
     all_of:
       - $TUBE
       - "conical"
+    none_of:
+      - "*configurationid*"
+      - "*oligo*"
+      - "*sequence*"
   - name: "pcr tubes"
     all_of:
       - "*pcr*"
       - $TUBE
+    none_of:
+      - "*configurationid*"
+      - "*oligo*"
+      - "*sequence*"
+      - "*purification*"
   - name: "pcr tubes"
     all_of:
       - "*smrtcyclr*"
@@ -1722,9 +3119,37 @@ market_rules:
     all_of:
       - "*plt*"
       - "no-tc"
+  # --- Disposable Wipes & Towels ---
+  - name: "disposable wipes and towels"
+    any_of:
+      - "*kimwipe*"
+      - "*kim wipe*"
+      - "*kimtech*"
+      - "*kaydry*"
+      - "*wypall*"
+      - "*accutech*"
+  - name: "disposable wipes and towels"
+    all_of:
+      - "*wipe*"
+    none_of:
+      - "*antibod*"
+      - "*pipet*"
+  - name: "disposable wipes and towels"
+    all_of:
+      - "*task*"
+      - "*wiper*"
+  - name: "disposable wipes and towels"
+    all_of:
+      - "*delicate*"
+      - "*task*"
+  - name: "disposable wipes and towels"
+    all_of:
+      - "*lens*"
+      - "*tissue*"
+
   - name: "face masks"
     all_of:
-      - "*resp" 
+      - "*resp"
       - "p95"
   - name: "face masks"
     all_of:
@@ -1811,3 +3236,7 @@ market_rules:
   - name: "temed"
     all_of:
       - "temed"
+  - name: "acetic acid"
+    all_of:
+      - "*acet*"
+      - "*acid*"

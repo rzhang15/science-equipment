@@ -1,46 +1,49 @@
 keywords:
   # Services & Contracts
+  # NOTE: Keywords use Aho-Corasick SUBSTRING matching.  Every keyword here
+  # will match if it appears ANYWHERE in a product description.  Avoid short
+  # stems that are substrings of common lab terms (e.g. "ship" matches
+  # "relationship", "thesis" matches "synthesis", "lease" matches "nuclease").
   - admin
   - agreement
   - audit
   - award
+  - billed
+  - blanket order
+  - blanket po
   - compensation
+  - consulting
   - contract
   - contractor
-  - consulting
+  - course
   - custodial
-  - reimbursement
+  - dues
+  - expenses
+  - guarantee
+  - maint.
+  - mainetenance
+  - monthly
+  - procedure
   - reference lab
-  - repair
+  - reimbursement
   - salaries
   - salaried
   - salary
   - secur
   - service
-  - serv
-  - shipping
-  - ship
   - staff
   - staffing
-  - subscription
   - subaward
   - subcontract
-  - blanket po
+  - subscription
   - surcharge
   - training
+  - teaching
   - travel
   - warranty
   - warranties
-  - sports
-  - sales
-  - communications
-  - fragment analysis
-  - chamber
-  - lamp
-
 
   # IT, Software & Electronics
-  - adapter
   - camera
   - computer
   - dell
@@ -52,51 +55,186 @@ keywords:
   - monitor
   - optiplex
   - printer
-  - print
   - software
+  - ssd
   - upgrades
-  - optiplex
 
-  # Facilities & MRO (Maintenance, Repair, and Operations)
+  # Facilities, Vehicles & MRO
   - air purification
+  - asbestos
+  - basement
+  - bobcat
   - buildings
-  - bucket
-  - cabinet
-  - can
-  - cart
+  - building
+  - concrete
   - connector
-  - handle
-  - haz
-  - laundry Barrier
-  - laundry FR
-  - laundry for
-  - laundry of
+  - door
+  - drain
+  - drainage
+  - fluorescent bulb
+  - generator
+  - hardware
+  - install
+  - lighting
   - renov
   - step stool
   - toilet
+  - tractor
   - transport container
+  - truck
+  - vehicle
   - water purification
 
+  # Athletics, Campus & Student Life
+  - advertising
+  - arena
+  - athletic
+  - basketball
+  - bleacher
+  - campaign
+  - campus
+  - completion
+  - conference
+  - coordinator
+  - credits
+  - entertainment
+  - firework
+  - football
+  - game
+  - hall site
+  - messaging
+  - ncaa
+  - newspaper
+  - notification
+  - racquet
+  - recreation
+  - semester
+  - sports
+  - student
+  - textbook
+  - ticket
+  - tournament
+  - transit
+  - turnitin
+  - webcard
+  - wellness
+
   # Food & General Supplies
-  - food
+  - bedding
   - grnla bar
   - nutrigrain
   - tackymat
 
-  # Ambiguous & Administrative (Use with care)
+  # Insurance, Legal & Finance
+  - claim
+  - deductible
+  - electricity
+  - insurance
+  - investments
+  - liability
+  - residency
+  - utilities
+
+  # Marketing & Communications
+  - communications
+  - community
+  - environmental
+  - graphics
+  - marketing
+  - music
+  - photography
+  - productions
+  - promotional
+  - publishing
+  - sales
+
+  # Instruments & Equipment (non-consumable)
+  - instrument
+  - appliance
+  - cfx
+  - charger
+  - chemidoc
+  - coverslipper
+  - dtba1d1
+  - ethovision
+  - furnace
+  - gasket
+  - imaging system
+  - karl suss
+  - mask aligner
+  - pbs detector
+  - spectramax
+  - stainer
+  - test cell
+  - thermometer
+  - vortex
+
+  # Agriculture & Non-Research
+  - alfalfa
+  - fertilizer
+
+  # Administrative & Ambiguous
+  - annual
   - batteries
   - battery
+  - book
+  - business
+  - chair
+  - connections
+  - datacenter
+  - edition
   - external reagents
+  - flight
+  - for reference
+  - fragment analysis
+  - health ins
   - internal reagents
-  - label
+  - interview
+  - journal
   - lab supplies
-  - orders
-  - other
+  - misc
+  - miscellaneous
+  - notice
+  - per attached quote
+  - program
+  - red cross
   - reference materials
+  - relocation
   - resale
+  - review
+  - scientist
+  - s-insert assembly
   - spend
-  - supplies
+  - storm drain
+  - survey
+  - ura system
   - various
+  - vicryl plus
+
+  # Additional Non-Lab keywords
+  - drive
+  - flights
+  - games
+  - guidewire
+  - handheld
+  - interviewing
+  - robot
+  - transmitter
+  - upgrade
+  - detector
+  - dna library
+  - mail
+  - accessories
+  - accessory
+  - ejector
+  - timer
+  - production
+
+  # Etching & Microfabrication (capital equipment, not consumables)
+  - etching
+  - accidence
+
+  # Year references (non-product descriptions)
   - fy 10
   - fy 11
   - fy 12
@@ -118,161 +256,13 @@ keywords:
   - fy18
   - fy19
   - fy20
-  - misc
-  - miscellaneous
-  - thermometer
-  - shaker
-  - forcep
-  - vortex
-  - design
-  - photography
-  - music
-  - education
-  - john
-  - robert
-  - graphics
-  - management
-  - community
-  - publishing
-  - environmental
-  - productions
-  - fertilizer
-  - marketing
-  - safety
-  - hour
-  - hardware
-  - investments
-  - entertainment
-  - promotional
-  - mainetenance
-  - hall site
-  - insurance
-  - liability
-  - deductible
-  - claim
-  - athletic
-  - wellness
-  - recreation
-  - transit
-  - advertising
-  - install
-  - semester
-  - guarantee
-  - ncaa
-  - newspaper
-  - conference
-  - replace
-  - building
-  - bobcat 
-  - spectramax
-  - notification
-  - journal 
-  - drainage
-  - instrument
-  - test cell
-  - furnace
-  - vacuum
-  - lighting
-  - truck
-  - vehicle
-  - pump
-  - student
-  - graduate
-  - cfx
-  - table
-  - library
-  - appliance
-  - charger
-  - dtba1d1
-  - gasket
-  - reader
-  - alfalfa
-  - chemidoc
-  - rfp
-  - red cross
-  - imaging system
-  - arena
-  - dna library
-  - storm drain
-  - utility
-  - utilities
-  - electricity
-  - hall site
-  - insurance
-  - liability
-  - deductible
-  - claim
-  - athletic
-  - wellness
-  - recreation
-  - transit
-  - advertising
-  - install
-  - semester
-  - guarantee
-  - ncaa
-  - newspaper
-  - conference
-  - replace
-  - building
-  - bobcat
-  - spectramax
-  - notification
-  - journal
-  - drainage
-  - turnitin
-  - thesis
-  - mail
-  - credits
-  - webcard
-  - s-insert assembly
-  - messaging
-  - campus
-  - pay
-  - scientist
-  - notice
-  - annual
-  - firework
-  - delivery
-  - upgrade
-  - bedding
-  - sequencing
-  - blanket order
-  - entertainment
-  - campaign
-  - textbook
-  - chair
-  - datacenter
-  - production
-  - bleacher
-  - relocation
-  - transport
-  - stainer
-  - interview
-  - door
-  - hardware
-  - survey
-  - program
-  - expenses
-  - health ins
-  - game
-  - flight
-  - residency
-  - robot
-  - tournament
-  - basketball
-  - ticket
-  - coordinator
-  - completion
-  - lease
-  - order
-  - concrete
-  - coverslipper
-  - for reference
-  - tractor
-  - connections
-  - date
-  - misc
-
-
-  
+  - "2010"
+  - "2011"
+  - "2012"
+  - "2013"
+  - "2014"
+  - "2015"
+  - "2016"
+  - "2017"
+  - "2018"
+  - "2019"
