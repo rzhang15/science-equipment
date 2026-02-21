@@ -19,7 +19,7 @@ import pandas as pd
 # ────────────────────────────── Path Setup ────────────────────────────────── #
 CODE_DIR = Path(__file__).resolve().parent
 ROOT_DIR = CODE_DIR.parent
-DEFAULT_RAW_DIRS = f"{ROOT_DIR / 'external' / 'samp1'},{ROOT_DIR / 'external' / 'samp2'}"
+DEFAULT_RAW_DIRS = f"{ROOT_DIR / 'external' / 'samp1'}"
 DEFAULT_OUT_DIR = ROOT_DIR / "output" / "standardized"
 
 # ───────────────── Column Maps ────────────────────────────────────────────── #
@@ -32,12 +32,7 @@ COLUMN_SPECS: Dict[str, Mapping[str, str]] = {
     "uni_florida_2009_2024.xlsx": {"product_desc": "Item Information Line Item Description", "supplier": "Supplier Supplier Name", "supplier_id": "Supplier Supplier Number", "sku": "Item Information SKU", "spend": "Line Level  Extended Price Amount (USD)", "qty": "Line Level Quantity", "purchase_id": "Header Level PO Number", "date": "Dates and Timestamps Created Time and Date"},
     "ttu_2010_2025.xlsx": {"product_desc": "Product Description", "supplier": "Supplier Name", "supplier_id": "Supplier ID", "sku": "SKU/Catalog #", "price": "Unit Price", "qty": "Quantity", "purchaser": "Principal Investigator", "purchase_id": "PO #", "date": "Creation Date", "fund_id" : "Fund - Banner"},
     "oregonstate_2010_2019.xlsx": {"product_desc": "Purchase Line Description", "supplier": "Vendor Last Name", "supplier_id": "VendorID", "price": "Unit Price", "qty": "Item Quantity", "purchase_id": "Unique Purchase Identifier", "date": "Purchase Date"},
-    "uomn_2014_2024.xlsx": {"product_desc": "Invoice Detail Description", "supplier": "Supplier Name", "supplier_id": "Supplier Code", "spend": "PO Line Amount", "qty": "PO Line Quantity", "purchase_id": "PO Number", "date": "PO Creation Date"},
-    "utarlington_2015_2019.xls": {"product_desc": "Item Info", "supplier": "Vendor Name", "supplier_id": "Vendor ID", "spend": "Merchandise Amt", "qty": "PO Qty", "purchase_id": "PO No.", "date": "PO Date"},
-    "utelpaso_2014_2019.xlsx": {"product_desc": "Descr", "supplier": "Vendor", "supplier_id": "Vendor ID", "spend": "Distribution Line Amount", "purchase_id": "PO No.", "date": "Invoice Date"},
-    "utsanantonio_2014_2019.xlsx": {"product_desc": "Descr", "supplier": "Vendor Name", "supplier_id": "Vendor ID", "qty": "Quantity", "spend": "Amount", "purchase_id": "PO No.", "date": "Acctg Date", "fund_id": "Fed Awd ID#"},
-    "tsu_2015_2023.xlsx": {"product_desc": "Short Text", "supplier": "Vendor Name", "supplier_id": "Vendor Number", "price": "Net Price", "spend": "Gross Price", "purchase_id": "Purchasing Doc Num", "date": "Document Date"},
-    "md_anderson_2012_2015.xlsx": {"product_desc": "Descr", "supplier": "VendorName", "supplier_id": "VendorID", "price": "PaidUnitPrice", "qty": "PaidQuantity", "purchase_id": "PO No", "date": "PODate"},
+        "md_anderson_2012_2015.xlsx": {"product_desc": "Descr", "supplier": "VendorName", "supplier_id": "VendorID", "price": "PaidUnitPrice", "qty": "PaidQuantity", "purchase_id": "PO No", "date": "PODate"},
 }
 STANDARD_COLS: List[str] = ["product_desc", "supplier", "supplier_id", "sku", "price", "qty", "spend", "unit", "purchaser", "fund_id", "purchase_id", "date", "funder"]
 
