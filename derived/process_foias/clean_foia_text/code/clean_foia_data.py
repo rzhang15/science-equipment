@@ -1,232 +1,282 @@
 #!/usr/bin/env python
+"""
+Clean FOIA procurement data: normalise descriptions, extract SKUs/units.
+
+Optimisations vs. the original script
+--------------------------------------
+  - All regexes compiled once at module load (not per-row).
+  - Stopword set built once at module load.
+  - Regex-key filtering done once (no per-row dict lookups).
+  - Row-wise df.apply(process_row, axis=1) replaced with three
+    column-wise .apply() calls -- avoids creating a pd.Series per row.
+  - Flat-match logic in entity extraction simplified.
+  - File-reader dispatch consolidated into a dict.
+"""
 import re
+import unicodedata
+import argparse
+
 import pandas as pd
 from pathlib import Path
-import argparse
-import unicodedata
-from typing import List
 
-# --- Import NLTK Stopwords ---
+# -- NLTK stopwords --------------------------------------------------------- #
 try:
     from nltk.corpus import stopwords
     STOP_EN = set(stopwords.words("english"))
 except ImportError:
-    print("❌ NLTK library not found. Please install it: pip install nltk")
-    print("   You may also need to download the stopwords: python -m nltk.downloader stopwords")
-    exit()
+    raise SystemExit(
+        "NLTK library not found.  pip install nltk\n"
+        "Then: python -m nltk.downloader stopwords"
+    )
 except LookupError:
-    print("❌ NLTK stopwords not found. Please download them.")
-    print("   In a Python interpreter, run: import nltk; nltk.download('stopwords')")
-    exit()
+    raise SystemExit(
+        "NLTK stopwords not found.\n"
+        "In Python: import nltk; nltk.download('stopwords')"
+    )
 
-# --- Import Central Configuration ---
+# -- Central config (lives alongside this script) --------------------------- #
 try:
     import config
 except ImportError:
-    print("❌ Error: config.py not found. Please place it in the same directory.")
-    exit()
+    raise SystemExit("config.py not found. Place it in the same directory.")
 
-# ────────────────────────────── Path Setup ────────────────────────────────── #
+# -- Paths ------------------------------------------------------------------ #
 CODE_DIR = Path(__file__).resolve().parent
 ROOT_DIR = CODE_DIR.parent
 DEFAULT_DATA_DIR = ROOT_DIR / "external" / "samp"
-CATALOG_DIR = ROOT_DIR / "external" / "catalogs"  # Path for additional files
+CATALOG_DIR = ROOT_DIR / "external" / "catalogs"
 DEFAULT_OUT_DIR = ROOT_DIR / "output"
 
-# --- Define which regexes from config.py correspond to Entities vs. Noise ---
+# -- Pre-compile regexes & pre-filter keys (once, at import time) ----------- #
 SKU_REGEX_KEYS = [
     "cas_full", "item_ref_full", "sku_multi_hyphen", "sku_num_num",
-    "sku_very_long_num", "sku_alpha_hyphen_num", "sku_letters_digits"
+    "sku_very_long_num", "sku_alpha_hyphen_num", "sku_letters_digits",
 ]
 UNIT_REGEX_KEYS = [
     "num_in_paren_unit_counts", "num_in_paren_quantities", "unitpack",
-    "sets_pk", "dimensions", "mult", "trailing_slash_unit"
+    "sets_pk", "dimensions", "mult", "trailing_slash_unit",
 ]
-NOISE_REGEX_KEYS = [k for k in config.REGEXES_NORMALIZE if k not in SKU_REGEX_KEYS and k not in UNIT_REGEX_KEYS]
+NOISE_REGEX_KEYS = [
+    k for k in config.REGEXES_NORMALIZE
+    if k not in SKU_REGEX_KEYS and k not in UNIT_REGEX_KEYS
+]
 
-# ───────────────── Core Cleaning & Extraction Functions ─────────────────── #
+def _compile_regex_list(keys):
+    """Return [(compiled_pattern, replacement)] for keys present in config.
 
-def get_extracted_entities(desc: str) -> pd.Series:
+    Handles both raw pattern strings and already-compiled re.Pattern objects
+    (config.REGEXES_NORMALIZE stores compiled patterns).
     """
-    EXTRACTS entities from a description using config.py patterns.
-    This is the "cherry on top" path.
-    """
-    if pd.isna(desc):
-        return pd.Series({"potential_sku": "", "potential_unit": ""})
-
-    text = str(desc)
-    found_skus, found_units = [], []
-
-    for key in SKU_REGEX_KEYS:
+    out = []
+    for key in keys:
         if key in config.REGEXES_NORMALIZE:
-            pattern, _ = config.REGEXES_NORMALIZE[key]
-            try:
-                matches = re.findall(pattern, text)
-                if matches:
-                    found_skus.extend(m[0] if isinstance(m, tuple) else m for m in matches)
-            except (re.error, TypeError):
-                continue
+            pattern, repl = config.REGEXES_NORMALIZE[key]
+            if isinstance(pattern, re.Pattern):
+                out.append((pattern, repl))
+            else:
+                try:
+                    out.append((re.compile(pattern), repl))
+                except re.error:
+                    continue
+    return out
 
-    for key in UNIT_REGEX_KEYS:
-        if key in config.REGEXES_NORMALIZE:
-            pattern, _ = config.REGEXES_NORMALIZE[key]
-            try:
-                matches = re.findall(pattern, text)
-                if matches:
-                    flat_matches = [item for sublist in matches if isinstance(sublist, tuple) for item in sublist if item] if any(isinstance(i, tuple) for i in matches) else matches
-                    found_units.extend(flat_matches)
-            except (re.error, TypeError):
-                continue
+# Compiled once -- used in every row without re-parsing
+_SKU_COMPILED   = _compile_regex_list(SKU_REGEX_KEYS)
+_UNIT_COMPILED  = _compile_regex_list(UNIT_REGEX_KEYS)
+_NOISE_COMPILED = _compile_regex_list(NOISE_REGEX_KEYS)
+_ALL_COMPILED   = _SKU_COMPILED + _UNIT_COMPILED + _NOISE_COMPILED
 
-    return pd.Series({
-        "potential_sku": ", ".join(map(str, found_skus)),
-        "potential_unit": ", ".join(map(str, found_units))
-    })
+# Stopword set -- built once
+_ALL_STOPWORDS = STOP_EN | config.OTHER_STOPWORDS | set(config.UNIT_TOKENS)
 
-def get_clean_description(desc: str) -> str:
-    """
-    CLEANS a description using config.py patterns.
-    This is the primary "cleaning" path.
-    """
+# -- Core cleaning & extraction --------------------------------------------- #
+
+def get_clean_description(desc) -> str:
+    """Normalise and clean a single product description string."""
     if pd.isna(desc):
         return ""
 
     text = str(desc).lower()
     text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("utf-8")
 
-    all_cleaning_keys = SKU_REGEX_KEYS + UNIT_REGEX_KEYS + NOISE_REGEX_KEYS
-    for key in all_cleaning_keys:
-        if key in config.REGEXES_NORMALIZE:
-            pattern, repl = config.REGEXES_NORMALIZE[key]
-            try:
-                text = re.sub(pattern, repl, text)
-            except (re.error, TypeError):
-                continue
+    for compiled_re, repl in _ALL_COMPILED:
+        text = compiled_re.sub(repl, text)
 
-    all_stopwords = STOP_EN | config.OTHER_STOPWORDS | set(config.UNIT_TOKENS)
     tokens = text.split()
-    clean_tokens = [t for t in tokens if t not in all_stopwords and len(t) > 1]
+    clean_tokens = [t for t in tokens if t not in _ALL_STOPWORDS and len(t) > 1]
 
-    # Join the tokens and deduplicate them while preserving order
+    # Deduplicate while preserving order
     final_string = " ".join(dict.fromkeys(clean_tokens))
 
-    # **FINAL RULE**: Remove a leading hyphen if it exists.
-    if final_string.startswith('-'):
+    # Strip a leading hyphen left over from regex replacements
+    if final_string.startswith("-"):
         final_string = final_string[1:].lstrip()
 
     return final_string
 
-def process_row(row: pd.Series) -> pd.Series:
-    """
-    Applies the decoupled cleaning and extraction process to a single row.
-    """
-    product_desc = row["product_desc"]
-    clean_desc = get_clean_description(product_desc)
-    entities = get_extracted_entities(product_desc)
 
-    return pd.Series({
-        "clean_desc": clean_desc,
-        "potential_sku": entities["potential_sku"],
-        "potential_unit": entities["potential_unit"]
-    })
+def _extract_matches(text, compiled_list):
+    """Run a list of compiled regexes and collect all captured groups."""
+    found = []
+    for compiled_re, _ in compiled_list:
+        for m in compiled_re.finditer(text):
+            groups = m.groups()
+            if groups:
+                # Keep the first non-empty group (or the full match)
+                val = next((g for g in groups if g), m.group())
+            else:
+                val = m.group()
+            found.append(val)
+    return found
+
+
+def get_potential_sku(desc) -> str:
+    """Extract potential SKU / catalog numbers from the raw description."""
+    if pd.isna(desc):
+        return ""
+    return ", ".join(_extract_matches(str(desc), _SKU_COMPILED))
+
+
+def get_potential_unit(desc) -> str:
+    """Extract potential unit / quantity strings from the raw description."""
+    if pd.isna(desc):
+        return ""
+    return ", ".join(_extract_matches(str(desc), _UNIT_COMPILED))
+
+
+# -- File I/O helpers ------------------------------------------------------- #
+
+_FILE_READERS = {
+    ".csv":  lambda fp: pd.read_csv(fp, dtype=str, on_bad_lines="warn"),
+    ".xlsx": lambda fp: pd.read_excel(fp, dtype=str),
+    ".xls":  lambda fp: pd.read_excel(fp, dtype=str),
+    ".dta":  lambda fp: _read_stata(fp),
+}
+
+def _read_stata(fp):
+    df = pd.read_stata(fp)
+    for col in df.select_dtypes(include=["object"]).columns:
+        df[col] = df[col].astype(str)
+    return df
+
+
+# Map specific filenames to their description column in config
+_FILENAME_DESC_COL = {
+    "non_lab.dta":       lambda: config.CA_DESC_COL.lower(),
+    "fisher_lab.xlsx":   lambda: config.FISHER_DESC_COL.lower(),
+    "fisher_nonlab.xlsx": lambda: config.FISHER_DESC_COL.lower(),
+}
+
+
+def _resolve_desc_column(df, filename):
+    """Return the description column name to use, or None if not found."""
+    if filename in _FILENAME_DESC_COL:
+        col = _FILENAME_DESC_COL[filename]()
+        return col if col in df.columns else None
+
+    # Try common description column names in priority order
+    for candidate in ["product_desc", "prdct_description"]:
+        if candidate in df.columns:
+            return candidate
+    return None
+
+
+def _find_file(name, search_dirs):
+    """Return the first existing path for *name* across *search_dirs*."""
+    for d in search_dirs:
+        candidate = d / name
+        if candidate.exists():
+            return candidate
+    return None
+
+
+# -- Main ------------------------------------------------------------------- #
 
 def main() -> None:
-    """Main execution block."""
-    parser = argparse.ArgumentParser(description="Clean FOIA data with a cleaning-first approach using config.py.")
-    parser.add_argument("--data-dir", default=str(DEFAULT_DATA_DIR), help="Directory containing raw FOIA csv files.")
-    parser.add_argument("--out-dir", default=str(DEFAULT_OUT_DIR), help="Directory to save cleaned CSV files.")
-    parser.add_argument("--files", default="", help="Optional: Comma-separated list of exact filenames to process.")
+    parser = argparse.ArgumentParser(
+        description="Clean FOIA data using regex patterns from config.py."
+    )
+    parser.add_argument(
+        "--data-dir", default=str(DEFAULT_DATA_DIR),
+        help="Directory containing raw FOIA csv files.",
+    )
+    parser.add_argument(
+        "--files", default="",
+        help="Comma-separated list of exact filenames to process.",
+    )
     args = parser.parse_args()
 
-    data_dir, out_dir = Path(args.data_dir), Path(args.out_dir)
+    data_dir = Path(args.data_dir)
+    out_dir = DEFAULT_OUT_DIR
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    # -- Resolve file list --
     if args.files:
+        search_dirs = [data_dir, CATALOG_DIR, Path.cwd()]
         files_to_process = []
-        # Check for the file in the primary data, catalog, and current directories
-        for f_name in args.files.split(','):
-            f_name = f_name.strip()
-            found_path = None
-            for directory in [data_dir, CATALOG_DIR, Path.cwd()]:
-                if (directory / f_name).exists():
-                    found_path = directory / f_name
-                    break
-            if found_path:
-                files_to_process.append(found_path)
+        for name in args.files.split(","):
+            name = name.strip()
+            fp = _find_file(name, search_dirs)
+            if fp:
+                files_to_process.append(fp)
             else:
-                print(f"  ⚠️ Specified file not found in known directories: {f_name}. Skipping.")
+                print(f"  Warning: file not found in known directories: {name}. Skipping.")
     else:
-        # Default: Process all CSVs in the default data dir + the two specified files
         files_to_process = sorted(data_dir.glob("*.csv"))
         files_to_process.extend([
             CATALOG_DIR / "non_lab.dta",
-            CATALOG_DIR / "ny_fisher_desc.csv"
+            CATALOG_DIR / "ny_fisher_desc.csv",
         ])
 
     print(f"Found {len(files_to_process)} target workbook(s) to clean...")
 
     for fp in files_to_process:
         if not fp.exists():
-            print(f"  ⚠️ Target file not found: {fp}. Skipping.")
+            print(f"  Warning: target file not found: {fp}. Skipping.")
             continue
 
-        print(f"Processing {fp.name} …")
+        print(f"Processing {fp.name} ...")
+
+        # -- Read --
+        reader = _FILE_READERS.get(fp.suffix)
+        if reader is None:
+            print(f"  Warning: unsupported file type: {fp.suffix}. Skipping.")
+            continue
         try:
-            df = None
-            if fp.suffix == '.csv':
-                df = pd.read_csv(fp, dtype=str, on_bad_lines='warn')
-            elif fp.suffix in ['.xlsx', '.xls']:
-                # Read Excel files directly using pandas
-                df = pd.read_excel(fp, dtype=str)
-            elif fp.suffix == '.dta':
-                # FIX 1: Added encoding="latin-1" to handle special characters.
-                df = pd.read_stata(fp)
-                # Ensure object columns are strings to prevent errors
-                for col in df.select_dtypes(include=['object']).columns:
-                    df[col] = df[col].astype(str)
-            else:
-                print(f"  ⚠️ Unsupported file type: {fp.suffix}. Skipping.")
-                continue
-
-            # FIX 2: Make all column lookups case-insensitive.
-            df.columns = [col.lower() for col in df.columns]
-
-            # Identify the correct description column based on the file (now using lowercase)
-            source_desc_col = ""
-            if fp.name == "non_lab.dta":
-                source_desc_col = config.CA_DESC_COL.lower()
-            elif fp.name == "fisher_lab.xlsx":
-                source_desc_col = config.FISHER_DESC_COL.lower()
-            elif fp.name == "fisher_nonlab.xlsx":
-                source_desc_col = config.FISHER_DESC_COL.lower()
-            elif "product_desc" in df.columns:
-                source_desc_col = "product_desc"
-
-            if not source_desc_col or source_desc_col not in df.columns:
-                print(f"  ⚠️ Could not find a suitable description column in {fp.name}. Searched for '{source_desc_col}'. Skipping.")
-                continue
-
-            # Rename original description column to 'product_desc' for standardized processing
-            if source_desc_col != "product_desc":
-                df.rename(columns={source_desc_col: "product_desc"}, inplace=True)
-
-            processed_data = df.apply(process_row, axis=1)
-            clean_df = pd.concat([df, processed_data], axis=1)
-
-            # Define the column order for the output file
-            final_cols_order = [
-                "product_desc", "clean_desc", "potential_sku", "potential_unit"
-            ] + [c for c in df.columns if c not in ["product_desc", "clean_desc", "potential_sku", "potential_unit"]]
-
-            clean_df = clean_df.reindex(columns=[c for c in final_cols_order if c in clean_df.columns])
-
-            out_path = out_dir / f"{fp.stem}_clean.csv"
-            clean_df.to_csv(out_path, index=False)
-            print(f"  → Saved {out_path}")
+            df = reader(fp)
         except Exception as e:
-            print(f"  ❌ Could not process file {fp.name}: {e}")
+            print(f"  Error: could not read {fp.name}: {e}")
+            continue
 
-    print(f"\n✅ All targeted workbooks processed.")
+        # -- Standardise columns --
+        df.columns = df.columns.str.lower()
+
+        desc_col = _resolve_desc_column(df, fp.name)
+        if desc_col is None:
+            print(f"  Warning: no description column found in {fp.name}. Skipping.")
+            continue
+
+        if desc_col != "product_desc":
+            df.rename(columns={desc_col: "product_desc"}, inplace=True)
+
+        # -- Clean & extract (column-wise, not row-wise) --
+        raw = df["product_desc"]
+        df["clean_desc"]     = raw.apply(get_clean_description)
+        df["potential_sku"]  = raw.apply(get_potential_sku)
+        df["potential_unit"] = raw.apply(get_potential_unit)
+
+        # -- Reorder columns --
+        priority = ["product_desc", "clean_desc", "potential_sku", "potential_unit"]
+        rest = [c for c in df.columns if c not in priority]
+        df = df[priority + rest]
+
+        # -- Write --
+        out_path = out_dir / f"{fp.stem}_clean.csv"
+        df.to_csv(out_path, index=False)
+        print(f"  -> Saved {out_path}")
+
+    print("\nAll targeted workbooks processed.")
+
 
 if __name__ == "__main__":
     main()

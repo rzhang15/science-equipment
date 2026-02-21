@@ -1,4 +1,5 @@
 ./samp/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/process_foias/standardize_foia/output/standardized
+./govspend/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/govspend/make_panel/output/
 ./catalogs/ | /n/netscratch/pakes_lab/Lab/sci_eq/product_catalogs
 ./categories/ | /n/netscratch/pakes_lab/Lab/sci_eq/
 
