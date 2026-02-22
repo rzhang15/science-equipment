@@ -49,9 +49,6 @@ def trace_item(desc: str, gatekeeper: HybridClassifier, expert, rule_cat: RuleBa
     """Run a single description through the full pipeline and return a trace dict."""
     trace = {"input": desc}
 
-    # ---- 0. Text cleaning (what the ML model sees) ----
-    trace["cleaned_for_model"] = config.clean_for_model(desc)
-
     # ---- 1. Keyword gates (Aho-Corasick, operates on RAW text) ----
     anti_seed = has_match(desc, gatekeeper.anti_seed_automaton)
     seed = has_match(desc, gatekeeper.seed_automaton)
@@ -64,11 +61,10 @@ def trace_item(desc: str, gatekeeper: HybridClassifier, expert, rule_cat: RuleBa
     trace["strong_lab_signal"] = strong
 
     # ---- 2. ML probability ----
-    cleaned = config.clean_for_model(desc)
     if gatekeeper.is_bert:
-        vec = gatekeeper.vectorizer.encode([cleaned], show_progress_bar=False)
+        vec = gatekeeper.vectorizer.encode([desc], show_progress_bar=False)
     else:
-        vec = gatekeeper.vectorizer.transform([cleaned])
+        vec = gatekeeper.vectorizer.transform([desc])
     ml_prob = gatekeeper.ml_model.predict_proba(vec)[:, 1][0]
     trace["ml_prob_lab"] = round(float(ml_prob), 4)
 
@@ -149,7 +145,6 @@ def print_trace(trace: dict):
     """Pretty-print one trace."""
     print("\n" + "=" * 70)
     print(f"  INPUT:  {trace['input']}")
-    print(f"  CLEANED: {trace['cleaned_for_model']}")
     print("-" * 70)
     print(f"  Anti-seed match:     {trace['anti_seed_match']}")
     print(f"  Seed match:          {trace['seed_match']}")

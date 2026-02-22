@@ -90,6 +90,22 @@ STRONG_LAB_SIGNALS = [
 TFIDF_MIN_SCORE_THRESHOLD = 0.01
 BERT_MIN_SCORE_THRESHOLD = 0.1
 
+# Additional stop words for the CATEGORY vectorizer only.
+# These terms appear across dozens of lab categories and inflate similarity
+# scores without helping distinguish between them.  NOT used by the gatekeeper
+# (where e.g. "kit" may carry lab-vs-non-lab signal).
+CATEGORY_STOP_WORDS = [
+    "kit", "kits",
+    "set", "sets",
+    "system", "systems",
+    "assay", "assays",
+    "reagent", "reagents",
+    "based",
+    "detection",
+    "purification",
+    "quantitation", "quantification",
+]
+
 # ==============================================================================
 # 5. Non-Lab Category Definitions
 # ==============================================================================
@@ -159,11 +175,20 @@ DOMAIN_STOP_WORDS = [
 def clean_for_model(text):
     """Strip non-semantic tokens (part numbers, dimensions, pure numbers)
     from a description before vectorization so the model focuses on
-    meaningful product terms."""
+    meaningful product terms.
+
+    NOTE: This is a lightweight safety-net cleaner.  For data that has
+    already been through clean_foia_data.py, these patterns will be
+    no-ops (the noise is already gone).  For data that has NOT been
+    upstream-cleaned (e.g. raw GovSpend), this catches the most common
+    noise but is NOT a substitute for the full clean_foia_data.py
+    pipeline.  Always run clean_foia_data.py on new sources first.
+    """
     if not isinstance(text, str):
         return ""
-    # Remove catalog/part numbers (e.g., "AB-1234", "CAT#12345")
-    text = re.sub(r'\b[A-Z]{0,4}[#-]?\d{3,}\b', ' ', text)
+    # Remove catalog/part numbers (e.g., "AB-1234", "cat#12345")
+    # Case-insensitive so it works on both raw and lowercased text
+    text = re.sub(r'\b[a-zA-Z]{0,4}[#-]?\d{3,}\b', ' ', text)
     # Remove dimensions (e.g., "12x75mm", "100ml", "4.5in")
     text = re.sub(
         r'\b\d+(\.\d+)?\s*(x\s*\d+(\.\d+)?\s*)*(mm|cm|ml|ul|mg|kg|oz|lb|in|ft|gal)\b',

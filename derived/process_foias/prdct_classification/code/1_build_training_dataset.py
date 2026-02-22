@@ -44,7 +44,7 @@ def load_fisher_non_lab_data():
 
 def prepare_and_save_tfidf_category_vectors(df_lab_only, vectorizer, output_path):
     print("Preparing and saving TF-IDF category vectors...")
-    descriptions = df_lab_only[config.CLEAN_DESC_COL].apply(config.clean_for_model)
+    descriptions = df_lab_only[config.CLEAN_DESC_COL]
     categories = pd.Categorical(df_lab_only[config.UT_CAT_COL])
     unique_categories = categories.categories
     batch_size = 5000
@@ -142,16 +142,14 @@ def main():
     print(df_prepared['label'].value_counts(normalize=True))
 
     print("\nFitting a TF-IDF vectorizer...")
-    custom_stops = list(ENGLISH_STOP_WORDS) + config.DOMAIN_STOP_WORDS
+    category_stops = list(ENGLISH_STOP_WORDS) + config.DOMAIN_STOP_WORDS + config.CATEGORY_STOP_WORDS
     category_vectorizer = TfidfVectorizer(
         ngram_range=(1, 3),
         min_df=config.CATEGORY_VECTORIZER_MIN_DF,
-        max_df=0.8,
-        stop_words=custom_stops,
-        token_pattern=r"(?u)\b[a-zA-Z][a-zA-Z]{2,}\b",
+        stop_words=category_stops,
         sublinear_tf=True,
     )
-    category_vectorizer.fit(df_prepared['prepared_description'].apply(config.clean_for_model))
+    category_vectorizer.fit(df_prepared['prepared_description'])
     joblib.dump(category_vectorizer, config.CATEGORY_VECTORIZER_PATH)
     print(f"Category vectorizer saved to: {config.CATEGORY_VECTORIZER_PATH}")
 

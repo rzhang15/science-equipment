@@ -10,9 +10,6 @@ from gslab_make.write_logs import *
 # MAKE.PY STARTS
 clear_dir(['../output/', '../temp/'])
 os.mkdir('../output/figures/')
-os.mkdir('../output/figures/raw/')
-os.mkdir('../output/figures/es/')
-os.mkdir('../output/estimates/')
 os.mkdir('../output/tables/')
 remove_dir(['../external/'])
 paths = {'makelog' : '../output/make.log', 'external_dir' : '../external/'}
@@ -21,6 +18,6 @@ start_makelog(paths)
 # MAKE LINKS
 link_externals(paths, ['links.txt'])
 # BUILD.DO
-run_stata(paths, program = 'analysis.do')
+run_stata(paths, program = 'build.do')
 end_makelog(paths)
 input('\n Press <Enter> to exit.')

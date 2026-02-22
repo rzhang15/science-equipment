@@ -30,7 +30,7 @@ class TfidfItemCategorizer:
         if not item_description or not item_description.strip():
             return "No Description", -1.0
         try:
-            item_vector = self.vectorizer.transform([config.clean_for_model(item_description)])
+            item_vector = self.vectorizer.transform([item_description])
             sim_scores = cosine_similarity(item_vector, self.category_vectors).flatten()
             best_score_index = np.argmax(sim_scores)
             best_score = sim_scores[best_score_index]
@@ -63,7 +63,7 @@ class EmbeddingItemCategorizer:
         if not description or not description.strip():
             return "No Description", -1.0
         try:
-            item_vector = self.encoder_model.encode([config.clean_for_model(description)])
+            item_vector = self.encoder_model.encode([description])
             sim_scores = cosine_similarity(item_vector, self.category_vectors).flatten()
             best_score_index = np.argmax(sim_scores)
             best_score = sim_scores[best_score_index]

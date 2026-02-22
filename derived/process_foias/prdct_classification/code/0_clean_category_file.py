@@ -232,19 +232,36 @@ def main():
     if rows_dropped > 0:
         print(f"  - Dropped {rows_dropped} rows due to missing descriptions or categories.")
 
-    # --- Consolidate sparse antibody categories ---
-    print("\nConsolidating sparse antibody categories...")
+    # --- Consolidate antibody categories ---
+    print("\nConsolidating antibody categories...")
     cat_col = df_merged[config.UT_CAT_COL].astype(str).str.lower()
-    is_antibody = cat_col.str.contains("antibod", na=False)  # catches both antibody and antibodies
-    is_poly = cat_col.str.contains("polyclonal", na=False)
-    is_mono = cat_col.str.contains("monoclonal", na=False)
+    is_antibody = cat_col.str.contains("antibod", na=False)
     is_primary = cat_col.str.contains("primary", na=False)
     is_secondary = cat_col.str.contains("secondary", na=False)
-    df_merged.loc[is_antibody & is_poly & is_primary, config.UT_CAT_COL] = "polyclonal primary antibody"
-    df_merged.loc[is_antibody & is_mono & is_primary, config.UT_CAT_COL] = "monoclonal primary antibody"
-    df_merged.loc[is_antibody & is_poly & is_secondary, config.UT_CAT_COL] = "polyclonal secondary antibody"
-    df_merged.loc[is_antibody & is_mono & is_secondary, config.UT_CAT_COL] = "monoclonal secondary antibody"
-    print("  Antibody category consolidation complete.")
+    n_ab_before = cat_col[is_antibody].nunique()
+    df_merged.loc[is_antibody & is_primary, config.UT_CAT_COL] = "primary antibodies"
+    df_merged.loc[is_antibody & is_secondary, config.UT_CAT_COL] = "secondary antibodies"
+    n_ab_after = df_merged.loc[is_antibody, config.UT_CAT_COL].nunique()
+    print(f"  Merged {n_ab_before} antibody subcategories -> {n_ab_after} "
+          f"({is_antibody.sum()} rows: primary antibodies + secondary antibodies)")
+
+    # --- Consolidate ELISA kit subcategories ---
+    print("\nConsolidating ELISA kit subcategories...")
+    cat_col = df_merged[config.UT_CAT_COL].astype(str).str.lower()
+    is_elisa = cat_col.str.contains("elisa", na=False)
+    n_elisa_before = cat_col[is_elisa].nunique()
+    n_elisa_rows = is_elisa.sum()
+    df_merged.loc[is_elisa, config.UT_CAT_COL] = "elisa kits"
+    print(f"  Merged {n_elisa_before} ELISA subcategories ({n_elisa_rows} rows) -> 'elisa kits'")
+
+    # --- Consolidate pipette tip subcategories ---
+    print("\nConsolidating pipette tip subcategories...")
+    cat_col = df_merged[config.UT_CAT_COL].astype(str).str.lower()
+    is_pipette_tip = cat_col.str.contains("pipette tip", na=False)
+    n_tip_consolidated = is_pipette_tip.sum()
+    df_merged.loc[is_pipette_tip, config.UT_CAT_COL] = "pipette tips"
+    tip_cats_merged = cat_col[is_pipette_tip].nunique()
+    print(f"  Merged {tip_cats_merged} pipette tip subcategories ({n_tip_consolidated} rows) -> 'pipette tips'")
 
     # 7. Generate and save category counts for review
     print("\nGenerating and saving category counts...")

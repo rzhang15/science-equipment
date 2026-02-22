@@ -1,347 +1,387 @@
-# Load necessary libraries
+# =============================================================================
+# Matching Treated Categories to Control Categories
+#
+# Approach: Mahalanobis distance matching on pre-treatment outcome levels
+# and market size. No propensity score, no caliper — guarantees every treated
+# category gets matched. Uses replace=TRUE so the same control can serve
+# multiple treated units.
+#
+# Matching covariates:
+#   - avg_log_price in 2010, 2011, 2012, 2013 (pre-treatment outcome path)
+#   - log(spend_2013) (market size, log-transformed to reduce skew)
+#
+# This directly matches on pre-treatment outcome trajectories, which is the
+# strongest way to ensure parallel trends. No need for trend regressions
+# that can fail and produce NAs.
+# =============================================================================
+
 library(tidyverse)
-library(fixest)
 library(MatchIt)
 library(cobalt)
 library(ggplot2)
-library(here)
 library(haven)
 library(stringr)
 set.seed(8975)
+
 # Set working directory and create output folders
 setwd("~/sci_eq/derived/first_stage/match_control/code")
 dir.create("../output/figures", recursive = TRUE, showWarnings = FALSE)
 dir.create("../output/balance_plots", recursive = TRUE, showWarnings = FALSE)
-dir.create("../output/grid_search_logs", recursive = TRUE, showWarnings = FALSE)
 
 # ---------------------------
-# Define Covariates, Weights, & Outcomes
+# Configuration
 # ---------------------------
-COVARIATES_TO_USE <- c("coef_log_price", "spend_2013")
-VARS_TO_CHECK <- c(COVARIATES_TO_USE)
+# Matching covariates: pre-treatment outcome levels + market size
+MATCH_COVARIATES <- c("log_raw_spend_2010", "raw_spend_2010",
+                      "log_raw_spend_2012", "raw_spend_2012")
 
-# DEFINE a vector of outcome variables tox loop through
+# Number of controls per treated unit
+MATCH_RATIO <- 3
+
+# Outcome variables to plot
 OUTCOME_VARS <- c("avg_log_price")
-
-# ---------------------------
-# Define Grid Search Parameters
-# ---------------------------
-# Define the range of values to test
-CALIPER_GRID <- seq(0.01, 0.25, by = 0.01)
-RATIO_GRID <- seq(1,3, by = 1)
-
-cat("Starting grid search with:\n")
-cat("Caliper values:", paste(CALIPER_GRID, collapse = ", "), "\n")
-cat("Ratio values:", paste(RATIO_GRID, collapse = ", "), "\n\n")
 
 # ---------------------------
 # Data Preparation
 # ---------------------------
-# Load data
+cat("Loading data...\n")
 panel <- read_dta("../external/samp/category_yr_tfidf.dta")
 panel <- panel %>% mutate(category = as.character(category))
 
-# Create pre-treatment dataset
-all_data_pre <- panel %>%
-  filter(year <= 2013)
+cat("Panel dimensions:", dim(panel), "\n")
+cat("Years in data:", sort(unique(panel$year)), "\n")
+cat("Total categories:", n_distinct(panel$category), "\n")
+cat("Treated categories:", n_distinct(panel$category[panel$treated == 1]), "\n")
+cat("Control categories:", n_distinct(panel$category[panel$treated == 0]), "\n\n")
 
-# Compute linear time trend coefficients
-trends_pre <- all_data_pre %>%
-  group_by(category, treated) %>%
-  summarise(
-    coef_price = possibly(~coef(lm(raw_price ~ year, .x, weights = spend_2013))[2], otherwise = NA_real_)(cur_data()),
-    coef_log_price = possibly(~coef(lm(avg_log_price ~ year, .x, weights = spend_2013))[2], otherwise = NA_real_)(cur_data()),
-    coef_spend = possibly(~coef(lm(raw_spend ~ year, .x, weights = spend_2013))[2], otherwise = NA_real_)(cur_data()),
-    coef_log_spend = possibly(~coef(lm(avg_log_spend ~ year, .x, weights = spend_2013))[2], otherwise = NA_real_)(cur_data()),
-    .groups = "drop"
-  )
+# Pivot pre-treatment data to wide format (one row per category)
+all_data_pre <- panel %>% filter(year <= 2013)
 
-# Pivot data to wide format
-data_wide_raw <- all_data_pre %>%
+data_wide <- all_data_pre %>%
   pivot_wider(
     names_from = year,
     names_sep = "_",
-    id_cols = c(category, treated, spend_2013 ),
-    values_from = c(avg_log_price, avg_log_spend, num_suppliers, obs_cnt, raw_spend, raw_price, raw_qty) # Ensure both outcomes are pivoted
+    id_cols = c(category, treated, spend_2013),
+    values_from = c(avg_log_price, log_raw_spend, num_suppliers, obs_cnt,
+                    raw_spend, raw_price, raw_qty, log_raw_price)
   ) %>%
   mutate(
-    w_avg_log_price_2013 = avg_log_price_2013 * spend_2013,
-    w_avg_log_price_2012 = avg_log_price_2012 * spend_2013,
-    w_avg_log_price_2011 = avg_log_price_2011 * spend_2013,
-    w_avg_log_price_2010 = avg_log_price_2010 * spend_2013,
-    w_avg_log_spend_2013 = avg_log_spend_2013 * spend_2013,
-    w_avg_log_spend_2012 = avg_log_spend_2012 * spend_2013,
-    w_avg_log_spend_2011 = avg_log_spend_2011 * spend_2013,
-    w_avg_log_spend_2010 = avg_log_spend_2010 * spend_2013
+    # Log-transform spend to reduce skew — huge markets won't dominate distance
+    log_spend_2013 = log(spend_2013 + 1)
   )
 
-# Join pre-treatment trends
-data_wide_raw <- left_join(data_wide_raw, trends_pre, by = c("category", "treated"))
-
-# KEY FIX: Safely remove rows with NAs in covariates OR the weighting variable
-data_wide <- data_wide_raw %>%
-  drop_na(all_of(VARS_TO_CHECK))
-
-# CRITICAL DIAGNOSTIC: Check if data remains after cleaning
-cat("Dimensions of raw wide data:", dim(data_wide_raw), "\n")
-cat("Dimensions after targeted NA removal:", dim(data_wide), "\n")
+cat("Wide data dimensions:", dim(data_wide), "\n")
 
 # ---------------------------
-# Robust Matching Loop (UPDATED FOR MULTIPLE OUTCOMES)
+# Handle missing covariates
 # ---------------------------
-covariates_formula <- as.formula(paste("treated ~", paste(COVARIATES_TO_USE, collapse = " + ")))
-treated_markets <- unique(data_wide$category[data_wide$treated == 1])
+# Check which categories have NA in matching covariates
+na_check <- data_wide %>%
+  filter(if_any(all_of(MATCH_COVARIATES), is.na))
 
-cat("\n\n====================================================\n")
-cat("Found", length(treated_markets), "treated markets to process after cleaning.\n")
-cat("====================================================\n\n")
+if (nrow(na_check) > 0) {
+  cat("Categories with NA in matching covariates:\n")
+  print(na_check %>% select(category, treated, all_of(MATCH_COVARIATES)))
+  cat("\n")
+}
 
+# Separate treated and controls
+all_treated <- data_wide %>% filter(treated == 1)
+all_controls <- data_wide %>% filter(treated == 0) %>% drop_na(all_of(MATCH_COVARIATES))
+
+# For treated units with NA covariates, we'll handle them with a fallback
+treated_has_na <- all_treated %>%
+  filter(if_any(all_of(MATCH_COVARIATES), is.na)) %>%
+  pull(category)
+
+treated_clean <- all_treated %>%
+  filter(!category %in% treated_has_na)
+
+cat("Treated markets total:", nrow(all_treated), "\n")
+cat("Treated markets with NA covariates:", length(treated_has_na), "\n")
+cat("Clean treated markets:", nrow(treated_clean), "\n")
+cat("Clean control markets:", nrow(all_controls), "\n")
+if (length(treated_has_na) > 0) {
+  cat("NA treated markets:", paste(treated_has_na, collapse = ", "), "\n")
+}
+cat("\n")
+
+# ---------------------------
+# Matching: all clean treated markets at once
+# ---------------------------
+# Combine clean treated + all clean controls for a single matchit call
+match_input <- bind_rows(treated_clean, all_controls)
+
+match_formula <- as.formula(paste("treated ~", paste(MATCH_COVARIATES, collapse = " + ")))
+
+cat("Running Mahalanobis distance matching...\n")
+cat("Formula:", deparse(match_formula), "\n")
+cat("Method: nearest, distance: mahalanobis, ratio:", MATCH_RATIO, ", replace: TRUE\n\n")
+
+main_model <- tryCatch({
+  matchit(
+    formula = match_formula,
+    method = "nearest",
+    distance = "mahalanobis",
+    data = match_input,
+    ratio = MATCH_RATIO,
+    replace = TRUE
+  )
+}, error = function(e) {
+  stop("Main matching failed: ", e$message)
+})
+
+# Print overall balance summary
+cat("=== Overall Balance Summary ===\n")
+print(summary(main_model))
+cat("\n")
+
+# Save overall balance plot
+tryCatch({
+  bal_plot <- love.plot(main_model, binary = "std", thresholds = c(m = .1),
+                        title = "Overall Covariate Balance (Mahalanobis Matching)")
+  ggsave("../output/balance_plots/balance_overall.pdf", plot = bal_plot, width = 8, height = 6)
+  print(bal_plot)
+}, error = function(e) {
+  message("WARNING: Overall love.plot failed: ", e$message)
+})
+
+# ---------------------------
+# Extract matched pairs from the single matchit model
+# ---------------------------
+match_data <- match.data(main_model)
+
+# Get the match matrix to know which controls each treated got
+match_matrix <- main_model$match.matrix  # rows = treated, cols = matched controls
+
+# Build the pairs list
 match_pairs_list <- list()
-optimal_params_list <- list() # List to store optimal params for each market
 
-# --- Main loop over each treated market ---
-for (category_id in treated_markets) {
-  cat("\nProcessing treated market:", category_id, "\n")
+for (i in seq_len(nrow(match_matrix))) {
+  treated_idx <- as.integer(rownames(match_matrix)[i])
+  treated_cat <- match_input$category[treated_idx]
   
-  temp_data <- data_wide %>%
-    filter(category == category_id | treated == 0)
+  control_indices <- as.integer(match_matrix[i, ])
+  control_indices <- control_indices[!is.na(control_indices)]
   
-  cat("--- Diagnostic summary for market:", category_id, "---\n")
-  print(
-    temp_data %>%
-      group_by(treated) %>%
-      summarise(count = n(), across(all_of(COVARIATES_TO_USE), list(mean = mean, sd = sd))) %>%
-      as.data.frame()
+  if (length(control_indices) == 0) next
+  
+  control_cats <- unique(match_input$category[control_indices])
+  
+  match_pairs_list[[treated_cat]] <- data.frame(
+    treated_market = treated_cat,
+    control_market = control_cats
   )
-  cat("--------------------------------------------------\n")
+}
+
+# ---------------------------
+# Handle NA treated markets with fallback (match on available covariates only)
+# ---------------------------
+if (length(treated_has_na) > 0) {
+  cat("\n--- Handling", length(treated_has_na), "treated markets with NA covariates ---\n")
   
-  # -----------------------------------------------------------------
-  # START: Grid Search for Optimal Caliper and Ratio
-  # -----------------------------------------------------------------
-  
-  grid_results_list <- list()
-  cat("--- Starting Grid Search for market:", category_id, "---\n")
-  
-  for (cal in CALIPER_GRID) {
-    for (rat in RATIO_GRID) {
-      
-      model_attempt <- tryCatch({
-        matchit(
-          formula = covariates_formula, method = "nearest", data = temp_data,
-          ratio = rat, caliper = cal, replace = TRUE
-          )
-      }, error = function(e) { NULL })
-      
-      mean_smd <- Inf
-      num_controls <- 0
-      
-      if (!is.null(model_attempt)) {
-        
-        # --- ROBUSTNESS FIX ---
-        # Instead of calling summary() (which errors on no-match),
-        # we check the model's weights directly.
-        # We count control units (treat == 0) that have a weight > 0.
-        num_controls_matched <- sum(model_attempt$weights[model_attempt$treat == 0] > 0)
-        
-        if (num_controls_matched > 0) {
-          # If we found controls, *now* it's safe to get the balance summary
-          match_summary <- summary(model_attempt, un = FALSE)
-          
-          # Calculate the mean absolute SMD for the matched group
-          mean_smd <- mean(abs(match_summary$sum.matched[, "Std. Mean Diff."]), na.rm = TRUE)
-          num_controls <- num_controls_matched
-        }
-        # If num_controls_matched is 0, mean_smd stays Inf and num_controls stays 0,
-        # which correctly penalizes this parameter set.
-        # --- END FIX ---
+  for (category_id in treated_has_na) {
+    cat("Fallback matching for:", category_id, "\n")
+    
+    treated_row <- all_treated %>% filter(category == category_id)
+    
+    # Determine which covariates are available for this treated unit
+    available_covs <- MATCH_COVARIATES[!is.na(treated_row[, MATCH_COVARIATES])]
+    
+    if (length(available_covs) == 0) {
+      # Absolute fallback: just match on log_spend_2013 if everything else is NA
+      available_covs <- "log_spend_2013"
+      if (is.na(treated_row$log_spend_2013)) {
+        message("FATAL: No covariates available for ", category_id)
+        next
       }
-      
-      # Store the result
-      grid_results_list[[paste0("c", cal, "_r", rat)]] <- data.frame(
-        caliper = cal,
-        ratio = rat,
-        mean_smd = mean_smd,
-        num_controls = num_controls
+    }
+    
+    fallback_data <- bind_rows(treated_row, all_controls) %>%
+      drop_na(all_of(available_covs))
+    
+    fallback_formula <- as.formula(paste("treated ~", paste(available_covs, collapse = " + ")))
+    
+    fallback_model <- tryCatch({
+      matchit(
+        formula = fallback_formula,
+        method = "nearest",
+        distance = "mahalanobis",
+        data = fallback_data,
+        ratio = MATCH_RATIO,
+        replace = TRUE
       )
+    }, error = function(e) {
+      message("Fallback matching failed for ", category_id, ": ", e$message)
+      NULL
+    })
+    
+    if (is.null(fallback_model)) next
+    
+    fb_match_matrix <- fallback_model$match.matrix
+    treated_idx <- as.integer(rownames(fb_match_matrix)[1])
+    control_indices <- as.integer(fb_match_matrix[1, ])
+    control_indices <- control_indices[!is.na(control_indices)]
+    
+    if (length(control_indices) > 0) {
+      control_cats <- unique(fallback_data$category[control_indices])
+      match_pairs_list[[category_id]] <- data.frame(
+        treated_market = category_id,
+        control_market = control_cats
+      )
+      cat("  Matched to:", paste(control_cats, collapse = ", "), "\n")
     }
   }
+}
+
+# ---------------------------
+# Combine all match pairs
+# ---------------------------
+if (length(match_pairs_list) == 0) {
+  stop("No matches were made at all!")
+}
+
+match_pairs <- do.call(rbind, match_pairs_list)
+rownames(match_pairs) <- NULL
+
+cat("\n====================================================\n")
+cat("Successfully matched", n_distinct(match_pairs$treated_market), "treated markets.\n")
+cat("====================================================\n\n")
+
+# Check completeness
+all_treated_cats <- unique(all_treated$category)
+matched_cats <- unique(match_pairs$treated_market)
+missing_cats <- setdiff(all_treated_cats, matched_cats)
+
+if (length(missing_cats) > 0) {
+  cat("!! MISSING treated markets (not matched):\n")
+  print(missing_cats)
+} else {
+  cat("All", length(all_treated_cats), "treated markets successfully matched.\n")
+}
+
+write_csv(match_pairs, "../output/match_pairs.csv")
+cat("Saved match_pairs.csv\n\n")
+
+# ---------------------------
+# Generate trend plots for each treated market
+# ---------------------------
+cat("Generating trend plots...\n\n")
+
+unique_treated <- unique(match_pairs$treated_market)
+
+for (treated_cat in unique_treated) {
+  # Get this market's controls
+  controls <- match_pairs %>%
+    filter(treated_market == treated_cat) %>%
+    pull(control_market) %>%
+    unique()
   
-  
-  # Combine results and find the best
-  grid_results_df <- do.call(rbind, grid_results_list)
-  
-  # Find best parameters: min SMD, but MUST have at least 1 control
-  best_params <- grid_results_df %>%
-    filter(is.finite(mean_smd) & num_controls > 0) %>%
-    arrange(mean_smd) %>%
-    slice(1) %>%
-    # --- !! FIX !! ---
-    # Rename 'mean_smd' to 'best_mean_smd' to match the
-    # fallback logic and the rest of the script.
-    rename(best_mean_smd = mean_smd)
-  # --- !! END FIX !! ---
-  
-  # Save the log of the grid search for this market
-  write_csv(grid_results_df, paste0("../output/grid_search_logs/grid_log_", category_id, ".csv"))
-  
-  
-  # --- !! START: MODIFIED BLOCK (1/2) !! ---
-  # Fallback logic: If grid search finds no match, force one without a caliper.
-  if (nrow(best_params) == 0) {
-    message("Grid search (caliper <= 0.25) found NO valid match for market ", category_id)
-    message("--- ATTEMPTING FALLBACK: Forcing match with best ratio and NO caliper. ---")
-    
-    # We will force a match using the largest ratio and NO caliper
-    # We set caliper to NA_real_ as a flag to remove it in the final call
-    best_params <- data.frame(
-      caliper = NA_real_,
-      ratio = max(RATIO_GRID), # Use the max ratio (e.g., 3)
-      best_mean_smd = NA_real_ # SMD will be bad, but we are forcing it. Use NA_real_
-    )
-  }
-  # --- !! END: MODIFIED BLOCK (1/2) !! ---
-  
-  
-  cat("--- Optimal params found for", category_id, ": Caliper =", best_params$caliper,
-      ", Ratio =", best_params$ratio, ", Mean SMD =", round(best_params$best_mean_smd, 4), "---\n")
-  
-  # Store for final summary
-  optimal_params_list[[category_id]] <- data.frame(
-    treated_market = category_id,
-    best_caliper = best_params$caliper,
-    best_ratio = best_params$ratio,
-    best_mean_smd = best_params$best_mean_smd
-  )
-  
-  # -----------------------------------------------------------------
-  # END: Grid Search
-  # -----------------------------------------------------------------
-  
-  
-  # --- !! START: MODIFIED BLOCK (2/2) !! ---
-  # Perform matching ONCE using OPTIMAL parameters
-  # This now checks for the NA flag to set the final caliper.
-  
-  # Conditionally set the final caliper:
-  # If best_params$caliper is NA (our flag), set caliper to NULL (to force match)
-  # Otherwise, use the best caliper found in the grid search.
-  final_caliper <- if (is.na(best_params$caliper)) {
-    NULL
-  } else {
-    best_params$caliper
-  }
-  
-  current_model <- tryCatch({
-    matchit(
-      formula = covariates_formula, method = "nearest", data = temp_data,
-      ratio = best_params$ratio, # Use best ratio
-      caliper = final_caliper,   # Use our new conditional caliper
-      replace = TRUE
-    )
-  }, error = function(e) { message("Matching failed (on optimal run): ", e$message); return(NULL) })
-  # --- !! END: MODIFIED BLOCK (2/2) !! ---
-  
-  
-  if (is.null(current_model)) next
-  
-  # Assess and save balance plot
-  balance_plot <- love.plot(current_model, binary = "std", thresholds = c(m = .1),
-                            title = paste("Covariate Balance for Market:", category_id,
-                                          "\n(Caliper=", best_params$caliper, ", Ratio=", best_params$ratio, ")"))
-  ggsave(filename = paste0("../output/balance_plots/balance_", category_id, ".pdf"), plot = balance_plot, width = 7, height = 6)
-  
-  # ✅ ADDED: Print the plot to the RStudio GUI (Plots pane)
-  print(balance_plot)
-  
-  match_data <- match.data(current_model)
-  if (nrow(match_data) <= 1) {
-    message("No valid control found for market ", category_id)
-    next
-  }
-  
-  treated_category <- unique(match_data$category[match_data$treated == 1])
-  matched_control_categories <- unique(match_data$category[match_data$treated == 0])
-  
-  # The match_pairs summary is independent of the outcome, so it stays here
-  match_pairs_list[[category_id]] <- data.frame(
-    treated_market = treated_category,
-    control_market = matched_control_categories
-  )
-  
-  # --- NEW: Loop over each OUTCOME variable to generate plots ---
   for (outcome_var in OUTCOME_VARS) {
-    cat("--- Generating plot for outcome:", outcome_var, "\n")
+    relevant_categories <- c(treated_cat, controls)
     
-    # 1. Prepare trend data for the current outcome variable
-    # ✅ MODIFIED: Added spend_2013 to the select() call
+    # Prepare trend data
     outcome_trends <- panel %>%
+      filter(category %in% relevant_categories) %>%
       select(category, year, treated, spend_2013, all_of(outcome_var)) %>%
       group_by(category) %>%
       mutate(outcome_adj = .data[[outcome_var]] - .data[[outcome_var]][year == 2013]) %>%
       ungroup()
     
-    # 2. Get the trend data for the single treated market
+    # Treated trend
     treated_plot_data <- outcome_trends %>%
-      filter(category == treated_category) %>%
-      mutate(group_label = paste("Treated:", treated_category))
+      filter(category == treated_cat) %>%
+      mutate(group_label = paste("Treated:", treated_cat))
     
-    # 3. Calculate the WEIGHTED AVERAGE trend across all matched control markets
+    # Weighted average control trend
     avg_control_plot_data <- outcome_trends %>%
-      filter(category %in% matched_control_categories) %>%
+      filter(category %in% controls) %>%
       group_by(year) %>%
-      # ✅ MODIFIED: Switched from mean() to weighted.mean() using spend_2013
-      summarise(outcome_adj = weighted.mean(outcome_adj, w = spend_2013, na.rm = TRUE), .groups = "drop") %>%
-      mutate(group_label = paste("Avg. Control (Weighted):", paste(matched_control_categories, collapse = ", ")))
+      summarise(
+        outcome_adj = weighted.mean(outcome_adj, w = spend_2013, na.rm = TRUE),
+        .groups = "drop"
+      ) %>%
+      mutate(group_label = paste("Avg. Control (n=", length(controls), ")"))
     
-    # 4. Combine the two datasets for plotting
     plot_data_final <- bind_rows(treated_plot_data, avg_control_plot_data)
     
-    # 5. Generate a dynamic title for the plot and y-axis
     plot_y_label <- str_to_title(str_replace_all(outcome_var, "_", " "))
-    plot_title <- paste(plot_y_label, "Trend:", treated_category)
     
-    # 6. Generate the plot
     p <- ggplot(plot_data_final, aes(x = year, y = outcome_adj, color = group_label)) +
       geom_line(linewidth = 1) +
       geom_point() +
       geom_vline(xintercept = 2013.5, linetype = "dashed", color = "gray40") +
       labs(
-        title = plot_title,
-        subtitle = "Treated vs. Weighted Average of Matched Control Markets",
+        title = paste(plot_y_label, "Trend:", treated_cat),
+        subtitle = paste("Controls:", paste(controls, collapse = ", ")),
         x = "Year",
-        y = paste(plot_y_label, "(Adjusted to 2013)"),
-        color = "Market Group"
+        y = paste(plot_y_label, "(Normalized to 2013)"),
+        color = "Group"
       ) +
       theme_minimal(base_size = 12) +
       scale_x_continuous(breaks = seq(2010, 2019, 1)) +
-      theme(legend.position = "bottom",
-            plot.title = element_text(face = "bold"),
-            legend.text = element_text(size = 8))
+      theme(
+        legend.position = "bottom",
+        plot.title = element_text(face = "bold"),
+        legend.text = element_text(size = 8),
+        plot.subtitle = element_text(size = 8, color = "gray40")
+      )
     
-    # 7. Save the plot with a dynamic filename
-    ggsave(paste0("../output/figures/", outcome_var, "_trends_", treated_category, ".pdf"), plot = p, width = 10, height = 7)
+    tryCatch({
+      # Sanitize filename (replace special characters)
+      safe_name <- str_replace_all(treated_cat, "[^a-zA-Z0-9_-]", "_")
+      ggsave(paste0("../output/figures/", outcome_var, "_trends_", safe_name, ".pdf"),
+             plot = p, width = 10, height = 7)
+      print(p)
+    }, error = function(e) {
+      message("WARNING: Plot failed for ", treated_cat, ": ", e$message)
+    })
     
-    # ✅ ADDED: Print the plot to the RStudio GUI (Plots pane)
-    print(p)
-    
-    # ✅ MODIFIED: Updated cat message
-    cat("Saved and displayed", outcome_var, "trend plot for", category_id, "\n")
+    cat("Plotted", outcome_var, "for", treated_cat, "\n")
   }
 }
 
-# Final summary
-if (length(match_pairs_list) > 0) {
-  match_pairs <- do.call(rbind, match_pairs_list)
-  cat("\nSuccessfully matched pairs:\n")
-  print(match_pairs)
-  write_csv(match_pairs, "../output/match_pairs.csv")
+# ---------------------------
+# Summary statistics
+# ---------------------------
+cat("\n====================================================\n")
+cat("MATCHING SUMMARY\n")
+cat("====================================================\n")
+cat("Total treated markets:", length(all_treated_cats), "\n")
+cat("Successfully matched:", n_distinct(match_pairs$treated_market), "\n")
+cat("Matching method: Mahalanobis distance, nearest neighbor\n")
+cat("Matching ratio:", MATCH_RATIO, "controls per treated\n")
+cat("Replace: TRUE\n")
+cat("Covariates:", paste(MATCH_COVARIATES, collapse = ", "), "\n")
+
+# Per-market SMD diagnostics
+cat("\n--- Per-Market Match Quality ---\n")
+for (treated_cat in unique_treated) {
+  controls <- match_pairs %>%
+    filter(treated_market == treated_cat) %>%
+    pull(control_market) %>%
+    unique()
   
-  # Save the summary of optimal parameters
-  optimal_params_df <- do.call(rbind, optimal_params_list)
-  cat("\nOptimal parameters chosen per market:\n")
-  print(optimal_params_df)
-  write_csv(optimal_params_df, "../output/optimal_match_params.csv")
+  t_row <- data_wide %>% filter(category == treated_cat)
+  c_rows <- data_wide %>% filter(category %in% controls)
   
-} else {
-  cat("\nNo successful matches were made.\n")
+  # Calculate mean abs difference in matching covariates (standardized by control SD)
+  available_covs <- intersect(MATCH_COVARIATES, names(t_row))
+  available_covs <- available_covs[!is.na(t_row[1, available_covs])]
+  
+  if (length(available_covs) > 0 && nrow(c_rows) > 0) {
+    smds <- sapply(available_covs, function(v) {
+      t_val <- as.numeric(t_row[[v]])
+      c_vals <- as.numeric(c_rows[[v]])
+      c_sd <- sd(c_vals, na.rm = TRUE)
+      if (is.na(c_sd) || c_sd == 0) return(NA_real_)
+      abs(t_val - mean(c_vals, na.rm = TRUE)) / c_sd
+    })
+    mean_smd <- mean(smds, na.rm = TRUE)
+    cat(sprintf("  %-55s | SMD: %.4f | Controls: %d\n", treated_cat, mean_smd, length(controls)))
+  } else {
+    cat(sprintf("  %-55s | SMD: NA (fallback) | Controls: %d\n", treated_cat, length(controls)))
+  }
 }
+
+cat("\nDone.\n")

@@ -13,16 +13,16 @@ import config
 
 def generate_tfidf_vectors(df):
     print("--- Generating TF-IDF Vectors for Gatekeeper ---")
-    # Preprocess: strip part numbers, dimensions, and pure numbers (E)
-    model_text = df['prepared_description'].fillna('').apply(config.clean_for_model)
+    # Data is already cleaned upstream by clean_foia_data.py -- no need for
+    # additional clean_for_model preprocessing on TF-IDF (the remaining
+    # alphanumeric tokens and dimensions carry lab-vs-non-lab signal).
+    model_text = df['prepared_description'].fillna('')
     # Combined stop words: sklearn English defaults + domain-specific (A)
     custom_stops = list(ENGLISH_STOP_WORDS) + config.DOMAIN_STOP_WORDS
     gatekeeper_vectorizer = TfidfVectorizer(
         ngram_range=(1, 3),
         min_df=config.GATEKEEPER_VECTORIZER_MIN_DF,
-        max_df=0.8,                                        # (C) drop ubiquitous tokens
         stop_words=custom_stops,                            # (A) domain stop words
-        token_pattern=r"(?u)\b[a-zA-Z][a-zA-Z]{2,}\b",    # (B) 3+ letter words only
         sublinear_tf=True,                                  # (D) dampen repeated terms
     )
     tfidf_vectors = gatekeeper_vectorizer.fit_transform(model_text)
@@ -35,9 +35,7 @@ def generate_transformer_vectors(df, model_name, output_filename):
     print(f"\n--- Generating Vectors for: {model_name} ---")
     model = SentenceTransformer(model_name)
 
-    # Apply same preprocessing as TF-IDF so BERT focuses on meaningful tokens
-    model_text = df['prepared_description'].fillna('').apply(config.clean_for_model)
-    vectors = model.encode(model_text.tolist(), show_progress_bar=True)
+    vectors = model.encode(df['prepared_description'].fillna('').tolist(), show_progress_bar=True)
     joblib.dump(vectors, os.path.join(config.OUTPUT_DIR, output_filename))
     print(f"  {model_name} vectors saved to {output_filename}")
 

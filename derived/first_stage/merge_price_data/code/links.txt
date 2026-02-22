@@ -1,0 +1,1 @@
+./samp/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/process_foias/prdct_classification/output/

@@ -116,18 +116,19 @@ program append_predata
 	foreach v in "hotel" "audit" "consulting" "courier" "custom" "grant" "honorarium" "membership" "postage" "reimb" "salaried" "secur" "ship" "staff" "blanket po" "adapter" "adap" "computer" "dell" "desktop" "ink cartridge" "laptop" "monitor" "optiplex" "printer" "bucket" "cabinet" "can" "cart" "handle" "haz" "laundry Barrier" "laundry FR" "step stool" "tackymat" "label" "fy20" "lodg" "print" "orientation" "isbn" "report" {
         drop if strpos(product_desc, "`v'") > 0 
     }
-    drop if strpos(agencyname, "jr college", "city college")  > 0
+    drop if strpos(agencyname, "jr college") > 0 | strpos(agencyname, "city college")  > 0 |strpos(agencyname, "junior college") >0
+    drop if inlist(agencyname, "carl sandburg college", "chaffey college", "cuesta college", "daytona state college", "florida state college at jacksonville", "harper college", "hartnell college") | inlist(agencyname, "kishwaukee college", "mchenry county college", "midland college", "miracosta college", "north central state college", "odessa college", "palm beach state college", "parkland college") | inlist(agencyname, "pasadena city college", "pasco-hernando state college", "san jacinto college", "seminole state college", "south georgial state college" , "south plains college", "southeastern illinois college") | inlist(agencyname, "southwestern illinois college", "state college of florida", "suny sullivan")
     save ../output/govspend_panel_full, replace
     keep if year >= 2010
     gen month = month(purchasedate)
     bys agencyname year month: gen org_yr_mnth_cntr = _n == 1
     bys agencyname year : egen org_mnth_cntr = total(org_yr_mnth_cntr)
-*    keep if org_mnth_cntr >= 8
     bys agencyname year : gen org_yr_cntr =  _n == 1
     bys agencyname: egen num_yrs = total(org_yr_cntr)
-    keep if num_yrs == 10
-    save ../output/balanced_govspend_2010_2019, replace
-    export delimited ../output/govspend_panel, replace
+    bys agencyname: egen min_yr = min(year)
+    keep if num_yrs == 10  | (num_yrs == 9 & min_yr == 2011)
+    save ../temp/balanced_govspend_2010_2019, replace
+*    export delimited ../output/govspend_panel, replace
     gcontract agencyname year month
     bys agencyname year: gen num_mnths = _N
     drop _freq
@@ -135,9 +136,12 @@ program append_predata
     gcontract agencyname year
     drop _freq
     gcontract agencyname
-    drop if _freq != 10
+    drop if _freq <  9 
     drop _freq
     save ../output/final_unis_list, replace
+    merge 1:m agencyname using ../temp/balanced_govspend_2010_2019, assert(2 3) keep(3) nogen
+    save ../output/balanced_govspend_2010_2019, replace
+    export delimited ../output/govspend_panel, replace
 end
 
 main

@@ -149,12 +149,10 @@ class HybridClassifier:
         all_ml_indices = keyword_check['indices'] + to_predict_ml['indices']
 
         if all_ml_data:
-            # Clean text for vectorization (must match training preprocessing)
-            cleaned = [config.clean_for_model(d) for d in all_ml_data]
             if self.is_bert:
-                vectors = self.vectorizer.encode(cleaned, show_progress_bar=False)
+                vectors = self.vectorizer.encode(all_ml_data, show_progress_bar=False)
             else:
-                vectors = self.vectorizer.transform(cleaned)
+                vectors = self.vectorizer.transform(all_ml_data)
 
             ml_probas = self.ml_model.predict_proba(vectors)[:, 1]
 

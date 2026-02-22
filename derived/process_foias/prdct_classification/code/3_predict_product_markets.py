@@ -209,12 +209,10 @@ def main(gatekeeper_name: str, expert_choice: str, source_abbrev: str = None):
             lab_final_preds = y_pred[lab_indices]
             lab_final_descs = descriptions[lab_indices]
 
-            # Clean descriptions to match training preprocessing
-            lab_cleaned_descs = lab_final_descs.apply(config.clean_for_model)
             if embedding_type == 'bert':
-                lab_embeddings = vectorizer_for_similarity.encode(lab_cleaned_descs.tolist(), show_progress_bar=True, batch_size=128)
+                lab_embeddings = vectorizer_for_similarity.encode(lab_final_descs.tolist(), show_progress_bar=True, batch_size=128)
             else: # TF-IDF
-                lab_embeddings = vectorizer_for_similarity.transform(lab_cleaned_descs)
+                lab_embeddings = vectorizer_for_similarity.transform(lab_final_descs)
             final_scores = []
             mismatched_categories_found = set() # <-- Add this line
             

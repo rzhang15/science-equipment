@@ -85,6 +85,22 @@ required_keywords:
       - "*loading*"
       - "*round*"
       - "*rnd*"
+  "aspirating pipettes":
+    any_of:
+      - "aspirating"
+      - "aspiration"
+      - "asp*"
+      - "asp"
+  "ethanol":
+    none_of: 
+      - "decly"
+      - "benz*"
+      - "hex*"
+      - "furfuryl"
+      - "isopropaol"
+      - "oxy*"
+      - "metha*"
+      - "amino*"
 
 
 # ==============================================================================
@@ -117,12 +133,13 @@ keyword_groups:
     - "*caspase*"
     - "*tunel*"
   NITRILE:
-    - "*nitrile*"
-    - "*nitril*"
-    - "*ntl*"
-    - "*nitr*"
-    - "*ntrl*"
-    - "*ntr*"
+    - "nitrile"
+    - "nitril"
+    - "ntl"
+    - "nit"
+    - "nitr"
+    - "ntrl"
+    - "ntr"
   GLOVES:
     - "*glove*"
     - "*glv*"
@@ -132,7 +149,10 @@ keyword_groups:
     - "*spin bar*"
   PIPETTE:
     - "pipette"
+    - "pipettes"
     - "pipet"
+    - "pipets"
+    - "*pipette*"
   PLATE:
     - "*plate*"
     - "*plt*"
@@ -778,11 +798,11 @@ market_rules:
       - "*pcr tb*"
       - "*tempassure*"
       - "*pyrogen*"
-  - name: "high-fidelity dna polymerases"
+  - name: "high-fidelity dna polymerase"
     all_of:
       - "ventsupreg"
       - "polymerase"
-  - name: "high-fidelity dna polymerases"
+  - name: "high-fidelity dna polymerase"
     all_of:
       - $HIGH_FIDELITY
       - "*polymerase*"
@@ -2171,6 +2191,10 @@ market_rules:
       - "*petri*"
 
   # --- Cell Culture Plates ---
+  - name: "petri dishes"
+    all_of:
+      - "*petri*"
+      - "*dish*"
   - name: "cell culture plates"
     all_of:
       - $PLATE
@@ -2207,23 +2231,39 @@ market_rules:
   # --- Microcentrifuge Tubes ---
   - name: "microcentrifuge tubes"
     all_of:
-      - "*microcent*"
-      - "*tube*"
+      - "mct"
+      - "nat"
+  - name: "microcentrifuge tubes"
+    all_of:
+      - "microtube"
+  - name: "microcentrifuge tubes"
+    all_of:
+      - "micro"
+      - $TUBE 
+  - name: "microcentrifuge tubes"
+    all_of:
+      - "microcent"
+      - $TUBE 
+  - name: "microcentrifuge tubes"
+    all_of:
+      - "microcentrifuge"
+      - $TUBE 
   - name: "microcentrifuge tubes"
     all_of:
       - "*microfuge*"
-      - "*tube*"
+      - $TUBE 
   - name: "microcentrifuge tubes"
     any_of:
       - "*microtube*"
       - "*micro tube*"
+      - "micro cent tube"
     none_of:
       - "*rack*"
       - "*centrifuge tube*"
   - name: "microcentrifuge tubes"
     all_of:
       - "*eppendorf*"
-      - "*tube*"
+      - $TUBE 
     none_of:
       - "*rack*"
       - "*pcr*"
@@ -2292,7 +2332,7 @@ market_rules:
       - "*15mltbe*"
 
   # --- Hypodermic Needles ---
-  - name: "medical syringes"
+  - name: "syringes"
     all_of:
       - "*syr*"
       - "*inge*"
@@ -2388,8 +2428,15 @@ market_rules:
       - "*stripet*"
   - name: "serological pipettes"
     all_of:
+      - "paper peel"
+      - $PIPETTE 
+  - name: "serological pipettes"
+    all_of:
       - "pap"
       - "*stripet*"
+  - name: "serological pipettes"
+    all_of:
+      - "stripet"
   - name: "serological pipettes"
     all_of:
       - $PIPETTE
@@ -2404,6 +2451,10 @@ market_rules:
     all_of:
       - $PIPETTE
       - "*sterile*"
+  - name: "serological pipettes"
+    all_of:
+      - $PIPETTE
+      - "serological"
     none_of:
       - "*tip*"
       - "*filter*"
@@ -2915,17 +2966,17 @@ market_rules:
       - "*fil*"
       - "*fltr*"
       - "*barrier*"
+  - name: "nitrile gloves"
+    all_of:
+      - $NITRILE
+      - $GLOVES
   - name: "latex gloves"
     all_of:
       - "*latex*"
       - $GLOVES
   - name: "latex gloves"
     all_of:
-      - "*ltx*"
-      - $GLOVES
-  - name: "nitrile gloves"
-    all_of:
-      - $NITRILE
+      - "ltx"
       - $GLOVES
   - name: "stir bars"
     any_of:
@@ -2943,6 +2994,14 @@ market_rules:
       - "*strip*"
       - $TUBE
 
+  - name: "test tubes"
+    all_of:
+      - "test tubes"
+    none_of:
+      - "rack"
+      - "rck"
+      - "centrifuge"
+      - "cntrifuge"
   - name: "test tubes"
     all_of:
       - "borosil"
@@ -3179,6 +3238,8 @@ market_rules:
   - name: "ethanol"
     all_of:
       - "etoh" 
+    none_of:
+      - "paraffin"
   - name: "ethanol"
     all_of:
       - "alcohol" 
@@ -3240,3 +3301,10 @@ market_rules:
     all_of:
       - "*acet*"
       - "*acid*"
+  - name: "disposable wipes and towels"
+    any_of: 
+      - "kimwipe"
+      - "napkin"
+      - "paper towels"
+      - "kimwps"
+      - "bleach towels"

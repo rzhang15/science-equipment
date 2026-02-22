@@ -136,9 +136,15 @@ class RuleBasedCategorizer:
 
         if pred_lower in self.veto_rules:
             rule_conditions = self.veto_rules[pred_lower]
+            # Veto if description is missing ALL required keywords
             if 'any_of' in rule_conditions:
                 expanded_any_of = [kw for alias in rule_conditions['any_of'] for kw in self.aliases.get(alias, [alias])]
                 if not any(self._get_regex(kw).search(description) for kw in expanded_any_of):
+                    return None
+            # Veto if description contains ANY excluded keyword
+            if 'none_of' in rule_conditions:
+                expanded_none_of = [kw for alias in rule_conditions['none_of'] for kw in self.aliases.get(alias, [alias])]
+                if any(self._get_regex(kw).search(description) for kw in expanded_none_of):
                     return None
 
         return prediction

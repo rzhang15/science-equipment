@@ -34,7 +34,7 @@ program merge_matched
     drop if treated == 0 & _merge == 1 
     drop _merge
     merge m:1 category using ../external/samp/category_hhi_tfidf, assert(2 3) keep(3) nogen
-    foreach var in avg_log_price avg_log_qty avg_log_spend  {
+    foreach var in avg_log_price log_raw_price log_raw_qty log_raw_spend {
         gen trt_`var' = `var' if treated == 1
         gen ctrl_`var' = `var' if treated == 0
     }
@@ -77,7 +77,7 @@ program merge_matched
     drop if treated == 0 & _merge == 1 
     drop _merge
     merge m:1 category using ../external/samp/category_hhi_tfidf, assert(2 3) keep(3) nogen
-    foreach var in avg_log_price avg_log_qty avg_log_spend  {
+    foreach var in avg_log_price log_raw_price log_raw_qty log_raw_spend {
         gen trt_`var' = `var' if treated == 1
         gen ctrl_`var' = `var' if treated == 0
     }
