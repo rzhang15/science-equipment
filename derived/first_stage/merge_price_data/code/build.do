@@ -19,28 +19,24 @@ program main
     rename purchasedate date
     keep agencyname product_desc clean_desc supplier price qty spend purchase_id date prediction_source similarity_score category 
     save ../temp/govspend_`embed', replace
-    // dallas+oregon+kansas
+    
+    // dallas+oregon
     import delimited  ../external/samp/utdallas_merged_clean_classified_with_non_parametric_`embed'.csv,clear 
     drop predicted_market
-    gen agencyname = "university of texas at dallas"
     keep product_desc clean_desc supplier price qty spend purchase_id date prediction_source similarity_score category 
+    gen agencyname = "university of texas at dallas"
     save ../temp/utdallas_`embed', replace
     
-    import delimited  ../external/samp/ukansas_2010_2019_standardized_clean_classified_with_non_parametric_`embed'.csv, clear
-    rename predicted_market category
-    keep product_desc clean_desc supplier price qty spend purchase_id date prediction_source similarity_score category 
-    gen agencyname = "university of kansas"
-    save ../temp/ukansas_`embed', replace
-
     import delimited  ../external/samp/oregonstate_2010_2019_standardized_clean_classified_with_non_parametric_`embed'.csv,clear 
     rename predicted_market category
     keep product_desc clean_desc supplier price qty spend purchase_id date prediction_source similarity_score category 
     gen agencyname = "oregon state university"
+    replace spend = price * qty
     save ../temp/oregonstate_`embed', replace
 
     clear
     save ../output/first_stage_data_`embed', replace emptyok
-    foreach f in govspend utdallas ukansas oregonstate {
+    foreach f in govspend utdallas oregonstate {
         append using ../temp/`f'_`embed'
     }
     rename supplier suppliername
