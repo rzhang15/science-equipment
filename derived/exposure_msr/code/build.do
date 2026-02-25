@@ -14,7 +14,7 @@ global treated_products  "$cell_culture $mol_bio $protein_bio"
 
 
 program main
-*    foia_pis
+    foia_pis
     clean_foia_data
 end
 
@@ -23,12 +23,12 @@ program foia_pis
     merge 1:1 athr_id using ../external/ls_samp/list_of_athrs, assert(1 2 3) keep(3) nogen
     save ../output/foia_athrs, replace
 
-    /*foreach i in 10 15 20 25 30 40 50 100 {
+    foreach i in 10 { //15 20 25 30 40 50 100 {
         import delimited using ../external/fields/author_static_clusters_`i', clear varnames(1)
         merge 1:1 athr_id using ../output/foia_athrs, assert(1 2 3) keep(3) nogen 
         save ../output/foia_athrs_with_clusters_`i', replace
         tab cluster_label
-    }*/
+    }
 end
 program clean_foia_data
     use ../external/foia/merged_foias_with_pis, clear

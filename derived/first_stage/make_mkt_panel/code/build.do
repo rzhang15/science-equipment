@@ -49,7 +49,6 @@ global treated "$tier1 $tier2 $tier3"
 program main
     qui import_suppliers
     foreach t in tfidf {
-        qui merge_price_data, embed(`t')
         qui select_good_categories, embed(`t')
         clean_raw, embed(`t')
         qui make_panels, embed(`t')
@@ -88,13 +87,19 @@ program import_suppliers
            "animal" "petroleum" "dermatology" "nano" "environment" "manufacturing" "resort" "uniform" "hospital" ///
            "devices" "architectural" "pools" "use " "packaging" "revenue" "verizon" "art gallery" "team apparel" ///
            "fashion" "gardens" "art suppies" "cellular" "unifirst" "tractor" "toyota" "traffic" "foods"  "deli" "tiger" "thyssenkrupp" "accounting" ///
-           "blackboard inc" "apex systems" "simplex grinnell" "mci enterpise" {
+           "blackboard inc" "apex systems" "simplex grinnell" "mci enterpise" "medline industries" "cardinal health" "air filter" ///
+           "med alliance group"  " uni" "university" "uni " "art materials" "gutter" "microscope" "radius systems" "baxter" "w nuhsbaum" "ntmdt" ///
+           "xray" "safc carlsbad" "petnet" "infoready" "bmg labtech" "marriot" "structurepoint" "barry forwarding" "data strategy" ///
+           "dow agroscieces" "biogen" "charter" "key performance" "professional" "communication" "images" "agency" "demolition" "furniture" ///
+           "personnel" "security" "talent" "linkquest" "new york times" "consulting" "sciquest" "fisheries" "telescope" "foundation" "data support" "bowling" "vacuum" "highway" ///
+           "engraving" "learning" "data " {
             drop if strpos(new_suppliername, "`k'") > 0
         }
         foreach k in "cem" "na" {
             drop if new_suppliername == "`k'"
         }
     }
+    drop if mi(suppliername)
     save ../temp/supplier_map, replace 
 end
 
@@ -120,14 +125,19 @@ program select_good_categories
         replace treated = 1 if strpos(category, "`c'") > 0 
     }
     *drop if inlist(category, "recombinant human protein") | strpos(category, "recombinant") > 0 | strpos(category, "growth factor") > 0  | strpos(category, "cell line") > 0 | strpos(category, "small molecule inhibitor") > 0  
-    gen keep  = (support >= 25 & precision >= 0.85 & recall >= 0.85) | (support >= 10 & precision >= 0.9 & recall >=0.75) 
+    gen keep  = (support >= 25 & precision >= 0.80 & recall >= 0.80) | (inrange(support, 10, 25) & precision >= 0.9 & recall >=0.85) 
     save ../temp/categories_`embed', replace
 end
 
 
 program clean_raw
     syntax, embed(string)
-    use ../external/merged/first_stage_data_`embed', clear
+    use ../external/price_samp/first_stage_data_`embed', clear
+    gen purchase_date = date(date, "DMY")
+    replace purchase_date = date(date, "YMD") if mi(purchase_date)
+    gen year = year(purchase_date)
+    keep if inrange(year, 2010,2019)
+    drop if strpos(agencyname, "medical") > 0
     qui count
     local total_obs = r(N)
     qui sum spend, d
@@ -152,19 +162,14 @@ program clean_raw
     di "[Supplier Cut]  N: `total_obs' Total Spend: `total_spend'"
 
     qui {
-        rename predicted_market category
         replace category = "cryovials" if strpos(clean_desc, "cryo") >0 & strpos(clean_desc, "vial") >0 
-        // get rid of negated orders these are returns
-        gduplicates tag poid clean_desc, gen(dup_order)
-        bys poid clean_desc: gegen has_neg = max(qty<0)
-        drop if has_neg == 1 & dup_order > 0
         // drop nonsense negatives
         drop if price <= 0 | qty <= 0 | spend <= 0
         // filter to consumables
         drop if category == "Non-Lab"
         drop if category == "unclassified"
         replace qty = spend / price if qty == 1
-        replace spend = price * qty 
+        replace price = spend/qty 
     }
     qui count
     local total_obs = r(N)
@@ -173,7 +178,7 @@ program clean_raw
     di "[ML Consumables & Negative Orders] N: `total_obs' Total Spend: `total_spend'"
 
     qui {
-        drop if spend > 100000 | price > 100000
+        drop if spend > 100000 | price > 100000 | qty > 100000
         foreach v in "furnace" "vacuum" "lighting" "truck" "pump" "student" ///
             "graduate " "cfx" "table" "library" "appliance" "charger" "dtba1d1" ///
             "gasket"  "reader" "alfalfa" "chemidoc" "rfp" "red cross" ///
@@ -193,13 +198,13 @@ program clean_raw
             "mask aligner" "karl suss" "procedure" "transmitter" "dues" "ura system" "accessory" "pbs detector" "billed" "monthly" "ethovision" ///
             "generator" "accessories" "handheld" "detector" "basement" "survey" "asbestos" "vicryl plus" "ejector" "maint." ///
             "chamber" "2010" "2011" "2012" "2013" "2014" "2015" "2016" "2017" "2018" "2019" "etching" ///
-            "development of" "steam distr" ///
-            "analyzer" "spectrometer" "cytometer" "centrifuge" "incubator" "autoclave" ///
+            "development of" "steam distr" "analyzer" "spectrometer" "cytometer" "centrifuge" "incubator" "autoclave" ///
             "freezer" "refrigerator" "oven" "microscope" "fume hood" "biosafety cabinet" ///
-            "wo#" "dining" "union up" "renovation" "construction" "flooring" ///
-            "glucarpidase" "voraxaze" ///
-            "supplement issue" "ajph" "phssr" ///
-            "capillarys" "droplet digital" {
+            "wo#" "dining" "union up" "renovation" "construction" "flooring" "lab gases" ///
+            "glucarpidase" "voraxaze" "supplement issue" "ajph" "phssr" "capillarys" "droplet digital" ///
+            "analyses" "datalogger"  "professionalism" ".org" "lcmsms" "pre-owned" "presentation" "enterprise" "dialysis" ///
+            "pooling" "cooling" "tower" "kelvin" "lithography"  "pot holes" "catering" "sidewalk" "profit" "speaker" "depart" "arriving" ///
+            "taxes" {
             drop if strpos(clean_desc, "`v'") > 0
         }
         drop if (strpos(clean_desc, "plate") > 0 | strpos(clean_desc, "card")) & category == "synthetic dna oligonucleotide"
@@ -209,6 +214,9 @@ program clean_raw
             "calibration" "installation" "shipping" "freight" "quote" "estimate" ///
             "contract" "agreement" "professional" "labor" "hourly" {
             drop if strpos(clean_desc, "`v'") > 0 & prediction_source == "Expert Model" & similarity_score < 0.20
+        } 
+        foreach v in "animal - " "fees - " "electronics - " "instrument" "office supplies" "lab furniture" "waste disposal" "equipment" "furniture" "software" "toolkit" "clamp" "tool" "tubing" "random" "unclear" "wire" "towel" "irrelevant chemicals" "oring" "caps" "gas" "first-aid" "first aid" "desk" "chair" "brushes" "trash" "cleaner" "cotton ball" "bundle of products" "tape" "miscellaneous" "clips" "flint" "accessories" "stands" "batteries" "ear protection" "apron" "pots" "pants" "stoppers" "closures" "rings" "mortar" "pestle" "support" "trays" "applicators and swabs" "bundle" {
+            drop if strpos(category, "`v'") > 0
         }
     }
     qui count
@@ -216,7 +224,6 @@ program clean_raw
     qui sum spend, d
     local total_spend : di %16.0f r(sum)
     di "[Remove Possible Non-consumables] N: `total_obs' Total Spend: `total_spend'"
-
     qui {
         gen obs_cnt = 1 
         bys category: gen cat_id = _n == 1
@@ -224,17 +231,18 @@ program clean_raw
         bys category year: gen cat_yr = _n == 1
         bys category: gegen num_yrs_cat = total(cat_yr)
         keep if num_yrs_cat == 10
+        drop cat_id cat_yr_obs cat_yr num_yrs_cat
     }
     qui count
     local total_obs = r(N)
     qui sum spend, d
     local total_spend : di %16.0f r(sum)
     di "[Balance Cat-years] N: `total_obs' Total Spend: `total_spend'"
-    
     qui {
         merge m:1 category using ../temp/categories_`embed', assert(1 2 3)  keep(1 3) nogen
-    *    drop if support < 25
-        drop if similarity_score <= 0.10 & prediction_source == "Expert Model"
+        drop if similarity_score <= 0.05 & agencyname != "university of texas at dallas"
+        drop if support < 10
+        drop if similarity_score <= 0.10 & prediction_source == "Expert Model" | (agencyname == "university of texas at dallas")
         replace category = subinstr(category, "/","-",.)
         gen raw_price = price
         gen raw_qty = qty
@@ -273,7 +281,7 @@ program clean_raw
     local total_obs = r(N)
     qui sum spend, d
     local total_spend : di %16.0f r(sum)
-    di "[Windsorize] N: `total_obs' Total Spend: `total_spend'
+    di "[Windsorize] N: `total_obs' Total Spend: `total_spend'"
 
     qui {
         preserve
@@ -289,7 +297,7 @@ program clean_raw
         graph export ../output/figures/precision_support_`embed'.pdf, replace
         restore
     } 
-    *drop if precision <0.2 | recall < 0.2
+    drop if precision <0.2 | recall < 0.2
     qui sum raw_spend 
     local tot_spend = r(sum)
     qui sum raw_spend if keep == 1
@@ -298,40 +306,78 @@ program clean_raw
     local tot_obs = r(N)
     qui count if keep  == 1
     di "Total observations in matched categories: " r(N) " out of " `tot_obs' " (" string(r(N)/`tot_obs'*100) "%)"
-    save ../output/full_item_level_`embed', replace
-
-    keep if keep == 1 
+    qui count if keep  == 1 & tier3 == 0
+    di "Total observations in matched categories minus tier3: " r(N) " out of " `tot_obs' " (" string(r(N)/`tot_obs'*100) "%)"
     qui {
-        drop num_yrs orgid
         bys suppliername year: gen supplier_yr = _n == 1
         bys suppliername: gegen tot_supplier_obs = total(obs_cnt) 
         bys suppliername: gen sup_id = _n == 1
+        drop if tot_supplier_obs == 1
+        drop supplier_yr tot_supplier_obs sup_id
         gegen uni_id = group(agencyname)
         gegen supplier_id = group(suppliername)
-        bys category : gen num_times = _N
-        bys supplier_id category year: gegen total_spend = total(raw_spend)
-        bys category year: gegen category_spend = total(raw_spend)
-        bys category supplier_id year: gen num_suppliers_id = _n == 1
-        bys category year: gegen num_suppliers = total(num_suppliers) 
-        save ../temp/item_level_`embed', replace
+        bys supplier_id category year: gegen total_sup_spend = total(raw_spend)
+        bys uni_id year: gen cnt = _n == 1
+        bys uni_id : egen num_years = total(cnt)
+        bys uni_id : egen min_year = min(year)
+        keep if num_years == 10 | (num_years == 9 & min_year == 2011)
+        gegen mkt = group(category)
+        drop num_years min_year cnt 
+        bys category year: gen yr_cnt = _n == 1
+        cap drop num_years
+        bys category : egen num_years = total(yr_cnt)
+        drop yr_cnt
+        drop if num_years != 10
+        bys category: gegen cat_spend = total(raw_spend) 
+        bys category: gegen tot_obs = total(obs_cnt)
+        gen obs_2013 = tot_obs if year == 2013
+        gen spend_2013 = cat_spend if year == 2013
+        hashsort category spend_2013
+        bys category : replace spend_2013 = spend_2013[_n-1] if mi(spend_2013)
+        hashsort category obs_2013
+        bys category : replace obs_2013 = obs_2013[_n-1] if mi(obs_2013)
     }
+    gegen uni_mkt = group(uni_id mkt)
+    bys uni_mkt : egen min_year = min(year)
+    bys uni_mkt : egen max_year = max(year)
+    keep if min_year < 2014 & max_year > 2014
+    save ../output/full_item_level_`embed', replace
 end
 
 program make_panels
     syntax, embed(string)
-    use ../temp/item_level_`embed', clear
-    bys uni_id year: gen cnt = _n == 1
-    bys uni_id : egen num_years = total(cnt)
-    drop if num_years != 10
-    gegen mkt = group(category)
+    use ../output/full_item_level_`embed', clear
+    collapse (mean) spend_2013 obs_2013 recall precision support treated tier1 tier2 tier3 keep item_price = raw_price avg_log_price = price avg_log_spend = spend avg_log_qty = qty (sum) raw_spend raw_qty obs_cnt (firstnm) mkt agencyname, by(category year uni_id)
+    gen raw_price = raw_spend/raw_qty
+    gen log_raw_price = ln(raw_price)
+    gen log_raw_qty = ln(raw_qty)
+    gen log_raw_spend = ln(raw_spend)
+    save ../output/full_uni_category_yr_`embed', replace
+
+    use ../output/full_item_level_`embed', clear
+    collapse (max) treated (mean) precision recall support tier1 tier2 tier3 keep spend_2013 obs_2013 item_price = raw_price avg_log_price = price avg_log_spend = spend avg_log_qty = qty (firstnm) mkt (sum) raw_spend raw_qty obs_cnt , by(category year)
+    gen raw_price = raw_spend/raw_qty
+    gen log_raw_spend = ln(raw_spend)
+    gen log_raw_qty = ln(raw_qty)
+    gen log_raw_price = ln(raw_price)
+    save "../output/full_category_yr_`embed'", replace 
+
+    use ../output/full_item_level_`embed', clear
+    keep if keep == 1  
+    cap drop uni_mkt min_year max_year
+    gegen uni_mkt = group(uni_id mkt)
+    bys uni_mkt : egen min_year = min(year)
+    bys uni_mkt : egen max_year = max(year)
+    keep if min_year < 2014 & max_year > 2014
+    save ../output/item_level_`embed', replace
    
     preserve
-    collapse (max) treated (mean) *price num_suppliers (sum) obs_cnt *raw_qty *raw_spend (firstnm) suppliername mkt , by(supplier_id category year)
+    collapse (max) treated (sum) obs_cnt *raw_spend (firstnm) suppliername mkt , by(supplier_id category year)
     save ../output/supplier_category_yr_`embed', replace
     gen pre_period = year < 2014
-    keep if inrange(year, 2012,2013) | inrange(year, 2015, 2016)
+    keep if inrange(year, 2011,2013) | inrange(year, 2015, 2017)
     collapse (sum) raw_spend obs_cnt (firstnm) suppliername treated , by(supplier_id category pre_period)
-    bys category: gegen total_spend = total(raw_spend)
+    bys category pre_period: gegen total_spend = total(raw_spend)
     gen mkt_shr = raw_spend/total_spend * 100 
     gen life_tech = mkt_shr if suppliername == "life technologies"
     gen thermo = mkt_shr if suppliername == "thermo fisher scientific"
@@ -351,24 +397,9 @@ program make_panels
     save ../output/category_hhi_`embed', replace    
     restore
 
-    bys category year: gen yr_cnt = _n == 1
-    cap drop num_years
-    bys category : egen num_years = total(yr_cnt)
-    drop yr_cnt
-    drop if num_years != 10
-    bys category: gegen cat_spend = total(raw_spend) 
-    bys category: gegen tot_obs = total(obs_cnt)
-    gen obs_2013 = tot_obs if year == 2013
-    gen spend_2013 = cat_spend if year == 2013
-    hashsort category spend_2013
-    bys category : replace spend_2013 = spend_2013[_n-1] if mi(spend_2013)
-    hashsort category obs_2013
-    bys category : replace obs_2013 = obs_2013[_n-1] if mi(obs_2013)
-    gen avg_log_price = price 
-    save ../output/item_level_`embed', replace
 
     preserve
-    collapse (max) treated (sum) raw_spend raw_qty obs_cnt (mean) avg_log_price num_suppliers precision recall spend_2013 (firstnm) suppliername agencyname mkt , by(uni_id category year)
+    collapse (max) treated (sum) raw_spend raw_qty obs_cnt (mean) spend_2013 obs_2013 precision recall support tier1 tier2 tier3 item_price = raw_price avg_log_price = price avg_log_spend = spend avg_log_qty = qty (firstnm) agencyname mkt , by(uni_id category year)
     gen raw_price = raw_spend/raw_qty
     gen log_raw_spend = ln(raw_spend)
     gen log_raw_qty = ln(raw_qty)
@@ -376,13 +407,13 @@ program make_panels
     save ../output/uni_category_yr_`embed', replace
     restore
 
-    collapse (max) treated (mean) avg_log_price num_suppliers precision recall spend_2013  (firstnm) mkt (sum) raw_spend raw_qty obs_cnt , by(category year)
+    collapse (max) treated (mean) precision recall support tier1 tier2 tier3 spend_2013 obs_2013 item_price = raw_price avg_log_price = price avg_log_spend = spend avg_log_qty = qty (firstnm) mkt (sum) raw_spend raw_qty obs_cnt , by(category year)
     gen raw_price = raw_spend/raw_qty
     gen log_raw_spend = ln(raw_spend)
     gen log_raw_qty = ln(raw_qty)
     gen log_raw_price = ln(raw_price)
     save "../output/category_yr_`embed'", replace 
-
+/*
     use ../output/uni_category_yr_`embed', clear
     keep if category == "us fbs"
     bys uni_id: gen num_years = _N
@@ -393,7 +424,7 @@ program make_panels
     tw line raw_spend year , xline(2014) xlab(2010(2)2019) xtitle("Year", size(small)) ytitle("Spend of FBS", size(small)) legend(off pos(1) ring(0))
     graph export ../output/figures/fbs_spend_over_time.pdf, replace
     tw line raw_qty year , xline(2014) xlab(2010(2)2019) xtitle("Year", size(small)) ytitle("QTY of FBS", size(small)) legend(off pos(1) ring(0))           
-    graph export ../output/figures/fbs_qty_over_time.pdf, replace 
+    graph export ../output/figures/fbs_qty_over_time.pdf, replace */
 end
 
 **

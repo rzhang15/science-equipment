@@ -199,6 +199,22 @@ def main(gatekeeper_name: str, expert_choice: str, source_abbrev: str = None):
             df_new.loc[valid_overrides.index, 'prediction_source'] = 'Market Rules'
 
         y_pred.fillna("unclassified", inplace=True)
+        cat_col = y_pred.astype(str).str.lower()
+        
+        # Consolidate Antibodies
+        is_antibody = cat_col.str.contains("antibod", na=False)
+        is_primary = cat_col.str.contains("primary", na=False)
+        is_secondary = cat_col.str.contains("secondary", na=False)
+        y_pred[is_antibody & is_primary] = "primary antibodies"
+        y_pred[is_antibody & is_secondary] = "secondary antibodies"
+
+        # Consolidate ELISA
+        is_elisa = cat_col.str.contains("elisa", na=False)
+        y_pred[is_elisa] = "elisa kits"
+
+        # Consolidate Pipette Tips
+        is_pipette_tip = cat_col.str.contains("pipette tip", na=False)
+        y_pred[is_pipette_tip] = "pipette tips"
 
         # +++ Step 5: Calculate FINAL similarity scores +++
         print("  - Step 5: Calculating final similarity scores for lab predictions...")
@@ -241,7 +257,6 @@ def main(gatekeeper_name: str, expert_choice: str, source_abbrev: str = None):
        
         # Assign final predictions
         df_new['predicted_market'] = y_pred
-        
         # --- End of Pipeline ---
 
         # Step G: Save the results

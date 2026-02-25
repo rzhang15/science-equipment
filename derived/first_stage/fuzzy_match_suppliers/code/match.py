@@ -15,6 +15,7 @@ CANONICAL_MAPPING = {
     'thermo fisher': 'thermo fisher scientific',
     'thermofisher': 'thermo fisher scientific',
     'fisher science': 'thermo fisher scientific',
+    'fisher scntfcpossible': 'thermo fisher scientific',
     'fisher sci': 'thermo fisher scientific',
     'fisher healthcare': 'thermo fisher scientific',
     'tfs fishersci': 'thermo fisher scientific',

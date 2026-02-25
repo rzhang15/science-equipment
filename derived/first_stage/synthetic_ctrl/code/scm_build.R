@@ -97,8 +97,7 @@ for (mkt in treated_categories) {
       special.predictors = list(
         list("avg_log_price", 2013, "mean"),
         list("avg_log_price", 2012, "mean"),
-        list("avg_log_price", 2011, "mean"),
-        list("avg_log_price", 2010, "mean")
+        list("avg_log_price", 2011, "mean")
       ),
       dependent = "avg_log_price",
       unit.variable = "category_num",
