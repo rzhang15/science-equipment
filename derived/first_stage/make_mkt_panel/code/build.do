@@ -19,7 +19,7 @@ global electrophoresis `" "pre-cast tris-glycine gels" "pre-cast bis-tris gels" 
 global western_blot `" "pvdf blotting membranes" "nitrocellulose blotting membranes" "precut nitrocellulose transfer blotting packs" "precut pvdf transfer blotting packs" "chemiluminescent substrates" "western blot transfer buffers" "western blot blockers" "western blot stripping buffers" "western blot boxes" "western blot pen" "western blot enhancers" "western blot rollers" "gel blotting papers" "chemiluminescence western blotting kit" "north/south chemiluminescent detection kit" "'
 global mw_standards `" "unstained dna ladders" "pre-stained dna ladders" "unstained rna ladders" "pre-stained rna ladders" "pre-stained protein molecular-weight ladder" "unstained protein molecular-weight ladder" "'
 global protein_mod `" "crosslinking reagents" "protein modifying enzymes" "protein labeling kits" "pegylation reagents" "bioconjugation reagents" "bioconjugate dye" "'
-global protein_assays `" "protein gel stains" "bca protein assay kit" "bradford protein assay kit" "total protein assay kit" "modified lowry protein assay kit" "'
+global protein_assays `" "protein gel stains" "bca protein assay k*it" "bradford protein assay kit" "total protein assay kit" "modified lowry protein assay kit" "'
 global transfection `" "transfection reagents" "transfection kits" "'
 global na_purification `" "column-based" "spin columns" "rna extraction reagents" "magnetic-bead based purification kit" "magnetic bacterial rna purification kit" "rna stabilization reagent" "liquid-based dna plasmid purification kit" "'
 global dyes `" "fluorophore - general" "fluorophore - bioconjugate dyes" "quantum dots" "nucleic acid gel stains" "'
@@ -47,60 +47,11 @@ global tier3 "$cc_supplements $cc_plastic $cc_buffers $cell_lines $antibodies $r
 global treated "$tier1 $tier2 $tier3"
 
 program main
-    qui import_suppliers
     foreach t in tfidf {
         qui select_good_categories, embed(`t')
         clean_raw, embed(`t')
         qui make_panels, embed(`t')
     }
-end
-
-program import_suppliers
-    import delimited using ../external/sup/supplier_mapping_final, varn(1) clear 
-    rename original_suppliername suppliername
-    rename canonical_supplier new_suppliername
-    qui {
-        foreach k in "xpedx" "rent" "event" "travel" "audio" "xerox"  "acct" "cardinal health 411 inc" ///
-            "henry ford health system" "illumina" "sports" "sales" "communications" "printing" ///
-            "design" "photography" "music" "education" "john" "robert" "graphics" "management" ///
-            "community" "publishing" "environmental" "productions" "marketing" "safety" "hour" "hardware" ///
-            "investments" "entertainment" "promotional" "maintenance" "american rock salt" "lowes" "equipment" "mailing" ///
-            "fire protection" "price waterhouse coopers" "hp" "radio" "cisco systems" "sanitation strategies" "network solutions" ///
-            "college board" "proquest" "hill rom" "painting" "warehouse" "assurance" "blind" "davol" "atricure" "media associates" ///
-             "cbord group" "united healthcare" "dimension data" "nwn" "farm" "heating" "drainage" "media" ///
-             "aviation" "travel" "airline" "defense" "freight" "lumber" "floor" "clean" "construct" "blackboard" ///
-             "oil" "commercial products" "kintetsu" "buhler" "nalco" "truck" "milestone" "eckert and ziegler" "newport"  ///
-             "engineering" "spectroglyph"  "backup technology" "gerdau" "datadirect" "network" ///
-             "plumbing" "hvac" "seating" "sprinkler" "nortrax" "marine"  "insurance" "campus" ///
-             "building" "finance" "fitness" "engineering" "airport" "touring" ///
-             "meeting" "commercial" "university" "college" "somanetics" "neurotune" "centerplate" "sport" ///
-             "cse" "interiors" "sheraton" "film" "pentax" "fire" "machine" "tko" "brow" "lithographing" ///
-            "twitchell" "ibm" "athletic" "lenovo" "immigration" "law enforcement" "school" "hotel" ///
-             "publication" "advtsng" "backflow" "lymphedema" "gas" "ferguson enterprise"  "valve" "cargo" ///
-            "weld" "flagcraft" "henry schein" "dental" "practicon" "alchip" "semiconductor" ///
-            "canyon materials" "photo" "display" "broadcasting" "stevesongs" " press" "bioquell" "gle associates" "medrad" ///
-            "psychological association" "mechanical" "3m unitek" "roofing" "print" "repair" "trophies" "trophy" "award" ///
-            "cater" "repair" "book" "coffee" "auto" "optical" "beauty" "bldg" "mower" "body shop" "eye supply" "golf"  ///
-            "fuel" "cdw government" "lma north america" "hamamatsu" "feed" "techniplast" "percival scientific" "zimmer" ///
-            "veterinary" "teleflex" "biomet" "waste" "surgical" "surgery" "anesthesia" "salt" "orfit" "endocare" ///
-           "medical" "waterpik" "imaging" "optic" "microscopy" "nurse" "urological" "nano"  "shipment" ///
-           "animal" "petroleum" "dermatology" "nano" "environment" "manufacturing" "resort" "uniform" "hospital" ///
-           "devices" "architectural" "pools" "use " "packaging" "revenue" "verizon" "art gallery" "team apparel" ///
-           "fashion" "gardens" "art suppies" "cellular" "unifirst" "tractor" "toyota" "traffic" "foods"  "deli" "tiger" "thyssenkrupp" "accounting" ///
-           "blackboard inc" "apex systems" "simplex grinnell" "mci enterpise" "medline industries" "cardinal health" "air filter" ///
-           "med alliance group"  " uni" "university" "uni " "art materials" "gutter" "microscope" "radius systems" "baxter" "w nuhsbaum" "ntmdt" ///
-           "xray" "safc carlsbad" "petnet" "infoready" "bmg labtech" "marriot" "structurepoint" "barry forwarding" "data strategy" ///
-           "dow agroscieces" "biogen" "charter" "key performance" "professional" "communication" "images" "agency" "demolition" "furniture" ///
-           "personnel" "security" "talent" "linkquest" "new york times" "consulting" "sciquest" "fisheries" "telescope" "foundation" "data support" "bowling" "vacuum" "highway" ///
-           "engraving" "learning" "data " {
-            drop if strpos(new_suppliername, "`k'") > 0
-        }
-        foreach k in "cem" "na" {
-            drop if new_suppliername == "`k'"
-        }
-    }
-    drop if mi(suppliername)
-    save ../temp/supplier_map, replace 
 end
 
 program select_good_categories
@@ -125,8 +76,8 @@ program select_good_categories
         replace treated = 1 if strpos(category, "`c'") > 0 
     }
     *drop if inlist(category, "recombinant human protein") | strpos(category, "recombinant") > 0 | strpos(category, "growth factor") > 0  | strpos(category, "cell line") > 0 | strpos(category, "small molecule inhibitor") > 0  
-    gen keep  = (support >= 25 & precision >= 0.80 & recall >= 0.80) | (inrange(support, 10, 25) & precision >= 0.9 & recall >=0.85) 
-    save ../temp/categories_`embed', replace
+    gen keep  = (support >= 25 & precision >= 0.80 & recall >= 0.80) //| (inrange(support, 10, 25) & precision >= 0.9 & recall >=0.90) 
+    save ../output/categories_`embed', replace
 end
 
 
@@ -145,7 +96,7 @@ program clean_raw
     di "[All purchases EVER] N:  `total_obs' Total Spend:  `total_spend'"
 
     qui {
-        merge m:1 suppliername using ../temp/supplier_map, assert(1 2 3) keep(3) nogen
+        merge m:1 suppliername using ../external/sup/lifescience_supplier_map, assert(1 2 3) keep(3) nogen
         rename (suppliername new_suppliername) (old_suppliername suppliername)
         drop if mi(suppliername)
         drop if suppliername == "na"
@@ -170,6 +121,7 @@ program clean_raw
         drop if category == "unclassified"
         replace qty = spend / price if qty == 1
         replace price = spend/qty 
+        drop if similarity_score == 0
     }
     qui count
     local total_obs = r(N)
@@ -204,7 +156,7 @@ program clean_raw
             "glucarpidase" "voraxaze" "supplement issue" "ajph" "phssr" "capillarys" "droplet digital" ///
             "analyses" "datalogger"  "professionalism" ".org" "lcmsms" "pre-owned" "presentation" "enterprise" "dialysis" ///
             "pooling" "cooling" "tower" "kelvin" "lithography"  "pot holes" "catering" "sidewalk" "profit" "speaker" "depart" "arriving" ///
-            "taxes" {
+            "taxes" "etc." "part number" "water bottles" {
             drop if strpos(clean_desc, "`v'") > 0
         }
         drop if (strpos(clean_desc, "plate") > 0 | strpos(clean_desc, "card")) & category == "synthetic dna oligonucleotide"
@@ -215,7 +167,10 @@ program clean_raw
             "contract" "agreement" "professional" "labor" "hourly" {
             drop if strpos(clean_desc, "`v'") > 0 & prediction_source == "Expert Model" & similarity_score < 0.20
         } 
-        foreach v in "animal - " "fees - " "electronics - " "instrument" "office supplies" "lab furniture" "waste disposal" "equipment" "furniture" "software" "toolkit" "clamp" "tool" "tubing" "random" "unclear" "wire" "towel" "irrelevant chemicals" "oring" "caps" "gas" "first-aid" "first aid" "desk" "chair" "brushes" "trash" "cleaner" "cotton ball" "bundle of products" "tape" "miscellaneous" "clips" "flint" "accessories" "stands" "batteries" "ear protection" "apron" "pots" "pants" "stoppers" "closures" "rings" "mortar" "pestle" "support" "trays" "applicators and swabs" "bundle" {
+        foreach v in "animal - " "fees - " "electronics - " "instrument" "office supplies" "lab furniture" "waste disposal" "equipment" "furniture" "software" ///
+          "toolkit" "clamp" "tool" "tubing" "random" "unclear" "wire" "towel" "irrelevant chemicals" "oring" "caps" "gas" "first-aid" "first aid" "desk" "chair" "brushes" "trash" "cleaner" ///
+          "cotton ball" "bundle of products" "tape" "miscellaneous" "clips" "flint" "accessories" "stands" "batteries" "ear protection" "apron" "pots" "pants" "stoppers" "closures" "rings" ///
+          "mortar" "pestle" "support" "trays" "applicators and swabs" "bundle" "sequencing" "tem - " {
             drop if strpos(category, "`v'") > 0
         }
     }
@@ -239,10 +194,8 @@ program clean_raw
     local total_spend : di %16.0f r(sum)
     di "[Balance Cat-years] N: `total_obs' Total Spend: `total_spend'"
     qui {
-        merge m:1 category using ../temp/categories_`embed', assert(1 2 3)  keep(1 3) nogen
-        drop if similarity_score <= 0.05 & agencyname != "university of texas at dallas"
-        drop if support < 10
-        drop if similarity_score <= 0.10 & prediction_source == "Expert Model" | (agencyname == "university of texas at dallas")
+        merge m:1 category using ../output/categories_`embed', assert(1 2 3)  keep(1 3) nogen
+        drop if similarity_score <= 0.10 & prediction_source == "Expert Model" 
         replace category = subinstr(category, "/","-",.)
         gen raw_price = price
         gen raw_qty = qty
@@ -252,30 +205,30 @@ program clean_raw
         replace spend = log(spend)
         bys category year : gegen spend99= pctile(raw_spend), p(99)
         bys category year : gegen spend1 = pctile(raw_spend), p(1)
-        bys category year : gegen qty99= pctile(raw_qty), p(99)
-        bys category year : gegen qty1 = pctile(raw_qty), p(1)
-        bys category year : gegen price99= pctile(raw_price), p(99)
-        bys category year : gegen price1 = pctile(raw_price), p(1)
+        *bys category year : gegen qty99= pctile(raw_qty), p(99)
+        *bys category year : gegen qty1 = pctile(raw_qty), p(1)
+        *bys category year : gegen price99= pctile(raw_price), p(99)
+        *bys category year : gegen price1 = pctile(raw_price), p(1)
         drop if raw_spend < spend1
+        drop if raw_spend > spend99
+        /*drop if raw_price > price99
         drop if raw_price < price1
         drop if raw_qty < qty1
-        drop if raw_spend > spend99
-        drop if raw_price > price99
-        drop if raw_qty > qty99
-        drop spend1 spend99 price1 price99 qty1 qty99
+        drop if raw_qty > qty99*/
+        drop spend1 spend99 //price1 price99 qty1 qty99
         bys category  : gegen spend99= pctile(raw_spend), p(99)
         bys category  : gegen spend1 = pctile(raw_spend), p(1)
-        bys category  : gegen qty99= pctile(raw_qty), p(99)
-        bys category  : gegen qty1 = pctile(raw_qty), p(1)
-        bys category  : gegen price99= pctile(raw_price), p(99)
-        bys category  : gegen price1 = pctile(raw_price), p(1)
+        *bys category  : gegen qty99= pctile(raw_qty), p(99)
+        *bys category  : gegen qty1 = pctile(raw_qty), p(1)
+        *bys category  : gegen price99= pctile(raw_price), p(99)
+        *bys category  : gegen price1 = pctile(raw_price), p(1)
         drop if raw_spend < spend1
         drop if raw_spend > spend99
-        drop if raw_qty < qty1
+        /*drop if raw_qty < qty1
         drop if raw_qty > qty99
         drop if raw_price < price1
-        drop if raw_price > price99
-        drop spend1 spend99 price1 price99 qty1 qty99
+        drop if raw_price > price99*/
+        drop spend1 spend99 //price1 price99 qty1 qty99
     }
     qui count
     local total_obs = r(N)
@@ -296,18 +249,14 @@ program clean_raw
             xtitle("Precision", size(small)) ytitle("Recall", size(small))
         graph export ../output/figures/precision_support_`embed'.pdf, replace
         restore
-    } 
-    drop if precision <0.2 | recall < 0.2
-    qui sum raw_spend 
-    local tot_spend = r(sum)
-    qui sum raw_spend if keep == 1
-    di "Total spend in matched categories: " r(sum) " out of " `tot_spend' " (" string(r(sum)/`tot_spend'*100) "%)"
+    }
+    drop if support < 5  
     qui count
-    local tot_obs = r(N)
-    qui count if keep  == 1
-    di "Total observations in matched categories: " r(N) " out of " `tot_obs' " (" string(r(N)/`tot_obs'*100) "%)"
-    qui count if keep  == 1 & tier3 == 0
-    di "Total observations in matched categories minus tier3: " r(N) " out of " `tot_obs' " (" string(r(N)/`tot_obs'*100) "%)"
+    local total_obs = r(N)
+    qui sum spend, d
+    local total_spend : di %16.0f r(sum)
+    di "[bad ml categories] N: `total_obs' Total Spend: `total_spend'"
+    
     qui {
         bys suppliername year: gen supplier_yr = _n == 1
         bys suppliername: gegen tot_supplier_obs = total(obs_cnt) 
@@ -341,6 +290,18 @@ program clean_raw
     bys uni_mkt : egen min_year = min(year)
     bys uni_mkt : egen max_year = max(year)
     keep if min_year < 2014 & max_year > 2014
+    qui sum raw_spend 
+    local tot_spend = r(sum)
+    qui sum raw_spend if keep == 1
+    di "Total spend in matched categories: " r(sum) " out of " `tot_spend' " (" string(r(sum)/`tot_spend'*100) "%)"
+    qui sum raw_spend if keep == 1 & tier3 == 0
+    di "Total spend in matched categories minus tier3: " r(sum) " out of " `tot_spend' " (" string(r(sum)/`tot_spend'*100) "%)"
+    qui count
+    local tot_obs = r(N)
+    qui count if keep  == 1
+    di "Total observations in matched categories: " r(N) " out of " `tot_obs' " (" string(r(N)/`tot_obs'*100) "%)"
+    qui count if keep  == 1 & tier3 == 0
+    di "Total observations in matched categories minus tier3: " r(N) " out of " `tot_obs' " (" string(r(N)/`tot_obs'*100) "%)"
     save ../output/full_item_level_`embed', replace
 end
 
@@ -413,18 +374,6 @@ program make_panels
     gen log_raw_qty = ln(raw_qty)
     gen log_raw_price = ln(raw_price)
     save "../output/category_yr_`embed'", replace 
-/*
-    use ../output/uni_category_yr_`embed', clear
-    keep if category == "us fbs"
-    bys uni_id: gen num_years = _N
-    keep if num_years == 10
-    collapse (sum) raw_spend raw_qty (mean) raw_price , by(year)
-    tw line raw_price year , xline(2014) xlab(2010(2)2019) xtitle("Year", size(small)) ytitle("Price of FBS", size(small)) legend(off pos(1) ring(0))
-    graph export ../output/figures/fbs_price_over_time.pdf, replace      
-    tw line raw_spend year , xline(2014) xlab(2010(2)2019) xtitle("Year", size(small)) ytitle("Spend of FBS", size(small)) legend(off pos(1) ring(0))
-    graph export ../output/figures/fbs_spend_over_time.pdf, replace
-    tw line raw_qty year , xline(2014) xlab(2010(2)2019) xtitle("Year", size(small)) ytitle("QTY of FBS", size(small)) legend(off pos(1) ring(0))           
-    graph export ../output/figures/fbs_qty_over_time.pdf, replace */
 end
 
 **
