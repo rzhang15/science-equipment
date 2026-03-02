@@ -1,3310 +1,3921 @@
-# ==============================================================================
-# VETO RULES: required_keywords
-# ------------------------------------------------------------------------------
-# Use this section to VETO a prediction from the expert model if it's missing
-# an essential keyword. This prevents incorrect classifications.
-# ==============================================================================
 hierarchical_veto_rules:
-  - prefix: "cell culture antibiotics - "
-    abbreviations:
-      "penicillin-streptomycin": ["pen-strep", "pen strep"]
-      
-  - prefix: "amino acid - "
-    abbreviations:
-      "l-glutamine": ["glutamine", "gln"]
-      "l-glycine": ["glycine", "gly"]
-
+- prefix: 'cell culture antibiotics - '
+  abbreviations:
+    penicillin-streptomycin:
+    - pen-strep
+    - pen strep
+- prefix: 'amino acid - '
+  abbreviations:
+    l-glutamine:
+    - glutamine
+    - gln
+    l-glycine:
+    - glycine
+    - gly
 required_keywords:
-  "us fbs":
+  us fbs:
     any_of:
-      - $FBS_TERMS
-  "bovine serum albumin":
+    - $FBS_TERMS
+    none_of:
+    - fb essence
+    - fetuin
+  bovine serum albumin:
     any_of:
-      - "albumin"
-  "laemmli sample buffer":
+    - albumin
+  laemmli sample buffer:
     any_of:
-      - "laemmli"
-  "polyclonal primary antibody":
+    - laemmli
+  polyclonal primary antibody:
     any_of:
-      - "polyclonal"
-      - "pab"
-      - "*antibod*"
-      - "anti-"
-      - "*igg*"
-      - "*serum*"
-  "enzyme activity assay":
+    - polyclonal
+    - pab
+    - '*antibod*'
+    - anti-
+    - '*igg*'
+    - '*serum*'
+  enzyme activity assay:
     any_of:
-      - "*enzyme*"
-      - "*activity*"
-      - "*assay*"
-  "dna shearing tube":
+    - '*enzyme*'
+    - '*activity*'
+    - '*assay*'
+  dna shearing tube:
     any_of:
-      - "*g-tube*"
-  "sterile filtered pipette tips":
+    - '*g-tube*'
+  sterile filtered pipette tips:
     any_of:
-      - "*filter*"
-      - "*fltr*"
-      - "*filt*"
-      - "*barrier*"
-      - "*tubeguard*"
-      - "*tubegard*"
-      - "*dualfilter*"
-      - "*softfit*"
-      - "*sftfitl*"
-      - "*softfitl*"
-      - "*avantguard*"
-  "low retention pipette tips":
+    - '*filter*'
+    - '*fltr*'
+    - '*filt*'
+    - '*barrier*'
+    - '*tubeguard*'
+    - '*tubegard*'
+    - '*dualfilter*'
+    - '*softfit*'
+    - '*sftfitl*'
+    - '*softfitl*'
+    - '*avantguard*'
+  low retention pipette tips:
     any_of:
-      - "*low ret*"
-      - "*lw ret*"
-      - "*loret*"
-      - "*lort*"
-      - "*lobind*"
-      - "*lo bind*"
-      - "*lowbind*"
-      - "*lwbnd*"
-      - "*low bind*"
-      - "*low-ret*"
-      - "*low-bind*"
-      - "lr"
-      - "*lowretention*"
-      - "*rpt*"
-      - "*slick*"
-  "extended length pipette tips":
+    - '*low ret*'
+    - '*lw ret*'
+    - '*loret*'
+    - '*lort*'
+    - '*lobind*'
+    - '*lo bind*'
+    - '*lowbind*'
+    - '*lwbnd*'
+    - '*low bind*'
+    - '*low-ret*'
+    - '*low-bind*'
+    - lr
+    - '*lowretention*'
+    - '*rpt*'
+    - '*slick*'
+  extended length pipette tips:
     any_of:
-      - "*xl*"
-      - "*extended*"
-      - "*elongated*"
-      - "*xlng*"
-      - "*xlong*"
-      - "*x-long*"
-      - "*reach*"
-  "gel loading pipette tips":
+    - '*xl*'
+    - '*extended*'
+    - '*elongated*'
+    - '*xlng*'
+    - '*xlong*'
+    - '*x-long*'
+    - '*reach*'
+  gel loading pipette tips:
     any_of:
-      - "*gel*"
-      - "*loading*"
-      - "*round*"
-      - "*rnd*"
-  "aspirating pipettes":
+    - '*gel*'
+    - '*loading*'
+    - '*round*'
+    - '*rnd*'
+  aspirating pipettes:
     any_of:
-      - "aspirating"
-      - "aspiration"
-      - "asp*"
-      - "asp"
-  "ethanol":
-    none_of: 
-      - "decly"
-      - "benz*"
-      - "hex*"
-      - "furfuryl"
-      - "isopropaol"
-      - "oxy*"
-      - "metha*"
-      - "amino*"
-
-
-# ==============================================================================
-# ALIASES: keyword_groups
-# ------------------------------------------------------------------------------
-# Use this section to define groups of keywords you can reference later.
-# ==============================================================================
+    - aspirating
+    - aspiration
+    - asp*
+    - asp
+  ethanol:
+    none_of:
+    - decly
+    - benz*
+    - hex*
+    - furfuryl
+    - isopropaol
+    - oxy*
+    - metha*
+    - amino*
 keyword_groups:
   ASSAY_OR_KIT:
-    - "*kit*"
-    - "*assay*"
-    - "*prep*"
-    - "*assembly*"
+  - '*kit*'
+  - '*assay*'
+  - '*prep*'
+  - '*assembly*'
   BUFFER:
-    - "*buffer*"
-    - "*bufr*"
-    - "*buf*"
+  - '*buffer*'
+  - '*bufr*'
+  - '*buf*'
   HIGH_FIDELITY:
-    - "*high fidelity*"
-    - "high-fidelity"
-    - "hf"
-    - "hifi"
+  - '*high fidelity*'
+  - high-fidelity
+  - hf
+  - hifi
   HOT_START:
-    - "*hot start*"
-    - "*fast start*"
-    - "fs"
-    - "hs"
+  - '*hot start*'
+  - '*fast start*'
+  - fs
+  - hs
   APOPTOSIS:
-    - "*apoptosis*"
-    - "*caspase*"
-    - "*tunel*"
+  - '*apoptosis*'
+  - '*caspase*'
+  - '*tunel*'
+  ELISA:
+  - '*elisa*'
+  - '*eia kit*'
+  - '*duoset*'
+  - '*quantikine*'
+  - '*legendplex*'
+  VIABILITY:
+  - '*viability*'
+  - '*celltiter*'
+  - '*alamar*blue*'
+  - '*presto*blue*'
+  - '*cck-8*'
+  - '*mtt*'
+  - '*xtt*'
+  - '*wst-1*'
+  - '*resazurin*'
+  LUCIFERASE:
+  - '*luciferase*'
+  - '*bright-glo*'
+  - '*nano-glo*'
+  - '*steady-glo*'
+  - '*one-glo*'
+  - '*dual-luciferase*'
+  - '*vivazine*'
+  SELECTION_ANTIBIOTIC:
+  - '*geneticin*'
+  - '*g418*'
+  - '*puromycin*'
+  - '*blasticidin*'
+  - '*hygromycin*'
+  - '*zeocin*'
   NITRILE:
-    - "nitrile"
-    - "nitril"
-    - "ntl"
-    - "nit"
-    - "nitr"
-    - "ntrl"
-    - "ntr"
+  - nitrile
+  - nitril
+  - ntl
+  - nit
+  - nitr
+  - ntrl
+  - ntr
   GLOVES:
-    - "*glove*"
-    - "*glv*"
-    - "*examglv*"
+  - '*glove*'
+  - '*glv*'
+  - '*examglv*'
   STIR_BAR:
-    - "*stir bar*"
-    - "*spin bar*"
+  - '*stir bar*'
+  - '*spin bar*'
   PIPETTE:
-    - "pipette"
-    - "pipettes"
-    - "pipet"
-    - "pipets"
-    - "*pipette*"
+  - pipette
+  - pipettes
+  - pipet
+  - pipets
+  - '*pipette*'
   PLATE:
-    - "*plate*"
-    - "*plt*"
-    - "*mltdish*"
-    - "*multidish*"
+  - '*plate*'
+  - '*plt*'
+  - '*mltdish*'
+  - '*multidish*'
   FLASK:
-    - "*flask*"
-    - "*flsk*"
+  - '*flask*'
+  - '*flsk*'
   TUBE:
-    - "*tube*"
-    - "*tb*"
-    - "*tbe*"
-    - "*tub*"
+  - '*tube*'
+  - '*tb*'
+  - '*tbe*'
+  - '*tub*'
   FBS_TERMS:
-    - "fbs"
-    - "dfbs"
-    - "*fetal bovine serum*"
-    - "*fetal calf serum*"
-    - "fcs"
-    - "fb essence"
-    - "usda tested serum"
-    - "fbs500"
-    - "usda approved origin"
-    - "fetalclone"
+  - fbs
+  - dfbs
+  - '*fetal bovine serum*'
+  - '*fetal calf serum*'
+  - 'fcs '
+  - usda tested serum
+  - fbs500
+  - usda approved origin
+  - fetalclone
+  - fetal bovine
+  - bovine calf serum
+  - hyclone bovine
   RESTRICTION_ENZYME:
-    - AclI
-    - HindIII-HF
-    - HindIII
-    - SspI-HF
-    - SspI
-    - MluCI
-    - PciI
-    - AgeI-HF
-    - AgeI
-    - BspMI
-    - BfuAI
-    - SexAI
-    - MluI-HF
-    - MluI
-    - BceAI
-    - HpyCH4IV
-    - HpyCH4III
-    - BaeI
-    - BsaXI
-    - AflIII
-    - SpeI-HF
-    - SpeI
-    - BsrI
-    - BmrI
-    - BglII
-    - AfeI
-    - AluI
-    - StuI
-    - ScaI-HF
-    - ScaI
-    - ClaI
-    - BspDI
-    - PI-SceI
-    - NsiI-HF
-    - NsiI
-    - AseI
-    - SwaI
-    - CspCI
-    - MfeI-HF
-    - MfeI
-    - PaqCI
-    - BssSI-v2
-    - Nb.BssSI
-    - BmgBI
-    - PmlI
-    - DraIII-HF
-    - DraIII
-    - AleI-v2
-    - EcoP15I
-    - PvuII-HF
-    - PvuII
-    - AlwNI
-    - BtsIMutI
-    - NdeI
-    - FatI
-    - NlaIII
-    - MslI
-    - XcmI
-    - BstXI
-    - PflMI
-    - BccI
-    - NcoI-HF
-    - NcoI
-    - BseYI
-    - FauI
-    - TspMI
-    - XmaI
-    - SmaI
-    - Nt.CviPII
-    - AciI
-    - SacII
-    - BsrBI
-    - MspI
-    - HpaII
-    - ScrFI
-    - StyD4I
-    - BsaJI
-    - BslI
-    - BtgI
-    - NciI
-    - AvrII
-    - MnlI
-    - BbvCI
-    - Nb.BbvCI
-    - Nt.BbvCI
-    - SbfI-HF
-    - Bpu10I
-    - Bsu36I
-    - EcoNI
-    - HpyAV
-    - PspGI
-    - BstNI
-    - StyI-HF
-    - StyI
-    - BcgI
-    - PvuI-HF
-    - PvuI
-    - BstUI
-    - EagI-HF
-    - EagI
-    - RsrII
-    - BsiEI
-    - BsiWI-HF
-    - BsiWI
-    - BsmBI-v2
-    - Esp3I
-    - Hpy99I
-    - MspA1I
-    - MspJI
-    - SgrAI
-    - BfaI
-    - BspCNI
-    - PaeR7I
-    - XhoI
-    - EarI
-    - AcuI
-    - PstI-HF
-    - PstI
-    - BpmI
-    - DdeI
-    - SfcI
-    - AflII
-    - BpuEI
-    - SmlI
-    - BsoBI
-    - AvaI
-    - MboII
-    - BbsI-HF
-    - BbsI
-    - XmnI
-    - BsmI
-    - Nb.BsmI
-    - EcoRI-HF
-    - EcoRI
-    - HgaI
-    - ZraI
-    - AatII
-    - PflFI
-    - Tth111I
-    - PshAI
-    - AhdI
-    - DrdI
-    - SacI-HF
-    - SacI
-    - Eco53kI
-    - BseRI
-    - MlyI
-    - PleI
-    - WarmStart Nt.BstNBI
-    - HinfI
-    - EcoRV-HF
-    - EcoRV
-    - Sau3AI
-    - DpnII
-    - MboI
-    - DpnI
-    - BsaBI
-    - TfiI
-    - BsrDI
-    - Nb.BsrDI
-    - BbvI
-    - BtsI-v2
-    - Nb.BtsI
-    - BstAPI
-    - SfaNI
-    - SphI-HF
-    - SphI
-    - SrfI
-    - NmeAIII
-    - NgoMIV
-    - NaeI
-    - BglI
-    - AsiSI
-    - BtgZI
-    - HhaI
-    - HinP1I
-    - BssHII
-    - NotI-HF
-    - NotI
-    - Fnu4HI
-    - Cac8I
-    - MwoI
-    - NheI-HF
-    - NheI
-    - BmtI-HF
-    - BmtI
-    - BspQI-HF
-    - BspQI
-    - SapI
-    - Nt.BspQI
-    - BlpI
-    - ApeKI
-    - TseI
-    - Bsp1286I
-    - AlwI
-    - BamHI-HF
-    - BamHI
-    - Nt.AlwI
-    - BtsCI
-    - FokI
-    - HaeIII
-    - FseI
-    - SfiI
-    - NarI
-    - KasI
-    - PluTI
-    - SfoI
-    - AscI
-    - EciI
-    - BsmFI
-    - ApaI
-    - PspOMI
-    - Sau96I
-    - NlaIV
-    - Acc65I
-    - KpnI-HF
-    - KpnI
-    - BsaI-HFv2
-    - BsaI
-    - HphI
-    - BstEII-HF
-    - BstEII
-    - AvaII
-    - BanI
-    - BaeGI
-    - BsaHI
-    - BanII
-    - RsaI
-    - CviQI
-    - BstZ17I-HF
-    - BstZ17I
-    - BciVI
-    - SalI-HF
-    - SalI
-    - BsmAI
-    - BcoDI
-    - Nt.BsmAI
-    - ApaLI
-    - BsgI
-    - AccI
-    - Hpy166II
-    - Tsp45I
-    - HpaI
-    - PmeI
-    - HincII
-    - BsiHKAI
-    - TspRI
-    - ApoI-HF
-    - ApoI
-    - NspI
-    - BsrFI-v2
-    - BstYI
-    - HaeII
-    - CviKI-1
-    - EcoO109I
-    - PpuMI
-    - I-CeuI
-    - SnaBI
-    - I-SceI
-    - BspHI
-    - BspEI
-    - MmeI
-    - TaqI-v2
-    - NruI-HF
-    - NruI
-    - Hpy188I
-    - Hpy188III
-    - XbaI
-    - BclI-HF
-    - HpyCH4V
-    - FspI
-    - PI-PspI
-    - MscI
-    - BsrGI-HF
-    - BsrGI
-    - MseI
-    - PacI
-    - PsiI-v2
-    - BstBI
-    - DraI
-    - PspXI
-    - BsaWI
-    - BsaAI
-    - EaeI
-
-# ==============================================================================
-# OVERRIDE RULES: market_rules
-# ------------------------------------------------------------------------------
-# These rules override any previous prediction.
-# IMPORTANT: Always place MOST SPECIFIC rules BEFORE more GENERAL rules.
-# ==============================================================================
+  - AclI
+  - HindIII-HF
+  - HindIII
+  - SspI-HF
+  - SspI
+  - MluCI
+  - PciI
+  - AgeI-HF
+  - AgeI
+  - BspMI
+  - BfuAI
+  - SexAI
+  - MluI-HF
+  - MluI
+  - BceAI
+  - HpyCH4IV
+  - HpyCH4III
+  - BaeI
+  - BsaXI
+  - AflIII
+  - SpeI-HF
+  - SpeI
+  - BsrI
+  - BmrI
+  - BglII
+  - AfeI
+  - AluI
+  - StuI
+  - ScaI-HF
+  - ScaI
+  - ClaI
+  - BspDI
+  - PI-SceI
+  - NsiI-HF
+  - NsiI
+  - AseI
+  - SwaI
+  - CspCI
+  - MfeI-HF
+  - MfeI
+  - PaqCI
+  - BssSI-v2
+  - Nb.BssSI
+  - BmgBI
+  - PmlI
+  - DraIII-HF
+  - DraIII
+  - AleI-v2
+  - EcoP15I
+  - PvuII-HF
+  - PvuII
+  - AlwNI
+  - BtsIMutI
+  - NdeI
+  - FatI
+  - NlaIII
+  - MslI
+  - XcmI
+  - BstXI
+  - PflMI
+  - BccI
+  - NcoI-HF
+  - NcoI
+  - BseYI
+  - FauI
+  - TspMI
+  - XmaI
+  - SmaI
+  - Nt.CviPII
+  - AciI
+  - SacII
+  - BsrBI
+  - MspI
+  - HpaII
+  - ScrFI
+  - StyD4I
+  - BsaJI
+  - BslI
+  - BtgI
+  - NciI
+  - AvrII
+  - MnlI
+  - BbvCI
+  - Nb.BbvCI
+  - Nt.BbvCI
+  - SbfI-HF
+  - Bpu10I
+  - Bsu36I
+  - EcoNI
+  - HpyAV
+  - PspGI
+  - BstNI
+  - StyI-HF
+  - StyI
+  - BcgI
+  - PvuI-HF
+  - PvuI
+  - BstUI
+  - EagI-HF
+  - EagI
+  - RsrII
+  - BsiEI
+  - BsiWI-HF
+  - BsiWI
+  - BsmBI-v2
+  - Esp3I
+  - Hpy99I
+  - MspA1I
+  - MspJI
+  - SgrAI
+  - BfaI
+  - BspCNI
+  - PaeR7I
+  - XhoI
+  - EarI
+  - AcuI
+  - PstI-HF
+  - PstI
+  - BpmI
+  - DdeI
+  - SfcI
+  - AflII
+  - BpuEI
+  - SmlI
+  - BsoBI
+  - AvaI
+  - MboII
+  - BbsI-HF
+  - BbsI
+  - XmnI
+  - BsmI
+  - Nb.BsmI
+  - EcoRI-HF
+  - EcoRI
+  - HgaI
+  - ZraI
+  - AatII
+  - PflFI
+  - Tth111I
+  - PshAI
+  - AhdI
+  - DrdI
+  - SacI-HF
+  - SacI
+  - Eco53kI
+  - BseRI
+  - MlyI
+  - PleI
+  - WarmStart Nt.BstNBI
+  - HinfI
+  - EcoRV-HF
+  - EcoRV
+  - Sau3AI
+  - DpnII
+  - MboI
+  - DpnI
+  - BsaBI
+  - TfiI
+  - BsrDI
+  - Nb.BsrDI
+  - BbvI
+  - BtsI-v2
+  - Nb.BtsI
+  - BstAPI
+  - SfaNI
+  - SphI-HF
+  - SphI
+  - SrfI
+  - NmeAIII
+  - NgoMIV
+  - NaeI
+  - BglI
+  - AsiSI
+  - BtgZI
+  - HhaI
+  - HinP1I
+  - BssHII
+  - NotI-HF
+  - NotI
+  - Fnu4HI
+  - Cac8I
+  - MwoI
+  - NheI-HF
+  - NheI
+  - BmtI-HF
+  - BmtI
+  - BspQI-HF
+  - BspQI
+  - SapI
+  - Nt.BspQI
+  - BlpI
+  - ApeKI
+  - TseI
+  - Bsp1286I
+  - AlwI
+  - BamHI-HF
+  - BamHI
+  - Nt.AlwI
+  - BtsCI
+  - FokI
+  - HaeIII
+  - FseI
+  - SfiI
+  - NarI
+  - KasI
+  - PluTI
+  - SfoI
+  - AscI
+  - EciI
+  - BsmFI
+  - ApaI
+  - PspOMI
+  - Sau96I
+  - NlaIV
+  - Acc65I
+  - KpnI-HF
+  - KpnI
+  - BsaI-HFv2
+  - BsaI
+  - HphI
+  - BstEII-HF
+  - BstEII
+  - AvaII
+  - BanI
+  - BaeGI
+  - BsaHI
+  - BanII
+  - RsaI
+  - CviQI
+  - BstZ17I-HF
+  - BstZ17I
+  - BciVI
+  - SalI-HF
+  - SalI
+  - BsmAI
+  - BcoDI
+  - Nt.BsmAI
+  - ApaLI
+  - BsgI
+  - AccI
+  - Hpy166II
+  - Tsp45I
+  - HpaI
+  - PmeI
+  - HincII
+  - BsiHKAI
+  - TspRI
+  - ApoI-HF
+  - ApoI
+  - NspI
+  - BsrFI-v2
+  - BstYI
+  - HaeII
+  - CviKI-1
+  - EcoO109I
+  - PpuMI
+  - I-CeuI
+  - SnaBI
+  - I-SceI
+  - BspHI
+  - BspEI
+  - MmeI
+  - TaqI-v2
+  - NruI-HF
+  - NruI
+  - Hpy188I
+  - Hpy188III
+  - XbaI
+  - BclI-HF
+  - HpyCH4V
+  - FspI
+  - PI-PspI
+  - MscI
+  - BsrGI-HF
+  - BsrGI
+  - MseI
+  - PacI
+  - PsiI-v2
+  - BstBI
+  - DraI
+  - PspXI
+  - BsaWI
+  - BsaAI
+  - EaeI
 market_rules:
-  # --- Restriction Enzymes (Highly Specific) ---
-  # Exclude synthetic oligos/plasmids: Sigma-Aldrich cloning primers contain
-  # RE site names in their primer name (e.g. "Pdzd2 SalI For") and have
-  # "ConfigurationID", "Synthesis Scale", or long DNA sequences in the
-  # description. True RE products are short descriptions like "EcoRI 10,000U".
-  # NOTE: case_sensitive applies to ALL fields including none_of, so use
-  # exact case matching for exclusion terms.
-  - name: "restriction enzymes"
-    case_sensitive: true
-    any_of:
-      - $RESTRICTION_ENZYME
-    none_of:
-      - "*ConfigurationID*"
-      - "*Synthesis Scale*"
-      - "*DNA Oligo*"
-      - "*Oligo Name*"
-      - "*Sequence (5*"
-      - "*Cloning site*"
-      - "*cloning site*"
-      - "*Gene Synthesis*"
-      - "*gene synthesis*"
-
-  # --- Antibodies (Specific) ---
-  # IMPORTANT: Order matters! Most specific rules first.
-  # 1. Explicit secondary (text says "secondary")
-  # 2. Alexa Fluor secondaries (species host signals: donkey/goat anti-X)
-  # 3. Alexa Fluor monoclonal primaries (CD markers)
-  # 4. Alkaline phosphatase conjugated secondaries
-  # 5. Other conjugated secondaries (IRDye, HRP)
-  # 6. Anti-mouse IgG secondaries (whole molecule patterns)
-  # 7. Explicit polyclonal primary
-  # 8. Explicit monoclonal primary
-  # 9. "rabbit mab" catch-all for monoclonal
-
-  # --- 1. Explicit secondary antibodies ---
-  - name: "monoclonal secondary antibody"
-    all_of: ["secondary", "antibody", "monoclonal"]
-  - name: "polyclonal secondary antibody"
-    all_of: ["secondary", "antibody"]
-    none_of: ["monoclonal"]
-
-  # --- 2. Alexa Fluor conjugated secondary antibodies ---
-  # These are labeled by host species producing the antibody (donkey/goat/chicken)
-  # targeting another species' IgG. The "alexa fluor" + host species pattern
-  # distinguishes them from Alexa Fluor-conjugated primary antibodies.
-  - name: "polyclonal secondary antibody"
-    all_of: ["*alexa fluor*", "*donkey*"]
-    any_of: ["*anti-mouse*", "*anti-rabbit*", "*anti-rat*", "*anti-goat*", "*anti-human*", "*anti-sheep*", "*anti-chicken*"]
-    none_of: ["monoclonal", "*phalloidin*"]
-  - name: "polyclonal secondary antibody"
-    all_of: ["*alexa fluor*", "*goat*"]
-    any_of: ["*anti-mouse*", "*anti-rabbit*", "*anti-rat*", "*anti-human*", "*anti-chicken*"]
-    none_of: ["monoclonal", "*phalloidin*"]
-  - name: "polyclonal secondary antibody"
-    all_of: ["*alexa fluor*", "*chicken*"]
-    any_of: ["*anti-mouse*", "*anti-rabbit*", "*anti-rat*", "*anti-goat*", "*anti-human*"]
-    none_of: ["monoclonal", "*phalloidin*"]
-  # Alexa Fluor + f(ab) fragment = secondary
-  - name: "polyclonal secondary antibody"
-    all_of: ["*alexa fluor*", "*f(ab*"]
-    none_of: ["monoclonal", "*phalloidin*"]
-  # Alexa Fluor + IgG (H+L) = secondary
-  - name: "polyclonal secondary antibody"
-    all_of: ["*alexa fluor*", "*igg*"]
-    any_of: ["*anti-mouse*", "*anti-rabbit*", "*anti-rat*", "*anti-goat*", "*anti-human*"]
-    none_of: ["monoclonal", "*phalloidin*", "*cd*"]
-
-  # --- 3. Alexa Fluor conjugated monoclonal PRIMARY antibodies ---
-  # Flow cytometry antibodies: Alexa Fluor + anti-mouse/human CD markers
-  - name: "monoclonal primary antibody"
-    all_of: ["*alexa fluor*", "*anti-mouse*"]
-    any_of: ["*cd*", "*ly-*", "*ly6*", "*ter-*", "*nk*", "*gl7*", "*f4/80*"]
-    none_of: ["*igg*", "*igm*", "*secondary*", "*donkey*", "*goat*", "*chicken*"]
-  - name: "monoclonal primary antibody"
-    all_of: ["*alexa fluor*", "*anti-human*"]
-    any_of: ["*cd*"]
-    none_of: ["*igg*", "*igm*", "*secondary*", "*donkey*", "*goat*", "*chicken*"]
-  - name: "monoclonal primary antibody"
-    all_of: ["*alexa fluor*", "*anti-mu*"]
-    any_of: ["*cd*", "*ly-*", "*ly6*", "*ter-*", "*nk*", "*gl7*", "*f4/80*"]
-    none_of: ["*igg*", "*igm*", "*secondary*", "*donkey*", "*goat*", "*chicken*"]
-
-  # --- Remaining Alexa Fluor secondary rules (no host species specified) ---
-  - name: "polyclonal secondary antibody"
-    all_of: ["*alexa fluor*", "*anti-mouse*"]
-    none_of: ["monoclonal", "*phalloidin*", "*cd*", "*ly-*", "*ly6*", "*ter-*", "*nk*", "*gl7*", "*f4/80*"]
-  - name: "polyclonal secondary antibody"
-    all_of: ["*alexa fluor*", "*anti-rabbit*"]
-    none_of: ["monoclonal", "*phalloidin*"]
-  - name: "polyclonal secondary antibody"
-    all_of: ["*alexa fluor*", "*anti-rat*"]
-    none_of: ["monoclonal", "*phalloidin*"]
-  - name: "polyclonal secondary antibody"
-    all_of: ["*alexa fluor*", "*anti-human*"]
-    none_of: ["monoclonal", "*phalloidin*", "*cd*"]
-  - name: "polyclonal secondary antibody"
-    all_of: ["*alexa fluor*", "*anti-goat*"]
-    none_of: ["monoclonal", "*phalloidin*"]
-
-  # --- 4. Alkaline phosphatase conjugated secondary antibodies ---
-  - name: "polyclonal secondary antibody"
-    all_of: ["*alkaline phosphatase*", "*anti-*"]
-    any_of: ["*igg*", "*goat*", "*donkey*", "*rabbit*", "*mouse*"]
-    none_of: ["monoclonal"]
-  - name: "polyclonal secondary antibody"
-    all_of: ["*ap*", "*anti-*", "*igg*"]
-    any_of: ["*goxmo*", "*goat*", "*donkey*"]
-    none_of: ["monoclonal"]
-
-  # --- 5. Other conjugated secondary antibodies ---
-  - name: "polyclonal secondary antibody"
-    all_of: ["*irdye*", "*anti-*"]
-    none_of: ["monoclonal"]
-  - name: "polyclonal secondary antibody"
-    all_of: ["*hrp*", "*anti-*", "*igg*"]
-    none_of: ["monoclonal"]
-  - name: "polyclonal secondary antibody"
-    all_of: ["*hrp*", "*anti-*"]
-    any_of: ["*goat*", "*donkey*", "*rabbit*", "*chicken*"]
-    none_of: ["monoclonal"]
-  # anti-mouse IgG (whole molecule) patterns = secondary
-  - name: "polyclonal secondary antibody"
-    all_of: ["*anti-mouse*", "*igg*"]
-    any_of: ["*whole*", "*h+l*", "*handl*", "*h&l*", "*f(ab*"]
-    none_of: ["monoclonal", "*cd*"]
-  - name: "polyclonal secondary antibody"
-    all_of: ["*anti-rabbit*", "*igg*"]
-    any_of: ["*whole*", "*h+l*", "*handl*", "*h&l*", "*f(ab*"]
-    none_of: ["monoclonal"]
-  # Donkey/goat anti-X igg without conjugate label = still secondary
-  - name: "polyclonal secondary antibody"
-    all_of: ["*donkey*", "*anti-*", "*igg*"]
-    none_of: ["monoclonal"]
-  - name: "polyclonal secondary antibody"
-    all_of: ["*goat*", "*anti-*", "*igg*"]
-    none_of: ["monoclonal", "*polyclonal*", "*pab*"]
-
-  # --- Monoclonal primary: flow cytometry conjugated antibodies ---
-  # These contain fluorophore + anti-mouse CD markers. They are directly conjugated
-  # monoclonal primaries, NOT secondaries. Must come BEFORE secondary rules.
-  - name: "monoclonal primary antibody"
-    all_of: ["*anti-mouse*", "*cd*"]
-    any_of: ["*fitc*", "*pe *", "*apc*", "*percp*", "*brilliant violet*", "*bv*", "*pacific blue*"]
-    none_of: ["*igg*", "*igm*", "*secondary*"]
-  - name: "monoclonal primary antibody"
-    all_of: ["*anti-human*", "*cd*"]
-    any_of: ["*fitc*", "*pe *", "*apc*", "*percp*", "*brilliant violet*", "*bv*", "*pacific blue*"]
-    none_of: ["*igg*", "*igm*", "*secondary*"]
-  - name: "monoclonal primary antibody"
-    all_of: ["*anti-mouse*"]
-    any_of: ["*pure*", "*purified*"]
-    none_of: ["*igg*", "*igm*", "*secondary*", "*alexa fluor*", "*hrp*", "*irdye*"]
-  # Flow cytometry: fluorophore + anti-mouse + cytokine/interleukin/marker targets
-  # These are BioLegend-style conjugated monoclonal primaries (NOT secondaries)
-  - name: "monoclonal primary antibody"
-    any_of: ["*fitc*", "*pe *", "*apc*", "*percp*", "*brilliant violet*", "*bv*", "*pacific blue*"]
-    all_of: ["*anti-mouse*"]
-    none_of: ["*igg*", "*igm*", "*secondary*", "*donkey*", "*goat*", "*chicken*"]
-  - name: "monoclonal primary antibody"
-    any_of: ["*fitc*", "*pe *", "*apc*", "*percp*", "*brilliant violet*", "*bv*", "*pacific blue*"]
-    all_of: ["*anti-human*"]
-    none_of: ["*igg*", "*igm*", "*secondary*", "*donkey*", "*goat*", "*chicken*", "*cd*"]
-  # Flow cytometry anti-mouse markers without explicit fluorophore
-  - name: "monoclonal primary antibody"
-    all_of: ["*anti-m*", "*f4/80*"]
-    none_of: ["*igg*", "*secondary*"]
-  - name: "monoclonal primary antibody"
-    all_of: ["*anti-mu*"]
-    any_of: ["*cd*", "*ly-*", "*ly6*", "*ter-*", "*nk*", "*gl7*", "*f4/80*"]
-    none_of: ["*igg*", "*igm*", "*secondary*", "*donkey*", "*goat*"]
-  - name: "monoclonal primary antibody"
-    all_of: ["*apc*", "*anti-mu*"]
-    none_of: ["*igg*", "*igm*", "*secondary*"]
-  # TruStain / Fc block antibodies = monoclonal primary
-  - name: "monoclonal primary antibody"
-    any_of: ["*trustain*", "*fc block*", "*fcx*"]
-    all_of: ["*anti-*"]
-    none_of: ["*secondary*"]
-
-  # --- 6. Polyclonal primary antibody ---
-  - name: "polyclonal primary antibody"
-    all_of: ["antibody"]
-    any_of:
-      - "polyclonal"
-      - "pab"
-  - name: "polyclonal primary antibody"
-    all_of: ["*rabbit polyclonal*"]
-  - name: "polyclonal primary antibody"
-    all_of: ["*goat polyclonal*"]
-  - name: "polyclonal primary antibody"
-    all_of: ["*rabbit polyab*"]
-
-  # --- 7. Monoclonal primary antibody ---
-  - name: "monoclonal primary antibody"
-    all_of:
-      - "monoclonal"
-      - "antibody"
-  - name: "monoclonal primary antibody"
-    all_of:
-      - "monoclonal"
-      - "anti"
-  - name: "monoclonal primary antibody"
-    all_of:
-      - "*mouse mono*"
-  - name: "monoclonal primary antibody"
-    all_of:
-      - "*rabbit mono*"
-  - name: "monoclonal primary antibody"
-    all_of:
-      - "mab"
-    none_of:
-      - "*secondary*"
-      - "*alexa fluor*"
-      - "*irdye*"
-      - "*hrp*"
-      - "*anti-static*"
-      - "*zerostat*"
-  - name: "monoclonal primary antibody"
-    all_of:
-      - "*clone*"
-      - "*antibod*"
-  # --- "rabbit mab" pattern: dominant monoclonal format (64% of correct items) ---
-  - name: "monoclonal primary antibody"
-    all_of:
-      - "*rabbit mab*"
-    none_of:
-      - "*secondary*"
-      - "*alexa fluor*"
-      - "*irdye*"
-      - "*hrp*"
-
-  # --- 8. Target-name and clone-code rules for mono vs poly disambiguation ---
-  # EPR/EP clone codes (Abcam recombinant monoclonal): 18 mono / 1 poly in data
-  - name: "monoclonal primary antibody"
-    all_of: ["*antibod*"]
-    any_of: ["*epr*", "*ep1*", "*ep2*"]
-    none_of: ["*secondary*", "*polyclonal*", "*pab*"]
-  # Safe monoclonal targets (100% mono in gold data, no poly collisions)
-  - name: "monoclonal primary antibody"
-    all_of: ["*antibod*", "*f4/80*"]
-    none_of: ["*secondary*", "*polyclonal*", "*pab*"]
-  - name: "monoclonal primary antibody"
-    all_of: ["*antibod*", "*pd-l1*"]
-    none_of: ["*secondary*", "*polyclonal*", "*pab*"]
-  - name: "monoclonal primary antibody"
-    all_of: ["*antibod*", "*cd68*"]
-    none_of: ["*secondary*", "*polyclonal*", "*pab*"]
-  - name: "monoclonal primary antibody"
-    all_of: ["*antibod*", "*cd62l*"]
-    none_of: ["*secondary*", "*polyclonal*", "*pab*"]
-  - name: "monoclonal primary antibody"
-    all_of: ["*antibod*", "*vdac*"]
-    none_of: ["*secondary*", "*polyclonal*", "*pab*"]
-  - name: "monoclonal primary antibody"
-    all_of: ["*antibod*", "*cox-2*"]
-    none_of: ["*secondary*", "*polyclonal*", "*pab*"]
-  - name: "monoclonal primary antibody"
-    all_of: ["*antibod*", "*tmem119*"]
-    none_of: ["*secondary*", "*polyclonal*", "*pab*"]
-  # anti-F4/80 without "antibody" (BioLegend flow cytometry items)
-  - name: "monoclonal primary antibody"
-    all_of: ["*anti-f4/80*"]
-    none_of: ["*secondary*", "*polyclonal*", "*igg*"]
-  # anti-PD-L1 / anti pd l1 without "antibody"
-  - name: "monoclonal primary antibody"
-    any_of: ["*anti-pd-l1*", "*anti pd l1*"]
-    none_of: ["*secondary*", "*polyclonal*"]
-  # anti-CD markers without "antibody" (flow cytometry primaries)
-  - name: "monoclonal primary antibody"
-    all_of: ["*anti-cd68*"]
-    none_of: ["*secondary*", "*polyclonal*", "*igg*"]
-  - name: "monoclonal primary antibody"
-    all_of: ["*anti-cd62l*"]
-    none_of: ["*secondary*", "*polyclonal*", "*igg*"]
-
-  # --- 9. Antibody rescue rules for items falling to Non-Lab ---
-  # "anti-" prefix + "antibod" keyword = definitely an antibody (not anti-static etc.)
-  # These go polyclonal as the safe default (polyclonal is the "unmarked" category)
-  - name: "polyclonal primary antibody"
-    all_of: ["*anti-*", "*antibod*"]
-    none_of:
-      - "*secondary*"
-      - "*monoclonal*"
-      - "*mab*"
-      - "*digoxigenin*"
-      - "*mouse monoclonal*"
-      - "*duolink*"
-      - "*pla probe*"
-      - "*immpress*"
-  # "anti-phospho-" pattern = phospho-specific antibody (polyclonal primary)
-  - name: "polyclonal primary antibody"
-    all_of: ["*anti-phospho*"]
-    none_of: ["*secondary*", "*monoclonal*", "*mab*"]
-  # "anti-histone" pattern
-  - name: "polyclonal primary antibody"
-    all_of: ["*anti-histone*"]
-    none_of: ["*secondary*", "*monoclonal*", "*mab*"]
-  # "anti-acetyl-" pattern
-  - name: "polyclonal primary antibody"
-    all_of: ["*anti-acetyl*"]
-    none_of: ["*secondary*", "*monoclonal*", "*mab*"]
-  # MA5-xxxxx = Invitrogen/Thermo catalog prefix for antibodies (13/15 are polyclonal primary)
-  - name: "polyclonal primary antibody"
-    any_of: ["*ma542*", "*ma534*", "*ma532*", "*ma536*"]
-    none_of: ["*cable*", "*adapter*"]
-  # "developed in rabbit/goat" without "antibody" keyword = polyclonal primary
-  - name: "polyclonal primary antibody"
-    all_of: ["*anti-*", "*developed*"]
-    none_of: ["*secondary*", "*monoclonal*"]
-
-  # --- PCR, qPCR & Molecular Biology Reagents ---
-  - name: "rnase inhibitors"
-    all_of:
-      - "recombinant"
-      - "rrasin"
-  - name: "rnase inhibitors"
-    all_of:
-      - "*superase*"
-  - name: "rnase inhibitors"
-    all_of:
-      - "*rnase*"
-      - "*inhib*"
-    none_of:
-      - "*iscript*"
-      - "*pcr tube*"
-      - "*pcr tb*"
-      - "*tempassure*"
-      - "*pyrogen*"
-  - name: "high-fidelity dna polymerase"
-    all_of:
-      - "ventsupreg"
-      - "polymerase"
-  - name: "high-fidelity dna polymerase"
-    all_of:
-      - $HIGH_FIDELITY
-      - "*polymerase*"
-    none_of:
-      - "*taq*"
-  - name: "taq polymerases" 
-    all_of:
-      - "*taq*"
-      - "*polymerase*"
-    none_of:
-      - $HIGH_FIDELITY
-      - $HOT_START
-      - "*mix*"
-  - name: "hot start dna polymerase"
-    all_of:
-      - $HOT_START
-      - "*polymerase*"
-    none_of:
-      - $HIGH_FIDELITY
-      - "*taq*"
-      - "*aq*"
-  - name: "hot start pcr systems"
-    all_of:
-      - "sapphireamp"
-    none_of:
-      - "qpcr"
-  - name: "high-fidelity pcr systems"
-    all_of:
-      - $HIGH_FIDELITY
-      - "pcr"
-      - "master"
-  - name: "high-fidelity pcr systems"
-    all_of:
-      - $HIGH_FIDELITY
-      - "master"
-  - name: "pcr systems"
-    all_of:
-      - "pcr"
-      - "mmax"
-    none_of:
-      - "sequence"
-  - name: "pcr systems"
-    all_of:
-      - "gotaq"
-      - "mmax"
-    none_of:
-      - "sequence"
-  - name: "pcr systems"
-    all_of:
-      - "pcr"
-      - "*redextract*"
-    none_of:
-      - "sequence"
-  - name: "pcr systems"
-    all_of:
-      - "pcr"
-      - "master"
-      - "max"
-    none_of:
-      - "sequence"
-  - name: "pcr systems"
-    all_of:
-      - "emeraldamp"
-    none_of:
-      - "qpcr"
-  - name: "dye-based qpcr systems"
-    all_of:
-      - "itaq"
-      - "sybr"
-      - "supermix"
-  - name: "dye-based qpcr systems"
-    all_of:
-      - "qpcr"
-      - "master"
-  - name: "dye-based qpcr systems"
-    all_of:
-      - "qpcr"
-      - "mix"
-  - name: "dye-based qpcr systems"
-    all_of:
-      - "powerupsybrgreen"
-  - name: "dye-based qpcr systems"
-    all_of:
-      - "fg"
-      - "fast"
-      - "sybr"
-      - "master"
-  - name: "dye-based qpcr systems"
-    all_of:
-      - "powerup"
-      - "sybr"
-      - "master"
-  - name: "dye-based qpcr systems"
-    all_of:
-      - "kapa"
-      - "sybr"
-      - "master"
-  - name: "probe-based qpcr systems"
-    all_of:
-      - "fg"
-      - "taqman"
-      - "gt"
-      - "master"
-  - name: "first-strand cdna synthesis systems"
-    all_of:
-      - "first-strand"
-      - "system"
-      - "rt"
-  - name: "first-strand cdna synthesis systems"
-    all_of:
-      - "iscript"
-    none_of:
-      - "*rnase*"
-  - name: "first-strand cdna synthesis systems"
-    all_of:
-      - "iscript"
-      - "supermix"
-  - name: "first-strand cdna synthesis systems"
-    all_of:
-      - "all-in-one"
-      - "master"
-      - "mix"
-  - name: "first-strand cdna synthesis systems"
-    all_of:
-      - "primescript"
-      - "rt"
-      - "master"
-      - "mix"
-  - name: "apoptosis detection kits"
-    all_of:
-      - $APOPTOSIS
-      - $ASSAY_OR_KIT
-  - name: "apoptosis detection kits"
-    all_of:
-      - "caspase"
-      - "colorimetric"
-  - name: "synthetic sirna" 
-    all_of:
-      - "sirna"
-      - "predesigned"
-  - name: "synthetic peptides"
-    all_of: ["peptides"]
-    any_of:
-      - "synthetic"
-      - "custom"
-      - "synthesis"
-      - "fmoc"
-      - "boc"
-  - name: "synthetic sirna" 
-    all_of:
-      - "sirna"
-      - "*oligo*"
-  - name: "synthetic sirna" 
-    all_of:
-      - "sirna"
-      - "configurationid"
-  - name: "synthetic dna oligonucleotide"
-    all_of:
-      - "*oligo*"
-      - "dna"
-  - name: "synthetic rna oligonucleotide"
-    all_of:
-      - "*oligo*"
-      - "rna"
-  - name: "transfection reagents"
-    any_of:
-      - "lipofectamine"
-      - "*lipofectamin*"
-      - "*fugene*"
-      - "*effectene*"
-      - "*cellfectin*"
-      - "*xfect*"
-      - "*polybrene*"
-      - "*jetprime*"
-      - "*turbofect*"
-      - "*transfect*"
-    none_of:
-      - "*sirna*"
-      - "*shrna*"
-      - "*rnai*"
-  - name: "viability stains"
-    any_of:
-      - "*trypan blue*"
-      - "*propidium iodide*"
-      - "*calcein*"
-      - "*live*dead*"
-      - "*livedead*"
-      - "*zombie*"
-      - "*mitotracker*"
-  - name: "viability stains"
-    all_of:
-      - "*annexin*"
-      - "*dead*"
-  - name: "nitrogen"
-    all_of:
-      - "nitrogen"
-      - "*purity*"
-    none_of:
-      - "*liquid*"
-      - "*urea*"
-      - "*carbon*"
-      - "*element*"
-      - "*yeast*"
-      - "*cylinder*"
-  - name: "histology & cell stains"
-    any_of:
-      - "schiffs reagent"
-      - "schiff reagent"
-      - "orange ii sodium"
-      - "orange sodium"
-      - "gills iii hematoxylin"
-      - "toluidine blue"
-      - "alcian blue"
-      - "eosin"
-      - "crystal violet"
-      - "hematoxylin"
-      - "eosin"
-      - "methylene blue"
-      - "wrights giemsa"
-      - "evans blue"
-      - "oil red"
-      - "methyl blue"
-      - "pinnacle blue"
-  - name: "protein gel stains"
-    all_of:
-      - "gelcode"
-  - name: "protein gel stains"
-    all_of:
-      - "protein"
-      - "*gel*"
-      - "*stain*"
-  - name: "protein gel stains"
-    all_of:
-      - "gelstar"
-  - name: "protein gel stains"
-    all_of:
-      - "stains-all"
-  - name: "nucleic acid gel stains"
-    all_of:
-      - "diamidino*"
-      - "phenylin*"
-  - name: "nucleic acid gel stains"
-    all_of:
-      - "thiazole orange"
-  - name: "nucleic acid gel stains"
-    all_of:
-      - "ethidium"
-      - "brmide"
-  - name: "nucleic acid gel stains"
-    all_of:
-      - "gelgreen"
-  - name: "nucleic acid gel stains"
-    all_of:
-      - "hoechst"
-  - name: "nucleic acid gel stains"
-    all_of:
-      - "hoechst"
-      - "trihydroch"
-  - name: "nucleic acid gel stains"
-    all_of:
-      - "*gel*"
-      - "*stain*"
-  - name: "nucleic acid gel stains"
-    all_of:
-      - "dapi"
-  - name: "nucleic acid gel stains"
-    all_of:
-      - "gelred"
-  - name: "nucleic acid gel stains"
-    all_of:
-      - "gelgreen"
-      - "sybr green"
-  - name: "dna polymerase i"
-    all_of:
-      - "deoxyribonuclease"
-      - "bovine"
-  - name: "dna polymerase i"
-    all_of:
-      - "deoxyribonuclease"
-      - "crude"
-  - name: "dntps"
-    all_of:
-      - "deoxynucleotide solution mix"
-    none_of:
-      - "supermix"
-      - "cdna"
-  - name: "dntps"
-    all_of:
-      - "*deoxynuc*"
-      - "mix"
-    none_of:
-      - "supermix"
-      - "cdna"
-  - name: "dntps"
-    all_of:
-      - "dntps"
-    none_of:
-      - "supermix"
-      - "cdna"
-  - name: "dntps"
-    all_of:
-      - "datp"
-    none_of:
-      - "supermix"
-      - "cdna"
-  - name: "dntps"
-    all_of:
-      - "dttp"
-    none_of:
-      - "supermix"
-      - "cdna"
-  - name: "dntps"
-    all_of:
-      - "dgtp"
-    none_of:
-      - "supermix"
-      - "cdna"
-  - name: "dntps"
-    all_of:
-      - "dctp"
-    none_of:
-      - "supermix"
-      - "cdna"
-  - name: "gel loading dye"
-    all_of:
-      - "gel"
-      - "loading"
-      - "dye"
-  # --- DNA/RNA Purification Kits ---
-  - name: "spin columns"
-    all_of:
-      - "spin"
-      - "column"
-  - name: "column-based rna miniprep"
-    all_of:
-      - "miniprep"
-      - "rna"
-      - $ASSAY_OR_KIT
-  - name: "column-based rna miniprep"
-    all_of:
-      - "purelink"
-      - "rna"
-      - "mini"
-      - $ASSAY_OR_KIT
-  - name: "column-based gel rna extraction kits"
-    all_of:
-      - "*rna*"
-      - "*gel*"
-      - $ASSAY_OR_KIT
-  - name: "column-based rna purification kits"
-    all_of:
-      - "rneasy"
-      - "mini"
-      - $ASSAY_OR_KIT
-    none_of:
-      - "sequence"
-      - "pump"
-      - "alcohol"
-  - name: "column-based rna purification kits"
-    all_of:
-      - "rna"
-      - "cleanup"
-      - "genejet"
-      - $ASSAY_OR_KIT
-    none_of:
-      - "sequence"
-      - "pump"
-      - "alcohol"
-  - name: "column-based rna purification kits"
-    all_of:
-      - "directzol"
-      - "micro"
-      - "rna"
-      - $ASSAY_OR_KIT
-    none_of:
-      - "sequence"
-      - "pump"
-      - "alcohol"
-  - name: "column-based rna purification kits"
-    all_of:
-      - "rneasy"
-      - "minelute"
-      - $ASSAY_OR_KIT
-    none_of:
-      - "sequence"
-      - "pump"
-      - "alcohol"
-  - name: "column-based rna purification kits"
-    all_of:
-      - "mirvana"
-      - "mirna"
-      - "isolation"
-      - $ASSAY_OR_KIT
-    none_of:
-      - "sequence"
-      - "pump"
-      - "alcohol"
-  - name: "column-based rna purification kits"
-    all_of:
-      - "genejet"
-      - "rna"
-      - "purif"
-      - $ASSAY_OR_KIT
-    none_of:
-      - "sequence"
-      - "pump"
-      - "alcohol"
-  - name: "column-based rna purification kits"
-    all_of:
-      - "*rna*"
-      - "*iso*"
-      - $ASSAY_OR_KIT
-    none_of:
-      - "sequence"
-      - "pump"
-      - "alcohol"
-  - name: "column-based rna purification kits"
-    all_of:
-      - "*rna*"
-      - "*purif*"
-      - $ASSAY_OR_KIT
-    none_of:
-      - "sequence"
-      - "pump"
-      - "alcohol"
-  - name: "column-based rna purification kits"
-    all_of:
-      - "*rna*"
-      - "*tissue*"
-      - $ASSAY_OR_KIT
-    none_of:
-      - "sequence"
-      - "pump"
-      - "alcohol"
-  - name: "column-based rna purification kits"
-    all_of:
-      - "*rna*"
-      - "*clean*"
-      - $ASSAY_OR_KIT
-    none_of:
-      - "sequence"
-      - "pump"
-      - "alcohol"
-  - name: "column-based dna plasmid megaprep"
-    all_of:
-      - "megaprep"
-      - $ASSAY_OR_KIT
-    none_of:
-      - "sequence"
-  - name: "column-based dna plasmid midiprep"
-    all_of:
-      - "midi"
-      - "nucleobond"
-      - $ASSAY_OR_KIT
-    none_of:
-      - "sequence"
-  - name: "column-based dna plasmid midiprep"
-    all_of:
-      - "midiprep"
-      - "plasmid"
-      - $ASSAY_OR_KIT
-    none_of:
-      - "sequence"
-  - name: "column-based dna plasmid miniprep"
-    all_of:
-      - "*mini*"
-      - "*prep*"
-      - $ASSAY_OR_KIT
-    none_of:
-      - "sequence"
-      - $TUBE
-      - "lysis"
-      - "rna"
-      - "column"
-  - name: "cell culture antibiotics - pen-strep"
-    all_of:
-      - "penicillin" 
-      - "streptomycin" 
-  - name: "cell culture antibiotics - pen-strep"
-    all_of:
-      - "pen"
-      - "strep"
-  - name: "cell culture antibiotics - pen-strep"
-    all_of:
-      - "penicillin-streptomycin" 
-  - name: "column-based dna genomic purification kits"
-    all_of:
-      - "*dna*"
-      - "*genomic*"
-      - $ASSAY_OR_KIT
-    none_of:
-      - "cloning"
-      - "*column*"
-      - $TUBE
-      - "*sequenc*"
-  - name: "column-based gel dna extraction kits"
-    all_of:
-      - "*dna*"
-      - "*gel*"
-      - $ASSAY_OR_KIT
-  - name: "column-based microbial dna purification kits"
-    all_of:
-      - "*dna*"
-      - "*microb*"
-      - $ASSAY_OR_KIT
-  - name: "column-based microbial dna purification kits"
-    all_of:
-      - "*dneasy*"
-      - "*powersoil*"
-      - $ASSAY_OR_KIT
-  - name: "column-based microbial dna purification kits"
-    all_of:
-      - "dneasy"
-      - "*microb*"
-      - $ASSAY_OR_KIT
-    none_of:
-      - "sequence"
-  - name: "column-based dna purification kits"
-    all_of:
-      - "dneasy"
-      - "kit"
-      - $ASSAY_OR_KIT
-    none_of:
-      - "sequence"
-  - name: "column-based dna purification kits"
-    all_of:
-      - "monarch"
-      - "dna"
-      - $ASSAY_OR_KIT
-    none_of:
-      - "sequence"
-      - "extraction"
-  - name: "column-based dna purification kits"
-    all_of:
-      - "*clean*"
-      - "dna"
-      - $ASSAY_OR_KIT
-    none_of:
-      - "sequence"
-  - name: "column-based dna purification kits"
-    all_of:
-      - "cleanup"
-      - "dna"
-      - "*prep*"
-    none_of:
-      - "sequence"
-
-  # --- RNA Extraction ---
-  - name: "rna extraction reagents"
-    any_of:
-      - "*trizol*"
-      - "*tri-reagent*"
-      - "*tri reagent*"
-      - "*qiazol*"
-
-  # --- Magnetic Beads ---
-  - name: "magnetic polystyrene beads"
-    any_of:
-      - "*dynabeads*"
-    none_of:
-      - "*streptavidin*"
-      - "*protein a*"
-      - "*protein g*"
-      - "*anti-*"
-      - "*oligo*"
-
-  # --- Protease Inhibitors (individual, not cocktails) ---
-  - name: "protease inhibitors"
-    any_of:
-      - "*trypsin inhibitor*"
-      - "*pmsf*"
-      - "*phenylmethylsulfonyl*"
-      - "*aprotinin*"
-      - "*leupeptin*"
-      - "*pepstatin*"
-    none_of:
-      - "*cocktail*"
-
-  # --- Microplate Sealing ---
-  - name: "microplate sealing films and tapes"
-    all_of:
-      - "*seal*"
-      - "*tape*"
-    none_of:
-      - "*pipet*"
-  - name: "microplate sealing films and tapes"
-    all_of:
-      - "*seal*"
-      - "*film*"
-      - "*plate*"
-  - name: "microplate sealing films and tapes"
-    all_of:
-      - "*optical*"
-      - "*seal*"
-
-  # --- Sodium Sulfate ---
-  - name: "sodium sulfate"
-    any_of:
-      - "*sodium sulfate*"
-      - "*sod sulft*"
-      - "*na2so4*"
-      - "*sodium sulphate*"
-
-  # --- Protein Work Reagents (BSA, Buffers, Detergents, Membranes, Ladders) ---
-  - name: "bovine serum albumin"
-    all_of:
-      - "bsa"
-    none_of:
-      - $BUFFER
-  - name: "bovine serum albumin"
-    all_of:
-      - "bovine"
-      - "serum"
-      - "album*"
-  - name: "bovine serum albumin"
-    all_of:
-      - "bovine"
-      - "serum"
-      - "albumin"
-  - name: "laemmli sample buffer"
-    all_of:
-      - "laemmli"
-      - $BUFFER
-  - name: "laemmli sample buffer"
-    all_of:
-      - "laemmli"
-      - $BUFFER
-  - name: "pvdf blotting membranes"
-    all_of:
-      - "pvdf"
-      - "membrane"
-    none_of:
-      - "*pack*"
-  - name: "pvdf blotting membranes"
-    all_of:
-      - "pvdf"
-      - "fltr sheet"
-    none_of:
-      - "*pack*"
-  - name: "pvdf blotting membranes"
-    all_of:
-      - "ipvh"
-      - "membrane"
-    none_of:
-      - "*pack*"
-  - name: "pvdf blotting membranes"
-    all_of:
-      - "ipvh"
-      - "fltr sheet"
-    none_of:
-      - "*pack*"
-  - name: "tris-glycine-sds (tgs) buffer"
-    all_of:
-      - "*tris*"
-      - "*glycine*"
-      - "*sds*"
-      - $BUFFER
-  - name: "tris-glycine-sds (tgs) buffer"
-    all_of:
-      - "*tris*"
-      - "*glycine*"
-      - "*sds*"
-  - name: "tris-glycine-sds (tgs) buffer"
-    all_of:
-      - "*tris*"
-      - "*gly*"
-      - "*sds*"
-  - name: "mops-sds buffer"
-    all_of:
-      - "*mops*"
-      - "*sds*"
-      - $BUFFER
-  - name: "mes-sds buffer"
-    all_of:
-      - "*mes*"
-      - "*sds*"
-      - $BUFFER
-  - name: "cell lysis buffers"
-    all_of:
-      - "ripa"
-      - $BUFFER
-  - name: "cell lysis buffers"
-    all_of:
-      - "np40"
-      - $BUFFER
-  - name: "cell lysis buffers"
-    all_of:
-      - "extraction"
-      - $BUFFER
-  - name: "cell lysis buffers"
-    all_of:
-      - "xtractor"
-      - $BUFFER
-  - name: "cell lysis buffers"
-    all_of:
-      - "extraction"
-      - "solution"
-  - name: "cell lysis buffers"
-    all_of:
-      - "lysis"
-      - $BUFFER
-  - name: "acidic ph buffers"
-    all_of:
-      - "ph"
-      - $BUFFER
-      - "4"
-  - name: "basic ph buffers"
-    all_of:
-      - "ph"
-      - $BUFFER
-      - "10"
-  - name: "neutral ph buffers"
-    all_of:
-      - "ph"
-      - $BUFFER
-      - "7"
-  - name: "hepes buffer"
-    all_of:
-      - "hepes"
-      - "sodium"
-      - "salt"
-  - name: "hepes buffer"
-    all_of:
-      - "hepes"
-      - $BUFFER
-  - name: "phosphate-buffered saline (pbs) buffer"
-    all_of:
-      - "fta hemaglutn"
-      - "7.2"
-  - name: "cell lysis detergents"
-    all_of: 
-      - "sodium" 
-      - "deoxycholate"
-  - name: "cell lysis detergents"
-    all_of: 
-      - "*igepal*"
-  - name: "cell lysis detergents"
-    all_of: 
-      - "sds"
-    none_of: 
-      - $BUFFER
-  - name: "cell lysis detergents"
-    all_of: 
-      - "sodium dodecyl sulfate"
-  - name: "cell lysis detergents"
-    all_of: 
-      - "dodecyl sulfate"
-  - name: "cell lysis detergents"
-    all_of: 
-      - "b-per bacterial protein"
-  - name: "cell lysis detergents"
-    all_of: 
-      - "b-per"
-  - name: "cell lysis detergents"
-    all_of: 
-      - "cellytic"
-  - name: "cell lysis detergents"
-    all_of: 
-      - "chaps"
-  - name: "cell lysis detergents"
-    all_of: 
-      - "ddm"
-  - name: "cell lysis detergents"
-    all_of: 
-      - "sarkosyl"
-  - name: "cell lysis detergents"
-    any_of: 
-      - "digiton"
-      - "digitonin"
-  - name: "cell lysis detergents"
-    all_of: 
-      - "m-per"
-  - name: "cell lysis detergents"
-    all_of: 
-      - "np40"
-    none_of:
-      - $BUFFER
-  - name: "cell lysis detergents"
-    all_of: 
-      - "triton"
-  - name: "cell lysis detergents"
-    all_of: 
-      - "tween"
-  - name: "acrylamide/bis solution"
-    all_of:
-      - "bisacrylamid"
-  - name: "acrylamide/bis solution"
-    all_of:
-      - "bisacrylamide"
-  - name: "acrylamide/bis solution"
-    all_of:
-      - "bis-acrylamide"
-  - name: "antibody-based affinity resins"
-    all_of:
-      - "protein"
-      - "*agarose*"
-  - name: "antibody-based affinity resins"
-    all_of:
-      - "red"
-      - "anti-flag"
-  - name: "antibody-based affinity resins"
-    all_of:
-      - "igg"
-      - "sepharose"
-  - name: "antibody-based affinity resins"
-    all_of:
-      - "igg"
-      - "agar"
-  - name: "chemiluminescent substrates"
-    all_of: 
-      - "chemiluminescent detection"
-  - name: "chemiluminescent substrates"
-    all_of: 
-      - "d-luciferin potasium salt"
-  - name: "chemiluminescent substrates"
-    all_of: 
-      - "d-luciferin sodium salt"
-  - name: "chemiluminescent substrates"
-    all_of: 
-      - "ecl western blotting sub"
-  - name: "chemiluminescent substrates"
-    all_of: 
-      - "signalfire"
-  - name: "chemiluminescent substrates"
-    all_of: 
-      - "supersignal"
-  - name: "chemiluminescent substrates"
-    all_of: 
-      - "xenolight"
-  - name: "unstained protein molecular-weight ladder"
-    all_of: ["protein", "*std*"]
-    any_of: ["*unstain*", "*unstd*"]
-  - name: "unstained protein molecular-weight ladder"
-    all_of: ["protein", "*stand*"]
-    any_of: ["*unstain*", "*unstd*"]
-  - name: "pre-stained protein molecular-weight ladder"
-    all_of: ["*prtlad*"]
-    any_of: ["*prestain*", "*prestd*", "*prestn*"]
-  - name: "pre-stained protein molecular-weight ladder"
-    all_of: ["seeblue", "plus2"]
-  - name: "pre-stained protein molecular-weight ladder"
-    all_of: ["protein", "*stand*"]
-    any_of: ["*prestain*", "*prestd*", "*prestn*"]
-  - name: "pre-stained protein molecular-weight ladder"
-    all_of: ["protein", "*std*"]
-    any_of: ["*prestain*", "*prestd*", "*prestn*"]
-  - name: "pre-stained protein molecular-weight ladder"
-    all_of: ["*prot*"]
-    any_of: ["*spectra*", "*seeblue*", "pageruler", "precision plus", "ez-run", "novex"]
-  - name: "pre-stained protein molecular-weight ladder"
-    all_of: ["*ladder*"]
-    any_of: ["*spectra*", "*seeblue*", "pageruler", "precision plus", "ez-run", "novex"]
-  - name: "Non-Lab"
-    all_of:
-      - "*mini-protean*"
-      - "*plate*"
-  - name: "Non-Lab"
-    all_of:
-      - "*mini-protean*"
-      - "*cassette*"
-  - name: "Non-Lab"
-    all_of:
-      - "*mini-protean*"
-      - "*comb*"
-  - name: "Non-Lab"
-    all_of:
-      - "*mini-protean*"
-      - "*cooling unit*"
-  - name: "pre-cast bis-tris gels"
-    any_of:
-      - "*nupage*"
-      - "*bolt*bis*tris*"
-    none_of:
-      - "*buffer*"
-      - "*stain*"
-  - name: "pre-cast bis-tris gels"
-    all_of:
-      - "*bis*tris*"
-      - "*gel*"
-    none_of:
-      - "*buffer*"
-      - "*stain*"
-  - name: "protease inhibitor cocktails"
-    any_of:
-      - "*complete mini*"
-      - "*complete ultra*"
-      - "*halt protease*"
-      - "*protease inhibitor cocktail*"
-      - "*protease inhib cock*"
-    none_of:
-      - "*phosphatase*"
-  - name: "pre-cast tris-glycine gels"
-    all_of:
-      - "*tgx*"
-      - "*gel*"
-  - name: "pre-cast tris-glycine gels"
-    all_of:
-      - "*tri*"
-      - "*gly*"
-      - "*gel*"
-  - name: "pre-cast tris-tricine gels"
-    all_of:
-      - "*tris*"
-      - "*tricine*"
-      - "*gel*"
-  - name: "pre-cast tris-glycine gels"
-    all_of:
-      - "*tg*"
-      - "*novex*"
-    none_of:
-      - "*hand casting*"
-  - name: "nucleic acid modifying enzymes"
-    any_of: ["t5 exonuclease", "alkaline phosphatase", "t4 polynucleotide kinase", "terminal transferase", "t5 exonuclease" , "t4 dna ligase"]
-
-  # --- Cell Culture Media & Reagents ---
-  # MOST SPECIFIC media rules first, then general catch-alls at the end.
-
-  # --- Specific media formulations (place before general DMEM/EMEM rules) ---
-  - name: "hams f12"
-    any_of:
-      - "*ham*f*12*"
-      - "*f-12*"
-      - "*f 12 nutrient*"
-    none_of:
-      - "*dmem*"
-      - "*dme*f*12*"
-
-  - name: "mccoys 5a"
-    all_of:
-      - "*mccoy*"
-      - "5a"
-
-  - name: "leibovitz l15 media"
-    any_of:
-      - "*leibovitz*"
-      - "*l-15 medium*"
-      - "*l-15 medi*"
-    none_of:
-      - "*kimwipe*"
-      - "*kim wipe*"
-
-  - name: "neurobasal medium"
-    any_of:
-      - "*neurobasal*"
-
-  - name: "imdm"
-    any_of:
-      - "*imdm*"
-      - "*iscove*"
-
-  - name: "insect cell media"
-    any_of:
-      - "*sf 900*"
-      - "*sf900*"
-      - "*sf-900*"
-      - "*schneider*drosophila*"
-      - "*ex-cell*"
-      - "*excell*"
-      - "*sfx insect*"
-      - "*insect*medium*"
-      - "*insect*media*"
-      - "formula 4-24"
-
-  - name: "stem cell media"
-    any_of:
-      - "*stempro*"
-      - "*mtesr*"
-      - "*stemline*"
-      - "*matrigel*organ*"
-
-  - name: "bme"
-    all_of:
-      - "bme"
-    none_of:
-      - "*dmem*"
-      - "*imdm*"
-      - "*emem*"
-
-  - name: "bme"
-    all_of:
-      - "basal medium eagle"
-
-  - name: "medium 199"
-    any_of:
-      - "*med*199*"
-      - "*medium 199*"
-
-  - name: "tyrodes solution"
-    any_of:
-      - "*tyrode*"
-
-  - name: "smem"
-    all_of:
-      - "smem"
-
-  - name: "liver media"
-    any_of:
-      - "*liver digest*"
-      - "*liver perfusion*"
-    none_of:
-      - "*williams*"
-
-  - name: "liver media"
-    all_of:
-      - "*williams*"
-      - "med"
-
-  - name: "keratinocyte tissue media"
-    any_of:
-      - "*keratinocyte*sfm*"
-      - "*keratinocyte*medium*"
-
-  - name: "cardiomyocyte tissue media"
-    any_of:
-      - "*claycomb*"
-
-  - name: "corneal tissue media"
-    any_of:
-      - "*corneal*epithelial*growth*"
-
-  - name: "neural media"
-    any_of:
-      - "*hibernate*"
-      - "*neurocult*"
-
-  - name: "prostate breast media"
-    any_of:
-      - "*brff*"
-
-  # --- Major media formulations ---
-  # DMEM includes DMEM/F-12 mixes (these are DMEM variants with Ham's F-12 supplement)
-  - name: "dmem"
-    any_of:
-      - "*dmem*"
-      - "*dulbecco*modified*"
-    none_of:
-      - "*buf*"
-  - name: "dmem"
-    all_of:
-      - "*dme*"
-      - "*f-12*"
-
-  - name: "dmem"
-    all_of:
-      - "*dme*"
-      - "*f 12*"
-
-  - name: "dmem"
-    all_of:
-      - "*dme*"
-      - "media"
-    none_of:
-      - "*f-12*"
-      - "*f 12*"
-
-  - name: "rpmi"
-    any_of:
-      - "*rpmi*"
-
-  - name: "emem"
-    any_of:
-      - "*emem*"
-      - "*eagle*medi*"
-      - "*eagle*minimum*essential*"
-    none_of:
-      - "*dulbecco*"
-      - "*dmem*"
-
-  - name: "dme"
-    all_of:
-      - "dme"
-    none_of:
-      - "*dmem*"
-      - "*emem*"
-      - "*imdm*"
-      - "*f-12*"
-      - "*f 12*"
-
-  # --- Transforming Growth Factor (previously misclassified as basal media) ---
-  - name: "transforming growth factor"
-    any_of:
-      - "rhtgf-b1"
-
-  # --- General catch-all for unclassified basal media ---
-  - name: "dry basal media, not chemically defined"
-    all_of:
-      - "basal"
-      - "med"
-    none_of:
-      - "*neurobasal*"
-      - "*dmem*"
-      - "*emem*"
-      - "*rpmi*"
-      - "*imdm*"
-      - "bme"
-  - name: "dehydrated bacterial broth"
-    all_of: 
-      - "soc"
-      - "medium"
-  - name: "dehydrated bacterial broth"
-    all_of: 
-      - "*s.o.c*"
-      - "medium"
-  - name: "dehydrated bacterial broth"
-    all_of: 
-      - "mueller"
-      - "broth"
-  - name: "dehydrated bacterial broth"
-    all_of: 
-      - "mueller"
-      - "brth"
-  - name: "dehydrated bacterial broth"
-    all_of: 
-      - "circlegrow"
-  - name: "dehydrated bacterial broth"
-    all_of: 
-      - "broth"
-      - "lennox"
-  - name: "dehydrated bacterial broth"
-    all_of: 
-      - "brth"
-      - "lennox"
-  - name: "prepared microbiology media"
-    all_of:
-      - "spectra vre"
-  - name: "prepared microbiology media"
-    all_of:
-      - $PLATE
-      - "chromagar"
-  - name: "prepared microbiology media"
-    all_of:
-      - "agar"
-      - "blood"
-  - name: "new zealand fbs"
-    all_of:
-      - $FBS_TERMS
-      - "*new zealand*"
-    none_of:
-      - "albumin"
-  - name: "us fbs"
-    all_of:
-      - $FBS_TERMS
-      - "*us*"
-    none_of:
-      - "albumin"
-  - name: "us fbs" # General catch-all for FBS
-    any_of:
-      - $FBS_TERMS
-    none_of:
-      - "albumin"
-  - name: "cell culture dissociation reagents"
-    all_of:
-      - "trypsin"
-      - "bovine"
-      - "pancreas"
-  - name: "cell culture dissociation reagents"
-    all_of:
-      - "edta"
-      - "trypsn"
-  - name: "cell culture dissociation reagents"
-    all_of:
-      - "trypsin"
-  - name: "cell culture dissociation reagents"
-    all_of:
-      - "collagenase"
-      - "type"
-      - "iv"
-  - name: "cell culture dissociation reagents"
-    all_of:
-      - "versene"
-
-  # --- Specialty Chemicals ---
-  - name: "crosslinking reagents"
-    all_of:
-      - "egs"
-  - name: "crosslinking reagents"
-    all_of:
-      - "edc"
-  - name: "crosslinking reagents"
-    all_of:
-      - "dgs"
-  - name: "crosslinking reagents"
-    all_of:
-      - "glutaraldehyde"
-      - "*sol*"
-  - name: "dmf"
-    all_of:
-      - "*dimethyl*"
-      - "*formamide*"
-  - name: "dmf"
-    all_of:
-      - "*dimetformamide*"
-  - name: "dmf"
-    all_of:
-      - "dmf"
-  - name: "dmso"
-    all_of:
-      - "*dimethyl*"
-      - "*sulfoxide*"
-    none_of:
-      - "*cuture*"
-      - "*d6*"
-  - name: "dmso"
-    all_of:
-      - "dmso"
-    none_of:
-      - "*cuture*"
-      - "*d6*"
-  - name: "methylene chloride"
-    all_of:
-      - "methylene"
-      - "*chlor*"
-    none_of:
-      - "hexane"
-  - name: "tris base"
-    all_of: ["tris", "base"]
-    none_of: ["("]
-  - name: "slide mounting medium"
-    any_of:
-      - "*fluoromount*"
-      - "*fluoro-gel*"
-      - "*vectashield*"
-      - "*vector shield*"
-      - "*histomount*"
-      - "*prolong gold*"
-      - "*prolong glass*"
-      - "*prolong diamond*"
-      - "*antifade mount*"
-      - "*dpx mountant*"
-      - "*crystal bond*"
-      - "*mounting medi*"
-
-  # --- Specific Labware (Filters, Concentrators) ---
-  - name: "syringe filters"
-    all_of:
-      - "*syr*"
-      - "*flt*"
-  - name: "syringe filters"
-    all_of:
-      - "*sy*"
-      - "*flt*"
-  - name: "syringe filters"
-    all_of:
-      - "millex-gv"
-  - name: "syringe filters"
-    all_of:
-      - "milx"
-  - name: "syringe filters"
-    all_of:
-      - "*millex*"
-  - name: "syringe filters"
-    all_of:
-      - "*anotop*"
-  - name: "syringe filters"
-    all_of:
-      - "*syr*"
-      - "*filt*"
-  - name: "syringe filters"
-    all_of:
-      - "puradisc"
-  - name: "centrifugal concentrators"
-    all_of: 
-      - "*vivaspinturbo*"
-  - name: "centrifugal concentrators"
-    all_of: 
-      - "pes"
-      - "concentrator"
-  - name: "bottle top filters"
-    all_of: ["steritop"]
-  - name: "bottle top filters"
-    all_of: ["*fltr*", "*bottltop*"]
-  - name: "bottle top filters"
-    all_of: ["*fltrbt*"]
-  - name: "bottle top filters"
-    all_of: ["*flt*", "*uta*"]
-  - name: "bottle top filters"
-    all_of: ["*btl*", "*fltr*"]
-  - name: "bottle top filters"
-    all_of: ["*aspirator*", "*pes*"]
-
-  # --- Cuvettes (electroporation BEFORE generic spectrophotometer) ---
-  - name: "electroporation cuvettes"
-    all_of:
-      - "*cuvet*"
-      - "*gap*"
-  - name: "electroporation cuvettes"
-    all_of:
-      - "*cuvet*"
-      - "*electro*"
-  - name: "fluorescence cuvettes"
-    all_of:
-      - "*cuvet*"
-      - "*fluorescen*"
-  - name: "spectrophotometer cuvettes"
-    all_of:
-      - "*cuvet*"
-    none_of:
-      - "*electro*"
-      - "*fluorescen*"
-      - "*gap*"
-      - "*rack*"
-      - "*holder*"
-
-  # --- Competent Cells ---
-  - name: "chemically competent cells"
-    any_of:
-      - "*one shot*"
-      - "*oneshot*"
-      - "*subcloning*"
-    none_of:
-      - "*electrocomp*"
-  - name: "chemically competent cells"
-    all_of:
-      - "*competent*"
-      - "*cell*"
-    none_of:
-      - "*electrocomp*"
-      - "*expression*"
-
-  # --- Wash Bottles ---
-  - name: "wash bottles"
-    any_of:
-      - "*wash bottle*"
-      - "*bottle wash*"
-      - "*wb ez-sqz*"
-      - "*wash btl*"
-      - "*washbtl*"
-
-  # --- Colorimetric Substrates ---
-  - name: "colorimetric substrates"
-    any_of:
-      - "*griess reagent*"
-      - "*tetrazolium*"
-      - "*onpg*"
-      - "*o-nitrophenyl*"
-      - "*pnpp*"
-      - "*p-nitrophenyl*"
-      - "*tmb substrate*"
-      - "*abts substrate*"
-
-  # --- Glass Beakers ---
-  - name: "glass beakers"
-    all_of:
-      - "*beaker*"
-      - "*glass*"
-  - name: "glass beakers"
-    all_of:
-      - "*beaker*"
-      - "*pyrex*"
-  - name: "glass beakers"
-    all_of:
-      - "*beaker*"
-      - "*griffin*"
-
-  # --- Boiling Flasks ---
-  - name: "boiling flasks"
-    all_of:
-      - $FLASK
-      - "*boil*"
-  - name: "boiling flasks"
-    all_of:
-      - $FLASK
-      - "*round*"
-      - "*bottom*"
-    none_of:
-      - "*cell*"
-      - "*culture*"
-      - "*glass bottom dish*"
-  - name: "boiling flasks"
-    all_of:
-      - $FLASK
-      - "*rb*"
-      - "*24/40*"
-
-  # --- Cell Culture Dishes ---
-  - name: "cell culture dishes"
-    all_of:
-      - "*dish*"
-      - "*glass bottom*"
-  - name: "cell culture dishes"
-    all_of:
-      - "*dish*"
-      - "*tc*"
-    none_of:
-      - "*crystalliz*"
-      - "*petri*"
-
-  # --- Cell Culture Plates ---
-  - name: "petri dishes"
-    all_of:
-      - "*petri*"
-      - "*dish*"
-  - name: "cell culture plates"
-    all_of:
-      - $PLATE
-      - "*well*"
-      - "*tc*"
-    none_of:
-      - "*no-tc*"
-      - "*non-tc*"
-  - name: "cell culture plates"
-    all_of:
-      - $PLATE
-      - "*well*"
-      - "*tissue culture*"
-    none_of:
-      - "*no-tc*"
-      - "*non-tc*"
-
-  # --- Cell Culture Flasks (catch T-flask patterns before general flask rules) ---
-  - name: "cell culture flasks"
-    all_of:
-      - $FLASK
-    any_of:
-      - "*canted*"
-      - "*vented*"
-      - "*nunclon*"
-      - "*nunc*"
-      - "*cellstar*"
-      - "*t25*"
-      - "*t75*"
-      - "*t150*"
-      - "*t175*"
-      - "*t225*"
-
-  # --- Microcentrifuge Tubes ---
-  - name: "microcentrifuge tubes"
-    all_of:
-      - "mct"
-      - "nat"
-  - name: "microcentrifuge tubes"
-    all_of:
-      - "microtube"
-  - name: "microcentrifuge tubes"
-    all_of:
-      - "micro"
-      - $TUBE 
-  - name: "microcentrifuge tubes"
-    all_of:
-      - "microcent"
-      - $TUBE 
-  - name: "microcentrifuge tubes"
-    all_of:
-      - "microcentrifuge"
-      - $TUBE 
-  - name: "microcentrifuge tubes"
-    all_of:
-      - "*microfuge*"
-      - $TUBE 
-  - name: "microcentrifuge tubes"
-    any_of:
-      - "*microtube*"
-      - "*micro tube*"
-      - "micro cent tube"
-    none_of:
-      - "*rack*"
-      - "*centrifuge tube*"
-  - name: "microcentrifuge tubes"
-    all_of:
-      - "*eppendorf*"
-      - $TUBE 
-    none_of:
-      - "*rack*"
-      - "*pcr*"
-      - "*configurationid*"
-
-  # --- PCR Tubes ---
-  - name: "pcr tube strips"
-    all_of:
-      - "*pcr*"
-      - "*tube*"
-      - "*strip*"
-    none_of:
-      - "*rack*"
-      - "*configurationid*"
-  - name: "pcr tube strips"
-    all_of:
-      - "*pcr*"
-      - "*strp*"
-    none_of:
-      - "*rack*"
-      - "*tip*"
-      - "*configurationid*"
-  - name: "pcr tubes"
-    all_of:
-      - "*pcr*"
-      - "*tube*"
-    none_of:
-      - "*strip*"
-      - "*rack*"
-      - "*tip*"
-      - "*configurationid*"
-      - "*oligo*"
-      - "*sequence*"
-      - "*cap*"
-
-  # --- Sample Vials ---
-  - name: "sample vials"
-    all_of:
-      - "*vial*"
-    any_of:
-      - "*headspace*"
-      - "*headspc*"
-      - "*amber*"
-      - "*reaction*"
-      - "*sample*"
-      - "*dram*"
-      - "*snap cap*"
-    none_of:
-      - "*scintillation*"
-      - "*scntl*"
-
-  # --- Centrifuge Conical Tubes ---
-  - name: "centrifuge conical tubes"
-    all_of:
-      - "*conical*"
-      - "*tube*"
-    none_of:
-      - "*centrifuge tube*"
-      - "*micro*"
-      - "*configurationid*"
-      - "*oligo*"
-      - "*sequence*"
-  - name: "centrifuge conical tubes"
-    any_of:
-      - "*50mltbe*"
-      - "*15mltbe*"
-
-  # --- Hypodermic Needles ---
-  - name: "syringes"
-    all_of:
-      - "*syr*"
-      - "*inge*"
-    none_of:
-      - "*needle*"  
-  - name: "hypodermic needles"
-    all_of:
-      - "*needle*"
-      - "*gauge*"
-    none_of:
-      - "*holder*"
-      - "*syringe*"
-      - "*syr*"
-  - name: "hypodermic needles"
-    all_of:
-      - "*needle*"
-      - "*ga*"
-      - "*strl*"
-    none_of:
-      - "*holder*"
-
-  # --- General Labware & Consumables (Moved to End) ---
-  - name: "weigh boats"
-    all_of:
-      - "*weigh*"
-    any_of:
-      - "*boat*"
-      - "*dish*"
-  - name: "weighing papers"
-    all_of:
-      - "*weigh*"
-    any_of:
-      - "*ppr*"
-      - "*paper*"
-  - name: "coverslips"
-    all_of: ["*cover*", "*glas*"]
-  - name: "coverslips"
-    all_of: ["*cover*", "*gls*"]
-  - name: "coverslips"
-    all_of: ["*cv*", "*glas*"]
-  - name: "coverslips"
-    all_of: ["*cv*", "*gls*"]
-  - name: "coverslips"
-    all_of: ["*cvr*", "*glas*"]
-  - name: "coverslips"
-    all_of: ["*cvr*", "*gls*"]
-  - name: "coverslips"
-    all_of: ["*cvr*", "*slip*"]
-  - name: "coverslips"
-    all_of: ["*cover*", "*slip*"]
-  - name: "cryogenic and freezer boxes"
-    all_of: ["container", "*freez*"]
-  - name: "cryogenic and freezer boxes"
-    all_of: ["container", "*frz*"]
-  - name: "cryogenic and freezer boxes"
-    all_of: ["cardboard", "*freez*"]
-  - name: "cryogenic and freezer boxes"
-    all_of: ["cardboard", "*frz*"]
-  - name: "cryogenic and freezer boxes"
-    all_of: ["freezer", "nat"]
-  - name: "cryogenic and freezer boxes"
-    all_of: ["cryostore"]
-  - name: "cryogenic and freezer boxes"
-    all_of: ["*cryovial*", "*storag*"]
-  - name: "cryogenic and freezer boxes"
-    all_of: ["*cryovial*", "*strg*"]
-  - name: "cryovials"
-    all_of: ["*cryo*", "*vial*"]
-  - name: "dialysis casettes"
-    all_of: 
-      - "*slide*"
-      - "*lyzer*"
-  - name: "microscopy slide holders"
-    all_of: ["*slide*"]
-    any_of: ["*blue*", "*red*", "*green*", "*yellow*","*white*"]
-  - name: "microscope slides"
-    all_of: ["*micro*", "*slide*"]
-  - name: "microscope slides"
-    all_of: ["*micro*", "*sld*"]
-  - name: "microscope slides"
-    all_of: ["*mcro*", "*sde*"]
-  - name: "microscope slides"
-    all_of: ["*micrsld*"]
-  - name: "microscope slides"
-    all_of: ["*microslide*"]
-  - name: "serological pipettes"
-    all_of:
-      - $PIPETTE
-      - "*ser*"
-  - name: "serological pipettes"
-    all_of:
-      - $PIPETTE
-      - "*stripet*"
-  - name: "serological pipettes"
-    all_of:
-      - "paper peel"
-      - $PIPETTE 
-  - name: "serological pipettes"
-    all_of:
-      - "pap"
-      - "*stripet*"
-  - name: "serological pipettes"
-    all_of:
-      - "stripet"
-  - name: "serological pipettes"
-    all_of:
-      - $PIPETTE
-      - "*strpet*"
-  - name: "serological pipettes"
-    all_of:
-      - "*strpette*"
-  - name: "serological pipettes"
-    all_of:
-      - "*stripette*"
-  - name: "serological pipettes"
-    all_of:
-      - $PIPETTE
-      - "*sterile*"
-  - name: "serological pipettes"
-    all_of:
-      - $PIPETTE
-      - "serological"
-    none_of:
-      - "*tip*"
-      - "*filter*"
-      - "*flt*"
-      - "*needle*"
-      - "*syringe*"
-  - name: "pasteur pipettes"
-    all_of: 
-      - $PIPETTE
-      - "*past*"
-  - name: "pasteur pipettes"
-    all_of: 
-      - $PIPETTE
-      - "*disp*"
-  - name: "low retention pipette tips"
-    all_of:
-      - "*tip*"
-      - "low ret"
-  - name: "low retention pipette tips"
-    all_of:
-      - "*tip*"
-      - "low reten"
-  - name: "low retention pipette tips"
-    all_of:
-      - "*tip*"
-      - "lw reten"
-  - name: "low retention pipette tips"
-    all_of:
-      - "*tip*"
-      - "*loret*"
-  - name: "low retention pipette tips"
-    all_of:
-      - "*tip*"
-      - "lr"
-    none_of:
-      - "*fil*"
-      - "*fltr*"
-      - "*filt*"
-      - "*barrier*"
-  - name: "low retention pipette tips"
-    all_of:
-      - "*tip*"
-      - "*lowbind*"
-  - name: "low retention pipette tips"
-    all_of:
-      - "*tip*"
-      - "*lwbnd*"
-  - name: "low retention pipette tips"
-    all_of:
-      - "*tip*"
-      - "*lo bind*"
-  - name: "low retention pipette tips"
-    all_of:
-      - "*tip*"
-      - "*lobind*"
-  - name: "low retention pipette tips"
-    all_of:
-      - "*tip*"
-      - "*low-ret*"
-  - name: "low retention pipette tips"
-    all_of:
-      - "*tip*"
-      - "*low-bind*"
-  - name: "low retention pipette tips"
-    all_of:
-      - "*tip*"
-      - "*low bind*"
-  - name: "low retention pipette tips"
-    all_of:
-      - "*tip*"
-      - "*lowretention*"
-  - name: "low retention pipette tips"
-    all_of:
-      - "*eplort*"
-  - name: "low retention pipette tips"
-    all_of:
-      - "*tip*"
-      - "*rpt*"
-    none_of:
-      - "*fil*"
-      - "*fltr*"
-      - "*barrier*"
-  - name: "low retention pipette tips"
-    all_of:
-      - "*tip*"
-      - "*slick*"
-  - name: "low retention pipette tips"
-    all_of:
-      - "*tip*"
-      - "*zap*"
-  - name: "low retention pipette tips"
-    all_of:
-      - "*pipette*"
-      - "*gps*"
-  # --- Gel loading pipette tips ---
-  - name: "gel loading pipette tips"
-    all_of:
-      - "*tip*"
-      - "gel load"
-  - name: "gel loading pipette tips"
-    all_of:
-      - "*tip*"
-      - "*gel*"
-      - "*load*"
-  - name: "gel loading pipette tips"
-    all_of:
-      - "*tip*"
-      - "*gel*"
-      - "*round*"
-  # "flex rnd" = flexible round gel loading tips (no "tip"/"gel" in description)
-  # Must require both "flex" AND "rnd" to avoid false positives on balloons/cryotubes
-  - name: "gel loading pipette tips"
-    all_of:
-      - "*flex*"
-      - "*rnd*"
-    none_of:
-      - "*balloon*"
-      - "*ballon*"
-      - "*cryotube*"
-      - "*cryovial*"
-  # "pipet tip ,gel," comma-separated format
-  - name: "gel loading pipette tips"
-    all_of:
-      - "*pipet*"
-      - "*gel*"
-    none_of:
-      - "*agarose*"
-      - "*electrophor*"
-  # --- Extended length BEFORE filtered (xl items with filter/barrier should be extended) ---
-  - name: "extended length pipette tips"
-    all_of:
-      - "*tip*"
-      - "*xl*"
-  - name: "extended length pipette tips"
-    all_of:
-      - "*tip*"
-      - "*extended*"
-  - name: "extended length pipette tips"
-    all_of:
-      - "*tip*"
-      - "*elongated*"
-  - name: "extended length pipette tips"
-    all_of:
-      - "*tip*"
-      - "*xlng*"
-  - name: "extended length pipette tips"
-    all_of:
-      - "*tip*"
-      - "*xlong*"
-  - name: "extended length pipette tips"
-    all_of:
-      - "*tip*"
-      - "*x-long*"
-  - name: "extended length pipette tips"
-    all_of:
-      - "*tip*"
-      - "*reach*"
-    none_of:
-      - "*syringe*"
-      - "*srng*"
-  - name: "extended length pipette tips"
-    all_of:
-      - "*pipet*"
-      - "*xl*"
-  - name: "extended length pipette tips"
-    all_of:
-      - "*pipet*"
-      - "*extended*"
-  - name: "extended length pipette tips"
-    all_of:
-      - "*pipet*"
-      - "*elongated*"
-  # --- Sterile filtered brand-name rules (no "tip" required) ---
-  # Eppendorf Dualfilter T.I.P.S. -- often concatenated without spaces
-  - name: "sterile filtered pipette tips"
-    any_of:
-      - "*epdualfilter*"
-      - "*ep dualfilter*"
-      - "*dualfilter*t.i.p*"
-  # TubeGard/TubeGuard brand = filtered tips
-  - name: "sterile filtered pipette tips"
-    any_of:
-      - "*tubegard*"
-      - "*tubeguard*"
-  # Hamilton HLT SoftFit-L = filtered tips
-  - name: "sterile filtered pipette tips"
-    all_of:
-      - "*hlt*"
-    any_of:
-      - "*softfit*"
-      - "*sftfitl*"
-      - "*softfitl*"
-      - "*rld*"
-  # AvantGuard brand = barrier/filtered tips
-  - name: "sterile filtered pipette tips"
-    all_of:
-      - "*avantguard*"
-  # ART brand tips (Aerosol Resistant Tips = filtered)
-  - name: "sterile filtered pipette tips"
-    all_of:
-      - "*tip*"
-      - "*art*"
-      - "*stl*"
-    none_of:
-      - "*xl*"
-      - "*xlng*"
-      - "*extended*"
-  # --- Standard sterile filtered rules (with "tip" required) ---
-  - name: "sterile filtered pipette tips"
-    all_of:
-      - "*tip*"
-      - "*fil*"
-    none_of:
-      - "lw reten"
-      - "low reten"
-      - "low"
-      - "*refil*"
-      - "*syringe*"
-      - "*srng*"
-      - "*syr *"
-      - "*xl*"
-      - "*xlng*"
-      - "*extended*"
-      - "*elongated*"
-      - "*needle*"
-      - "*dispensing*"
-  - name: "sterile filtered pipette tips"
-    all_of:
-      - "*tip*"
-      - "*fitl*"
-    none_of:
-      - "lw reten"
-      - "low reten"
-      - "low"
-      - "*refil*"
-      - "*syringe*"
-      - "*srng*"
-      - "*syr *"
-      - "*xl*"
-      - "*xlng*"
-      - "*extended*"
-      - "*elongated*"
-      - "*needle*"
-      - "*dispensing*"
-  - name: "sterile filtered pipette tips"
-    all_of:
-      - "*tip*"
-      - "*fltr*"
-    none_of:
-      - "lw reten"
-      - "low reten"
-      - "low"
-      - "*refil*"
-      - "*syringe*"
-      - "*srng*"
-      - "*syr *"
-      - "*xl*"
-      - "*xlng*"
-      - "*extended*"
-      - "*elongated*"
-      - "*needle*"
-      - "*dispensing*"
-  - name: "sterile filtered pipette tips"
-    all_of:
-      - "*tip*"
-      - "*barrier*"
-    none_of:
-      - "lw reten"
-      - "low reten"
-      - "low"
-      - "*refil*"
-      - "*syringe*"
-      - "*srng*"
-      - "*syr *"
-      - "*xl*"
-      - "*xlng*"
-      - "*extended*"
-      - "*elongated*"
-      - "*needle*"
-      - "*dispensing*"
-  - name: "standard pipette tips"
-    all_of:
-      - "*tip*"
-      - "*refil*"
-    none_of:
-      - "*fil*"
-      - "*syringe*"
-  - name: "standard pipette tips"
-    all_of:
-      - "*tip*"
-      - "*reload*"
-  - name: "standard pipette tips"
-    all_of:
-      - "*tip*"
-      - "*rload*"
-    none_of:
-      - "*eplort*"
-      - "*loret*"
-      - "*low ret*"
-  - name: "standard pipette tips" # General catch-all for tips
-    all_of:
-      - "*tip*"
-      - $PIPETTE
-    none_of:
-      - "*ser*"
-      - "*optiplex*"
-      - "*multipurpose*"
-      - "*multiple*"
-      - "stripet"
-      - "strpet"
-      - "gel load"
-      - "low reten"
-      - "*syringe*"
-      - "*srng*"
-
-  # --- Standard pipette tip brand-name rules ---
-  # These catch heavily abbreviated descriptions without "pipette" keyword.
-  # ClipTip brand (Thermo Scientific) -- 25 items misclassified
-  - name: "standard pipette tips"
-    all_of:
-      - "*cliptip*"
-    none_of:
-      - "*fil*"
-      - "*fltr*"
-      - "*barrier*"
-      - "*low ret*"
-      - "*lr*"
-  # "bevldtip" and "beveldtip" abbreviations (yellow/clear beveled tips)
-  - name: "standard pipette tips"
-    any_of:
-      - "*bevldtip*"
-      - "*beveldtip*"
-    none_of:
-      - "*fil*"
-      - "*fltr*"
-      - "*barrier*"
-  # Eclipse brand tips
-  - name: "standard pipette tips"
-    all_of:
-      - "*eclipse*"
-    any_of:
-      - "*non-sterile*"
-      - "*sterile*"
-      - "*ns*"
-    none_of:
-      - "*fil*"
-      - "*fltr*"
-      - "*barrier*"
-  # Biohit brand tips (concatenated "biohittip")
-  - name: "standard pipette tips"
-    all_of:
-      - "*biohit*"
-    none_of:
-      - "*fil*"
-      - "*fltr*"
-      - "*barrier*"
-      - "*pipette*"
-  # Finntip brand (when not caught by pipette rule)
-  - name: "standard pipette tips"
-    any_of:
-      - "*finntip*"
-      - "*finntp*"
-      - "*fintip*"
-    none_of:
-      - "*fil*"
-      - "*fltr*"
-      - "*barrier*"
-  # TipOne brand (USA Scientific)
-  - name: "standard pipette tips"
-    all_of:
-      - "*tipone*"
-    none_of:
-      - "*fil*"
-      - "*fltr*"
-      - "*barrier*"
-      - "*low ret*"
-      - "*lr*"
-      - "*xl*"
-      - "*extended*"
-      - "*gel*"
-  # SureGrip brand tips
-  - name: "standard pipette tips"
-    all_of:
-      - "*suregrip*"
-    none_of:
-      - "*fil*"
-      - "*fltr*"
-      - "*barrier*"
-  # "tip" alone with color/packaging context (catches "tip yel", "tip clear", "tip bg")
-  - name: "standard pipette tips"
-    all_of:
-      - "*tip*"
-      - "*bulk*"
-    none_of:
-      - "*fil*"
-      - "*fltr*"
-      - "*filt*"
-      - "*barrier*"
-      - "*low ret*"
-      - "*lr*"
-      - "*syringe*"
-      - "*srng*"
-      - "*gel*"
-      - "*xl*"
-      - "*extended*"
-      - "*ser*"
-      - "*past*"
-      - "*cotton*"
-      - "*q-tip*"
-  # "tip" + "rack/racked" (catches "tip pk/rk", "ylw beveldtip rack")
-  - name: "standard pipette tips"
-    all_of:
-      - "*tip*"
-      - "*rack*"
-    none_of:
-      - "*fil*"
-      - "*fltr*"
-      - "*filt*"
-      - "*barrier*"
-      - "*low ret*"
-      - "*lr*"
-      - "*syringe*"
-      - "*srng*"
-      - "*gel*"
-      - "*xl*"
-      - "*extended*"
-      - "*ser*"
-      - "*past*"
-      - "*test tube*"
-      - "*microtube*"
-      - "*pcr*"
-  # "tip" + "rk" (shortened rack)
-  - name: "standard pipette tips"
-    all_of:
-      - "*tip*"
-      - "rk"
-    none_of:
-      - "*fil*"
-      - "*fltr*"
-      - "*filt*"
-      - "*barrier*"
-      - "*low ret*"
-      - "*lr*"
-      - "*syringe*"
-      - "*srng*"
-      - "*gel*"
-      - "*xl*"
-      - "*extended*"
-      - "*ser*"
-      - "*past*"
-  # "tip" + "nat"/"natural" (catches "nat ultra micro", "natural beveled")
-  - name: "standard pipette tips"
-    all_of:
-      - "*tip*"
-    any_of:
-      - "*nat*"
-      - "*natural*"
-      - "*beveled*"
-      - "*bevld*"
-    none_of:
-      - "*fil*"
-      - "*fltr*"
-      - "*filt*"
-      - "*barrier*"
-      - "*low ret*"
-      - "*lr*"
-      - "*syringe*"
-      - "*srng*"
-      - "*gel*"
-      - "*xl*"
-      - "*extended*"
-      - "*ser*"
-      - "*past*"
-      - "*alternative*"
-      - "*national*"
-  # ept.i.p.s. = Eppendorf T.I.P.S. (standard tips)
-  - name: "standard pipette tips"
-    any_of:
-      - "*ept.i.p*"
-      - "*ep t.i.p*"
-    none_of:
-      - "*dualfilter*"
-      - "*filter*"
-      - "*fltr*"
-      - "*loret*"
-      - "*low ret*"
-  # "pure sftfitl" = Thermo Finntip Pure SoftFit-L (standard tips, no "tip" in desc)
-  - name: "standard pipette tips"
-    all_of:
-      - "*sftfitl*"
-    none_of:
-      - "*hlt*"
-      - "*fil*"
-      - "*fltr*"
-      - "*barrier*"
-  - name: "standard pipette tips"
-    all_of:
-      - "*softfitl*"
-    none_of:
-      - "*hlt*"
-      - "*fil*"
-      - "*fltr*"
-      - "*barrier*"
-  - name: "standard pipette tips"
-    all_of:
-      - "*softfit-l*"
-    none_of:
-      - "*hlt*"
-      - "*fil*"
-      - "*fltr*"
-      - "*barrier*"
-  - name: "nitrile gloves"
-    all_of:
-      - $NITRILE
-      - $GLOVES
-  - name: "latex gloves"
-    all_of:
-      - "*latex*"
-      - $GLOVES
-  - name: "latex gloves"
-    all_of:
-      - "ltx"
-      - $GLOVES
-  - name: "stir bars"
-    any_of:
-      - $STIR_BAR
-    none_of:
-      - "retriever"
-      - "stir bar retrievers"
-  - name: "scintillation vials"
-    all_of:
-      - "vial"
-      - "scint"
-  - name: "pcr tube strips"
-    all_of:
-      - "*pcr*"
-      - "*strip*"
-      - $TUBE
-
-  - name: "test tubes"
-    all_of:
-      - "test tubes"
-    none_of:
-      - "rack"
-      - "rck"
-      - "centrifuge"
-      - "cntrifuge"
-  - name: "test tubes"
-    all_of:
-      - "borosil"
-      - "dct"
-  - name: "microcentrifuge tubes"
-    all_of:
-      - "microtub"
-  - name: "microcentrifuge tubes"
-    all_of:
-      - "microtbe"
-  - name: "microcentrifuge tubes"
-    all_of:
-      - "microtub"
-  - name: "microcentrifuge tubes"
-    all_of:
-      - $TUBE
-      - "*microcent*"
-  - name: "microcentrifuge tubes"
-    all_of:
-      - $TUBE
-      - "*lobnd*"
-  - name: "microcentrifuge tubes"
-    all_of:
-      - $TUBE
-      - "*mct*"
-  - name: "centrifuge conical tubes"
-    all_of:
-      - $TUBE
-      - "*cent*"
-    none_of:
-      - "*configurationid*"
-      - "*oligo*"
-      - "*sequence*"
-      - "*concentration*"
-  - name: "centrifuge conical tubes"
-    all_of:
-      - $TUBE
-      - "*cfg*"
-  - name: "centrifuge conical tubes"
-    all_of:
-      - $TUBE
-      - "*cnt*"
-    none_of:
-      - "*configurationid*"
-      - "*oligo*"
-      - "*sequence*"
-  - name: "centrifuge conical tubes"
-    all_of:
-      - $TUBE
-      - "*conic*"
-    none_of:
-      - "*configurationid*"
-      - "*oligo*"
-      - "*sequence*"
-  - name: "centrifuge conical tubes"
-    all_of:
-      - "cap"
-      - "cb"
-      - "ct"
-  - name: "centrifuge conical tubes"
-    all_of:
-      - $TUBE
-      - "flatpp"
-  - name: "centrifuge conical tubes"
-    all_of:
-      - $TUBE
-      - "conical"
-    none_of:
-      - "*configurationid*"
-      - "*oligo*"
-      - "*sequence*"
-  - name: "pcr tubes"
-    all_of:
-      - "*pcr*"
-      - $TUBE
-    none_of:
-      - "*configurationid*"
-      - "*oligo*"
-      - "*sequence*"
-      - "*purification*"
-  - name: "pcr tubes"
-    all_of:
-      - "*smrtcyclr*"
-      - $TUBE
-    none_of:
-      - "sequence"
-      - "*rack*"
-  - name: "cell culture tubes"
-    all_of:
-      - $TUBE
-      - "*ct*"
-      - "cellstar"
-  - name: "cell culture tubes"
-    all_of:
-      - $TUBE
-      - "tc"
-  - name: "cell culture tubes"
-    all_of:
-      - $TUBE
-      - "*cult*"
-  - name: "cell culture plates"
-    all_of:
-      - $PLATE 
-      - "tc"
-    none_of:
-      - "no-tc"
-  - name: "cell culture plates"
-    all_of:
-      - $PLATE 
-      - "*cult*"
-    none_of:
-      - "no-tc"
-  - name: "cell culture plates"
-    all_of:
-      - $PLATE 
-      - "*cltr*"
-    none_of:
-      - "no-tc"
-  - name: "cell culture plates"
-    all_of:
-      - $PLATE 
-      - "*tissue*"
-    none_of:
-      - "no-tc"
-  - name: "cell culture plates"
-    all_of:
-      - $PLATE 
-      - "biolite"
-    none_of:
-      - "no-tc"
-  - name: "cell culture plates"
-    all_of:
-      - $PLATE 
-      - "*ster"
-    none_of:
-      - "no-tc"
-  - name: "cell culture plates"
-    all_of:
-      - $PLATE 
-      - "*bacti*"
-    none_of:
-      - "no-tc"
-  - name: "cell culture plates"
-    all_of:
-      - $PLATE 
-      - "*hbind*"
-    none_of:
-      - "no-tc"
-  - name: "cell culture plates"
-    all_of:
-      - $PLATE 
-      - "*tis*"
-    none_of:
-      - "no-tc"
-  - name: "cell culture plates"
-    all_of:
-      - $PLATE 
-      - "st"
-    none_of:
-      - "no-tc"
-  - name: "cell culture dishes"
-    all_of:
-      - "*dish*"
-      - "*tissue*"
-  - name: "cell culture dishes"
-    all_of:
-      - "dish"
-      - "tc"
-  - name: "cell culture dishes"
-    all_of:
-      - "dish"
-      - "cell culture"
-  - name: "surface binding assay microplates"
-    all_of:
-      - "*plt*"
-      - "no-tc"
-  # --- Disposable Wipes & Towels ---
-  - name: "disposable wipes and towels"
-    any_of:
-      - "*kimwipe*"
-      - "*kim wipe*"
-      - "*kimtech*"
-      - "*kaydry*"
-      - "*wypall*"
-      - "*accutech*"
-  - name: "disposable wipes and towels"
-    all_of:
-      - "*wipe*"
-    none_of:
-      - "*antibod*"
-      - "*pipet*"
-  - name: "disposable wipes and towels"
-    all_of:
-      - "*task*"
-      - "*wiper*"
-  - name: "disposable wipes and towels"
-    all_of:
-      - "*delicate*"
-      - "*task*"
-  - name: "disposable wipes and towels"
-    all_of:
-      - "*lens*"
-      - "*tissue*"
-
-  - name: "face masks"
-    all_of:
-      - "*resp"
-      - "p95"
-  - name: "face masks"
-    all_of:
-      - "*face*" 
-      - "*mask*"
-  - name: "face masks"
-    all_of:
-      - "surgical" 
-      - "mask"
-  - name: "face masks"
-    all_of:
-      - "*face*" 
-      - "*msk*"
-  - name: "face masks"
-    all_of:
-      - "*resp*" 
-      - "*medical*"
-  - name: "face masks"
-    all_of:
-      - "*mask*" 
-      - "*hvy*"
-      - "*dty*"
-  - name: "ethanol"
-    all_of:
-      - "*etoh*" 
-      - "*proof*"
-  - name: "ethanol"
-    all_of:
-      - "etoh" 
-    none_of:
-      - "paraffin"
-  - name: "ethanol"
-    all_of:
-      - "alcohol" 
-      - "proof"
-  - name: "ethanol"
-    all_of:
-      - "ethylalco" 
-  - name: "ethanol"
-    all_of:
-      - "ethylalchl" 
-  - name: "ethanol"
-    all_of:
-      - "ethyl alcohol" 
-  - name: "ethanol"
-    all_of:
-      - "ethyl"
-      - "alchl" 
-  - name: "ethanol"
-    all_of:
-      - "ethyl"
-      - "alco" 
-  - name: "ethanol"
-    all_of:
-      - "eth"
-      - "alc" 
-  - name: "ethanol"
-    all_of:
-      - "alcohol"
-      - "reagent" 
-  - name: "erlenmeyer flasks"
-    all_of:
-      - "*erlen*"
-      - $FLASK
-  - name: "erlenmeyer flasks"
-    all_of:
-      - "shake"
-      - $FLASK
-  - name: "erlenmeyer flasks"
-    all_of:
-      - "*erl"
-      - $FLASK
-  - name: "erlenmeyer flasks"
-    all_of:
-      - "baf"
-      - $FLASK
-  - name: "formaldehydes and paraformaldehydes"
-    any_of:
-      - "*formldhyd*"
-      - "*formaldehyde*"
-      - "*paraformald*"
-      - "*prfrmldhyd*"
-  - name: "hanks' balanced salt solution (hbss) buffer"
-    all_of:
-      - "hbss"
-  - name: "temed"
-    all_of:
-      - "temed"
-  - name: "acetic acid"
-    all_of:
-      - "*acet*"
-      - "*acid*"
-  - name: "disposable wipes and towels"
-    any_of: 
-      - "kimwipe"
-      - "napkin"
-      - "paper towels"
-      - "kimwps"
-      - "bleach towels"
+- name: restriction enzymes
+  case_sensitive: true
+  any_of:
+  - $RESTRICTION_ENZYME
+  none_of:
+  - '*ConfigurationID*'
+  - '*Synthesis Scale*'
+  - '*DNA Oligo*'
+  - '*Oligo Name*'
+  - '*Sequence (5*'
+  - '*Cloning site*'
+  - '*cloning site*'
+  - '*Gene Synthesis*'
+  - '*gene synthesis*'
+- name: monoclonal secondary antibody
+  all_of:
+  - secondary
+  - antibody
+  - monoclonal
+- name: polyclonal secondary antibody
+  all_of:
+  - secondary
+  - antibody
+  none_of:
+  - monoclonal
+- name: polyclonal secondary antibody
+  all_of:
+  - '*alexa fluor*'
+  - '*donkey*'
+  any_of:
+  - '*anti-mouse*'
+  - '*anti-rabbit*'
+  - '*anti-rat*'
+  - '*anti-goat*'
+  - '*anti-human*'
+  - '*anti-sheep*'
+  - '*anti-chicken*'
+  none_of:
+  - monoclonal
+  - '*phalloidin*'
+- name: polyclonal secondary antibody
+  all_of:
+  - '*alexa fluor*'
+  - '*goat*'
+  any_of:
+  - '*anti-mouse*'
+  - '*anti-rabbit*'
+  - '*anti-rat*'
+  - '*anti-human*'
+  - '*anti-chicken*'
+  none_of:
+  - monoclonal
+  - '*phalloidin*'
+- name: polyclonal secondary antibody
+  all_of:
+  - '*alexa fluor*'
+  - '*chicken*'
+  any_of:
+  - '*anti-mouse*'
+  - '*anti-rabbit*'
+  - '*anti-rat*'
+  - '*anti-goat*'
+  - '*anti-human*'
+  none_of:
+  - monoclonal
+  - '*phalloidin*'
+- name: polyclonal secondary antibody
+  all_of:
+  - '*alexa fluor*'
+  - '*f(ab*'
+  none_of:
+  - monoclonal
+  - '*phalloidin*'
+- name: polyclonal secondary antibody
+  all_of:
+  - '*alexa fluor*'
+  - '*igg*'
+  any_of:
+  - '*anti-mouse*'
+  - '*anti-rabbit*'
+  - '*anti-rat*'
+  - '*anti-goat*'
+  - '*anti-human*'
+  none_of:
+  - monoclonal
+  - '*phalloidin*'
+  - '*cd*'
+- name: monoclonal primary antibody
+  all_of:
+  - '*alexa fluor*'
+  - '*anti-mouse*'
+  any_of:
+  - '*cd*'
+  - '*ly-*'
+  - '*ly6*'
+  - '*ter-*'
+  - '*nk*'
+  - '*gl7*'
+  - '*f4/80*'
+  none_of:
+  - '*igg*'
+  - '*igm*'
+  - '*secondary*'
+  - '*donkey*'
+  - '*goat*'
+  - '*chicken*'
+- name: monoclonal primary antibody
+  all_of:
+  - '*alexa fluor*'
+  - '*anti-human*'
+  any_of:
+  - '*cd*'
+  none_of:
+  - '*igg*'
+  - '*igm*'
+  - '*secondary*'
+  - '*donkey*'
+  - '*goat*'
+  - '*chicken*'
+- name: monoclonal primary antibody
+  all_of:
+  - '*alexa fluor*'
+  - '*anti-mu*'
+  any_of:
+  - '*cd*'
+  - '*ly-*'
+  - '*ly6*'
+  - '*ter-*'
+  - '*nk*'
+  - '*gl7*'
+  - '*f4/80*'
+  none_of:
+  - '*igg*'
+  - '*igm*'
+  - '*secondary*'
+  - '*donkey*'
+  - '*goat*'
+  - '*chicken*'
+- name: polyclonal secondary antibody
+  all_of:
+  - '*alexa fluor*'
+  - '*anti-mouse*'
+  none_of:
+  - monoclonal
+  - '*phalloidin*'
+  - '*cd*'
+  - '*ly-*'
+  - '*ly6*'
+  - '*ter-*'
+  - '*nk*'
+  - '*gl7*'
+  - '*f4/80*'
+- name: polyclonal secondary antibody
+  all_of:
+  - '*alexa fluor*'
+  - '*anti-rabbit*'
+  none_of:
+  - monoclonal
+  - '*phalloidin*'
+- name: polyclonal secondary antibody
+  all_of:
+  - '*alexa fluor*'
+  - '*anti-rat*'
+  none_of:
+  - monoclonal
+  - '*phalloidin*'
+- name: polyclonal secondary antibody
+  all_of:
+  - '*alexa fluor*'
+  - '*anti-human*'
+  none_of:
+  - monoclonal
+  - '*phalloidin*'
+  - '*cd*'
+- name: polyclonal secondary antibody
+  all_of:
+  - '*alexa fluor*'
+  - '*anti-goat*'
+  none_of:
+  - monoclonal
+  - '*phalloidin*'
+- name: polyclonal secondary antibody
+  all_of:
+  - '*alkaline phosphatase*'
+  - '*anti-*'
+  any_of:
+  - '*igg*'
+  - '*goat*'
+  - '*donkey*'
+  - '*rabbit*'
+  - '*mouse*'
+  none_of:
+  - monoclonal
+- name: polyclonal secondary antibody
+  all_of:
+  - '*ap*'
+  - '*anti-*'
+  - '*igg*'
+  any_of:
+  - '*goxmo*'
+  - '*goat*'
+  - '*donkey*'
+  none_of:
+  - monoclonal
+- name: polyclonal secondary antibody
+  all_of:
+  - '*irdye*'
+  - '*anti-*'
+  none_of:
+  - monoclonal
+- name: polyclonal secondary antibody
+  all_of:
+  - '*hrp*'
+  - '*anti-*'
+  - '*igg*'
+  none_of:
+  - monoclonal
+- name: polyclonal secondary antibody
+  all_of:
+  - '*hrp*'
+  - '*anti-*'
+  any_of:
+  - '*goat*'
+  - '*donkey*'
+  - '*rabbit*'
+  - '*chicken*'
+  none_of:
+  - monoclonal
+- name: polyclonal secondary antibody
+  all_of:
+  - '*anti-mouse*'
+  - '*igg*'
+  any_of:
+  - '*whole*'
+  - '*h+l*'
+  - '*handl*'
+  - '*h&l*'
+  - '*f(ab*'
+  none_of:
+  - monoclonal
+  - '*cd*'
+- name: polyclonal secondary antibody
+  all_of:
+  - '*anti-rabbit*'
+  - '*igg*'
+  any_of:
+  - '*whole*'
+  - '*h+l*'
+  - '*handl*'
+  - '*h&l*'
+  - '*f(ab*'
+  none_of:
+  - monoclonal
+- name: polyclonal secondary antibody
+  all_of:
+  - '*donkey*'
+  - '*anti-*'
+  - '*igg*'
+  none_of:
+  - monoclonal
+- name: polyclonal secondary antibody
+  all_of:
+  - '*goat*'
+  - '*anti-*'
+  - '*igg*'
+  none_of:
+  - monoclonal
+  - '*polyclonal*'
+  - '*pab*'
+- name: monoclonal primary antibody
+  all_of:
+  - '*anti-mouse*'
+  - '*cd*'
+  any_of:
+  - '*fitc*'
+  - '*pe *'
+  - '*apc*'
+  - '*percp*'
+  - '*brilliant violet*'
+  - '*bv*'
+  - '*pacific blue*'
+  none_of:
+  - '*igg*'
+  - '*igm*'
+  - '*secondary*'
+- name: monoclonal primary antibody
+  all_of:
+  - '*anti-human*'
+  - '*cd*'
+  any_of:
+  - '*fitc*'
+  - '*pe *'
+  - '*apc*'
+  - '*percp*'
+  - '*brilliant violet*'
+  - '*bv*'
+  - '*pacific blue*'
+  none_of:
+  - '*igg*'
+  - '*igm*'
+  - '*secondary*'
+- name: monoclonal primary antibody
+  all_of:
+  - '*anti-mouse*'
+  any_of:
+  - '*pure*'
+  - '*purified*'
+  none_of:
+  - '*igg*'
+  - '*igm*'
+  - '*secondary*'
+  - '*alexa fluor*'
+  - '*hrp*'
+  - '*irdye*'
+- name: monoclonal primary antibody
+  any_of:
+  - '*fitc*'
+  - '*pe *'
+  - '*apc*'
+  - '*percp*'
+  - '*brilliant violet*'
+  - '*bv*'
+  - '*pacific blue*'
+  all_of:
+  - '*anti-mouse*'
+  none_of:
+  - '*igg*'
+  - '*igm*'
+  - '*secondary*'
+  - '*donkey*'
+  - '*goat*'
+  - '*chicken*'
+- name: monoclonal primary antibody
+  any_of:
+  - '*fitc*'
+  - '*pe *'
+  - '*apc*'
+  - '*percp*'
+  - '*brilliant violet*'
+  - '*bv*'
+  - '*pacific blue*'
+  all_of:
+  - '*anti-human*'
+  none_of:
+  - '*igg*'
+  - '*igm*'
+  - '*secondary*'
+  - '*donkey*'
+  - '*goat*'
+  - '*chicken*'
+  - '*cd*'
+- name: monoclonal primary antibody
+  all_of:
+  - '*anti-m*'
+  - '*f4/80*'
+  none_of:
+  - '*igg*'
+  - '*secondary*'
+- name: monoclonal primary antibody
+  all_of:
+  - '*anti-mu*'
+  any_of:
+  - '*cd*'
+  - '*ly-*'
+  - '*ly6*'
+  - '*ter-*'
+  - '*nk*'
+  - '*gl7*'
+  - '*f4/80*'
+  none_of:
+  - '*igg*'
+  - '*igm*'
+  - '*secondary*'
+  - '*donkey*'
+  - '*goat*'
+- name: monoclonal primary antibody
+  all_of:
+  - '*apc*'
+  - '*anti-mu*'
+  none_of:
+  - '*igg*'
+  - '*igm*'
+  - '*secondary*'
+- name: monoclonal primary antibody
+  any_of:
+  - '*trustain*'
+  - '*fc block*'
+  - '*fcx*'
+  all_of:
+  - '*anti-*'
+  none_of:
+  - '*secondary*'
+- name: polyclonal primary antibody
+  all_of:
+  - antibody
+  any_of:
+  - polyclonal
+  - pab
+- name: polyclonal primary antibody
+  all_of:
+  - '*rabbit polyclonal*'
+- name: polyclonal primary antibody
+  all_of:
+  - '*goat polyclonal*'
+- name: polyclonal primary antibody
+  all_of:
+  - '*rabbit polyab*'
+- name: monoclonal primary antibody
+  all_of:
+  - monoclonal
+  - antibody
+- name: monoclonal primary antibody
+  all_of:
+  - monoclonal
+  - anti
+- name: monoclonal primary antibody
+  all_of:
+  - '*mouse mono*'
+- name: monoclonal primary antibody
+  all_of:
+  - '*rabbit mono*'
+- name: monoclonal primary antibody
+  all_of:
+  - mab
+  none_of:
+  - '*secondary*'
+  - '*alexa fluor*'
+  - '*irdye*'
+  - '*hrp*'
+  - '*anti-static*'
+  - '*zerostat*'
+- name: monoclonal primary antibody
+  all_of:
+  - '*clone*'
+  - '*antibod*'
+- name: monoclonal primary antibody
+  all_of:
+  - '*rabbit mab*'
+  none_of:
+  - '*secondary*'
+  - '*alexa fluor*'
+  - '*irdye*'
+  - '*hrp*'
+- name: monoclonal primary antibody
+  all_of:
+  - '*antibod*'
+  any_of:
+  - '*epr*'
+  - '*ep1*'
+  - '*ep2*'
+  none_of:
+  - '*secondary*'
+  - '*polyclonal*'
+  - '*pab*'
+- name: monoclonal primary antibody
+  all_of:
+  - '*antibod*'
+  - '*f4/80*'
+  none_of:
+  - '*secondary*'
+  - '*polyclonal*'
+  - '*pab*'
+- name: monoclonal primary antibody
+  all_of:
+  - '*antibod*'
+  - '*pd-l1*'
+  none_of:
+  - '*secondary*'
+  - '*polyclonal*'
+  - '*pab*'
+- name: monoclonal primary antibody
+  all_of:
+  - '*antibod*'
+  - '*cd68*'
+  none_of:
+  - '*secondary*'
+  - '*polyclonal*'
+  - '*pab*'
+- name: monoclonal primary antibody
+  all_of:
+  - '*antibod*'
+  - '*cd62l*'
+  none_of:
+  - '*secondary*'
+  - '*polyclonal*'
+  - '*pab*'
+- name: monoclonal primary antibody
+  all_of:
+  - '*antibod*'
+  - '*vdac*'
+  none_of:
+  - '*secondary*'
+  - '*polyclonal*'
+  - '*pab*'
+- name: monoclonal primary antibody
+  all_of:
+  - '*antibod*'
+  - '*cox-2*'
+  none_of:
+  - '*secondary*'
+  - '*polyclonal*'
+  - '*pab*'
+- name: monoclonal primary antibody
+  all_of:
+  - '*antibod*'
+  - '*tmem119*'
+  none_of:
+  - '*secondary*'
+  - '*polyclonal*'
+  - '*pab*'
+- name: monoclonal primary antibody
+  all_of:
+  - '*anti-f4/80*'
+  none_of:
+  - '*secondary*'
+  - '*polyclonal*'
+  - '*igg*'
+- name: monoclonal primary antibody
+  any_of:
+  - '*anti-pd-l1*'
+  - '*anti pd l1*'
+  none_of:
+  - '*secondary*'
+  - '*polyclonal*'
+- name: monoclonal primary antibody
+  all_of:
+  - '*anti-cd68*'
+  none_of:
+  - '*secondary*'
+  - '*polyclonal*'
+  - '*igg*'
+- name: monoclonal primary antibody
+  all_of:
+  - '*anti-cd62l*'
+  none_of:
+  - '*secondary*'
+  - '*polyclonal*'
+  - '*igg*'
+- name: polyclonal primary antibody
+  all_of:
+  - '*anti-*'
+  - '*antibod*'
+  none_of:
+  - '*secondary*'
+  - '*monoclonal*'
+  - '*mab*'
+  - '*digoxigenin*'
+  - '*mouse monoclonal*'
+  - '*duolink*'
+  - '*pla probe*'
+  - '*immpress*'
+- name: polyclonal primary antibody
+  all_of:
+  - '*anti-phospho*'
+  none_of:
+  - '*secondary*'
+  - '*monoclonal*'
+  - '*mab*'
+- name: polyclonal primary antibody
+  all_of:
+  - '*anti-histone*'
+  none_of:
+  - '*secondary*'
+  - '*monoclonal*'
+  - '*mab*'
+- name: polyclonal primary antibody
+  all_of:
+  - '*anti-acetyl*'
+  none_of:
+  - '*secondary*'
+  - '*monoclonal*'
+  - '*mab*'
+- name: polyclonal primary antibody
+  any_of:
+  - '*ma542*'
+  - '*ma534*'
+  - '*ma532*'
+  - '*ma536*'
+  none_of:
+  - '*cable*'
+  - '*adapter*'
+- name: polyclonal primary antibody
+  all_of:
+  - '*anti-*'
+  - '*developed*'
+  none_of:
+  - '*secondary*'
+  - '*monoclonal*'
+- name: rnase inhibitors
+  all_of:
+  - recombinant
+  - rrasin
+- name: rnase inhibitors
+  all_of:
+  - '*superase*'
+- name: rnase inhibitors
+  all_of:
+  - '*rnase*'
+  - '*inhib*'
+  none_of:
+  - '*iscript*'
+  - '*pcr tube*'
+  - '*pcr tb*'
+  - '*tempassure*'
+  - '*pyrogen*'
+- name: high-fidelity dna polymerase
+  all_of:
+  - ventsupreg
+  - polymerase
+- name: high-fidelity dna polymerase
+  all_of:
+  - $HIGH_FIDELITY
+  - '*polymerase*'
+  none_of:
+  - '*taq*'
+- name: taq polymerases
+  all_of:
+  - '*taq*'
+  - '*polymerase*'
+  none_of:
+  - $HIGH_FIDELITY
+  - $HOT_START
+  - '*mix*'
+- name: hot start dna polymerase
+  all_of:
+  - $HOT_START
+  - '*polymerase*'
+  none_of:
+  - $HIGH_FIDELITY
+  - '*taq*'
+  - '*aq*'
+- name: hot start pcr systems
+  all_of:
+  - sapphireamp
+  none_of:
+  - qpcr
+- name: high-fidelity pcr systems
+  all_of:
+  - $HIGH_FIDELITY
+  - pcr
+  - master
+- name: high-fidelity pcr systems
+  all_of:
+  - $HIGH_FIDELITY
+  - master
+- name: pcr systems
+  all_of:
+  - pcr
+  - mmax
+  none_of:
+  - sequence
+- name: pcr systems
+  all_of:
+  - gotaq
+  - mmax
+  none_of:
+  - sequence
+- name: pcr systems
+  all_of:
+  - pcr
+  - '*redextract*'
+  none_of:
+  - sequence
+- name: pcr systems
+  all_of:
+  - pcr
+  - master
+  - max
+  none_of:
+  - sequence
+- name: pcr systems
+  all_of:
+  - emeraldamp
+  none_of:
+  - qpcr
+- name: dye-based qpcr systems
+  all_of:
+  - itaq
+  - sybr
+  - supermix
+- name: dye-based qpcr systems
+  all_of:
+  - qpcr
+  - master
+- name: dye-based qpcr systems
+  all_of:
+  - qpcr
+  - mix
+- name: dye-based qpcr systems
+  all_of:
+  - powerupsybrgreen
+- name: dye-based qpcr systems
+  all_of:
+  - fg
+  - fast
+  - sybr
+  - master
+- name: dye-based qpcr systems
+  all_of:
+  - powerup
+  - sybr
+  - master
+- name: dye-based qpcr systems
+  all_of:
+  - kapa
+  - sybr
+  - master
+- name: probe-based qpcr systems
+  all_of:
+  - fg
+  - taqman
+  - gt
+  - master
+- name: first-strand cdna synthesis systems
+  all_of:
+  - first-strand
+  - system
+  - rt
+- name: first-strand cdna synthesis systems
+  all_of:
+  - iscript
+  none_of:
+  - '*rnase*'
+- name: first-strand cdna synthesis systems
+  all_of:
+  - iscript
+  - supermix
+- name: first-strand cdna synthesis systems
+  all_of:
+  - all-in-one
+  - master
+  - mix
+- name: first-strand cdna synthesis systems
+  all_of:
+  - primescript
+  - rt
+  - master
+  - mix
+- name: apoptosis detection kits
+  all_of:
+  - $APOPTOSIS
+  - $ASSAY_OR_KIT
+- name: apoptosis detection kits
+  all_of:
+  - caspase
+  - colorimetric
+- name: synthetic sirna
+  all_of:
+  - sirna
+  - predesigned
+- name: synthetic peptides
+  all_of:
+  - peptides
+  any_of:
+  - synthetic
+  - custom
+  - synthesis
+  - fmoc
+  - boc
+- name: synthetic sirna
+  all_of:
+  - sirna
+  - '*oligo*'
+- name: synthetic sirna
+  all_of:
+  - sirna
+  - configurationid
+- name: synthetic dna oligonucleotide
+  all_of:
+  - '*oligo*'
+  - dna
+- name: synthetic rna oligonucleotide
+  all_of:
+  - '*oligo*'
+  - rna
+- name: transfection reagents
+  any_of:
+  - lipofectamine
+  - '*lipofectamin*'
+  - '*fugene*'
+  - '*effectene*'
+  - '*cellfectin*'
+  - '*xfect*'
+  - '*polybrene*'
+  - '*jetprime*'
+  - '*turbofect*'
+  - '*transfect*'
+  none_of:
+  - '*sirna*'
+  - '*shrna*'
+  - '*rnai*'
+- name: viability stains
+  any_of:
+  - '*trypan blue*'
+  - '*propidium iodide*'
+  - '*calcein*'
+  - '*live*dead*'
+  - '*livedead*'
+  - '*zombie*'
+  - '*mitotracker*'
+- name: viability stains
+  all_of:
+  - '*annexin*'
+  - '*dead*'
+- name: nitrogen
+  all_of:
+  - nitrogen
+  - '*purity*'
+  none_of:
+  - '*liquid*'
+  - '*urea*'
+  - '*carbon*'
+  - '*element*'
+  - '*yeast*'
+  - '*cylinder*'
+- name: histology & cell stains
+  any_of:
+  - schiffs reagent
+  - schiff reagent
+  - orange ii sodium
+  - orange sodium
+  - gills iii hematoxylin
+  - toluidine blue
+  - alcian blue
+  - eosin
+  - crystal violet
+  - hematoxylin
+  - eosin
+  - methylene blue
+  - wrights giemsa
+  - evans blue
+  - oil red
+  - methyl blue
+  - pinnacle blue
+- name: protein gel stains
+  all_of:
+  - gelcode
+- name: protein gel stains
+  all_of:
+  - protein
+  - '*gel*'
+  - '*stain*'
+  none_of:
+  - '*bradford*'
+  - '*bio-rad*'
+  - '*assay*'
+- name: nucleic acid gel stains
+  all_of:
+  - gelstar
+- name: protein gel stains
+  all_of:
+  - stains-all
+- name: histology & cell stains
+  all_of:
+  - diamidino*
+  - phenylin*
+- name: histology & cell stains
+  all_of:
+  - thiazole orange
+- name: nucleic acid gel stains
+  all_of:
+  - ethidium
+  - brmide
+- name: nucleic acid gel stains
+  all_of:
+  - gelgreen
+- name: histology & cell stains
+  all_of:
+  - hoechst
+- name: histology & cell stains
+  all_of:
+  - hoechst
+  - trihydroch
+- name: nucleic acid gel stains
+  all_of:
+  - '*gel*'
+  - '*stain*'
+- name: histology & cell stains
+  all_of:
+  - dapi
+  none_of:
+  - '*gel*'
+- name: nucleic acid gel stains
+  all_of:
+  - gelred
+- name: nucleic acid gel stains
+  all_of:
+  - gelgreen
+  - sybr green
+- name: dnase i
+  all_of:
+  - deoxyribonuclease
+  - bovine
+- name: dnase i
+  all_of:
+  - deoxyribonuclease
+  - crude
+- name: dnase i
+  any_of:
+  - '*dnase i*'
+  - '*dnase set*'
+  - '*deoxyribonuclease i*'
+  - '*deoxyribonuclease*lyophilized*'
+  none_of:
+  - '*dnase-free*'
+  - '*rnase/dnase*'
+- name: dntps
+  all_of:
+  - deoxynucleotide solution mix
+  none_of:
+  - supermix
+  - cdna
+- name: dntps
+  all_of:
+  - '*deoxynuc*'
+  - mix
+  none_of:
+  - supermix
+  - cdna
+- name: dntps
+  all_of:
+  - dntps
+  none_of:
+  - supermix
+  - cdna
+- name: dntps
+  all_of:
+  - datp
+  none_of:
+  - supermix
+  - cdna
+- name: dntps
+  all_of:
+  - dttp
+  none_of:
+  - supermix
+  - cdna
+- name: dntps
+  all_of:
+  - dgtp
+  none_of:
+  - supermix
+  - cdna
+- name: dntps
+  all_of:
+  - dctp
+  none_of:
+  - supermix
+  - cdna
+- name: gel loading dye
+  all_of:
+  - gel
+  - loading
+  - dye
+- name: spin columns
+  all_of:
+  - spin
+  - column
+- name: column-based rna miniprep
+  all_of:
+  - miniprep
+  - rna
+  - $ASSAY_OR_KIT
+- name: column-based rna miniprep
+  all_of:
+  - purelink
+  - rna
+  - mini
+  - $ASSAY_OR_KIT
+- name: column-based gel rna extraction kits
+  all_of:
+  - '*rna*'
+  - '*gel*'
+  - $ASSAY_OR_KIT
+- name: column-based rna purification kits
+  all_of:
+  - rneasy
+  - mini
+  - $ASSAY_OR_KIT
+  none_of:
+  - sequence
+  - pump
+  - alcohol
+- name: column-based rna purification kits
+  all_of:
+  - rna
+  - cleanup
+  - genejet
+  - $ASSAY_OR_KIT
+  none_of:
+  - sequence
+  - pump
+  - alcohol
+- name: column-based rna purification kits
+  all_of:
+  - directzol
+  - micro
+  - rna
+  - $ASSAY_OR_KIT
+  none_of:
+  - sequence
+  - pump
+  - alcohol
+- name: column-based rna purification kits
+  all_of:
+  - rneasy
+  - minelute
+  - $ASSAY_OR_KIT
+  none_of:
+  - sequence
+  - pump
+  - alcohol
+- name: column-based rna purification kits
+  all_of:
+  - mirvana
+  - mirna
+  - isolation
+  - $ASSAY_OR_KIT
+  none_of:
+  - sequence
+  - pump
+  - alcohol
+- name: column-based rna purification kits
+  all_of:
+  - genejet
+  - rna
+  - purif
+  - $ASSAY_OR_KIT
+  none_of:
+  - sequence
+  - pump
+  - alcohol
+- name: column-based rna purification kits
+  all_of:
+  - '*rna*'
+  - '*iso*'
+  - $ASSAY_OR_KIT
+  none_of:
+  - sequence
+  - pump
+  - alcohol
+- name: column-based rna purification kits
+  all_of:
+  - '*rna*'
+  - '*purif*'
+  - $ASSAY_OR_KIT
+  none_of:
+  - sequence
+  - pump
+  - alcohol
+- name: column-based rna purification kits
+  all_of:
+  - '*rna*'
+  - '*tissue*'
+  - $ASSAY_OR_KIT
+  none_of:
+  - sequence
+  - pump
+  - alcohol
+- name: column-based rna purification kits
+  all_of:
+  - '*rna*'
+  - '*clean*'
+  - $ASSAY_OR_KIT
+  none_of:
+  - sequence
+  - pump
+  - alcohol
+- name: column-based dna plasmid megaprep
+  all_of:
+  - megaprep
+  - $ASSAY_OR_KIT
+  none_of:
+  - sequence
+- name: column-based dna plasmid midiprep
+  all_of:
+  - midi
+  - nucleobond
+  - $ASSAY_OR_KIT
+  none_of:
+  - sequence
+- name: column-based dna plasmid midiprep
+  all_of:
+  - midiprep
+  - plasmid
+  - $ASSAY_OR_KIT
+  none_of:
+  - sequence
+- name: column-based dna plasmid miniprep
+  all_of:
+  - '*mini*'
+  - '*prep*'
+  - $ASSAY_OR_KIT
+  none_of:
+  - sequence
+  - $TUBE
+  - lysis
+  - rna
+  - column
+- name: cell culture antibiotics - pen-strep
+  all_of:
+  - penicillin
+  - streptomycin
+- name: cell culture antibiotics - pen-strep
+  all_of:
+  - pen
+  - strep
+- name: cell culture antibiotics - pen-strep
+  all_of:
+  - penicillin-streptomycin
+- name: column-based dna genomic purification kits
+  all_of:
+  - '*dna*'
+  - '*genomic*'
+  - $ASSAY_OR_KIT
+  none_of:
+  - cloning
+  - '*column*'
+  - $TUBE
+  - '*sequenc*'
+- name: column-based gel dna extraction kits
+  all_of:
+  - '*dna*'
+  - '*gel*'
+  - $ASSAY_OR_KIT
+- name: column-based microbial dna purification kits
+  all_of:
+  - '*dna*'
+  - '*microb*'
+  - $ASSAY_OR_KIT
+- name: column-based microbial dna purification kits
+  all_of:
+  - '*dneasy*'
+  - '*powersoil*'
+  - $ASSAY_OR_KIT
+- name: column-based microbial dna purification kits
+  all_of:
+  - dneasy
+  - '*microb*'
+  - $ASSAY_OR_KIT
+  none_of:
+  - sequence
+- name: column-based dna purification kits
+  all_of:
+  - dneasy
+  - kit
+  - $ASSAY_OR_KIT
+  none_of:
+  - sequence
+- name: column-based dna purification kits
+  all_of:
+  - monarch
+  - dna
+  - $ASSAY_OR_KIT
+  none_of:
+  - sequence
+  - extraction
+- name: column-based dna purification kits
+  all_of:
+  - '*clean*'
+  - dna
+  - $ASSAY_OR_KIT
+  none_of:
+  - sequence
+- name: column-based dna purification kits
+  all_of:
+  - cleanup
+  - dna
+  - '*prep*'
+  none_of:
+  - sequence
+- name: rna extraction reagents
+  any_of:
+  - '*trizol*'
+  - '*tri-reagent*'
+  - '*tri reagent*'
+  - '*qiazol*'
+- name: magnetic polystyrene beads
+  any_of:
+  - '*dynabeads*'
+  none_of:
+  - '*streptavidin*'
+  - '*protein a*'
+  - '*protein g*'
+  - '*anti-*'
+  - '*oligo*'
+- name: protease inhibitors
+  any_of:
+  - '*trypsin inhibitor*'
+  - '*pmsf*'
+  - '*phenylmethylsulfonyl*'
+  - '*aprotinin*'
+  - '*leupeptin*'
+  - '*pepstatin*'
+  none_of:
+  - '*cocktail*'
+- name: microplate sealing films and tapes
+  all_of:
+  - '*seal*'
+  - '*tape*'
+  none_of:
+  - '*pipet*'
+- name: microplate sealing films and tapes
+  all_of:
+  - '*seal*'
+  - '*film*'
+  - '*plate*'
+- name: microplate sealing films and tapes
+  all_of:
+  - '*optical*'
+  - '*seal*'
+- name: sodium sulfate
+  any_of:
+  - '*sodium sulfate*'
+  - '*sod sulft*'
+  - '*na2so4*'
+  - '*sodium sulphate*'
+- name: bovine serum albumin
+  all_of:
+  - bsa
+  none_of:
+  - $BUFFER
+- name: bovine serum albumin
+  all_of:
+  - bovine
+  - serum
+  - album*
+- name: bovine serum albumin
+  all_of:
+  - bovine
+  - serum
+  - albumin
+- name: laemmli sample buffer
+  all_of:
+  - laemmli
+  - $BUFFER
+- name: laemmli sample buffer
+  all_of:
+  - laemmli
+  - $BUFFER
+- name: pvdf blotting membranes
+  all_of:
+  - pvdf
+  - membrane
+  none_of:
+  - '*pack*'
+- name: pvdf blotting membranes
+  all_of:
+  - pvdf
+  - fltr sheet
+  none_of:
+  - '*pack*'
+- name: pvdf blotting membranes
+  all_of:
+  - ipvh
+  - membrane
+  none_of:
+  - '*pack*'
+- name: pvdf blotting membranes
+  all_of:
+  - ipvh
+  - fltr sheet
+  none_of:
+  - '*pack*'
+- name: tris-glycine-sds (tgs) buffer
+  all_of:
+  - '*tris*'
+  - '*glycine*'
+  - '*sds*'
+  - $BUFFER
+- name: tris-glycine-sds (tgs) buffer
+  all_of:
+  - '*tris*'
+  - '*glycine*'
+  - '*sds*'
+- name: tris-glycine-sds (tgs) buffer
+  all_of:
+  - '*tris*'
+  - '*gly*'
+  - '*sds*'
+- name: mops-sds buffer
+  all_of:
+  - '*mops*'
+  - '*sds*'
+  - $BUFFER
+- name: mes-sds buffer
+  all_of:
+  - '*mes*'
+  - '*sds*'
+  - $BUFFER
+- name: cell lysis buffers
+  all_of:
+  - ripa
+  - $BUFFER
+- name: cell lysis buffers
+  all_of:
+  - np40
+  - $BUFFER
+- name: cell lysis buffers
+  all_of:
+  - extraction
+  - $BUFFER
+- name: cell lysis buffers
+  all_of:
+  - xtractor
+  - $BUFFER
+- name: cell lysis buffers
+  all_of:
+  - extraction
+  - solution
+- name: cell lysis buffers
+  all_of:
+  - lysis
+  - $BUFFER
+- name: acidic ph buffers
+  all_of:
+  - ph
+  - $BUFFER
+  - '4'
+- name: basic ph buffers
+  all_of:
+  - ph
+  - $BUFFER
+  - '10'
+- name: neutral ph buffers
+  all_of:
+  - ph
+  - $BUFFER
+  - '7'
+- name: hepes buffer
+  all_of:
+  - hepes
+  - sodium
+  - salt
+- name: hepes buffer
+  all_of:
+  - hepes
+  - $BUFFER
+- name: phosphate-buffered saline (pbs) buffer
+  all_of:
+  - fta hemaglutn
+  - '7.2'
+- name: cell lysis detergents
+  all_of:
+  - sodium
+  - deoxycholate
+- name: cell lysis detergents
+  all_of:
+  - '*igepal*'
+- name: cell lysis detergents
+  all_of:
+  - sds
+  none_of:
+  - $BUFFER
+- name: cell lysis detergents
+  all_of:
+  - sodium dodecyl sulfate
+- name: cell lysis detergents
+  all_of:
+  - dodecyl sulfate
+- name: cell lysis detergents
+  all_of:
+  - b-per bacterial protein
+- name: cell lysis detergents
+  all_of:
+  - b-per
+- name: cell lysis detergents
+  all_of:
+  - cellytic
+- name: cell lysis detergents
+  all_of:
+  - chaps
+- name: cell lysis detergents
+  all_of:
+  - ddm
+- name: cell lysis detergents
+  all_of:
+  - sarkosyl
+- name: cell lysis detergents
+  any_of:
+  - digiton
+  - digitonin
+- name: cell lysis detergents
+  all_of:
+  - m-per
+- name: cell lysis detergents
+  all_of:
+  - np40
+  none_of:
+  - $BUFFER
+- name: cell lysis detergents
+  all_of:
+  - triton
+- name: cell lysis detergents
+  all_of:
+  - tween
+- name: acrylamide/bis solution
+  all_of:
+  - bisacrylamid
+- name: acrylamide/bis solution
+  all_of:
+  - bisacrylamide
+- name: acrylamide/bis solution
+  all_of:
+  - bis-acrylamide
+- name: antibody-based affinity resins
+  all_of:
+  - protein
+  - '*agarose*'
+- name: antibody-based affinity resins
+  all_of:
+  - red
+  - anti-flag
+- name: antibody-based affinity resins
+  all_of:
+  - igg
+  - sepharose
+- name: antibody-based affinity resins
+  all_of:
+  - igg
+  - agar
+- name: chemiluminescent substrates
+  all_of:
+  - chemiluminescent detection
+- name: chemiluminescent substrates
+  all_of:
+  - d-luciferin potasium salt
+- name: chemiluminescent substrates
+  all_of:
+  - d-luciferin sodium salt
+- name: chemiluminescent substrates
+  all_of:
+  - ecl western blotting sub
+- name: chemiluminescent substrates
+  all_of:
+  - signalfire
+- name: chemiluminescent substrates
+  all_of:
+  - supersignal
+- name: chemiluminescent substrates
+  all_of:
+  - xenolight
+- name: unstained protein molecular-weight ladder
+  all_of:
+  - protein
+  - '*std*'
+  any_of:
+  - '*unstain*'
+  - '*unstd*'
+- name: unstained protein molecular-weight ladder
+  all_of:
+  - protein
+  - '*stand*'
+  any_of:
+  - '*unstain*'
+  - '*unstd*'
+- name: pre-stained protein molecular-weight ladder
+  all_of:
+  - '*prtlad*'
+  any_of:
+  - '*prestain*'
+  - '*prestd*'
+  - '*prestn*'
+- name: pre-stained protein molecular-weight ladder
+  all_of:
+  - seeblue
+  - plus2
+- name: pre-stained protein molecular-weight ladder
+  all_of:
+  - protein
+  - '*stand*'
+  any_of:
+  - '*prestain*'
+  - '*prestd*'
+  - '*prestn*'
+- name: pre-stained protein molecular-weight ladder
+  all_of:
+  - protein
+  - '*std*'
+  any_of:
+  - '*prestain*'
+  - '*prestd*'
+  - '*prestn*'
+- name: pre-stained protein molecular-weight ladder
+  all_of:
+  - '*prot*'
+  any_of:
+  - '*spectra*'
+  - '*seeblue*'
+  - pageruler
+  - precision plus
+  - ez-run
+  - novex
+- name: pre-stained protein molecular-weight ladder
+  all_of:
+  - '*ladder*'
+  any_of:
+  - '*spectra*'
+  - '*seeblue*'
+  - pageruler
+  - precision plus
+  - ez-run
+  - novex
+- name: non-lab
+  all_of:
+  - '*mini-protean*'
+  - '*plate*'
+- name: non-lab
+  all_of:
+  - '*mini-protean*'
+  - '*cassette*'
+- name: non-lab
+  all_of:
+  - '*mini-protean*'
+  - '*comb*'
+- name: non-lab
+  all_of:
+  - '*mini-protean*'
+  - '*cooling unit*'
+- name: pre-cast bis-tris gels
+  any_of:
+  - '*nupage*'
+  - '*bolt*bis*tris*'
+  none_of:
+  - '*buffer*'
+  - '*stain*'
+- name: pre-cast bis-tris gels
+  all_of:
+  - '*bis*tris*'
+  - '*gel*'
+  none_of:
+  - '*buffer*'
+  - '*stain*'
+- name: protease inhibitor cocktails
+  any_of:
+  - '*complete mini*'
+  - '*complete ultra*'
+  - '*halt protease*'
+  - '*protease inhibitor cocktail*'
+  - '*protease inhib cock*'
+  none_of:
+  - '*phosphatase*'
+- name: pre-cast tris-glycine gels
+  all_of:
+  - '*tgx*'
+  - '*gel*'
+- name: pre-cast tris-glycine gels
+  all_of:
+  - '*tri*'
+  - '*gly*'
+  - '*gel*'
+- name: pre-cast tris-tricine gels
+  all_of:
+  - '*tris*'
+  - '*tricine*'
+  - '*gel*'
+- name: pre-cast tris-glycine gels
+  all_of:
+  - '*tg*'
+  - '*novex*'
+  none_of:
+  - '*hand casting*'
+- name: nucleic acid modifying enzymes
+  any_of:
+  - t5 exonuclease
+  - alkaline phosphatase
+  - t4 polynucleotide kinase
+  - terminal transferase
+  - t5 exonuclease
+  - t4 dna ligase
+- name: hams f12
+  any_of:
+  - '*ham*f*12*'
+  - '*f-12*'
+  - '*f 12 nutrient*'
+  none_of:
+  - '*dmem*'
+  - '*dme*f*12*'
+- name: mccoys 5a
+  all_of:
+  - '*mccoy*'
+  - 5a
+- name: leibovitz l15 media
+  any_of:
+  - '*leibovitz*'
+  - '*l-15 medium*'
+  - '*l-15 medi*'
+  none_of:
+  - '*kimwipe*'
+  - '*kim wipe*'
+- name: neurobasal medium
+  any_of:
+  - '*neurobasal*'
+- name: imdm
+  any_of:
+  - '*imdm*'
+  - '*iscove*'
+- name: insect cell media
+  any_of:
+  - '*sf 900*'
+  - '*sf900*'
+  - '*sf-900*'
+  - '*schneider*drosophila*'
+  - '*ex-cell*'
+  - '*excell*'
+  - '*sfx insect*'
+  - '*insect*medium*'
+  - '*insect*media*'
+  - formula 4-24
+- name: stem cell media
+  any_of:
+  - '*stempro*'
+  - '*mtesr*'
+  - '*stemline*'
+  - '*matrigel*organ*'
+- name: bme
+  all_of:
+  - bme
+  none_of:
+  - '*dmem*'
+  - '*imdm*'
+  - '*emem*'
+- name: bme
+  all_of:
+  - basal medium eagle
+- name: specialty cell culture media
+  any_of:
+  - '*med*199*'
+  - '*medium 199*'
+- name: tyrodes solution
+  any_of:
+  - '*tyrode*'
+- name: specialty cell culture media
+  all_of:
+  - smem
+- name: specialty cell culture media
+  any_of:
+  - '*liver digest*'
+  - '*liver perfusion*'
+  none_of:
+  - '*williams*'
+- name: specialty cell culture media
+  all_of:
+  - '*williams*'
+  - med
+- name: specialty cell culture media
+  any_of:
+  - '*keratinocyte*sfm*'
+  - '*keratinocyte*medium*'
+- name: specialty cell culture media
+  any_of:
+  - '*claycomb*'
+- name: specialty cell culture media
+  any_of:
+  - '*corneal*epithelial*growth*'
+- name: specialty cell culture media
+  any_of:
+  - '*hibernate*'
+  - '*neurocult*'
+- name: specialty cell culture media
+  any_of:
+  - '*brff*'
+- name: dmem
+  any_of:
+  - '*dmem*'
+  - '*dulbecco*modified*'
+  none_of:
+  - '*buf*'
+- name: dmem
+  all_of:
+  - '*dme*'
+  - '*f-12*'
+- name: dmem
+  all_of:
+  - '*dme*'
+  - '*f 12*'
+- name: dmem
+  all_of:
+  - '*dme*'
+  - media
+  none_of:
+  - '*f-12*'
+  - '*f 12*'
+- name: rpmi
+  any_of:
+  - '*rpmi*'
+- name: emem
+  any_of:
+  - '*emem*'
+  - '*eagle*medi*'
+  - '*eagle*minimum*essential*'
+  none_of:
+  - '*dulbecco*'
+  - '*dmem*'
+- name: dmem
+  all_of:
+  - dme
+  none_of:
+  - '*dmem*'
+  - '*emem*'
+  - '*imdm*'
+  - '*f-12*'
+  - '*f 12*'
+- name: recombinant human protein
+  any_of:
+  - rhtgf-b1
+- name: dry basal media, not chemically defined
+  all_of:
+  - basal
+  - med
+  none_of:
+  - '*neurobasal*'
+  - '*dmem*'
+  - '*emem*'
+  - '*rpmi*'
+  - '*imdm*'
+  - bme
+- name: dehydrated bacterial broth
+  all_of:
+  - soc
+  - medium
+- name: dehydrated bacterial broth
+  all_of:
+  - '*s.o.c*'
+  - medium
+- name: dehydrated bacterial broth
+  all_of:
+  - mueller
+  - broth
+- name: dehydrated bacterial broth
+  all_of:
+  - mueller
+  - brth
+- name: dehydrated bacterial broth
+  all_of:
+  - circlegrow
+- name: dehydrated bacterial broth
+  all_of:
+  - broth
+  - lennox
+- name: dehydrated bacterial broth
+  all_of:
+  - brth
+  - lennox
+- name: prepared microbiology media
+  all_of:
+  - spectra vre
+- name: prepared microbiology media
+  all_of:
+  - $PLATE
+  - chromagar
+- name: prepared microbiology media
+  all_of:
+  - agar
+  - blood
+- name: new zealand fbs
+  all_of:
+  - $FBS_TERMS
+  - '*new zealand*'
+  none_of:
+  - albumin
+- name: us fbs
+  all_of:
+  - $FBS_TERMS
+  - '*us*'
+  none_of:
+  - albumin
+- name: us fbs
+  any_of:
+  - $FBS_TERMS
+  none_of:
+  - albumin
+- name: cell culture dissociation reagents
+  all_of:
+  - trypsin
+  - bovine
+  - pancreas
+- name: cell culture dissociation reagents
+  all_of:
+  - edta
+  - trypsn
+- name: cell culture dissociation reagents
+  all_of:
+  - trypsin
+- name: cell culture dissociation reagents
+  all_of:
+  - collagenase
+  - type
+  - iv
+- name: cell culture dissociation reagents
+  all_of:
+  - versene
+- name: crosslinking reagents
+  all_of:
+  - egs
+- name: crosslinking reagents
+  all_of:
+  - edc
+- name: crosslinking reagents
+  all_of:
+  - dgs
+- name: crosslinking reagents
+  all_of:
+  - glutaraldehyde
+  - '*sol*'
+- name: dmf
+  all_of:
+  - '*dimethyl*'
+  - '*formamide*'
+- name: dmf
+  all_of:
+  - '*dimetformamide*'
+- name: dmf
+  all_of:
+  - dmf
+- name: dmso
+  all_of:
+  - '*dimethyl*'
+  - '*sulfoxide*'
+  none_of:
+  - '*cuture*'
+  - '*d6*'
+- name: dmso
+  all_of:
+  - dmso
+  none_of:
+  - '*cuture*'
+  - '*d6*'
+- name: methylene chloride
+  all_of:
+  - methylene
+  - '*chlor*'
+  none_of:
+  - hexane
+- name: tris base
+  all_of:
+  - tris
+  - base
+  none_of:
+  - (
+- name: slide mounting medium
+  any_of:
+  - '*fluoromount*'
+  - '*fluoro-gel*'
+  - '*vectashield*'
+  - '*vector shield*'
+  - '*histomount*'
+  - '*prolong gold*'
+  - '*prolong glass*'
+  - '*prolong diamond*'
+  - '*antifade mount*'
+  - '*dpx mountant*'
+  - '*crystal bond*'
+  - '*mounting medi*'
+- name: syringe filters
+  all_of:
+  - '*syr*'
+  - '*flt*'
+- name: syringe filters
+  all_of:
+  - '*sy*'
+  - '*flt*'
+- name: syringe filters
+  all_of:
+  - millex-gv
+- name: syringe filters
+  all_of:
+  - milx
+- name: syringe filters
+  all_of:
+  - '*millex*'
+- name: syringe filters
+  all_of:
+  - '*anotop*'
+- name: syringe filters
+  all_of:
+  - '*syr*'
+  - '*filt*'
+- name: syringe filters
+  all_of:
+  - puradisc
+- name: centrifugal concentrators
+  all_of:
+  - '*vivaspinturbo*'
+- name: centrifugal concentrators
+  all_of:
+  - pes
+  - concentrator
+- name: bottle top filters
+  all_of:
+  - steritop
+- name: bottle top filters
+  all_of:
+  - '*fltr*'
+  - '*bottltop*'
+- name: bottle top filters
+  all_of:
+  - '*fltrbt*'
+- name: bottle top filters
+  all_of:
+  - '*flt*'
+  - '*uta*'
+- name: bottle top filters
+  all_of:
+  - '*btl*'
+  - '*fltr*'
+- name: bottle top filters
+  all_of:
+  - '*aspirator*'
+  - '*pes*'
+- name: electroporation cuvettes
+  all_of:
+  - '*cuvet*'
+  - '*gap*'
+- name: electroporation cuvettes
+  all_of:
+  - '*cuvet*'
+  - '*electro*'
+- name: fluorescence cuvettes
+  all_of:
+  - '*cuvet*'
+  - '*fluorescen*'
+- name: spectrophotometer cuvettes
+  all_of:
+  - '*cuvet*'
+  none_of:
+  - '*electro*'
+  - '*fluorescen*'
+  - '*gap*'
+  - '*rack*'
+  - '*holder*'
+- name: chemically competent cells
+  any_of:
+  - '*one shot*'
+  - '*oneshot*'
+  - '*subcloning*'
+  none_of:
+  - '*electrocomp*'
+- name: chemically competent cells
+  all_of:
+  - '*competent*'
+  - '*cell*'
+  none_of:
+  - '*electrocomp*'
+  - '*expression*'
+- name: wash bottles
+  any_of:
+  - '*wash bottle*'
+  - '*bottle wash*'
+  - '*wb ez-sqz*'
+  - '*wash btl*'
+  - '*washbtl*'
+- name: colorimetric substrates
+  any_of:
+  - '*griess reagent*'
+  - '*tetrazolium*'
+  - '*onpg*'
+  - '*o-nitrophenyl*'
+  - '*pnpp*'
+  - '*p-nitrophenyl*'
+  - '*tmb substrate*'
+  - '*abts substrate*'
+- name: glass beakers
+  all_of:
+  - '*beaker*'
+  - '*glass*'
+- name: glass beakers
+  all_of:
+  - '*beaker*'
+  - '*pyrex*'
+- name: glass beakers
+  all_of:
+  - '*beaker*'
+  - '*griffin*'
+- name: boiling flasks
+  all_of:
+  - $FLASK
+  - '*boil*'
+- name: boiling flasks
+  all_of:
+  - $FLASK
+  - '*round*'
+  - '*bottom*'
+  none_of:
+  - '*cell*'
+  - '*culture*'
+  - '*glass bottom dish*'
+- name: boiling flasks
+  all_of:
+  - $FLASK
+  - '*rb*'
+  - '*24/40*'
+- name: cell culture dishes
+  all_of:
+  - '*dish*'
+  - '*glass bottom*'
+- name: cell culture dishes
+  all_of:
+  - '*dish*'
+  - '*tc*'
+  none_of:
+  - '*crystalliz*'
+  - '*petri*'
+- name: petri dishes
+  all_of:
+  - '*petri*'
+  - '*dish*'
+- name: cell culture plates
+  all_of:
+  - $PLATE
+  - '*well*'
+  - '*tc*'
+  none_of:
+  - '*no-tc*'
+  - '*non-tc*'
+- name: cell culture plates
+  all_of:
+  - $PLATE
+  - '*well*'
+  - '*tissue culture*'
+  none_of:
+  - '*no-tc*'
+  - '*non-tc*'
+- name: cell culture flasks
+  all_of:
+  - $FLASK
+  any_of:
+  - '*canted*'
+  - '*vented*'
+  - '*nunclon*'
+  - '*nunc*'
+  - '*cellstar*'
+  - '*t25*'
+  - '*t75*'
+  - '*t150*'
+  - '*t175*'
+  - '*t225*'
+- name: microcentrifuge tubes
+  all_of:
+  - mct
+  - nat
+- name: microcentrifuge tubes
+  all_of:
+  - microtube
+- name: microcentrifuge tubes
+  all_of:
+  - micro
+  - $TUBE
+- name: microcentrifuge tubes
+  all_of:
+  - microcent
+  - $TUBE
+- name: microcentrifuge tubes
+  all_of:
+  - microcentrifuge
+  - $TUBE
+- name: microcentrifuge tubes
+  all_of:
+  - '*microfuge*'
+  - $TUBE
+- name: microcentrifuge tubes
+  any_of:
+  - '*microtube*'
+  - '*micro tube*'
+  - micro cent tube
+  none_of:
+  - '*rack*'
+  - '*centrifuge tube*'
+- name: microcentrifuge tubes
+  all_of:
+  - '*eppendorf*'
+  - $TUBE
+  none_of:
+  - '*rack*'
+  - '*pcr*'
+  - '*configurationid*'
+- name: pcr tube strips
+  all_of:
+  - '*pcr*'
+  - '*tube*'
+  - '*strip*'
+  none_of:
+  - '*rack*'
+  - '*configurationid*'
+- name: pcr tube strips
+  all_of:
+  - '*pcr*'
+  - '*strp*'
+  none_of:
+  - '*rack*'
+  - '*tip*'
+  - '*configurationid*'
+- name: pcr tubes
+  all_of:
+  - '*pcr*'
+  - '*tube*'
+  none_of:
+  - '*strip*'
+  - '*rack*'
+  - '*tip*'
+  - '*configurationid*'
+  - '*oligo*'
+  - '*sequence*'
+  - '*cap*'
+- name: sample vials
+  all_of:
+  - '*vial*'
+  any_of:
+  - '*headspace*'
+  - '*headspc*'
+  - '*amber*'
+  - '*reaction*'
+  - '*sample*'
+  - '*dram*'
+  - '*snap cap*'
+  none_of:
+  - '*scintillation*'
+  - '*scntl*'
+- name: centrifuge conical tubes
+  all_of:
+  - '*conical*'
+  - '*tube*'
+  none_of:
+  - '*centrifuge tube*'
+  - '*micro*'
+  - '*configurationid*'
+  - '*oligo*'
+  - '*sequence*'
+- name: centrifuge conical tubes
+  any_of:
+  - '*50mltbe*'
+  - '*15mltbe*'
+- name: syringes
+  all_of:
+  - '*syr*'
+  - '*inge*'
+  none_of:
+  - '*needle*'
+- name: hypodermic needles
+  all_of:
+  - '*needle*'
+  - '*gauge*'
+  none_of:
+  - '*holder*'
+  - '*syringe*'
+  - '*syr*'
+- name: hypodermic needles
+  all_of:
+  - '*needle*'
+  - '*ga*'
+  - '*strl*'
+  none_of:
+  - '*holder*'
+- name: weigh boats
+  all_of:
+  - '*weigh*'
+  any_of:
+  - '*boat*'
+  - '*dish*'
+- name: weighing papers
+  all_of:
+  - '*weigh*'
+  any_of:
+  - '*ppr*'
+  - '*paper*'
+- name: coverslips
+  all_of:
+  - '*cover*'
+  - '*glas*'
+- name: coverslips
+  all_of:
+  - '*cover*'
+  - '*gls*'
+- name: coverslips
+  all_of:
+  - '*cv*'
+  - '*glas*'
+- name: coverslips
+  all_of:
+  - '*cv*'
+  - '*gls*'
+- name: coverslips
+  all_of:
+  - '*cvr*'
+  - '*glas*'
+- name: coverslips
+  all_of:
+  - '*cvr*'
+  - '*gls*'
+- name: coverslips
+  all_of:
+  - '*cvr*'
+  - '*slip*'
+- name: coverslips
+  all_of:
+  - '*cover*'
+  - '*slip*'
+- name: cryogenic and freezer boxes
+  all_of:
+  - container
+  - '*freez*'
+- name: cryogenic and freezer boxes
+  all_of:
+  - container
+  - '*frz*'
+- name: cryogenic and freezer boxes
+  all_of:
+  - cardboard
+  - '*freez*'
+- name: cryogenic and freezer boxes
+  all_of:
+  - cardboard
+  - '*frz*'
+- name: cryogenic and freezer boxes
+  all_of:
+  - freezer
+  - nat
+- name: cryogenic and freezer boxes
+  all_of:
+  - cryostore
+- name: cryogenic and freezer boxes
+  all_of:
+  - '*cryovial*'
+  - '*storag*'
+- name: cryogenic and freezer boxes
+  all_of:
+  - '*cryovial*'
+  - '*strg*'
+- name: cryovials
+  all_of:
+  - '*cryo*'
+  - '*vial*'
+- name: dialysis casettes
+  all_of:
+  - '*slide*'
+  - '*lyzer*'
+- name: microscopy slide holders
+  all_of:
+  - '*slide*'
+  any_of:
+  - '*blue*'
+  - '*red*'
+  - '*green*'
+  - '*yellow*'
+  - '*white*'
+- name: microscope slides
+  all_of:
+  - '*micro*'
+  - '*slide*'
+- name: microscope slides
+  all_of:
+  - '*micro*'
+  - '*sld*'
+- name: microscope slides
+  all_of:
+  - '*mcro*'
+  - '*sde*'
+- name: microscope slides
+  all_of:
+  - '*micrsld*'
+- name: microscope slides
+  all_of:
+  - '*microslide*'
+- name: serological pipettes
+  all_of:
+  - $PIPETTE
+  - '*ser*'
+- name: serological pipettes
+  all_of:
+  - $PIPETTE
+  - '*stripet*'
+- name: serological pipettes
+  all_of:
+  - paper peel
+  - $PIPETTE
+- name: serological pipettes
+  all_of:
+  - pap
+  - '*stripet*'
+- name: serological pipettes
+  all_of:
+  - stripet
+- name: serological pipettes
+  all_of:
+  - $PIPETTE
+  - '*strpet*'
+- name: serological pipettes
+  all_of:
+  - '*strpette*'
+- name: serological pipettes
+  all_of:
+  - '*stripette*'
+- name: serological pipettes
+  all_of:
+  - $PIPETTE
+  - '*sterile*'
+- name: serological pipettes
+  all_of:
+  - $PIPETTE
+  - serological
+  none_of:
+  - '*tip*'
+  - '*filter*'
+  - '*flt*'
+  - '*needle*'
+  - '*syringe*'
+- name: pasteur pipettes
+  all_of:
+  - $PIPETTE
+  - '*past*'
+- name: pasteur pipettes
+  all_of:
+  - $PIPETTE
+  - '*disp*'
+- name: low retention pipette tips
+  all_of:
+  - '*tip*'
+  - low ret
+- name: low retention pipette tips
+  all_of:
+  - '*tip*'
+  - low reten
+- name: low retention pipette tips
+  all_of:
+  - '*tip*'
+  - lw reten
+- name: low retention pipette tips
+  all_of:
+  - '*tip*'
+  - '*loret*'
+- name: low retention pipette tips
+  all_of:
+  - '*tip*'
+  - lr
+  none_of:
+  - '*fil*'
+  - '*fltr*'
+  - '*filt*'
+  - '*barrier*'
+- name: low retention pipette tips
+  all_of:
+  - '*tip*'
+  - '*lowbind*'
+- name: low retention pipette tips
+  all_of:
+  - '*tip*'
+  - '*lwbnd*'
+- name: low retention pipette tips
+  all_of:
+  - '*tip*'
+  - '*lo bind*'
+- name: low retention pipette tips
+  all_of:
+  - '*tip*'
+  - '*lobind*'
+- name: low retention pipette tips
+  all_of:
+  - '*tip*'
+  - '*low-ret*'
+- name: low retention pipette tips
+  all_of:
+  - '*tip*'
+  - '*low-bind*'
+- name: low retention pipette tips
+  all_of:
+  - '*tip*'
+  - '*low bind*'
+- name: low retention pipette tips
+  all_of:
+  - '*tip*'
+  - '*lowretention*'
+- name: low retention pipette tips
+  all_of:
+  - '*eplort*'
+- name: low retention pipette tips
+  all_of:
+  - '*tip*'
+  - '*rpt*'
+  none_of:
+  - '*fil*'
+  - '*fltr*'
+  - '*barrier*'
+- name: low retention pipette tips
+  all_of:
+  - '*tip*'
+  - '*slick*'
+- name: low retention pipette tips
+  all_of:
+  - '*tip*'
+  - '*zap*'
+- name: low retention pipette tips
+  all_of:
+  - '*pipette*'
+  - '*gps*'
+- name: gel loading pipette tips
+  all_of:
+  - '*tip*'
+  - gel load
+- name: gel loading pipette tips
+  all_of:
+  - '*tip*'
+  - '*gel*'
+  - '*load*'
+- name: gel loading pipette tips
+  all_of:
+  - '*tip*'
+  - '*gel*'
+  - '*round*'
+- name: gel loading pipette tips
+  all_of:
+  - '*flex*'
+  - '*rnd*'
+  none_of:
+  - '*balloon*'
+  - '*ballon*'
+  - '*cryotube*'
+  - '*cryovial*'
+- name: gel loading pipette tips
+  all_of:
+  - '*pipet*'
+  - '*gel*'
+  none_of:
+  - '*agarose*'
+  - '*electrophor*'
+- name: extended length pipette tips
+  all_of:
+  - '*tip*'
+  - '*xl*'
+- name: extended length pipette tips
+  all_of:
+  - '*tip*'
+  - '*extended*'
+- name: extended length pipette tips
+  all_of:
+  - '*tip*'
+  - '*elongated*'
+- name: extended length pipette tips
+  all_of:
+  - '*tip*'
+  - '*xlng*'
+- name: extended length pipette tips
+  all_of:
+  - '*tip*'
+  - '*xlong*'
+- name: extended length pipette tips
+  all_of:
+  - '*tip*'
+  - '*x-long*'
+- name: extended length pipette tips
+  all_of:
+  - '*tip*'
+  - '*reach*'
+  none_of:
+  - '*syringe*'
+  - '*srng*'
+- name: extended length pipette tips
+  all_of:
+  - '*pipet*'
+  - '*xl*'
+- name: extended length pipette tips
+  all_of:
+  - '*pipet*'
+  - '*extended*'
+- name: extended length pipette tips
+  all_of:
+  - '*pipet*'
+  - '*elongated*'
+- name: sterile filtered pipette tips
+  any_of:
+  - '*epdualfilter*'
+  - '*ep dualfilter*'
+  - '*dualfilter*t.i.p*'
+- name: sterile filtered pipette tips
+  any_of:
+  - '*tubegard*'
+  - '*tubeguard*'
+- name: sterile filtered pipette tips
+  all_of:
+  - '*hlt*'
+  any_of:
+  - '*softfit*'
+  - '*sftfitl*'
+  - '*softfitl*'
+  - '*rld*'
+- name: sterile filtered pipette tips
+  all_of:
+  - '*avantguard*'
+- name: sterile filtered pipette tips
+  all_of:
+  - '*tip*'
+  - '*art*'
+  - '*stl*'
+  none_of:
+  - '*xl*'
+  - '*xlng*'
+  - '*extended*'
+- name: sterile filtered pipette tips
+  all_of:
+  - '*tip*'
+  - '*fil*'
+  none_of:
+  - lw reten
+  - low reten
+  - low
+  - '*refil*'
+  - '*syringe*'
+  - '*srng*'
+  - '*syr *'
+  - '*xl*'
+  - '*xlng*'
+  - '*extended*'
+  - '*elongated*'
+  - '*needle*'
+  - '*dispensing*'
+- name: sterile filtered pipette tips
+  all_of:
+  - '*tip*'
+  - '*fitl*'
+  none_of:
+  - lw reten
+  - low reten
+  - low
+  - '*refil*'
+  - '*syringe*'
+  - '*srng*'
+  - '*syr *'
+  - '*xl*'
+  - '*xlng*'
+  - '*extended*'
+  - '*elongated*'
+  - '*needle*'
+  - '*dispensing*'
+- name: sterile filtered pipette tips
+  all_of:
+  - '*tip*'
+  - '*fltr*'
+  none_of:
+  - lw reten
+  - low reten
+  - low
+  - '*refil*'
+  - '*syringe*'
+  - '*srng*'
+  - '*syr *'
+  - '*xl*'
+  - '*xlng*'
+  - '*extended*'
+  - '*elongated*'
+  - '*needle*'
+  - '*dispensing*'
+- name: sterile filtered pipette tips
+  all_of:
+  - '*tip*'
+  - '*barrier*'
+  none_of:
+  - lw reten
+  - low reten
+  - low
+  - '*refil*'
+  - '*syringe*'
+  - '*srng*'
+  - '*syr *'
+  - '*xl*'
+  - '*xlng*'
+  - '*extended*'
+  - '*elongated*'
+  - '*needle*'
+  - '*dispensing*'
+- name: standard pipette tips
+  all_of:
+  - '*tip*'
+  - '*refil*'
+  none_of:
+  - '*fil*'
+  - '*syringe*'
+- name: standard pipette tips
+  all_of:
+  - '*tip*'
+  - '*reload*'
+- name: standard pipette tips
+  all_of:
+  - '*tip*'
+  - '*rload*'
+  none_of:
+  - '*eplort*'
+  - '*loret*'
+  - '*low ret*'
+- name: standard pipette tips
+  all_of:
+  - '*tip*'
+  - $PIPETTE
+  none_of:
+  - '*ser*'
+  - '*optiplex*'
+  - '*multipurpose*'
+  - '*multiple*'
+  - stripet
+  - strpet
+  - gel load
+  - low reten
+  - '*syringe*'
+  - '*srng*'
+- name: standard pipette tips
+  all_of:
+  - '*cliptip*'
+  none_of:
+  - '*fil*'
+  - '*fltr*'
+  - '*barrier*'
+  - '*low ret*'
+  - '*lr*'
+- name: standard pipette tips
+  any_of:
+  - '*bevldtip*'
+  - '*beveldtip*'
+  none_of:
+  - '*fil*'
+  - '*fltr*'
+  - '*barrier*'
+- name: standard pipette tips
+  all_of:
+  - '*eclipse*'
+  any_of:
+  - '*non-sterile*'
+  - '*sterile*'
+  - '*ns*'
+  none_of:
+  - '*fil*'
+  - '*fltr*'
+  - '*barrier*'
+- name: standard pipette tips
+  all_of:
+  - '*biohit*'
+  none_of:
+  - '*fil*'
+  - '*fltr*'
+  - '*barrier*'
+  - '*pipette*'
+- name: standard pipette tips
+  any_of:
+  - '*finntip*'
+  - '*finntp*'
+  - '*fintip*'
+  none_of:
+  - '*fil*'
+  - '*fltr*'
+  - '*barrier*'
+- name: standard pipette tips
+  all_of:
+  - '*tipone*'
+  none_of:
+  - '*fil*'
+  - '*fltr*'
+  - '*barrier*'
+  - '*low ret*'
+  - '*lr*'
+  - '*xl*'
+  - '*extended*'
+  - '*gel*'
+- name: standard pipette tips
+  all_of:
+  - '*suregrip*'
+  none_of:
+  - '*fil*'
+  - '*fltr*'
+  - '*barrier*'
+- name: standard pipette tips
+  all_of:
+  - '*tip*'
+  - '*bulk*'
+  none_of:
+  - '*fil*'
+  - '*fltr*'
+  - '*filt*'
+  - '*barrier*'
+  - '*low ret*'
+  - '*lr*'
+  - '*syringe*'
+  - '*srng*'
+  - '*gel*'
+  - '*xl*'
+  - '*extended*'
+  - '*ser*'
+  - '*past*'
+  - '*cotton*'
+  - '*q-tip*'
+- name: standard pipette tips
+  all_of:
+  - '*tip*'
+  - '*rack*'
+  none_of:
+  - '*fil*'
+  - '*fltr*'
+  - '*filt*'
+  - '*barrier*'
+  - '*low ret*'
+  - '*lr*'
+  - '*syringe*'
+  - '*srng*'
+  - '*gel*'
+  - '*xl*'
+  - '*extended*'
+  - '*ser*'
+  - '*past*'
+  - '*test tube*'
+  - '*microtube*'
+  - '*pcr*'
+- name: standard pipette tips
+  all_of:
+  - '*tip*'
+  - rk
+  none_of:
+  - '*fil*'
+  - '*fltr*'
+  - '*filt*'
+  - '*barrier*'
+  - '*low ret*'
+  - '*lr*'
+  - '*syringe*'
+  - '*srng*'
+  - '*gel*'
+  - '*xl*'
+  - '*extended*'
+  - '*ser*'
+  - '*past*'
+- name: standard pipette tips
+  all_of:
+  - '*tip*'
+  any_of:
+  - '*nat*'
+  - '*natural*'
+  - '*beveled*'
+  - '*bevld*'
+  none_of:
+  - '*fil*'
+  - '*fltr*'
+  - '*filt*'
+  - '*barrier*'
+  - '*low ret*'
+  - '*lr*'
+  - '*syringe*'
+  - '*srng*'
+  - '*gel*'
+  - '*xl*'
+  - '*extended*'
+  - '*ser*'
+  - '*past*'
+  - '*alternative*'
+  - '*national*'
+- name: standard pipette tips
+  any_of:
+  - '*ept.i.p*'
+  - '*ep t.i.p*'
+  none_of:
+  - '*dualfilter*'
+  - '*filter*'
+  - '*fltr*'
+  - '*loret*'
+  - '*low ret*'
+- name: standard pipette tips
+  all_of:
+  - '*sftfitl*'
+  none_of:
+  - '*hlt*'
+  - '*fil*'
+  - '*fltr*'
+  - '*barrier*'
+- name: standard pipette tips
+  all_of:
+  - '*softfitl*'
+  none_of:
+  - '*hlt*'
+  - '*fil*'
+  - '*fltr*'
+  - '*barrier*'
+- name: standard pipette tips
+  all_of:
+  - '*softfit-l*'
+  none_of:
+  - '*hlt*'
+  - '*fil*'
+  - '*fltr*'
+  - '*barrier*'
+- name: nitrile gloves
+  all_of:
+  - $NITRILE
+  - $GLOVES
+- name: latex gloves
+  all_of:
+  - '*latex*'
+  - $GLOVES
+- name: latex gloves
+  all_of:
+  - ltx
+  - $GLOVES
+- name: stir bars
+  any_of:
+  - $STIR_BAR
+  none_of:
+  - retriever
+  - stir bar retrievers
+- name: scintillation vials
+  all_of:
+  - vial
+  - scint
+- name: pcr tube strips
+  all_of:
+  - '*pcr*'
+  - '*strip*'
+  - $TUBE
+- name: test tubes
+  all_of:
+  - test tubes
+  none_of:
+  - rack
+  - rck
+  - centrifuge
+  - cntrifuge
+- name: test tubes
+  all_of:
+  - borosil
+  - dct
+- name: microcentrifuge tubes
+  all_of:
+  - microtub
+- name: microcentrifuge tubes
+  all_of:
+  - microtbe
+- name: microcentrifuge tubes
+  all_of:
+  - microtub
+- name: microcentrifuge tubes
+  all_of:
+  - $TUBE
+  - '*microcent*'
+- name: microcentrifuge tubes
+  all_of:
+  - $TUBE
+  - '*lobnd*'
+- name: microcentrifuge tubes
+  all_of:
+  - $TUBE
+  - '*mct*'
+- name: centrifuge conical tubes
+  all_of:
+  - $TUBE
+  - '*cent*'
+  none_of:
+  - '*configurationid*'
+  - '*oligo*'
+  - '*sequence*'
+  - '*concentration*'
+- name: centrifuge conical tubes
+  all_of:
+  - $TUBE
+  - '*cfg*'
+- name: centrifuge conical tubes
+  all_of:
+  - $TUBE
+  - '*cnt*'
+  none_of:
+  - '*configurationid*'
+  - '*oligo*'
+  - '*sequence*'
+- name: centrifuge conical tubes
+  all_of:
+  - $TUBE
+  - '*conic*'
+  none_of:
+  - '*configurationid*'
+  - '*oligo*'
+  - '*sequence*'
+- name: centrifuge conical tubes
+  all_of:
+  - cap
+  - cb
+  - ct
+- name: centrifuge conical tubes
+  all_of:
+  - $TUBE
+  - flatpp
+- name: centrifuge conical tubes
+  all_of:
+  - $TUBE
+  - conical
+  none_of:
+  - '*configurationid*'
+  - '*oligo*'
+  - '*sequence*'
+- name: pcr tubes
+  all_of:
+  - '*pcr*'
+  - $TUBE
+  none_of:
+  - '*configurationid*'
+  - '*oligo*'
+  - '*sequence*'
+  - '*purification*'
+- name: pcr tubes
+  all_of:
+  - '*smrtcyclr*'
+  - $TUBE
+  none_of:
+  - sequence
+  - '*rack*'
+- name: cell culture tubes
+  all_of:
+  - $TUBE
+  - '*ct*'
+  - cellstar
+- name: cell culture tubes
+  all_of:
+  - $TUBE
+  - tc
+- name: cell culture tubes
+  all_of:
+  - $TUBE
+  - '*cult*'
+- name: cell culture plates
+  all_of:
+  - $PLATE
+  - tc
+  none_of:
+  - no-tc
+- name: cell culture plates
+  all_of:
+  - $PLATE
+  - '*cult*'
+  none_of:
+  - no-tc
+- name: cell culture plates
+  all_of:
+  - $PLATE
+  - '*cltr*'
+  none_of:
+  - no-tc
+- name: cell culture plates
+  all_of:
+  - $PLATE
+  - '*tissue*'
+  none_of:
+  - no-tc
+- name: cell culture plates
+  all_of:
+  - $PLATE
+  - biolite
+  none_of:
+  - no-tc
+- name: cell culture plates
+  all_of:
+  - $PLATE
+  - '*ster'
+  none_of:
+  - no-tc
+- name: cell culture plates
+  all_of:
+  - $PLATE
+  - '*bacti*'
+  none_of:
+  - no-tc
+- name: cell culture plates
+  all_of:
+  - $PLATE
+  - '*hbind*'
+  none_of:
+  - no-tc
+- name: cell culture plates
+  all_of:
+  - $PLATE
+  - '*tis*'
+  none_of:
+  - no-tc
+- name: cell culture plates
+  all_of:
+  - $PLATE
+  - st
+  none_of:
+  - no-tc
+- name: cell culture dishes
+  all_of:
+  - '*dish*'
+  - '*tissue*'
+- name: cell culture dishes
+  all_of:
+  - dish
+  - tc
+- name: cell culture dishes
+  all_of:
+  - dish
+  - cell culture
+- name: surface binding assay microplates
+  all_of:
+  - '*plt*'
+  - no-tc
+- name: nonlab - disposable wipes and towels
+  any_of:
+  - '*kimwipe*'
+  - '*kim wipe*'
+  - '*kimtech*'
+  - '*kaydry*'
+  - '*wypall*'
+  - '*accutech*'
+- name: nonlab - disposable wipes and towels
+  all_of:
+  - '*wipe*'
+  none_of:
+  - '*antibod*'
+  - '*pipet*'
+- name: nonlab - disposable wipes and towels
+  all_of:
+  - '*task*'
+  - '*wiper*'
+- name: nonlab - disposable wipes and towels
+  all_of:
+  - '*delicate*'
+  - '*task*'
+- name: nonlab - disposable wipes and towels
+  all_of:
+  - '*lens*'
+  - '*tissue*'
+- name: face masks
+  all_of:
+  - '*resp'
+  - p95
+- name: face masks
+  all_of:
+  - '*face*'
+  - '*mask*'
+- name: face masks
+  all_of:
+  - surgical
+  - mask
+- name: face masks
+  all_of:
+  - '*face*'
+  - '*msk*'
+- name: face masks
+  all_of:
+  - '*resp*'
+  - '*medical*'
+- name: face masks
+  all_of:
+  - '*mask*'
+  - '*hvy*'
+  - '*dty*'
+- name: ethanol
+  all_of:
+  - '*etoh*'
+  - '*proof*'
+- name: ethanol
+  all_of:
+  - etoh
+  none_of:
+  - paraffin
+- name: ethanol
+  all_of:
+  - alcohol
+  - proof
+- name: ethanol
+  all_of:
+  - ethylalco
+- name: ethanol
+  all_of:
+  - ethylalchl
+- name: ethanol
+  all_of:
+  - ethyl alcohol
+- name: ethanol
+  all_of:
+  - ethyl
+  - alchl
+- name: ethanol
+  all_of:
+  - ethyl
+  - alco
+- name: ethanol
+  all_of:
+  - eth
+  - alc
+- name: ethanol
+  all_of:
+  - alcohol
+  - reagent
+- name: erlenmeyer flasks
+  all_of:
+  - '*erlen*'
+  - $FLASK
+- name: erlenmeyer flasks
+  all_of:
+  - shake
+  - $FLASK
+- name: erlenmeyer flasks
+  all_of:
+  - '*erl'
+  - $FLASK
+- name: erlenmeyer flasks
+  all_of:
+  - baf
+  - $FLASK
+- name: formaldehydes and paraformaldehydes
+  any_of:
+  - '*formldhyd*'
+  - '*formaldehyde*'
+  - '*paraformald*'
+  - '*prfrmldhyd*'
+- name: hanks' balanced salt solution (hbss) buffer
+  all_of:
+  - hbss
+- name: temed
+  all_of:
+  - temed
+- name: acetic acid
+  all_of:
+  - '*acet*'
+  - '*acid*'
+- name: nonlab - disposable wipes and towels
+  any_of:
+  - kimwipe
+  - napkin
+  - paper towels
+  - kimwps
+  - bleach towels
+- name: uncoated sandwich colorimetric elisa kits
+  any_of:
+  - '*duoset*'
+  - '*duo set*'
+  none_of:
+  - '*ancillary*'
+- name: pre-coated sandwich colorimetric elisa kits
+  any_of:
+  - '*quantikine*'
+- name: pre-coated sandwich colorimetric elisa kits
+  all_of:
+  - '*elisa*'
+  - '*kit*'
+  none_of:
+  - '*uncoated*'
+  - '*max*'
+  - '*buffer*'
+  - '*starter*'
+  - '*accessory*'
+  - '*duoset*'
+- name: uncoated sandwich colorimetric elisa kits
+  all_of:
+  - '*elisa max*'
+- name: pre-coated sandwich colorimetric elisa kits
+  any_of:
+  - '*eia kit*'
+  none_of:
+  - '*uncoated*'
+- name: bioluminescent immunoassay kit
+  any_of:
+  - '*legendplex*'
+- name: cell viability kits
+  any_of:
+  - '*celltiter*'
+  - '*cell titer*'
+  - '*alamar blue*'
+  - '*alamarblue*'
+  - '*resazurin*'
+  - '*presto blue*'
+  - '*prestoblue*'
+  - '*cck-8*'
+  - '*cell counting kit*'
+  - '*mtt cell*'
+  - '*xtt cell*'
+  - '*wst-1*'
+- name: ldh cytotoxicity assay
+  any_of:
+  - '*ldh*cytotox*'
+  - '*ldh*cytox*'
+  - '*ldh cyto*'
+  - '*cytotoxicity detection kit*ldh*'
+- name: viability/cytotoxicity kit
+  all_of:
+  - '*live*dead*'
+  - '*viability*'
+- name: viability/cytotoxicity kit
+  any_of:
+  - '*multitox*'
+- name: bioluminescence assay kit
+  any_of:
+  - '*luciferase assay*'
+  - '*bright-glo*'
+  - '*brightglo*'
+  - '*nano-glo*'
+  - '*nanoglo*'
+  - '*dual-luciferase*'
+  - '*dual luciferase*'
+  - '*steady-glo*'
+  - '*steadyglo*'
+  - '*one-glo*'
+  - '*vivazine*'
+  none_of:
+  - '*d-luciferin*'
+- name: protein quantitation assay kits
+  any_of:
+  - '*bio-rad protein assay*'
+  - '*bradford protein*'
+  - '*bradford assay*'
+  - '*bca protein assay*'
+  - '*pierce bca*'
+  - '*modified lowry*'
+  - '*qubit protein*'
+  - '*nanodrop protein*'
+  - '*protein assay dye*'
+- name: seamless cloning kits
+  any_of:
+  - '*gibson assembly*'
+  - '*in-fusion*'
+  - '*hifi assembly*'
+  - '*nebuilder*'
+  none_of:
+  - '*competent*'
+- name: ta cloning kits
+  any_of:
+  - '*pgem*t*easy*'
+  - '*pgem*t easy*'
+  - '*pgem-t*'
+  - '*t-vector*'
+  - '*topo ta*'
+  - '*ta cloning*'
+- name: gateway cloning kits
+  any_of:
+  - '*clonase*'
+  - '*gateway*bp*'
+  - '*gateway*lr*'
+  none_of:
+  - '*competent*'
+- name: cell culture antibiotics - geneticin
+  any_of:
+  - '*geneticin*'
+  - '*g418*'
+  - '*g 418*'
+  none_of:
+  - '*pen*strep*'
+- name: cell culture antibiotics - puromycin
+  any_of:
+  - '*puromycin*'
+- name: cell culture antibiotics - blasticidin
+  any_of:
+  - '*blasticidin*'
+- name: cell culture antibiotics - hygromycin
+  any_of:
+  - '*hygromycin*'
+- name: cell culture antibiotics - zeocin
+  any_of:
+  - '*zeocin*'
+- name: cell culture antifungals
+  any_of:
+  - '*fungizone*'
+  - '*antimycotic*'
+  - '*amphotericin b*'
+  - '*amphotericin-b*'
+  none_of:
+  - '*antimycin a*'
+- name: recombinant human protein
+  all_of:
+  - '*recombinant human*'
+  none_of:
+  - '*antibod*'
+  - '*dnase*'
+  - '*albumin*'
+- name: recombinant human protein
+  all_of:
+  - '*rp human*'
+  none_of:
+  - '*antibod*'
+- name: recombinant mouse protein
+  all_of:
+  - '*recombinant mouse*'
+  none_of:
+  - '*antibod*'
+  - '*albumin*'
+- name: recombinant mouse protein
+  all_of:
+  - '*rp mouse*'
+  none_of:
+  - '*antibod*'
+- name: recombinant human protein
+  any_of:
+  - '*peprotech*'
+  all_of:
+  - '*human*'
+  none_of:
+  - '*antibod*'
+  - '*elisa*'
+  - '*duoset*'
+- name: sequencing - library prep kit
+  any_of:
+  - '*library prep*'
+  - '*lib prep*'
+  - '*quantseq*'
+  - '*nextera*'
+  - '*truseq*'
+  - '*smarter*rna-seq*'
+  - '*smrna-seq*'
+  - '*chromium*single cell*'
+  none_of:
+  - '*oligo*'
+- name: magnetic-bead based purificaton kit
+  any_of:
+  - '*ampure*'
+  - '*spriselect*'
+  none_of:
+  - '*spring*'
+- name: sirna transfection reagents
+  any_of:
+  - '*dharmafect*'
+  - '*dharma*transfect*'
+  - '*sirna*transfect*'
+  - '*rnaimax*'
+  none_of:
+  - '*lipofectamine*'
+- name: drug - chemotherapy agents
+  any_of:
+  - '*cisplatin*'
+  - '*carboplatin*'
+  - '*oxaliplatin*'
+  - '*paclitaxel*'
+  - '*docetaxel*'
+  - '*doxorubicin*'
+  - '*tamoxifen*'
+  - '*enzalutamide*'
+  - '*temozolomide*'
+  - '*cytarabine*'
+  none_of:
+  - '*antibod*'
+  - '*elisa*'
+  - '*assay*'
+- name: small molecule inhibitors
+  any_of:
+  - '*ly294002*'
+  - '*ly 294002*'
+  - '*pd98059*'
+  - '*pd 98059*'
+  - '*sb203580*'
+  - '*sb 203580*'
+  - '*u0126*'
+  - '*sp600125*'
+  - '*bay 11-7082*'
+  - '*mg132*'
+  - '*wortmannin*'
+  - '*staurosporine*'
+  - '*rapamycin*'
+  - '*thapsigargin*'
+  - '*tunicamycin*'
+  - '*bafilomycin*'
+  - '*brefeldin a*'
+  - '*nocodazole*'
+  - '*nutlin*'
+  - '*roscovitine*'
+  none_of:
+  - '*antibod*'
+  - '*elisa*'
+- name: cellular metabolism assay kits
+  any_of:
+  - '*seahorse*'
+  - '*xf assay*'
+  - '*xfe96*'
+  - '*mito stress*'
+  - '*glycolysis stress*'
+  - '*glycolytic rate*'
+- name: cellular metabolism assay kits
+  all_of:
+  - '*assay kit*'
+  any_of:
+  - '*lipid peroxidation*'
+  - '*glutathione*'
+  - '*glycogen*'
+  - '*glutamine*'
+  - '*lactate*'
+  - '*atp*'
+  - '*nad*'
+  - '*acetyl-coa*'
+  none_of:
+  - '*elisa*'
+- name: slide mounting medium
+  any_of:
+  - '*permount*'
+  - '*cytoseal*'
+  - '*aqua-mount*'
+  - '*aquamount*'
+  - '*eukitt*'
+  - '*entellan*'
+  - '*canada balsam*'
+- name: cell culture coating reagents
+  any_of:
+  - '*matrigel*'
+  - '*geltrex*'
+  - '*cultrex*'
+  none_of:
+  - '*organ*'
+- name: magnetic polystyrene beads
+  any_of:
+  - '*dynabeads*'
+  none_of:
+  - '*streptavidin*'
+  - '*protein a*'
+  - '*protein g*'
+  - '*anti-*'
+  - '*oligo*'
+- name: blocking buffers
+  any_of:
+  - '*odyssey*blocking*'
+  - '*protein-free*blocking*'
+  - '*blocking buffer*'
+- name: blocking reagents
+  any_of:
+  - '*background punisher*'
+  - '*m.o.m.*blocking*'
+  - '*mouse on mouse*blocking*'
+- name: western blot transfer buffers
+  any_of:
+  - '*transfer buffer*'
+  - '*transfer buf*'
+  all_of:
+  - '*bolt*'
+- name: western blot transfer buffers
+  all_of:
+  - '*transfer*'
+  - '*buffer*'
+  - '*blot*'
+- name: rna extraction reagents
+  any_of:
+  - '*rna-bee*'
+  - '*rna bee*'
+  - '*stat-60*'
+  - '*ribozol*'

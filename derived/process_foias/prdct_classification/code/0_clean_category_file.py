@@ -219,7 +219,12 @@ def main():
         if key in df_ut.columns and key in df_cat.columns:
             df_ut[key] = df_ut[key].astype(str)
             df_cat[key] = df_cat[key].astype(str)
-
+    print("\nDropping duplicates from category mapping file to ensure unique merge keys...")
+    initial_cat_len = len(df_cat)
+    df_cat = df_cat.drop_duplicates(subset=config.UT_DALLAS_MERGE_KEYS, keep='first')
+    rows_dropped = initial_cat_len - len(df_cat)
+    if rows_dropped > 0:
+        print(f"  - Dropped {rows_dropped} duplicate rows from the category file.")
     # 5. Perform an inner merge to keep only matched rows
     print("\nMerging files (inner merge to keep only matched rows)...")
     df_merged = pd.merge(df_ut, df_cat, on=config.UT_DALLAS_MERGE_KEYS, how='inner', validate="many_to_one")
@@ -248,7 +253,7 @@ def main():
     # --- Consolidate ELISA kit subcategories ---
     print("\nConsolidating ELISA kit subcategories...")
     cat_col = df_merged[config.UT_CAT_COL].astype(str).str.lower()
-    is_elisa = cat_col.str.contains("elisa", na=False)
+    is_elisa = cat_col.str.contains("elisa", na=False) & ~cat_col.str.contains("buffer", na=False)
     n_elisa_before = cat_col[is_elisa].nunique()
     n_elisa_rows = is_elisa.sum()
     df_merged.loc[is_elisa, config.UT_CAT_COL] = "elisa kits"
