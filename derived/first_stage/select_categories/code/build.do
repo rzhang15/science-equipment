@@ -380,13 +380,13 @@ program select_good_categories
 
     gen treated_strict = (tier1 == 1)
     gen treated_1and2  = (tier1 == 1 | tier2 == 1)
-    gen treated_all    = (tier1 == 1 | tier2 == 1 | tier3 == 1)
+    gen treated    = (tier1 == 1 | tier2 == 1 | tier3 == 1)
 
     * Summary
     tab tier1
     tab tier2
     tab tier3
-    tab treated_all
+    tab treated
     gen keep  = (support >= 25 & precision >= 0.80 & recall >= 0.80) //| (inrange(support, 10, 25) & precision >= 0.9 & recall >=0.90) 
     save ../output/categories_`embed', replace
 end
