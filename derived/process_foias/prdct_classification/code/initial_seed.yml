@@ -594,3 +594,34 @@ keywords:
   - SwaI
   - XbaI
   - XhoI
+
+  # ====================================================================
+  # Cell Lines (common names, min 5 chars to avoid Aho-Corasick collateral)
+  # ====================================================================
+  - hek-293
+  - hl-60
+  - jurkat
+  - thp-1
+  - mcf-7
+  - sh-sy5y
+  - raw 264
+  - u-937
+  - vero cell
+  - mdck
+
+  # ====================================================================
+  # Chemicals & Reagents (missed by existing seeds -- from FN analysis)
+  # ====================================================================
+  - histamine
+  - cesium chloride
+  - bacitracin
+  - diethyl pyrocarbonate
+  - depc
+  - immersion oil
+  - cytoseal
+  - westernsure
+  - spill kit
+  - corn oil
+  - sulfur
+  - pyrophosphatase
+  - n-ethylmaleimide

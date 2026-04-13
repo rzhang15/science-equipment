@@ -282,5 +282,141 @@ def main():
     print(f"\nFinal clean and merged data saved to: {config.UT_DALLAS_MERGED_CLEAN_PATH}")
     print("--- Step 0: Complete ---")
 
+def main_umich():
+    print("--- Starting Step 0: Cleaning and Merging UMich Data (2010-2019) ---")
+
+    os.makedirs(config.TEMP_DIR, exist_ok=True)
+
+    print("Loading raw data files...")
+    try:
+        df_um = pd.read_csv(config.UMICH_CLEAN_CSV, low_memory=False)
+        df_cat = pd.read_excel(config.UMICH_CATEGORIES_XLSX, keep_default_na=False, na_values=[''])
+        print(f"  - Loaded {len(df_um)} rows from UMich main file.")
+        print(f"  - Loaded {len(df_cat)} rows from category mapping file.")
+    except FileNotFoundError as e:
+        print(f"Error loading data files: {e}. Make sure paths in config.py are correct.")
+        return
+
+    # Filter to 2010-2019
+    print("Filtering to 2010-2019...")
+    df_um['date'] = pd.to_datetime(df_um['date'], errors='coerce')
+    df_um = df_um[df_um['date'].dt.year.between(2010, 2019)]
+    print(f"  - {len(df_um)} rows after year filter (2010-2019).")
+
+    # =========================================================================
+    # Category Standardization Pipeline (same as UT Dallas)
+    # =========================================================================
+    print("\n--- Category Standardization Pipeline ---")
+
+    print("  Step 3a: Normalizing unicode, lowercase, stripping whitespace...")
+    if config.UT_CAT_COL in df_cat.columns:
+        df_cat[config.UT_CAT_COL] = df_cat[config.UT_CAT_COL].astype(str).apply(clean_category_string)
+
+    if 'old_category' in df_cat.columns:
+        df_cat['old_category'] = df_cat['old_category'].astype(str).apply(clean_category_string)
+        df_cat[config.UT_CAT_COL] = df_cat[config.UT_CAT_COL].replace('', pd.NA).fillna(df_cat['old_category'])
+
+    n_categories_before = df_cat[config.UT_CAT_COL].nunique()
+    print(f"  Unique categories after normalization: {n_categories_before}")
+
+    print("  Step 3b: Applying known typo corrections...")
+    n_typos_fixed = 0
+    if config.UT_CAT_COL in df_cat.columns:
+        mask = df_cat[config.UT_CAT_COL].isin(TYPO_CORRECTIONS.keys())
+        n_typos_fixed = mask.sum()
+        df_cat[config.UT_CAT_COL] = df_cat[config.UT_CAT_COL].replace(TYPO_CORRECTIONS)
+    print(f"  Fixed {n_typos_fixed} rows with known typos ({len(TYPO_CORRECTIONS)} correction rules)")
+
+    print("  Step 3c: Detecting and merging singular/plural category pairs...")
+    if config.UT_CAT_COL in df_cat.columns:
+        unique_categories = set(df_cat[config.UT_CAT_COL].dropna().unique())
+        plural_map = build_plural_map(unique_categories)
+
+        if plural_map:
+            df_cat[config.UT_CAT_COL] = df_cat[config.UT_CAT_COL].replace(plural_map)
+            print(f"  Merged {len(plural_map)} singular/plural pairs")
+            sample_merges = list(plural_map.items())[:10]
+            for singular, plural in sample_merges:
+                print(f"    '{singular}' -> '{plural}'")
+            if len(plural_map) > 10:
+                print(f"    ... and {len(plural_map) - 10} more")
+        else:
+            print("  No singular/plural pairs detected.")
+
+    n_categories_after = df_cat[config.UT_CAT_COL].nunique()
+    print(f"\n  Category count: {n_categories_before} -> {n_categories_after} "
+          f"(reduced by {n_categories_before - n_categories_after})")
+
+    # Prepare keys for merging
+    for key in config.UMICH_MERGE_KEYS:
+        if key in df_um.columns and key in df_cat.columns:
+            df_um[key] = df_um[key].astype(str)
+            df_cat[key] = df_cat[key].astype(str)
+
+    print("\nDropping duplicates from category mapping file to ensure unique merge keys...")
+    initial_cat_len = len(df_cat)
+    df_cat = df_cat.drop_duplicates(subset=config.UMICH_MERGE_KEYS, keep='first')
+    rows_dropped = initial_cat_len - len(df_cat)
+    if rows_dropped > 0:
+        print(f"  - Dropped {rows_dropped} duplicate rows from the category file.")
+
+    print("\nMerging files (inner merge to keep only matched rows)...")
+    df_merged = pd.merge(df_um, df_cat, on=config.UMICH_MERGE_KEYS, how='inner', validate="many_to_one")
+    print(f"  - Merge complete. Resulting dataset has {len(df_merged)} rows.")
+
+    initial_rows = len(df_merged)
+    df_merged.dropna(subset=[config.CLEAN_DESC_COL, config.UT_CAT_COL], inplace=True)
+    rows_dropped = initial_rows - len(df_merged)
+    if rows_dropped > 0:
+        print(f"  - Dropped {rows_dropped} rows due to missing descriptions or categories.")
+
+    # Consolidate antibody categories
+    print("\nConsolidating antibody categories...")
+    cat_col = df_merged[config.UT_CAT_COL].astype(str).str.lower()
+    is_antibody = cat_col.str.contains("antibod", na=False)
+    is_primary = cat_col.str.contains("primary", na=False)
+    is_secondary = cat_col.str.contains("secondary", na=False)
+    n_ab_before = cat_col[is_antibody].nunique()
+    df_merged.loc[is_antibody & is_primary, config.UT_CAT_COL] = "primary antibodies"
+    df_merged.loc[is_antibody & is_secondary, config.UT_CAT_COL] = "secondary antibodies"
+    n_ab_after = df_merged.loc[is_antibody, config.UT_CAT_COL].nunique()
+    print(f"  Merged {n_ab_before} antibody subcategories -> {n_ab_after} "
+          f"({is_antibody.sum()} rows: primary antibodies + secondary antibodies)")
+
+    # Consolidate ELISA kit subcategories
+    print("\nConsolidating ELISA kit subcategories...")
+    cat_col = df_merged[config.UT_CAT_COL].astype(str).str.lower()
+    is_elisa = cat_col.str.contains("elisa", na=False) & ~cat_col.str.contains("buffer", na=False)
+    n_elisa_before = cat_col[is_elisa].nunique()
+    n_elisa_rows = is_elisa.sum()
+    df_merged.loc[is_elisa, config.UT_CAT_COL] = "elisa kits"
+    print(f"  Merged {n_elisa_before} ELISA subcategories ({n_elisa_rows} rows) -> 'elisa kits'")
+
+    # Consolidate pipette tip subcategories
+    print("\nConsolidating pipette tip subcategories...")
+    cat_col = df_merged[config.UT_CAT_COL].astype(str).str.lower()
+    is_pipette_tip = cat_col.str.contains("pipette tip", na=False)
+    n_tip_consolidated = is_pipette_tip.sum()
+    df_merged.loc[is_pipette_tip, config.UT_CAT_COL] = "pipette tips"
+    tip_cats_merged = cat_col[is_pipette_tip].nunique()
+    print(f"  Merged {tip_cats_merged} pipette tip subcategories ({n_tip_consolidated} rows) -> 'pipette tips'")
+
+    # Generate and save category counts for review
+    print("\nGenerating and saving category counts...")
+    category_counts = df_merged[config.UT_CAT_COL].value_counts().reset_index()
+    category_counts.columns = ['category', 'count']
+    counts_output_path = os.path.join(config.OUTPUT_DIR, 'umich_category_counts.csv')
+    category_counts.to_csv(counts_output_path, index=False)
+    print(f"  Category counts saved to: {counts_output_path}")
+    print(f"  Final unique categories: {df_merged[config.UT_CAT_COL].nunique()}")
+
+    df_merged.to_parquet(config.UMICH_MERGED_CLEAN_PATH, index=False)
+    print(f"\nFinal clean and merged data saved to: {config.UMICH_MERGED_CLEAN_PATH}")
+    print("--- Step 0 (UMich): Complete ---")
+
+
 if __name__ == "__main__":
+    print(f"[Variant: {config.VARIANT}]")
     main()
+    if config.USE_UMICH:
+        main_umich()

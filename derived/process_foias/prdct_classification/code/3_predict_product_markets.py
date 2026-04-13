@@ -18,7 +18,7 @@ from rule_based_categorizer import RuleBasedCategorizer
 from categorize_items import TfidfItemCategorizer, EmbeddingItemCategorizer
 
 def main(gatekeeper_name: str, expert_choice: str, source_abbrev: str = None):
-    print(f"--- Starting Prediction Pipeline ---")
+    print(f"--- Starting Prediction Pipeline [Variant: {config.VARIANT}] ---")
     print(f"  - Gatekeeper Model:    {gatekeeper_name}")
     print(f"  - Expert Model Choice:   {expert_choice}")
     print(f"  - Data Source:         {source_abbrev or 'All Universities/GovSpend'}")
@@ -133,7 +133,16 @@ def main(gatekeeper_name: str, expert_choice: str, source_abbrev: str = None):
             print(f"  - WARNING:Skipping file: Still missing required column '{config.CLEAN_DESC_COL}' after checks.")
             continue
             
-        descriptions = df_new[config.CLEAN_DESC_COL].astype(str).fillna("")
+        clean_descriptions = df_new[config.CLEAN_DESC_COL].astype(str).fillna("")
+
+        # For the gatekeeper: optionally prepend supplier tokens
+        if config.USE_SUPPLIER and 'supplier' in df_new.columns:
+            descriptions = df_new.apply(
+                lambda r: (config.normalize_supplier(str(r['supplier'])) + ' ' + str(r[config.CLEAN_DESC_COL])).strip(),
+                axis=1
+            )
+        else:
+            descriptions = clean_descriptions
 
         # --- Pipeline Logic ---
         df_new['prediction_source'] = 'Non-Lab'
@@ -162,7 +171,9 @@ def main(gatekeeper_name: str, expert_choice: str, source_abbrev: str = None):
                 print(f"  - Supplier filter: {supplier_override_count} items forced to Non-Lab ({supplier_nonlab_mask.sum()} total supplier Non-Lab).")
 
         if is_lab_mask.any():
-            lab_descriptions = descriptions[is_lab_mask]
+            # Expert model uses clean descriptions (no supplier token) for
+            # content-based category matching
+            lab_descriptions = clean_descriptions[is_lab_mask]
             
             print(f"  - Step 2: Predicting markets with '{expert_choice}' expert...")
             tqdm.pandas(desc="    - Predicting")
@@ -223,7 +234,7 @@ def main(gatekeeper_name: str, expert_choice: str, source_abbrev: str = None):
         if final_lab_mask.any():
             lab_indices = final_lab_mask[final_lab_mask].index
             lab_final_preds = y_pred[lab_indices]
-            lab_final_descs = descriptions[lab_indices]
+            lab_final_descs = clean_descriptions[lab_indices]
 
             if embedding_type == 'bert':
                 lab_embeddings = vectorizer_for_similarity.encode(lab_final_descs.tolist(), show_progress_bar=True, batch_size=128)

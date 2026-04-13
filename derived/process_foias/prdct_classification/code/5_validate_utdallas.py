@@ -21,7 +21,7 @@ import config
 
 def main(gatekeeper_name: str, expert_choice: str, min_support: int = 25):
     print("="*80)
-    print("--- Starting Validation on PRE-CLASSIFIED UT Dallas Data ---")
+    print(f"--- Starting Validation on PRE-CLASSIFIED UT Dallas Data [Variant: {config.VARIANT}] ---")
     print(f"  - Gatekeeper Model:      {gatekeeper_name}")
     print(f"  - Expert Model Choice:   {expert_choice}")
     print(f"  - Summary Report Support: >= {min_support} items")

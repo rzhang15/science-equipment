@@ -16,7 +16,7 @@ import config
 from classifier import HybridClassifier, load_keywords_and_build_automaton, extract_market_keywords_and_build_automaton
 
 def main(embedding_name: str):
-    print(f"--- Training Hybrid Model with '{embedding_name}' Embeddings ---")
+    print(f"--- Training Hybrid Model with '{embedding_name}' Embeddings [Variant: {config.VARIANT}] ---")
 
     embedding_path = os.path.join(config.OUTPUT_DIR, f"embeddings_{embedding_name}.joblib")
     if not os.path.exists(embedding_path):
@@ -80,7 +80,12 @@ def main(embedding_name: str):
 
     if not df_test_utdallas.empty:
         print(f"  - Found {len(df_test_utdallas)} UT Dallas items in the hold-out set.")
-        descriptions_utdallas = df_test_utdallas[config.CLEAN_DESC_COL].fillna('')
+        # Use prepared_description (with supplier token if applicable) so eval
+        # matches what the gatekeeper was trained on
+        if config.USE_SUPPLIER and 'prepared_description' in df_test_utdallas.columns:
+            descriptions_utdallas = df_test_utdallas['prepared_description'].fillna('')
+        else:
+            descriptions_utdallas = df_test_utdallas[config.CLEAN_DESC_COL].fillna('')
         y_true_utdallas = df_test_utdallas['label']
 
         # Get predictions from the full hybrid model

@@ -128,6 +128,7 @@ class HybridClassifier:
                          'has_strong_signal': []}
 
         for i, desc in enumerate(descriptions):
+            desc = config.clean_for_model(desc) if isinstance(desc, str) else ''
             is_anti_seed = has_match(desc, self.anti_seed_automaton)
             is_market_rule = has_match(desc, self.market_rule_automaton)
             is_seed = has_match(desc, self.seed_automaton)

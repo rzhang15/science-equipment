@@ -98,10 +98,16 @@ required_keywords:
     - benz*
     - hex*
     - furfuryl
-    - isopropaol
+    - isopropanol
     - oxy*
     - metha*
     - amino*
+  dmf:
+    none_of:
+    - hexane
+  chloroform:
+    none_of:
+    - chloroform-d 
 keyword_groups:
   ASSAY_OR_KIT:
   - '*kit*'
@@ -504,6 +510,29 @@ market_rules:
   - '*cloning site*'
   - '*Gene Synthesis*'
   - '*gene synthesis*'
+- name : recombinant human protein
+  all_of:
+  - gdnf
+- name : recombinant human protein
+  all_of:
+  - alpha-lbd 
+- name : recombinant human protein
+  all_of:
+  - ar-lbd 
+- name : recombinant human protein
+  all_of:
+  - bfgf 
+- name : recombinant human protein
+  all_of:
+  - rec
+  - hu 
+- name : recombinant human protein
+  all_of:
+  - recombinant
+  - human
+- name : recombinant human protein
+  all_of:
+  - paps 
 - name: monoclonal secondary antibody
   all_of:
   - secondary
@@ -882,6 +911,45 @@ market_rules:
   - '*anti-*'
   none_of:
   - '*secondary*'
+- name: primary antibodies 
+  all_of:
+  - antibody
+  any_of:
+  - capase-9 
+  - capase-3 
+- name: secondary antibodies 
+  all_of:
+  - rabbit
+  - sheep
+  - igg
+- name: secondary antibodies 
+  all_of:
+  - rabbit
+  - goat 
+  - igg
+- name: secondary antibodies 
+  all_of:
+  - rabbit
+  - goat 
+  - alexa fluor 
+- name: secondary antibodies 
+  all_of:
+  - dky 
+  - anti-gt 
+  - igg
+- name: secondary antibodies 
+  all_of:
+  - goat 
+  - anti-mouse 
+  - igg
+- name: secondary antibodies 
+  all_of:
+  - alexa fluor 
+  - donkey 
+- name: polyclonal primary antibody
+  any_of:
+  - pab 
+  - rabbit 
 - name: polyclonal primary antibody
   all_of:
   - antibody
@@ -1294,6 +1362,12 @@ market_rules:
   all_of:
   - '*annexin*'
   - '*dead*'
+- name: fluorophore - bioconjugate dyes
+  all_of:
+  - 'rhodamine isothiocyanate'
+- name: fluorophore - bioconjugate dyes
+  all_of:
+  - 'carboxyfluorescein'
 - name: nitrogen
   all_of:
   - nitrogen
@@ -1366,7 +1440,10 @@ market_rules:
 - name: nucleic acid gel stains
   all_of:
   - '*gel*'
-  - '*stain*'
+  - 'stain'
+  none_of:
+  - '*tray*'
+  - '*kit*'
 - name: histology & cell stains
   all_of:
   - dapi
@@ -1448,12 +1525,12 @@ market_rules:
   all_of:
   - spin
   - column
-- name: column-based rna miniprep
+- name: column-based rna purification kits
   all_of:
   - miniprep
   - rna
   - $ASSAY_OR_KIT
-- name: column-based rna miniprep
+- name: column-based rna purification kits 
   all_of:
   - purelink
   - rna
@@ -1832,58 +1909,58 @@ market_rules:
   all_of:
   - fta hemaglutn
   - '7.2'
-- name: cell lysis detergents
+- name: cell lysis detergents - sodium deoxycholate
   all_of:
   - sodium
   - deoxycholate
-- name: cell lysis detergents
+- name: cell lysis detergents - np-40 (igepal ca-630)
   all_of:
   - '*igepal*'
-- name: cell lysis detergents
+- name: cell lysis detergents - sds (sodium dodecyl sulfate)
   all_of:
   - sds
   none_of:
   - $BUFFER
-- name: cell lysis detergents
+- name: cell lysis detergents - sds (sodium dodecyl sulfate)
   all_of:
   - sodium dodecyl sulfate
-- name: cell lysis detergents
+- name: cell lysis detergents - sds (sodium dodecyl sulfate)
   all_of:
   - dodecyl sulfate
-- name: cell lysis detergents
+- name: cell lysis detergents - commercial protein extraction reagents
   all_of:
   - b-per bacterial protein
-- name: cell lysis detergents
+- name: cell lysis detergents - commercial protein extraction reagents
   all_of:
   - b-per
-- name: cell lysis detergents
+- name: cell lysis detergents - commercial protein extraction reagents
   all_of:
   - cellytic
-- name: cell lysis detergents
+- name: cell lysis detergents - chaps
   all_of:
   - chaps
-- name: cell lysis detergents
+- name: cell lysis detergents - ddm
   all_of:
   - ddm
-- name: cell lysis detergents
+- name: cell lysis detergents - sarkosyl
   all_of:
   - sarkosyl
-- name: cell lysis detergents
+- name: cell lysis detergents - digitonin
   any_of:
   - digiton
   - digitonin
-- name: cell lysis detergents
+- name: cell lysis detergents - commercial protein extraction reagents
   all_of:
   - m-per
-- name: cell lysis detergents
+- name: cell lysis detergents - np-40 (igepal ca-630)
   all_of:
   - np40
   none_of:
   - $BUFFER
-- name: cell lysis detergents
+- name: cell lysis detergents - triton x-100
   all_of:
   - triton
-- name: cell lysis detergents
+- name: cell lysis detergents - tween detergents
   all_of:
   - tween
 - name: acrylamide/bis solution
@@ -2176,7 +2253,7 @@ market_rules:
 - name: rpmi
   any_of:
   - '*rpmi*'
-- name: emem
+- name: mem
   any_of:
   - '*emem*'
   - '*eagle*medi*'
@@ -2207,6 +2284,26 @@ market_rules:
   - '*rpmi*'
   - '*imdm*'
   - bme
+- name: dehydrated bacterial agar
+  all_of:
+  - agar
+  - blood 
+- name: dehydrated bacterial agar
+  all_of:
+  - chromagar
+- name: dehydrated bacterial agar
+  all_of:
+  - agar
+  - dextrose
+- name: dehydrated bacterial agar
+  all_of:
+  - agar
+  - dextrose
+- name: dehydrated bacterial agar 
+  all_of:
+  - mueller
+  - hinton
+  - agar 
 - name: dehydrated bacterial broth
   all_of:
   - soc
@@ -2295,6 +2392,17 @@ market_rules:
   all_of:
   - glutaraldehyde
   - '*sol*'
+- name: isopropanol
+  all_of:
+  - isopropanol
+- name: isopropanol
+  all_of:
+  - isopropyl
+  - alcohol 
+- name: isopropanol
+  all_of:
+  - isprpyl
+  - alch
 - name: dmf
   all_of:
   - '*dimethyl*'
@@ -2318,6 +2426,9 @@ market_rules:
   none_of:
   - '*cuture*'
   - '*d6*'
+- name: methylene chloride
+  all_of:
+  - 'dichloromethane'
 - name: methylene chloride
   all_of:
   - methylene
@@ -2964,6 +3075,10 @@ market_rules:
   - '*dualfilter*t.i.p*'
 - name: sterile filtered pipette tips
   any_of:
+  - 'combitp'
+  - 'combitip'
+- name: sterile filtered pipette tips
+  any_of:
   - '*tubegard*'
   - '*tubeguard*'
 - name: sterile filtered pipette tips
@@ -3484,7 +3599,7 @@ market_rules:
   all_of:
   - '*plt*'
   - no-tc
-- name: nonlab - disposable wipes and towels
+- name: Non-Lab
   any_of:
   - '*kimwipe*'
   - '*kim wipe*'
@@ -3492,21 +3607,21 @@ market_rules:
   - '*kaydry*'
   - '*wypall*'
   - '*accutech*'
-- name: nonlab - disposable wipes and towels
+- name: Non-Lab
   all_of:
   - '*wipe*'
   none_of:
   - '*antibod*'
   - '*pipet*'
-- name: nonlab - disposable wipes and towels
+- name: Non-Lab
   all_of:
   - '*task*'
   - '*wiper*'
-- name: nonlab - disposable wipes and towels
+- name: Non-Lab
   all_of:
   - '*delicate*'
   - '*task*'
-- name: nonlab - disposable wipes and towels
+- name: Non-Lab
   all_of:
   - '*lens*'
   - '*tissue*'
@@ -3605,7 +3720,7 @@ market_rules:
   all_of:
   - '*acet*'
   - '*acid*'
-- name: nonlab - disposable wipes and towels
+- name: Non-Lab
   any_of:
   - kimwipe
   - napkin
@@ -3790,7 +3905,7 @@ market_rules:
   - '*chromium*single cell*'
   none_of:
   - '*oligo*'
-- name: magnetic-bead based purificaton kit
+- name: magnetic-bead based purification kit
   any_of:
   - '*ampure*'
   - '*spriselect*'

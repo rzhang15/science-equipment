@@ -15,16 +15,29 @@ MODELS_TO_PREPARE = {
 }
 
 def main():
-    print("--- Starting Step 1c: Preparing BERT Expert Category Vectors ---")
+    print(f"--- Starting Step 1c: Preparing BERT Expert Category Vectors [Variant: {config.VARIANT}] ---")
 
-    print("Loading pre-cleaned and merged UT Dallas data...")
+    print("Loading pre-cleaned and merged data...")
+    frames = []
     try:
-        df_merged = pd.read_parquet(config.UT_DALLAS_MERGED_CLEAN_PATH)
-        print(f"  - Loaded {len(df_merged)} rows.")
+        df_ut = pd.read_parquet(config.UT_DALLAS_MERGED_CLEAN_PATH)
+        print(f"  - Loaded {len(df_ut)} rows from UT Dallas.")
+        frames.append(df_ut)
     except FileNotFoundError:
         print(f"ERROR: Cleaned UT Dallas file not found at: {config.UT_DALLAS_MERGED_CLEAN_PATH}")
         print("   Please run 0_clean_category_file.py first.")
         return
+
+    if config.USE_UMICH:
+        try:
+            df_um = pd.read_parquet(config.UMICH_MERGED_CLEAN_PATH)
+            print(f"  - Loaded {len(df_um)} rows from UMich.")
+            frames.append(df_um)
+        except FileNotFoundError:
+            print(f"WARNING: UMich file not found at: {config.UMICH_MERGED_CLEAN_PATH}")
+            print("   Continuing with UT Dallas only.")
+
+    df_merged = pd.concat(frames, ignore_index=True)
 
     initial_rows = len(df_merged)
     df_merged.dropna(subset=[config.CLEAN_DESC_COL, config.UT_CAT_COL], inplace=True)

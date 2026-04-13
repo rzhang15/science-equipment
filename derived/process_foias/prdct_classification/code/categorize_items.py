@@ -6,6 +6,7 @@ Returns both the category and the similarity score.
 import joblib
 import numpy as np
 import os
+import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer
 
@@ -41,6 +42,36 @@ class TfidfItemCategorizer:
         except Exception as e:
             print(f"  WARNING: Error during TF-IDF prediction for '{item_description[:50]}...': {e}")
             return "Prediction Error", -1.0
+
+    def predict_batch(self, descriptions: pd.Series) -> tuple:
+        """Batch-predict categories for an entire Series at once.
+
+        Replaces repeated calls to get_item_category via progress_apply.
+        One vectorizer.transform + one cosine_similarity matrix multiply
+        for all items, instead of N separate calls.
+
+        Returns (predictions, scores) as pd.Series with the same index.
+        """
+        descs = descriptions.astype(str)
+        empty_mask = descs.str.strip() == ''
+
+        item_vectors = self.vectorizer.transform(descs)
+        sim_matrix = cosine_similarity(item_vectors, self.category_vectors)  # (n, n_cats)
+
+        best_indices = np.argmax(sim_matrix, axis=1)
+        best_scores = sim_matrix[np.arange(len(best_indices)), best_indices]
+
+        cat_array = np.array(self.category_names)
+        pred_array = cat_array[best_indices].copy()
+
+        pred_array[best_scores < config.TFIDF_MIN_SCORE_THRESHOLD] = "unclassified"
+        pred_array[empty_mask.values] = "No Description"
+        best_scores[empty_mask.values] = -1.0
+
+        return (
+            pd.Series(pred_array, index=descriptions.index),
+            pd.Series(best_scores, index=descriptions.index),
+        )
 
 
 class EmbeddingItemCategorizer:

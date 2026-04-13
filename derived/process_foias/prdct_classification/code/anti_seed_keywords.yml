@@ -42,6 +42,7 @@ keywords:
   - travel
   - warranty
   - warranties
+  - processing
 
   # IT, Software & Electronics
   - camera
@@ -58,6 +59,8 @@ keywords:
   - software
   - ssd
   - upgrades
+  - nextal
+
 
   # Facilities, Vehicles & MRO
   - air purification
@@ -84,6 +87,8 @@ keywords:
   - truck
   - vehicle
   - water purification
+  - pooling
+  - cooling
 
   # Athletics, Campus & Student Life
   - advertising
@@ -168,7 +173,36 @@ keywords:
   - test cell
   - thermometer
   - vortex
-
+  - vacuum
+  - condenser
+  - freezer rack
+  - luer
+  - plate cutter
+  - brain matrix
+  - chamber induction
+  - flask brush
+  - o-ring
+  - valve
+  - genechip
+  - part number
+  - water bottles
+  - incubator
+  - cytometer
+  - spectrometer
+  - refrigerator
+  - generator
+  - droplet digital
+  - genechip
+  - aortic
+  - homogenizer
+  - tissuer grinder
+  - cauterizer
+  - rocker
+  - shaker
+  - swagelok
+  - stainless steel
+  - imaging system
+  - balance
   # Agriculture & Non-Research
   - alfalfa
   - fertilizer
@@ -210,6 +244,30 @@ keywords:
   - ura system
   - various
   - vicryl plus
+  - etc.
+  - taxes
+  - profit
+  - speaker
+  - catering
+  - pot holes
+  - pre-ownded
+  - cooling
+  - depart
+  - arriving
+  - advertise
+  - special order
+  - user guide
+  - development of
+  - steam distr
+  - union up
+  - dining
+  - presentation
+  - sidewalk
+  - accessories
+  - rent
+  - postcard
+
+  
 
   # Additional Non-Lab keywords
   - drive
@@ -229,6 +287,13 @@ keywords:
   - ejector
   - timer
   - production
+  - rfp
+  - calibration
+  - cleaning tissue
+  - kleenex
+  - paper towels
+  - towel
+  - towl hnd
 
   # Etching & Microfabrication (capital equipment, not consumables)
   - etching
@@ -266,3 +331,24 @@ keywords:
   - "2017"
   - "2018"
   - "2019"
+
+  # Bulk Solvent / Commodity Chemical Indicators
+  # These phrases appear on commodity chemical purchases (not lab consumables).
+  # NOTE: Generic grade descriptors like "reagent grade" and "acs grade" were
+  # intentionally OMITTED because lab buffers (tris, hepes) also carry those
+  # labels.  Only long, unambiguous phrases are safe here.
+  - for liquid chromatography
+  - for spectroscopy
+  - for gas chromatography
+  - spectrophotometric grade
+  - pesticide grade
+  - toluene
+
+  # Instrument / Equipment Descriptions
+  # These appear in instrument-part descriptions where the word "instrument"
+  # itself is absent (so the existing "instrument" anti-seed misses them).
+  - imaging sys
+  - power supply
+  - replacement lamp
+  - replacement bulb
+  - manifold assembly

@@ -45,7 +45,7 @@ def generate_transformer_vectors(df, model_name, output_filename):
 
 
 def main():
-    print("--- Starting Step 1b: Embedding Generation ---")
+    print(f"--- Starting Step 1b: Embedding Generation [Variant: {config.VARIANT}] ---")
     try:
         df = pd.read_parquet(config.PREPARED_DATA_PATH)
     except FileNotFoundError:
