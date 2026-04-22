@@ -13,6 +13,55 @@ hierarchical_veto_rules:
     - glycine
     - gly
 required_keywords:
+  nucleic acid modifying enzymes - t4 polynucleotide kinase:
+    any_of:
+    - t4
+    - pnk
+    none_of:
+    - '*antibod*'
+    - '*anti-*'
+  laminin:
+    any_of:
+    - laminin
+    none_of:
+    - '*antibod*'
+    - '*anti-*'
+  human:
+    none_of:
+    - '*antibod*'
+    - '*anti-*'
+    - '*mab*'
+  tris base:
+    any_of:
+    - tris
+    - trizma
+  acetone:
+    any_of:
+    - acetone
+  acetic acid:
+    any_of:
+    - acetic
+    - acet acid
+  dmf:
+    any_of:
+    - dmf
+    - '*formamide*'
+  reverse transcriptase:
+    any_of:
+    - '*transcriptase*'
+    - '*superscript*'
+    - '*m-mlv*'
+    - moloney
+    - amv
+    - rt
+  rnase inhibitors:
+    any_of:
+    - '*rnase*'
+    - '*ribonuclease*'
+    - '*superase*'
+    - '*ribolock*'
+    - '*rrasin*'
+    - '*rnasin*'
   us fbs:
     any_of:
     - $FBS_TERMS
@@ -22,6 +71,9 @@ required_keywords:
   bovine serum albumin:
     any_of:
     - albumin
+  crystallizing dishes:
+    any_of:
+    - '*crystalliz*'
   laemmli sample buffer:
     any_of:
     - laemmli
@@ -107,8 +159,67 @@ required_keywords:
     - hexane
   chloroform:
     none_of:
-    - chloroform-d 
+    - chloroform-d
+  column-based pcr and gel purification kit:
+    all_of:
+    - pcr
+    - gel
 keyword_groups:
+  # DNA-oligo subcategorization.  OLIGO_WORD is a broad "this-is-an-oligo"
+  # signal (oligo/primer/sirna/grna).  OLIGO_MODIFIER lists the
+  # 5'/3'-modification tokens that force the "- modified" subcategory.
+  # OLIGO_PURIFIED lists the PAGE/HPLC purification phrases.  Large-scale
+  # (>= 1 umol) is handled via regex_any_of in the rule itself since it
+  # requires numeric matching.
+  OLIGO_WORD:
+  - '*oligo*'
+  - '*primer*'
+  OLIGO_MODIFIER:
+  - 5'-
+  - 3'-
+  - fam
+  - 6-fam
+  - tet
+  - hex
+  - vic
+  - joe
+  - ned
+  - pet
+  - tamra
+  - rox
+  - texas red
+  - texasred
+  - cy3
+  - cy5
+  - cy5.5
+  - bhq1
+  - bhq2
+  - bhq3
+  - zen
+  - iabk
+  - iabfq
+  - iabrq
+  - dabcyl
+  - biotin
+  - '*biotinylated*'
+  - '*amine*'
+  - '*thiol*'
+  - '*spacer*'
+  - '*nhs*'
+  - phosphate
+  - '*5-phos*'
+  - '*3-phos*'
+  OLIGO_PURIFIED:
+  - page purified
+  - page-purified
+  - pagepurified
+  - page purification
+  - hplc purified
+  - hplc-purified
+  - hplcpurified
+  - hplc purification
+  - page
+  - hplc
   ASSAY_OR_KIT:
   - '*kit*'
   - '*assay*'
@@ -123,6 +234,10 @@ keyword_groups:
   - high-fidelity
   - hf
   - hifi
+  - '*pfu*'
+  - '*phusion*'
+  - '*accuprime*'
+  - q5
   HOT_START:
   - '*hot start*'
   - '*fast start*'
@@ -164,6 +279,10 @@ keyword_groups:
   - '*hygromycin*'
   - '*zeocin*'
   NITRILE:
+  # Nitrile proper, plus chloroprene/neoprene variants.  Chloroprene-rubber
+  # exam gloves (often abbreviated "chl-pren") are synthetic non-latex exam
+  # gloves that procurement systems don't give their own category — grouping
+  # them under `nitrile gloves` matches how they're used functionally.
   - nitrile
   - nitril
   - ntl
@@ -171,6 +290,12 @@ keyword_groups:
   - nitr
   - ntrl
   - ntr
+  - chloroprene
+  - chlor-pren
+  - chl-pren
+  - chlorprene
+  - neoprene
+  - neopren
   GLOVES:
   - '*glove*'
   - '*glv*'
@@ -496,6 +621,183 @@ keyword_groups:
   - BsaAI
   - EaeI
 market_rules:
+# If, after cleaning (lowercase, stopwords like "and"/"the" removed, units &
+# SKUs stripped, whitespace collapsed), the description is nothing but a
+# shipping/freight/handling phrase, it's not a lab item. exact_any_of anchors
+# ^...$ so this only fires when the WHOLE cleaned description is one of these.
+- name: Non-Lab
+  exact_any_of:
+  - shipping
+  - shipping handling
+  - shipping handling charge
+  - shipping handling charges
+  - shipping handling fee
+  - shipping handling fees
+  - shipping handling cost
+  - shipping handling costs
+  - shipping charge
+  - shipping charges
+  - shipping fee
+  - shipping fees
+  - shipping cost
+  - shipping costs
+  - freight
+  - freight charge
+  - freight charges
+  - freight fee
+  - freight fees
+  - freight cost
+  - freight costs
+  - handling
+  - handling charge
+  - handling charges
+  - handling fee
+  - handling fees
+  - postage
+  - postage fee
+  - postage charge
+  - delivery
+  - delivery charge
+  - delivery charges
+  - delivery fee
+  - delivery fees
+# ---------------------------------------------------------------------------
+# Oligonucleotide rules MUST come before `restriction enzymes` — synthetic
+# primers and oligos routinely carry restriction-site names in their
+# descriptions (e.g. "F_BamHI_primer", "_SacI site"), and first-match-wins
+# would otherwise misfile them under the enzyme market.
+#
+# DNA oligo subcategory precedence when multiple signals co-occur:
+#   modified > purified > large scale > desalted (default)
+# A PAGE-purified FAM-labeled 1 umol oligo lands in "- modified".
+# ---------------------------------------------------------------------------
+- name: synthetic sirna
+  all_of:
+  - sirna
+  - '*oligo*'
+- name: synthetic sirna
+  all_of:
+  - sirna
+  - configurationid
+# DNA oligo: modified (5'/3' fluorophore, quencher, chemical modification)
+- name: synthetic dna oligonucleotide - modified
+  all_of:
+  - $OLIGO_WORD
+  - dna
+  - $OLIGO_MODIFIER
+# DNA oligo: PAGE / HPLC purified
+- name: synthetic dna oligonucleotide - purified
+  all_of:
+  - $OLIGO_WORD
+  - dna
+  - $OLIGO_PURIFIED
+# DNA oligo: large scale (>= 1 umol).  Scales below 1 umol are reported in
+# nmol (25/100/250 nmol); however, some procurement exports (e.g. UMich's
+# "0.0250 umo") write sub-1-umol scales in umol units, so we require the
+# integer part of the umol quantity to be >= 1 (first digit non-zero).
+- name: synthetic dna oligonucleotide - large scale
+  all_of:
+  - $OLIGO_WORD
+  - dna
+  regex_any_of:
+  - '(?i)(?<!\w)[1-9]\d*(?:\.\d+)?\s*[µu]mol(?!\w)'
+  - '(?i)(?<!\w)[1-9]\d*(?:\.\d+)?\s*umo(?!\w)'
+# DNA oligo: desalted (default when no subcategory signal fires)
+- name: synthetic dna oligonucleotide - desalted
+  all_of:
+  - '*oligo*'
+  - dna
+- name: synthetic rna oligonucleotide
+  all_of:
+  - '*oligo*'
+  - rna
+# Structural-name primer rule: catches oligos whose descriptions don't
+# include the word "oligo" but carry tell-tale primer markers —
+# _F / _R / _fwd / _rev / _forward / _reverse suffixes, forward/reverse
+# primer phrasing, guide RNAs, and sticky-end / Gateway cloning tokens.
+# Defaults to the "- desalted" subcategory; bare primer names almost never
+# carry modifier / purification / scale descriptors, so desalted is the
+# correct default.
+- name: synthetic dna oligonucleotide - desalted
+  regex_any_of:
+  # _F / _R / _F2 / _R1 at end of a multi-char identifier or before a separator.
+  # The (?<=\w{3}) guard avoids matching trivial 2-char tokens like "a_F".
+  - '(?<=\w{3})_[FR]\d*(?=$|[\s\-])'
+  # _fwd / _rev / _forward / _reverse, token-bounded
+  - '(?i)_(?:fwd|rev|forward|reverse)(?=$|[\s\-])'
+  # Forward / reverse primer phrasing in either order
+  - '(?i)\b(?:forward|reverse)\s+primer\b'
+  - '(?i)\bprimer\s+(?:forward|reverse)\b'
+  # Reverse-complement phrasing — canonical primer-pair descriptor
+  - '(?i)\b(?:rev|reverse)\s+complement\b'
+  # IDT / oligo-order metadata tokens.  Every one of these is nearly
+  # exclusive to custom oligo order sheets.  Verified 0 hits among true
+  # restriction-enzyme / chemistry / consumable items in UMich hold-out.
+  - '(?i)\bbase\s*pair\s+\d+\s+scale\b'
+  - '(?i)\bconfigurationid\b'
+  - '(?i)\bpackagetype\b'
+  - '(?i)\btypecode\b'
+  - '(?i)\bsynthesis\s+scale\b'
+  # Mutagenesis primer phrasing ("mutant-b rev", "mut5 fwd").  Does NOT
+  # include bare "site-directed" — that belongs to the
+  # site-directed-mutagenesis-systems category.
+  - '(?i)\b(?:mutant|mutagenesis|mut\d+)\s+(?:fwd|rev|forward|reverse|primer|[fr])\b'
+  # Direction marker at start of description ("rev 2nd overlap papxgfp").
+  # Only the abbreviations (rev/fwd) — the full words "reverse" /
+  # "forward" are excluded because they also start non-oligo phrases
+  # like "reverse transcriptase" and "forward scatter".
+  - '(?i)^(?:rev|fwd)\s+\w'
+  # Direction marker at end of a digit-bearing slug (UMich primer SKUs:
+  # "pmi3228 fw", "tcf7 109 rev", "c3019del fw").  Requires the preceding
+  # slug to carry a digit, which avoids matching "m-mlv rev" or "mutagen
+  # rev" where the preceding token is pure alpha.
+  - '(?i)\b\w*\d\w*[\s_\-](?:fw|fwd|rev|reverse)$'
+  # Reverse-primer / forward-primer shorthand (rp / fp) at end of slug.
+  # Unlike rev/reverse, "rp" and "fp" are essentially never meaningful
+  # suffixes outside primer naming, so no digit guard is needed.
+  - '(?i)\b\w{3,}[\s_\-](?:rp|fp)\d*$'
+  # Mutagenesis primer with optional intermediate token ("mutant-b rev",
+  # "mutagen c rev", "mut5 fwd") — the already-listed mutagenesis_primer
+  # pattern requires whitespace directly after "mutant"; this variant
+  # permits a short token between.
+  - '(?i)\bmut(?:ant|agenesis|\d+)?[\s\-_]\w*[\s\-_](?:fwd|rev|forward|reverse|primer)\b'
+  # Concatenated slug+direction: "d9mit226rev", "hoxa10chiprev4", "c2405checkfwd"
+  - '(?i)\b[a-z0-9]{3,}(?:rev|fwd|forward|reverse)\d*\b'
+  # Suffix-compounded primer naming: "confirmf", "chiprev", "seq 1r", "checkfwd"
+  - '(?i)(?:^|[\s_\-])confirm[fr]\d*\b'
+  - '(?i)(?:^|[\s_\-])(?:chip|check)[a-z]*[fr]\d*\b'
+  - '(?i)\bseq\s*\d*\s*[rf]\d*\b'
+  # Guide / synthetic RNAs
+  - '(?i)\bsgrna\b'
+  - '(?i)\bgrna\b'
+  - '(?i)\bshrna\b'
+  # Sticky-end & Gateway cloning oligo markers
+  - '(?i)sticky[\s_]end'
+  - '(?i)\batt[bplr]\d?\b'
+  # Bare-word "oligo" fallback — runs after the DNA/RNA-specific rules
+  # above so siRNA / DNA / RNA disambiguation still wins when explicit
+  # markers are present.  Defaults to DNA oligo when the description says
+  # only "oligo" (and never reaches here for paint/spray primers because
+  # the gatekeeper already filtered those as non-lab).
+  - '(?i)\boligo\w*'
+# Enzyme-name + oligo-marker rule.  Verified 0/1047 true restriction-enzyme
+# items in UMich contain tokens like fwd/sense/adaptor/sequence/promoter/
+# chip/gene — real enzyme orders are bone-simple (enzyme + maybe fastdigest
+# / hf / units / mg).  So co-occurrence of an enzyme name with any of these
+# markers means the description is an oligo/primer that happens to mention
+# a cloning site, not an enzyme product.  Defaults to desalted.
+- name: synthetic dna oligonucleotide - desalted
+  all_of:
+  - $RESTRICTION_ENZYME
+  regex_any_of:
+  - '(?i)\b(?:fw|fwd|forward|rev|reverse)\b'
+  - '(?i)\b(?:sense|antisense)\b'
+  - '(?i)\b(?:adaptor|adapter|linker|overhang)\b'
+  - '(?i)\b(?:prime|primer)\b'
+  - '(?i)\bsequence\b'
+  - '(?i)\bprom(?:oter)?\b'
+  - '(?i)\bchip\b'
+  - '(?i)\bgene\b'
 - name: restriction enzymes
   case_sensitive: true
   any_of:
@@ -510,6 +812,55 @@ market_rules:
   - '*cloning site*'
   - '*Gene Synthesis*'
   - '*gene synthesis*'
+  # Oligo / primer context markers — case-insensitive so we catch any
+  # capitalization the procurement system emits.  Each expression opts in to
+  # IGNORECASE via (?i) because the enclosing rule is case_sensitive.
+  #
+  # All tokens below were verified against 1047 true restriction-enzyme
+  # items in UMich hold-out: 0 collisions.  Real enzyme descriptions are
+  # bone-simple (enzyme name + maybe fastdigest / hf / units / mg), so any
+  # co-occurrence with these markers indicates an oligo with a cloning-site
+  # reference, not an enzyme product.
+  regex_none_of:
+  - '(?i)\boligo\w*'
+  - '(?i)\bprimer\w*'
+  - '(?i)\bsgrna\b'
+  - '(?i)\bgrna\b'
+  - '(?i)\bsirna\b'
+  - '(?i)\bshrna\b'
+  - '(?i)sticky[\s_]end'
+  - '(?i)_(?:fwd|rev|forward|reverse)(?=$|[\s\-])'
+  - '(?i)(?<=\w{3})_[FR]\d*(?=$|[\s\-])'
+  - '(?i)\batt[bplr]\d?\b'
+  # Direction / strand / primer-design markers (0 FN verified)
+  - '(?i)\b(?:fw|fwd|forward|rev|reverse)\b'
+  - '(?i)\b(?:sense|antisense)\b'
+  - '(?i)\b(?:adaptor|adapter|linker|overhang)\b'
+  - '(?i)\bprime\b'
+  - '(?i)\bsequence\b'
+  - '(?i)\bprom(?:oter)?\b'
+  - '(?i)\bchip\b'
+  - '(?i)\bdna\b'
+  - '(?i)\brna\b'
+  - '(?i)\bgene\b'
+  # Cloning-construct protein/tag markers.  Items like "gfp kdel noti" or
+  # "mcherry-xhoi" are plasmid/oligo constructs that mention restriction
+  # sites, not enzyme orders.  Verified against UMich enzyme hold-out: real
+  # enzyme descriptions never carry these tokens.
+  - '(?i)\bgfp\b'
+  - '(?i)\byfp\b'
+  - '(?i)\bcfp\b'
+  - '(?i)\brfp\b'
+  - '(?i)\bmcherry\b'
+  - '(?i)\bmneongreen\b'
+  - '(?i)\bmscarlet\b'
+  - '(?i)\bkdel\b'
+  - '(?i)\bflag\b'
+  - '(?i)\bha-?tag\b'
+  - '(?i)\bmyc-?tag\b'
+  - '(?i)\bcas9\b'
+  - '(?i)\bcre\b'
+  - '(?i)\blox[pn]\b'
 - name : recombinant human protein
   all_of:
   - gdnf
@@ -911,41 +1262,13 @@ market_rules:
   - '*anti-*'
   none_of:
   - '*secondary*'
-- name: primary antibodies 
-  all_of:
-  - antibody
-  any_of:
-  - capase-9 
-  - capase-3 
-- name: secondary antibodies 
-  all_of:
-  - rabbit
-  - sheep
-  - igg
-- name: secondary antibodies 
-  all_of:
-  - rabbit
-  - goat 
-  - igg
-- name: secondary antibodies 
-  all_of:
-  - rabbit
-  - goat 
-  - alexa fluor 
-- name: secondary antibodies 
-  all_of:
-  - dky 
-  - anti-gt 
-  - igg
-- name: secondary antibodies 
-  all_of:
-  - goat 
-  - anti-mouse 
-  - igg
-- name: secondary antibodies 
-  all_of:
-  - alexa fluor 
-  - donkey 
+# NOTE: Plural `primary antibodies` / `secondary antibodies` rules used to
+# live here.  They were removed because (a) 3_predict_product_markets.py
+# collapses every mono/poly *primary/secondary antibody* label into the
+# plural bucket post-hoc, so these rules contributed nothing the mono/poly
+# rules above didn't already cover, and (b) the original primary-antibodies
+# rule keyed on the typo tokens `capase-9` / `capase-3` which never appear
+# in real descriptions (correct spelling is `caspase`).
 - name: polyclonal primary antibody
   any_of:
   - pab 
@@ -1170,6 +1493,18 @@ market_rules:
 - name: high-fidelity dna polymerase
   all_of:
   - $HIGH_FIDELITY
+  - '*taq*'
+  - '*polymerase*'
+- name: hot start taq polymerase
+  all_of:
+  - $HOT_START
+  - '*taq*'
+  - '*polymerase*'
+  none_of:
+  - $HIGH_FIDELITY
+- name: high-fidelity dna polymerase
+  all_of:
+  - $HIGH_FIDELITY
   - '*polymerase*'
   none_of:
   - '*taq*'
@@ -1317,31 +1652,24 @@ market_rules:
   - synthesis
   - fmoc
   - boc
-- name: synthetic sirna
-  all_of:
-  - sirna
-  - '*oligo*'
-- name: synthetic sirna
-  all_of:
-  - sirna
-  - configurationid
-- name: synthetic dna oligonucleotide
-  all_of:
-  - '*oligo*'
-  - dna
-- name: synthetic rna oligonucleotide
-  all_of:
-  - '*oligo*'
-  - rna
+# Oligo / siRNA / DNA-oligo / RNA-oligo rules were relocated above the
+# `restriction enzymes` rule (near the fees/shipping block) so first-match
+# wins for oligos that carry a restriction-site name in their description.
+# Subcategory rules (must come BEFORE parent rule to win via first-match)
+- name: transfection reagents - polybrene (viral transduction)
+  any_of:
+  - '*polybrene*'
+  - '*olybrene*'
+- name: transfection reagents - cellfectin (insect cell)
+  any_of:
+  - '*cellfectin*'
 - name: transfection reagents
   any_of:
   - lipofectamine
   - '*lipofectamin*'
   - '*fugene*'
   - '*effectene*'
-  - '*cellfectin*'
   - '*xfect*'
-  - '*polybrene*'
   - '*jetprime*'
   - '*turbofect*'
   - '*transfect*'
@@ -1479,6 +1807,7 @@ market_rules:
   none_of:
   - supermix
   - cdna
+  - kit
 - name: dntps
   all_of:
   - '*deoxynuc*'
@@ -1486,23 +1815,28 @@ market_rules:
   none_of:
   - supermix
   - cdna
+  - kit
 - name: dntps
   all_of:
   - dntps
   none_of:
   - supermix
   - cdna
+  - kit
 - name: dntps
   all_of:
   - datp
   none_of:
   - supermix
   - cdna
+  - kit
 - name: dntps
   all_of:
   - dttp
   none_of:
   - supermix
+  - cdna
+  - kit
   - cdna
 - name: dntps
   all_of:
@@ -1510,12 +1844,14 @@ market_rules:
   none_of:
   - supermix
   - cdna
+  - kit
 - name: dntps
   all_of:
   - dctp
   none_of:
   - supermix
   - cdna
+  - kit
 - name: gel loading dye
   all_of:
   - gel
@@ -1709,6 +2045,21 @@ market_rules:
   - $ASSAY_OR_KIT
   none_of:
   - sequence
+- name: column-based dna genomic purification kits
+  all_of:
+  - '*gdna*'
+  - $ASSAY_OR_KIT
+  none_of:
+  - sequence
+  - cloning
+- name: column-based plant dna purification kits
+  all_of:
+  - '*dna*'
+  - '*plant*'
+  - $ASSAY_OR_KIT
+  none_of:
+  - sequence
+  - cloning
 - name: column-based dna purification kits
   all_of:
   - dneasy
@@ -1744,15 +2095,6 @@ market_rules:
   - '*tri-reagent*'
   - '*tri reagent*'
   - '*qiazol*'
-- name: magnetic polystyrene beads
-  any_of:
-  - '*dynabeads*'
-  none_of:
-  - '*streptavidin*'
-  - '*protein a*'
-  - '*protein g*'
-  - '*anti-*'
-  - '*oligo*'
 - name: protease inhibitors
   any_of:
   - '*trypsin inhibitor*'
@@ -1968,26 +2310,115 @@ market_rules:
   - bisacrylamid
 - name: acrylamide/bis solution
   all_of:
+  - acrylamide/bisacrylamide
+- name: acrylamide/bis solution
+  all_of:
+  - acrylamide/bis
+- name: acrylamide/bis solution
+  all_of:
+  - '*acrylam*'
+  - '*bis*'
+- name: acrylamide/bis solution
+  all_of:
+  - acryl/bis
+- name: acrylamide/bis solution
+  all_of:
+  - bisacrylamide
+  - acrylamide
+- name: acrylamide/bis solution
+  all_of:
   - bisacrylamide
 - name: acrylamide/bis solution
   all_of:
   - bis-acrylamide
-- name: antibody-based affinity resins
+- name: acrylamide/bis solution
   all_of:
-  - protein
-  - '*agarose*'
-- name: antibody-based affinity resins
+  - accugel
+  # Protein A/G/L on agarose or Sepharose
+- name: affinity resins - protein a
   all_of:
-  - red
-  - anti-flag
-- name: antibody-based affinity resins
-  all_of:
-  - igg
+  - protein a
+  none_of:
+  - protein a/g
+  - protein ag
+  - magnetic
+  - dynabead
+  any_of:
+  - agarose
   - sepharose
-- name: antibody-based affinity resins
+
+- name: affinity resins - protein g
   all_of:
-  - igg
-  - agar
+  - protein g
+  none_of:
+  - protein a/g
+  - protein ag
+  - magnetic
+  - dynabead
+  any_of:
+  - agarose
+  - sepharose
+
+- name: affinity resins - protein a/g
+  any_of:
+  - protein a/g
+  - protein ag
+  none_of:
+  - magnetic
+  - dynabead
+
+- name: affinity resins - protein g
+  all_of:
+  - protein l
+  none_of:
+  - magnetic
+  - dynabead
+  any_of:
+  - agarose
+  - sepharose
+
+- name: affinity resins - protein l
+  all_of:
+  - protein l
+  none_of:
+  - magnetic
+  - dynabead
+  - protein l-s  # guard against unrelated "Protein L-something" strings
+- name: affinity resins - protein a (magnetic)
+  all_of:
+  - protein a
+  any_of:
+  - dynabead
+  - magnetic
+  - mag bead
+  none_of:
+  - protein a/g
+
+- name: affinity resins - protein g (magnetic)
+  all_of:
+  - protein g
+  any_of:
+  - dynabead
+  - magnetic
+  - mag bead
+  none_of:
+  - protein a/g
+
+- name: affinity resins - protein a/g (magnetic)
+  all_of:
+  - protein a/g
+  any_of:
+  - dynabead
+  - magnetic
+  - mag bead
+
+- name: affinity resins - protein a/g (magnetic)
+  all_of:
+  - protein ag
+  any_of:
+  - dynabead
+  - magnetic
+  - mag bead
 - name: chemiluminescent substrates
   all_of:
   - chemiluminescent detection
@@ -2070,19 +2501,19 @@ market_rules:
   - precision plus
   - ez-run
   - novex
-- name: non-lab
+- name: Non-Lab
   all_of:
   - '*mini-protean*'
   - '*plate*'
-- name: non-lab
+- name: Non-Lab
   all_of:
   - '*mini-protean*'
   - '*cassette*'
-- name: non-lab
+- name: Non-Lab
   all_of:
   - '*mini-protean*'
   - '*comb*'
-- name: non-lab
+- name: Non-Lab
   all_of:
   - '*mini-protean*'
   - '*cooling unit*'
@@ -2129,14 +2560,90 @@ market_rules:
   - '*novex*'
   none_of:
   - '*hand casting*'
+# Subcategory rules (must come BEFORE parent rule to win via first-match)
+- name: nucleic acid modifying enzymes - t4 dna ligase buffer
+  all_of:
+  - '*t4 dna ligase*'
+  - '*buffer*'
+- name: nucleic acid modifying enzymes - t4 dna ligase
+  any_of:
+  - '*t4 dna ligase*'
+  - '*dna ligase t4*'
+  - '*t4 ligase*'
+  - '*enzyme-t4 ligase*'
+  none_of:
+  - '*buffer*'
+  - '*taq*'
+- name: nucleic acid modifying enzymes - t4 polynucleotide kinase buffer
+  all_of:
+  - '*t4 polynucleotide kinase*'
+  - '*buffer*'
+- name: nucleic acid modifying enzymes - t4 polynucleotide kinase
+  any_of:
+  - '*t4 polynucleotide kinase*'
+  - '*t4 pnk*'
+  - '*t4 polynuc kinase*'
+  - '*t4 plynucleotide*'
+  - '*polynucleotide kinase*'
+  none_of:
+  - '*buffer*'
+  - '*antibod*'
+  - '*anti-*'
+- name: nucleic acid modifying enzymes - alkaline phosphatases
+  any_of:
+  - '*alkaline phosphatase*'
+  - '*antarctic phosphatase*'
+  - '*antarctic phos*'
+  - '*calf intestinal phosphatase*'
+  - '*calf int. alk*'
+  - '*calf int alk*'
+  - '*alk. phosph*'
+  - '*shrimp alkaline*'
+  - '*shrimp phosphatase*'
+  - '*fastap*'
+  - '*quick cip*'
+  none_of:
+  - '*antibod*'
+  - '*anti-*'
+  - '*conjug*'
+  - '*hrp*'
+  - '*secondary*'
+  - '*substrate*'
+  - '*liquid subst*'
+  - '*red ap*'
+  - '*immpact*'
+  - '*goat anti*'
+  - '*mouse anti*'
+  - '*rabbit anti*'
+  - '*rat anti*'
+  - '*chicken anti*'
+  - '*donkey anti*'
+  - '*sheep anti*'
+  - '*extravidin*'
+  - '*streptavidin*'
+  - '*neutravidin*'
+  - '*avidin*'
+- name: nucleic acid modifying enzymes - terminal transferase
+  any_of:
+  - '*terminal transferase*'
+  - '*terminal deoxynucleotidyl*'
+  - '*tdt enzyme*'
+- name: nucleic acid modifying enzymes - exonucleases
+  any_of:
+  - '*t5 exonuclease*'
+  - '*lambda exonuclease*'
+  - '*exonuclease i*'
+  - '*exonuclease iii*'
+  - '*mung bean nuclease*'
 - name: nucleic acid modifying enzymes
   any_of:
   - t5 exonuclease
   - alkaline phosphatase
-  - t4 polynucleotide kinase
   - terminal transferase
-  - t5 exonuclease
-  - t4 dna ligase
+  none_of:
+  - '*antibod*'
+  - '*anti-*'
+  - '*buffer*'
 - name: hams f12
   any_of:
   - '*ham*f*12*'
@@ -2157,7 +2664,7 @@ market_rules:
   none_of:
   - '*kimwipe*'
   - '*kim wipe*'
-- name: neurobasal medium
+- name: neurobasal media
   any_of:
   - '*neurobasal*'
 - name: imdm
@@ -2182,14 +2689,14 @@ market_rules:
   - '*mtesr*'
   - '*stemline*'
   - '*matrigel*organ*'
-- name: bme
+- name: basal medium eagle
   all_of:
   - bme
   none_of:
   - '*dmem*'
   - '*imdm*'
   - '*emem*'
-- name: bme
+- name: basal medium eagle
   all_of:
   - basal medium eagle
 - name: specialty cell culture media
@@ -2482,10 +2989,10 @@ market_rules:
 - name: syringe filters
   all_of:
   - puradisc
-- name: centrifugal concentrators
+- name: centrifugal ultrafiltration devices
   all_of:
   - '*vivaspinturbo*'
-- name: centrifugal concentrators
+- name: centrifugal ultrafiltration devices
   all_of:
   - pes
   - concentrator
@@ -2553,16 +3060,69 @@ market_rules:
   - '*wb ez-sqz*'
   - '*wash btl*'
   - '*washbtl*'
-- name: colorimetric substrates
+# Subcategory rules (must come BEFORE parent rule to win via first-match)
+- name: colorimetric substrates - bcip/nbt
+  all_of:
+  - '*bcip*'
+  - '*nbt*'
+- name: colorimetric substrates - nbt
   any_of:
-  - '*griess reagent*'
-  - '*tetrazolium*'
+  - '*nitro blue tetrazolium*'
+  - '*nitro blue tetzolium*'
+  - '*ntro blue tetzolium*'
+  - '*nitrotetrazolium blue*'
+  - '*nitro bt*'
+  - '*tetzolium clri*'
+  none_of:
+  - '*bcip*'
+- name: colorimetric substrates - mtt
+  any_of:
+  - '*thiazolyl blue tetrazolium*'
+  - '*thiazolyl blue tetzolium*'
+  - '*mtt dimethylthiaz*'
+  none_of:
+  - '*proliferation*'
+  - '*cell viability*'
+  - '*cell growth*'
+  - '*viability kit*'
+  - '*viability assay*'
+- name: colorimetric substrates - onpg
+  any_of:
   - '*onpg*'
   - '*o-nitrophenyl*'
-  - '*pnpp*'
-  - '*p-nitrophenyl*'
+  - '*nitrophenyl-beta-d-galactopyranoside*'
+  - '*nitrophenyl b-d-galactopyranoside*'
+- name: colorimetric substrates - x-gal
+  any_of:
+  - '*x-gal*'
+  - '*5-bromo-4-chloro-3-indolyl-b-d-galactopyranoside*'
+- name: colorimetric substrates - tmb
+  any_of:
   - '*tmb substrate*'
+  - '*tetramethylbenzidine*'
+- name: colorimetric substrates - abts
+  any_of:
   - '*abts substrate*'
+  - '*azino-bis*'
+  - '*abts solution*'
+- name: colorimetric substrates - dab
+  any_of:
+  - '*3,3-diaminobenzidine*'
+  - '*diaminobenzidine*'
+  - '*dab substrate*'
+- name: colorimetric substrates - griess reagent
+  any_of:
+  - '*griess reagent*'
+  - '*griess diazotization*'
+- name: colorimetric substrates - dtnb (ellman's reagent)
+  any_of:
+  - '*ellman*'
+  - '*dtnb*'
+  - '*5,5-dithiobis*'
+- name: colorimetric substrates - onpg 
+  any_of:
+  - '*onpg*'
+  - '*o-nitrophenyl*'
 - name: glass beakers
   all_of:
   - '*beaker*'
@@ -2597,6 +3157,11 @@ market_rules:
   all_of:
   - '*dish*'
   - '*glass bottom*'
+  none_of:
+  - '*crystalliz*'
+  - '*petri*'
+  - '*soap*'
+  - '*dishwash*'
 - name: cell culture dishes
   all_of:
   - '*dish*'
@@ -2604,10 +3169,35 @@ market_rules:
   none_of:
   - '*crystalliz*'
   - '*petri*'
+  - '*soap*'
+  - '*dishwash*'
 - name: petri dishes
   all_of:
   - '*petri*'
   - '*dish*'
+- name: crystallizing dishes
+  all_of:
+  - '*dish*'
+  - '*crystalliz*'
+- name: labware detergents and cleaners
+  any_of:
+  - '*alconox*'
+  - '*liquinox*'
+  - '*citranox*'
+  - '*detergent 8*'
+  - '*detergent8*'
+  - '*micro-90*'
+  - '*tergazyme*'
+  - '*contrad*'
+  - '*rbs-35*'
+  - '*dish soap*'
+  - '*dishwashing*'
+  - '*palmolive*'
+  - dawn dish
+  - '*dish detergent*'
+  none_of:
+  - '*antibod*'
+  - '*anti-*'
 - name: cell culture plates
   all_of:
   - $PLATE
@@ -2638,10 +3228,21 @@ market_rules:
   - '*t150*'
   - '*t175*'
   - '*t225*'
+  # Natural-language triggers — descriptions like "flask tissue culture",
+  # "75cm2 tissue culture flask", "cell culture flask 250ml" were being
+  # missed and shunted into `boiling flasks` by the Expert Model fallback.
+  - '*tissue culture*'
+  - '*cell culture*'
+  - '*cm2*'
+  - tc
 - name: microcentrifuge tubes
   all_of:
   - mct
   - nat
+- name: microcentrifuge tubes
+  all_of:
+  - mct
+  - $TUBE
 - name: microcentrifuge tubes
   all_of:
   - microtube
@@ -2677,6 +3278,17 @@ market_rules:
   - '*rack*'
   - '*pcr*'
   - '*configurationid*'
+# Brand-specific microcentrifuge tube variants whose canonical names don't
+# contain `micro`/`eppendorf`/`mct` — matched on the brand token alone.
+- name: microcentrifuge tubes
+  any_of:
+  - '*posi-click*'
+  - '*posiclick*'
+  - '*superspin*'
+  - '*super spin*'
+  none_of:
+  - '*rack*'
+  - '*pcr*'
 - name: pcr tube strips
   all_of:
   - '*pcr*'
@@ -3587,14 +4199,38 @@ market_rules:
   all_of:
   - '*dish*'
   - '*tissue*'
+  none_of:
+  - '*crystalliz*'
+  - '*petri*'
+  - '*soap*'
+  - '*dishwash*'
 - name: cell culture dishes
   all_of:
   - dish
   - tc
+  none_of:
+  - '*crystalliz*'
+  - '*petri*'
+  - '*soap*'
+  - '*dishwash*'
+- name: cell culture dishes
+  all_of:
+  - dish
+  - t/c
+  none_of:
+  - '*crystalliz*'
+  - '*petri*'
+  - '*soap*'
+  - '*dishwash*'
 - name: cell culture dishes
   all_of:
   - dish
   - cell culture
+  none_of:
+  - '*crystalliz*'
+  - '*petri*'
+  - '*soap*'
+  - '*dishwash*'
 - name: surface binding assay microplates
   all_of:
   - '*plt*'
@@ -3720,6 +4356,19 @@ market_rules:
   all_of:
   - '*acet*'
   - '*acid*'
+  none_of:
+  - '*trifluoro*'
+  - '*chloroacet*'
+  - '*bromoacet*'
+  - '*iodoacet*'
+  - '*peracet*'
+  - '*percetic*'
+  - '*hydroxycoum*'
+  - '*aminoacet*'
+  - '*phenylacet*'
+  - '*mercaptoacet*'
+  - '*nitroacet*'
+  - '*cyanoacet*'
 - name: Non-Lab
   any_of:
   - kimwipe
@@ -3778,11 +4427,11 @@ market_rules:
   - '*ldh*cytox*'
   - '*ldh cyto*'
   - '*cytotoxicity detection kit*ldh*'
-- name: viability/cytotoxicity kit
+- name: cell viability kits
   all_of:
   - '*live*dead*'
   - '*viability*'
-- name: viability/cytotoxicity kit
+- name: cell viability kits
   any_of:
   - '*multitox*'
 - name: bioluminescence assay kit
@@ -3893,7 +4542,7 @@ market_rules:
   - '*antibod*'
   - '*elisa*'
   - '*duoset*'
-- name: sequencing - library prep kit
+- name: Non-Lab 
   any_of:
   - '*library prep*'
   - '*lib prep*'
@@ -3998,15 +4647,6 @@ market_rules:
   - '*cultrex*'
   none_of:
   - '*organ*'
-- name: magnetic polystyrene beads
-  any_of:
-  - '*dynabeads*'
-  none_of:
-  - '*streptavidin*'
-  - '*protein a*'
-  - '*protein g*'
-  - '*anti-*'
-  - '*oligo*'
 - name: blocking buffers
   any_of:
   - '*odyssey*blocking*'

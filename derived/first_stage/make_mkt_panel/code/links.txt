@@ -1,4 +1,5 @@
 ./price_samp/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/first_stage/merge_price_data/output/
 ./samp/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/process_foias/prdct_classification/output/
+./categories/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/first_stage/select_categories/output/
 ./unis/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/govspend/make_panel/output/
 ./sup/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/first_stage/fuzzy_match_suppliers/output/

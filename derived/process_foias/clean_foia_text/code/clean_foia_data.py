@@ -275,6 +275,14 @@ def main() -> None:
         df.to_csv(out_path, index=False)
         print(f"  -> Saved {out_path}")
 
+        # -- Save a 2010-2019 subset for umich_1998_2019 --
+        if "umich_1998_2019" in fp.stem and "date" in df.columns:
+            df_date = pd.to_datetime(df["date"], errors="coerce")
+            df_sub = df[(df_date.dt.year >= 2010) & (df_date.dt.year <= 2019)]
+            sub_path = out_dir / f"{fp.stem.replace('1998_2019', '2010_2019')}_clean.csv"
+            df_sub.to_csv(sub_path, index=False)
+            print(f"  -> Saved {sub_path} ({len(df_sub)} rows)")
+
     print("\nAll targeted workbooks processed.")
 
 

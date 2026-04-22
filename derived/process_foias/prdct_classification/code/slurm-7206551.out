@@ -1,0 +1,30 @@
+--- Starting Prediction Pipeline [Variant: umich_supplier] ---
+  - Gatekeeper Model:    tfidf
+  - Expert Model Choice:   tfidf
+  - Data Source:         umich
+
+Loading necessary models and categorizers...
+  - Initializing TfidfItemCategorizer...
+  - Loaded word feats: 80380, char feats: 257475, contrastive weights: yes
+Initializing RuleBasedCategorizer with upgraded logic...
+  - Loaded 626 market override rules.
+  - Loaded 24 exact-match veto rules.
+  - Loaded 2 hierarchical veto rules.
+
+UMich specified. Loading the pre-cleaned and merged file from script 0.
+
+--- Processing file: umich_merged_clean.parquet ---
+  - Step 1: Running gatekeeper...
+  - Gatekeeper identified 246741 potential lab items.
+  - Supplier filter: 331 items forced to Non-Lab (631 total supplier Non-Lab).
+  - Step 2: Predicting markets with 'tfidf' expert (batched)...
+  - Step 3: Applying prediction veto rules...
+  - WARNING:Vetoed 1923 expert predictions.
+  - Step 4: Applying final market override rules...
+  - 182746 unique description pairs among 306226 rows
+  - Applied 149562 market override rules.
+  - Step 5: Calculating final similarity scores for lab predictions...
+  -  DEBUG: Category mismatch. Rule category 'non-lab' not found in expert model's category list.
+Prediction file saved to: /n/holylabs/pakes_lab/Lab/sci_eq/derived/process_foias/prdct_classification/output/umich_supplier/umich_merged_clean_classified_with_tfidf.csv
+
+--- All files processed. ---

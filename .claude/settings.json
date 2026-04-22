@@ -1,0 +1,34 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls /n/home02/cxu75/sci_eq/derived/process_foias/prdct_classification/output/utdallas_*report*)",
+      "Bash(ls -la /n/home02/cxu75/sci_eq/derived/process_foias/prdct_classification/temp/*.parquet)",
+      "Bash(chmod +x /n/home02/cxu75/sci_eq/derived/process_foias/prdct_classification/code/run_comparison.sh)",
+      "Read(//n/home02/cxu75/sci_eq/derived/process_foias/clean_foia_text/code/**)",
+      "Read(//n/holylabs/pakes_lab/Lab/sci_eq/derived/process_foias/clean_foia_text/code/**)",
+      "Bash(python3 -c ':*)",
+      "Bash(git checkout:*)",
+      "Read(//n/home02/cxu75/sci_eq/derived/process_foias/prdct_classification/code/**)",
+      "Read(//n/holylabs/pakes_lab/Lab/sci_eq/derived/process_foias/prdct_classification/code/**)",
+      "Bash(ls -la /n/home02/cxu75/sci_eq/derived/process_foias/prdct_classification/external/samp/umich*)",
+      "Read(//n/netscratch/pakes_lab/Lab/sci_eq/**)",
+      "Bash(ls /n/home02/cxu75/sci_eq/derived/process_foias/prdct_classification/output/baseline/*full_report* /n/home02/cxu75/sci_eq/derived/process_foias/prdct_classification/output/umich_supplier/*full_report*)",
+      "Bash(python compare_variants.py baseline umich_supplier)",
+      "Bash(bash run_comparison.sh)",
+      "Bash(head -20 echo \"---\" ls /n/holylabs/pakes_lab/Lab/sci_eq/derived/process_foias/prdct_classification/output/*.csv)",
+      "Bash(python3)",
+      "Bash(python3 diagnose_categories.py)",
+      "Bash(python3 analyze_failure_patterns.py)",
+      "Bash(python compare_variants.py --report combined)",
+      "Bash(python compare_variants.py baseline umich_supplier --report combined)",
+      "Bash(python analyze_failure_patterns.py)",
+      "Bash(python -c ':*)"
+    ],
+    "additionalDirectories": [
+      "/n/home02/cxu75/sci_eq/derived/process_foias/clean_foia_text/code",
+      "/n/holylabs/pakes_lab/Lab/sci_eq/derived/process_foias/clean_foia_text/code",
+      "/n/home02/cxu75/sci_eq/derived/process_foias/prdct_classification/code",
+      "/n/holylabs/pakes_lab/Lab/sci_eq/derived/process_foias/prdct_classification/code"
+    ]
+  }
+}

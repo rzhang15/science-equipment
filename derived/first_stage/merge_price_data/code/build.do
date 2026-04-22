@@ -8,7 +8,7 @@ version 17
 
 program main
     local embed tfidf
-    import delimited ../external/samp/govspend_panel_classified_with_non_parametric_`embed'.csv, clear
+    import delimited ../external/samp/govspend_panel_classified_with_`embed'.csv, clear
     // get rid of negated orders these are returns
     rename predicted_market category
     gduplicates tag poid clean_desc, gen(dup_order)
@@ -21,13 +21,13 @@ program main
     save ../temp/govspend_`embed', replace
     
     // dallas+oregon
-    import delimited  ../external/samp/utdallas_merged_clean_classified_with_non_parametric_`embed'.csv,clear 
+    import delimited  ../external/samp/utdallas_merged_clean_classified_with_`embed'.csv,clear 
     drop predicted_market
     keep product_desc clean_desc supplier price qty spend purchase_id date prediction_source similarity_score category 
     gen agencyname = "university of texas at dallas"
     save ../temp/utdallas_`embed', replace
     
-    import delimited  ../external/samp/oregonstate_2010_2019_standardized_clean_classified_with_non_parametric_`embed'.csv,clear 
+    import delimited  ../external/samp/oregonstate_2010_2019_standardized_clean_classified_with_`embed'.csv,clear 
     rename predicted_market category
     keep product_desc clean_desc supplier price qty spend purchase_id date prediction_source similarity_score category 
     gen agencyname = "oregon state university"

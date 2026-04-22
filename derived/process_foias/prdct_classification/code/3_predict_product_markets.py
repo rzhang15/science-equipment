@@ -9,8 +9,8 @@ import glob
 import os
 import joblib
 import argparse
-from tqdm import tqdm
-from sklearn.metrics import pairwise # Added for cosine_similarity
+from scipy import sparse
+from sklearn.preprocessing import normalize
 import numpy as np # Added for NaN
 
 import config
@@ -27,25 +27,23 @@ def main(gatekeeper_name: str, expert_choice: str, source_abbrev: str = None):
     print("\nLoading necessary models and categorizers...")
     try:
         gatekeeper_model = joblib.load(os.path.join(config.OUTPUT_DIR, f"hybrid_classifier_{gatekeeper_name}.joblib"))
-        
-        model_type, embedding_type = expert_choice.rsplit('_', 1)
-        if model_type == 'non_parametric':
-            # --- Load the appropriate expert predictor and tools for similarity ---
-            if embedding_type == 'tfidf':
-                expert_predictor = TfidfItemCategorizer()
-                vectorizer_for_similarity = expert_predictor.vectorizer
-                # Convert sparse category vectors to dense for indexing
-                category_vectors_for_similarity = expert_predictor.category_vectors.toarray()
-                category_names_map = {name: i for i, name in enumerate(expert_predictor.category_names)}
-            elif embedding_type == 'bert':
-                expert_predictor = EmbeddingItemCategorizer("bert", "all-MiniLM-L6-v2")
-                vectorizer_for_similarity = expert_predictor.encoder_model # The BERT model itself
-                category_vectors_for_similarity = expert_predictor.category_vectors
-                category_names_map = {name: i for i, name in enumerate(expert_predictor.category_names)}
-            else:
-                 raise ValueError(f"Unsupported embedding type: {embedding_type}")
+
+        # --- Load the appropriate expert predictor and tools for similarity ---
+        if expert_choice == 'tfidf':
+            expert_predictor = TfidfItemCategorizer()
+            vectorizer_for_similarity = expert_predictor.vectorizer
+            # Keep sparse — fancy-indexing this into dense blows up memory
+            # (N_items x N_tfidf_features). sparse indexing, normalize, and the
+            # multiply+sum path below all handle sparse natively.
+            category_vectors_for_similarity = expert_predictor.category_vectors.tocsr()
+            category_names_map = {name: i for i, name in enumerate(expert_predictor.category_names)}
+        elif expert_choice == 'bert':
+            expert_predictor = EmbeddingItemCategorizer("bert", "all-MiniLM-L6-v2")
+            vectorizer_for_similarity = expert_predictor.encoder_model # The BERT model itself
+            category_vectors_for_similarity = expert_predictor.category_vectors
+            category_names_map = {name: i for i, name in enumerate(expert_predictor.category_names)}
         else:
-            raise NotImplementedError(f"Expert model type '{model_type}' not configured.")
+            raise ValueError(f"Unsupported expert choice: {expert_choice}")
 
         rule_categorizer = RuleBasedCategorizer(config.MARKET_RULES_YAML)
 
@@ -63,6 +61,14 @@ def main(gatekeeper_name: str, expert_choice: str, source_abbrev: str = None):
             dataframes_to_process.append(('utdallas_merged_clean.parquet', df_utd))
         except FileNotFoundError:
             print(f"ERROR:Pre-merged UT Dallas file not found. Run 0_clean_category_file.py first.")
+            return
+    elif 'umich' in source_lower:
+        print(f"\nUMich specified. Loading the pre-cleaned and merged file from script 0.")
+        try:
+            df_um = pd.read_parquet(config.UMICH_MERGED_CLEAN_PATH)
+            dataframes_to_process.append(('umich_merged_clean.parquet', df_um))
+        except FileNotFoundError:
+            print(f"ERROR: Pre-merged UMich file not found. Run 0_clean_category_file.py first.")
             return
     elif 'govspend' in source_lower:
         print(f"\nGovSpend specified. Loading the GovSpend panel data.")
@@ -134,15 +140,7 @@ def main(gatekeeper_name: str, expert_choice: str, source_abbrev: str = None):
             continue
             
         clean_descriptions = df_new[config.CLEAN_DESC_COL].astype(str).fillna("")
-
-        # For the gatekeeper: optionally prepend supplier tokens
-        if config.USE_SUPPLIER and 'supplier' in df_new.columns:
-            descriptions = df_new.apply(
-                lambda r: (config.normalize_supplier(str(r['supplier'])) + ' ' + str(r[config.CLEAN_DESC_COL])).strip(),
-                axis=1
-            )
-        else:
-            descriptions = clean_descriptions
+        suppliers = df_new['supplier'] if config.USE_SUPPLIER and 'supplier' in df_new.columns else None
 
         # --- Pipeline Logic ---
         df_new['prediction_source'] = 'Non-Lab'
@@ -150,7 +148,7 @@ def main(gatekeeper_name: str, expert_choice: str, source_abbrev: str = None):
         y_pred = pd.Series("Non-Lab", index=df_new.index)
 
         print("  - Step 1: Running gatekeeper...")
-        is_lab_mask = (gatekeeper_model.predict(descriptions) == 1)
+        is_lab_mask = (gatekeeper_model.predict(clean_descriptions, suppliers=suppliers) == 1)
         print(f"  - Gatekeeper identified {is_lab_mask.sum()} potential lab items.")
 
         # --- Step 1.5: Supplier-based Non-Lab filter ---
@@ -170,17 +168,21 @@ def main(gatekeeper_name: str, expert_choice: str, source_abbrev: str = None):
                 df_new.loc[supplier_nonlab_mask, 'prediction_source'] = 'Supplier Non-Lab'
                 print(f"  - Supplier filter: {supplier_override_count} items forced to Non-Lab ({supplier_nonlab_mask.sum()} total supplier Non-Lab).")
 
+        step2_vectors = None
+        step2_indices = None
         if is_lab_mask.any():
             # Expert model uses clean descriptions (no supplier token) for
             # content-based category matching
             lab_descriptions = clean_descriptions[is_lab_mask]
-            
-            print(f"  - Step 2: Predicting markets with '{expert_choice}' expert...")
-            tqdm.pandas(desc="    - Predicting")
-            expert_results = lab_descriptions.progress_apply(expert_predictor.get_item_category)
-            expert_predictions = expert_results.apply(lambda x: x[0])
-            expert_scores = expert_results.apply(lambda x: x[1])
-            
+
+            print(f"  - Step 2: Predicting markets with '{expert_choice}' expert (batched)...")
+            # One transform/encode + one cosine matmul for all lab rows.
+            # item_vectors are cached for Step 5 to avoid re-encoding.
+            expert_predictions, expert_scores, step2_vectors = (
+                expert_predictor.predict_batch(lab_descriptions)
+            )
+            step2_indices = lab_descriptions.index
+
             print("  - Step 3: Applying prediction veto rules...")
             validated_predictions = pd.Series(
                 [rule_categorizer.validate_prediction(pred, desc) for pred, desc in zip(expert_predictions, lab_descriptions)],
@@ -197,11 +199,24 @@ def main(gatekeeper_name: str, expert_choice: str, source_abbrev: str = None):
 
         print("  - Step 4: Applying final market override rules...")
         has_raw_col = config.RAW_DESC_COL in df_new.columns
-        overrides = df_new.apply(
-        lambda row: rule_categorizer.get_market_override(
-            clean_description=str(row[config.CLEAN_DESC_COL]),
-            raw_description=str(row[config.RAW_DESC_COL]) if has_raw_col else None
-        ), axis=1
+        clean_list = df_new[config.CLEAN_DESC_COL].astype(str).tolist()
+        if has_raw_col:
+            raw_list = df_new[config.RAW_DESC_COL].astype(str).tolist()
+            pairs = list(zip(clean_list, raw_list))
+        else:
+            pairs = [(c, None) for c in clean_list]
+
+        # FOIA product data is highly repetitive (same item ordered many
+        # times).  Dedupe on (clean, raw) so the rule regex chain runs once
+        # per unique pair instead of per row.
+        unique_pairs = set(pairs)
+        print(f"  - {len(unique_pairs)} unique description pairs among {len(pairs)} rows")
+        pair_to_override = {
+            p: rule_categorizer.get_market_override(p[0], p[1])
+            for p in unique_pairs
+        }
+        overrides = pd.Series(
+            [pair_to_override[p] for p in pairs], index=df_new.index
         )
         valid_overrides = overrides.dropna()
         y_pred.update(valid_overrides)
@@ -230,42 +245,62 @@ def main(gatekeeper_name: str, expert_choice: str, source_abbrev: str = None):
         # +++ Step 5: Calculate FINAL similarity scores +++
         print("  - Step 5: Calculating final similarity scores for lab predictions...")
         final_lab_mask = (y_pred != "Non-Lab") & (y_pred != "unclassified") & (y_pred != "Prediction Error") & (y_pred != "No Description")
-        
+
         if final_lab_mask.any():
             lab_indices = final_lab_mask[final_lab_mask].index
             lab_final_preds = y_pred[lab_indices]
             lab_final_descs = clean_descriptions[lab_indices]
 
-            if embedding_type == 'bert':
-                lab_embeddings = vectorizer_for_similarity.encode(lab_final_descs.tolist(), show_progress_bar=True, batch_size=128)
-            else: # TF-IDF
-                lab_embeddings = vectorizer_for_similarity.transform(lab_final_descs)
-            final_scores = []
-            mismatched_categories_found = set() # <-- Add this line
-            
-            for i, idx in enumerate(lab_indices):
-                final_cat = lab_final_preds[idx]
-                if final_cat in category_names_map:
-                    cat_index = category_names_map[final_cat]
-                    avg_cat_vector = category_vectors_for_similarity[cat_index]
-                    item_vector = lab_embeddings[i]
-                    
-                    if item_vector.ndim == 1: item_vector = item_vector.reshape(1, -1)
-                    if avg_cat_vector.ndim == 1: avg_cat_vector = avg_cat_vector.reshape(1, -1)
-                         
-                    score = pairwise.cosine_similarity(item_vector, avg_cat_vector)[0][0]
-                    final_scores.append(score)
+            # Reuse Step 2's cached vectors when all final-lab rows were in
+            # the gatekeeper lab set.  Market overrides (Step 4) can promote
+            # rows outside is_lab_mask to a category — encode those fresh.
+            if step2_vectors is not None and lab_indices.isin(step2_indices).all():
+                positions = step2_indices.get_indexer(lab_indices)
+                lab_embeddings = step2_vectors[positions]
+            else:
+                if expert_choice == 'bert':
+                    lab_embeddings = vectorizer_for_similarity.encode(
+                        lab_final_descs.tolist(), show_progress_bar=True, batch_size=128
+                    )
                 else:
-                    # --- THIS IS THE FIX ---
-                    # It will print the problematic category name ONE time
-                    if final_cat not in mismatched_categories_found:
-                        print(f"  -  DEBUG: Category mismatch. Rule category '{final_cat}' not found in expert model's category list.")
-                        mismatched_categories_found.add(final_cat)
-                    # -----------------------
-                    final_scores.append(np.nan) # Keep appending nan
+                    lab_embeddings = vectorizer_for_similarity.transform(lab_final_descs)
 
-            df_new.loc[lab_indices, 'similarity_score'] = final_scores 
-       
+            # Vectorized row-wise cosine: gather each row's assigned category
+            # vector in one fancy-index, L2-normalize both sides, dot per row.
+            cat_idx_arr = np.array(
+                [category_names_map.get(c, -1) for c in lab_final_preds]
+            )
+            valid_pos = np.where(cat_idx_arr >= 0)[0]
+            missing_pos = np.where(cat_idx_arr < 0)[0]
+            if len(missing_pos):
+                for c in sorted(set(lab_final_preds.iloc[missing_pos].tolist())):
+                    print(f"  -  DEBUG: Category mismatch. Rule category '{c}' not found in expert model's category list.")
+
+            final_scores = np.full(len(lab_indices), np.nan)
+            if len(valid_pos):
+                v_lab_n = normalize(lab_embeddings[valid_pos], axis=1)
+                cat_vecs_n = normalize(category_vectors_for_similarity, axis=1)
+                cat_idx_valid = cat_idx_arr[valid_pos]
+
+                # Group by assigned category and compute per-group. Avoids a
+                # fancy-index over category rows that blows up either memory
+                # (dense) or scipy's int32 nnz counter (sparse) when the
+                # number of selected rows is large.
+                scores = np.empty(len(valid_pos))
+                for ci in np.unique(cat_idx_valid):
+                    mask = cat_idx_valid == ci
+                    v_cat_row = cat_vecs_n[ci]
+                    v_lab_rows = v_lab_n[mask]
+                    if sparse.issparse(v_lab_rows):
+                        s = np.asarray(v_lab_rows.multiply(v_cat_row).sum(axis=1)).ravel()
+                    else:
+                        s = v_lab_rows @ np.asarray(v_cat_row).ravel()
+                    scores[mask] = s
+                final_scores[valid_pos] = scores
+
+            df_new.loc[lab_indices, 'similarity_score'] = final_scores
+
+
         # Assign final predictions
         df_new['predicted_market'] = y_pred
         # --- End of Pipeline ---
@@ -287,7 +322,7 @@ if __name__ == "__main__":
         "--expert",
         type=str,
         required=True,
-        choices=['non_parametric_tfidf', 'non_parametric_bert'],
+        choices=['tfidf', 'bert'],
     )
     args = parser.parse_args()
     main(gatekeeper_name=args.gatekeeper, expert_choice=args.expert, source_abbrev=args.source_abbrev)

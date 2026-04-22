@@ -1,8 +1,8 @@
 ./ls_samp/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/pull_openalex/output 
 ./samp/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/gather_athr_pprs/output 
-./foia/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/grants/get_foia_pis/output 
+./foia/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/process_foias/merge_foias_for_expsr/output 
 ./fields/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/cluster_fields/output 
-./ml/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/first_stage/make_mkt_panel/temp
+./ml/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/first_stage/select_categories/output
 ./betas/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/analysis/first_stage/output
 ./sup/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/first_stage/fuzzy_match_suppliers/output/
 

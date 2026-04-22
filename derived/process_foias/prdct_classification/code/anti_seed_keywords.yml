@@ -5,6 +5,7 @@ keywords:
   # stems that are substrings of common lab terms (e.g. "ship" matches
   # "relationship", "thesis" matches "synthesis", "lease" matches "nuclease").
   - admin
+  - analysis
   - agreement
   - audit
   - award
@@ -202,7 +203,22 @@ keywords:
   - swagelok
   - stainless steel
   - imaging system
-  - balance
+  - precision balance
+  - rotary
+  - evaporator
+  - mixer
+  - rotator
+  - tubing
+  - vapor
+  - adapter
+  - brush
+  - stpr
+  - stopper
+  - durac
+  - washer
+  - cryolabel
+  - cryotag
+  - vaccum
   # Agriculture & Non-Research
   - alfalfa
   - fertilizer
@@ -268,7 +284,6 @@ keywords:
   - postcard
 
   
-
   # Additional Non-Lab keywords
   - drive
   - flights
@@ -294,6 +309,16 @@ keywords:
   - paper towels
   - towel
   - towl hnd
+  - hotplt
+  - hot plate
+  - hotplate
+  - hotplt
+  - rotator
+  - vortexer
+  - homogenizer
+  - tissue grinder
+  - assembly
+
 
   # Etching & Microfabrication (capital equipment, not consumables)
   - etching
@@ -343,6 +368,25 @@ keywords:
   - spectrophotometric grade
   - pesticide grade
   - toluene
+  # Specific bulk solvents sold by the liter, not lab consumables.
+  # Audit note: these were verified to have ~0 overlap with items
+  # currently labeled lab in the training set.  Sigma grade brands
+  # (bioultra, sigmaultra, chromasolv) and dichloromethane were
+  # REJECTED here because they do overlap with lab-labeled buffers.
+  - nitromethane
+  - cyclopentane
+  - hexadecane
+  - chloroform-d
+  - hexylene glycol
+
+  # Deuterated NMR solvents — audit: -d6 had 1/44 lab overlap, -d8 had 1/15.
+  # These markers reliably indicate NMR solvents (non-lab in this taxonomy),
+  # not bench reagents.  Stricter variants (-d3/-d4/-d5/-d2) had 10-30%
+  # lab overlap and were REJECTED to preserve lab recall.
+  - -d6
+  - -d8
+  - 99.9+%
+  - 99.9 atom
 
   # Instrument / Equipment Descriptions
   # These appear in instrument-part descriptions where the word "instrument"
@@ -352,3 +396,111 @@ keywords:
   - replacement lamp
   - replacement bulb
   - manifold assembly
+  - picotip
+  - pe tubing
+  - peek tubing
+  - ptfe tape
+  - pump oil
+  - sample intro
+  - biosensor tray
+  - digi-sense
+  - forceps
+  - dumont
+  - tweezers
+  - tool
+  - hot plate
+  - zip tie
+  - milli-q
+  - rotor
+  - stopper
+  - scalpel
+  - ph electrode
+  - kimwipe
+  - underpad
+  - invoice
+  - publication
+  - sequencing
+  - electrode
+
+  # Service / repair / calibration compound phrases.  Safer than adding bare
+  # "repair" or "calibrate" (which hit DNA repair kits, calibration standards).
+  # Each phrase below is a pipette/instrument servicing pattern.
+  - pipette calibration
+  - pipet calibration
+  - pipettes calibration
+  - pipette repair
+  - pipet repair
+  - pipette service
+  - pipet service
+  - pipette invoice
+  - pipet invoice
+  - instrument repair
+  - instrument service
+  - instrument calibration
+  - balance calibration
+  - scale calibration
+  - repair fee
+  - service fee
+  - shipping fee
+  - shipping charge
+  - maintenance contract
+  - service contract
+
+  # Microscope / cytometer consumables that we treat as instrument-adjacent.
+  - immersion oil
+  - sheath fluid
+
+  # L-amino acid reagents — in both UMich and UT Dallas training these are
+  # catalogued as "irrelevant chemicals - amino acids and derivatives" and
+  # audited at 0-3% lab rate.  Careful: L-leucine/L-glutamic sit around 12-19%
+  # and are intentionally omitted.
+  - l-tryptophan
+  - l-tyrosine
+  - l-proline
+  - l-valine
+  - l-threonine
+  - l-histidine
+  - l-carnitine
+  - l-phenylephrine
+  - l-cysteine
+
+  # Bulk chemistry markers (audited 0% lab rate in Dallas + UMich training).
+  - trace metals basis
+  - nickelous
+  - titanium(iii)
+
+  # Order / quote / promotion admin artifacts (from UMich hold-out FPs)
+  - order confirmation
+  - please send
+  - please manually
+  - use quotation
+  - quotation number
+  - ups account
+  - canceled
+  - rush order
+  - offer code
+  - promotion code
+  - get free
+  - replaces column
+
+  # Pipette / controller brands treated as instruments (not consumables)
+  - pipetman
+  - pipet-aid
+  - finnpipette
+  - ergoone
+  - replacement shaft
+  - performance verification
+
+  # Sequencing library-prep kit brands (complements generic "sequencing")
+  - miseq
+  - nextera
+  - truseq
+  - nextflex
+  - thruplex
+  - seqcap
+  - dnbseq
+
+  # Singular forms of existing forceps/tweezers; add scissors
+  - forcep
+  - tweezer
+  - scissor

@@ -22,6 +22,9 @@ keywords:
   - latex bulb
   - low retention
   - lts tip
+  - pipet-aid
+  - pipet controller
+  - powerpette
   - macro tip
   - maxi tips
   - microtip
@@ -41,6 +44,17 @@ keywords:
   - stripette
   - tip bulk
   - xl tip
+  # Pipette-tip brands
+  - aerofilter
+  - aerosol barr
+  - bestips
+  - griptip
+  - griptips
+  - spacesaver tip
+  - gps-lts
+  - gps-l10
+  - darts tip
+  - dart tip
 
   # ====================================================================
   # Tubes, Vials, & Plates
@@ -170,6 +184,8 @@ keywords:
   - carboy
   - cork-ring
   - crystallizing
+  - crystallizing dish
+  - crystallising dish
   - cuvette
   - cylinder ml
   - graduated cylinder
@@ -180,13 +196,17 @@ keywords:
   - needle
   - scoopula
   - spin-bar
+  - spinbar
   - spoonula
   - stir-bar
   - stirbar
   - stirring bar
   - stop-cock
   - syringe
+  - thimble
   - thimble sgl
+  - extract thimble
+  - extraction thimble
   - weigh boat
   - weighing paper
   
@@ -201,6 +221,15 @@ keywords:
   - media bottle
   - storage bottle
   - fltrbtpa
+  # Freezer / cryogenic storage boxes
+  - 81-place
+  - 81 place
+  - 81-cell
+  - cryogenic box
+  - cryostore
+  - hinged freezer
+  - freezer storage
+  - freezer hinged
   
   # Sealing & Labeling
   - aluminum foil
@@ -221,6 +250,16 @@ keywords:
   - sealing film
   - top seal
   - wrapping film
+  # Microplate sealing films / tapes
+  - sealing tape
+  - plate sealer
+  - plate seal
+  - breathe-easy
+  - breathe easy
+  - microseal
+  - thermal seal
+  - adhesive plate
+  - aluminum seal
   
   # Racks
   - 96 rack
@@ -250,8 +289,13 @@ keywords:
   - temed
   - tris
   - tween
+  - live dead
+  - live/dead
 
   # Solvents & Bulk Chemicals
+  - acrylamide/bisacrylamide
+  - acrylamide
+  - acryl/bis
   - methylenebisacrylamide
   - bleach
   - clorox
@@ -296,6 +340,10 @@ keywords:
   - molecular sieve
   - phenol
   - phosphoric acid
+  - phosporic ac
+  - ortho-phosphoric
+  - bicinchoninic
+  - transit lt
   - poly ethylene glycol
   - potassium carbonate
   - potassium chloride
@@ -318,8 +366,33 @@ keywords:
   - urea
   - water molecular bio
   - xylene
+  - xylenes
   - zinc chloride
   - x-gal
+  # Named-chemical lab categories added from category audit:
+  - methylene chloride
+  - ethylene glycol
+  - polyethylene glycol
+  - nitric acid
+  - sulfuric acid
+  - acetic acid
+  - trifluoroacetic acid
+  - formaldehyde
+  - paraformaldehyde
+  - potassium hydroxide
+  - sodium sulfate
+  - sodium citrate
+  - magnesium sulfate
+  - imidazole
+  - iptg
+  - tris base
+  - hydrogen peroxide
+  - heavy water
+  - chromatography-grade water
+  - agarose
+  - dntps
+  - glucose test strip
+  - reducing agents
 
   # Molecular Biology (Enzymes, Kits, Reagents)
   - cdna
@@ -333,10 +406,19 @@ keywords:
   - dynabead
   - enzyme
   - ez-10 column
+  - eagles minimum
+  - electrocompetent cells
+  - competent cells
   - genejet
   - generuler
   - gibco
   - hot-start
+  - hotstart
+  - high-fidelity
+  - hi-fidelity
+  - hi-fid
+  - hi-fi
+  - hifi
   - iscript
   - itaq
   - ligase
@@ -347,6 +429,9 @@ keywords:
   - mini-prep
   - midi-prep
   - maxi-prep
+  - maxiprep
+  - miniprep
+  - midiprep
   - trizol
   - tri-reagent
   - qiazol
@@ -369,6 +454,8 @@ keywords:
   - proteinase
   - qpcr
   - pcr
+  - rt pcr
+  - rt-pcr
   - rev transcription
   - reverse transcriptase
   - ribolock
@@ -388,7 +475,8 @@ keywords:
   - taq
   - Tth111I
   - turbofect
-  - zymoprep
+  - zymoprepa
+  - zymolyase
 
   # Proteins, Purification & Western Blot
   - albumin
@@ -529,9 +617,14 @@ keywords:
   - bp ladder
   - dna ladder
   - ladder dna
-  - protein ladder
+  - protein laddera
+  - protladder
   - protein standard
   - rna ladder
+  - molecular weight marker
+  - molecular weight standard
+  - kb ladder
+
 
   # ====================================================================
   # Safety & Apparel (Disposable)
@@ -594,6 +687,109 @@ keywords:
   - SwaI
   - XbaI
   - XhoI
+  # Additions from UMich FN audit (Promega/NEB catalogs, not in base list):
+  - AclI
+  - AfeI
+  - AflII
+  - AflIII
+  - AscI
+  - AseI
+  - AsiSI
+  # AvaI removed — 'avai' substring-matches 'available' on non-lab FPs
+  - AvrII
+  # BanI removed — 'bani' substring is rare but had FP hits on 'carbanilide'
+  - BanII
+  - BbvCI
+  - BfaI
+  - BglI
+  - BsaI
+  - BsaAI
+  - BsgI
+  - BsiWI
+  - BspEI
+  - BspHI
+  - BspQI
+  - BsrGI
+  - BstBI
+  - BstXI
+  - DdeI
+  - DpnII
+  - DraIII
+  # EarI removed — 'eari' had false matches on baseline non-lab items
+  - FauI
+  - FokI
+  - FseI
+  - FspI
+  - HaeII
+  - HaeIII
+  - HhaI
+  - HincII
+  - HinfI
+  - HpaII
+  - KasI
+  - MboI
+  - MfeI
+  - MluCI
+  - MseI
+  - MspI
+  - NaeI
+  # NarI removed — 'nari' substring-matches 'narishige' (microscope mfr)
+  - NciI
+  - NgoMIV
+  - NlaIII
+  - NruI
+  - NsiI
+  - PciI
+  - PmeI
+  - PmlI
+  - PsiI
+  - PspOMI
+  - RsaI
+  - SacII
+  - SapI
+  - SbfI
+  - SfiI
+  - SgfI
+  - SgrAI
+  - SmlI
+  - SnaBI
+  - SrfI
+  - SspI
+  - StyI
+  - TaqI
+  - XcmI
+  - XmaI
+  - XmnI
+  - ZraI
+
+  # ====================================================================
+  # Research Peptides (from UMich FN audit: Bachem / Phoenix / Sigma)
+  # Add as seed so keyword-match triggers lab classification even when
+  # the surrounding description is catalog-number-heavy.
+  # ====================================================================
+  - angiotensin
+  - amyloid beta
+  - beta-amyloid
+  - bombesin
+  - bradykinin
+  - calcitonin
+  - dynorphin
+  - endothelin
+  - galanin
+  - ghrelin
+  - gnrh
+  - gonadorelin
+  - kisspeptin
+  - lhrh
+  - melanocortin
+  - neurotensin
+  - neuropeptide
+  - orexin
+  - oxytocin
+  - secretin
+  - somatostatin
+  - synthetic peptide
+  - vasopressin
 
   # ====================================================================
   # Cell Lines (common names, min 5 chars to avoid Aho-Corasick collateral)
@@ -625,3 +821,121 @@ keywords:
   - sulfur
   - pyrophosphatase
   - n-ethylmaleimide
+
+  # ====================================================================
+  # PPE, EM supplies, and lab brand gaps (from FN analysis)
+  # ====================================================================
+  # Audit note: "lab coat", "safety glasses", "respirator", "hand sanitizer",
+  # "pelco", "contrad" were REJECTED here because the training set already
+  # labels 45-93% of matching items as non-lab.  Making them seeds would
+  # hurt non-lab recall more than it fixes lab recall.
+  - labcoat  # closed-spelling variant; space-form "lab coat" too ambiguous
+
+  # Electron microscopy / TEM consumables (low non-lab overlap in training)
+  - cryoloop
+  - formvar
+  - laceycarbon
+  - lacey carbon
+  - em grid
+  - quantum dot
+  - carbon adhesive
+
+  # Lab reagent / kit brand names (low non-lab overlap in training)
+  - nebuilder
+  - nonidet
+  - np-40
+  - np40
+  - bapta
+  - lipofectamine
+  - tergazyme
+  - softcide
+  - mitoview
+  - mitobrilliant
+  - zymobiomics
+  - superose
+  - gelred
+  - gelmax
+
+  # ====================================================================
+  # UMich FN additions (validated >=98% lab in both UMich and UT Dallas
+  # training data, or Dallas-absent; safe for baseline precision)
+  # ====================================================================
+  # Molecular biology / gene symbols / CRISPR
+  - cas9
+  - exon
+  - intron
+  - antisense
+  - duplex
+  - isotype
+  - igg1
+  - egfp
+  - mcherry
+  - lacz
+  - sv40
+  - gapdh
+  - cd44
+  - sox10
+
+  # Commercial reagent / product lines (siRNA, qPCR, cloning, antibody)
+  - smartpool
+  - on-targetplus
+  - sigenome
+  - primetime
+  - pentr
+  - rtpcr
+  - affinipure
+
+  # Hand-pulled from UMich FN review (validated)
+  - stembeads
+  - amplite
+  - cal-520
+  - perfect-focus
+  - hcr probe
+  - lumavidia
+
+  # FN-mining round 2 (validated: ≥91% lab rate on both Dallas + UMich)
+  # Lab detergents
+  - alconox
+  - liquinox
+  - citranox
+  - tergazyme
+  - contrad
+  - micro-90
+  - rbs-35
+  - dish soap
+  - dishwashing liquid
+  - dish detergent
+  - palmolive
+  - dawn dish
+  # Magnetic-bead / cleanup products
+  - ampure
+  # Autoradiography film + markers
+  - biomax
+  - hyperfilm
+  - glogos
+  - autoradiograph
+  - x-omat
+  - autoradiography film
+  # Pipette-tip brands
+  - dualfilter
+  - talltip
+  # Microtube brands
+  - posi-click
+  - posiclick
+  # Millex / Millipore syringe filters (abbreviation)
+  - milx
+  # Western blot blockers
+  - nonfat dry milk
+  - non-fat dry milk
+
+  # User-directed adds.
+  # Targeted "mini-protean" variants — bare "mini-protean" hits 50% instrument
+  # parts (combs, spacers, tanks) so only consumable-specific phrases are safe.
+  - mini-protean precast
+  - mini-protean tgx
+  - protean tgx
+  # Stopcock: 70% lab in training, most non-lab hits are "instrument part -
+  # glass stopcock" classifications of what are really lab consumables.
+  - stopcock
+  - stop cock
+  - activin

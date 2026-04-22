@@ -15,17 +15,19 @@ class RuleBasedCategorizer:
                 raw_rules = yaml.safe_load(f)
             self.aliases = {f"${k}": v for k, v in raw_rules.get('keyword_groups', {}).items()}
 
-            # NEW: Auto-wildcard restriction enzymes to handle underscores
-            if '$RESTRICTION_ENZYME' in self.aliases:
-                self.aliases['$RESTRICTION_ENZYME'] = [
-                    f"*{e}*" if not (e.startswith('*') and e.endswith('*')) else e 
-                    for e in self.aliases['$RESTRICTION_ENZYME']
-                ]
+            # Enzyme aliases used to be auto-wrapped in `*...*` here.  That
+            # made a bare "BamHI" match inside unrelated tokens like
+            # "F_BamHI_primer" or "BamHI site", misclassifying synthetic DNA
+            # oligos (which routinely carry restriction-site names in their
+            # descriptions) as restriction enzymes.  Keeping enzyme names
+            # word-bounded is the correct default; list any punctuation
+            # variants (e.g. `Nb.BsmI`, `BsaI-HFv2`) explicitly in the YAML.
             self.override_rules = raw_rules.get('market_rules', [])
             self.veto_rules = raw_rules.get('required_keywords', {})
             self.hierarchical_veto_rules = raw_rules.get('hierarchical_veto_rules', [])
-            
+
             self._compiled_regexes = {}
+            self._compiled_raw_regexes = {}
 
             print(f"  - Loaded {len(self.override_rules)} market override rules.")
             print(f"  - Loaded {len(self.veto_rules)} exact-match veto rules.")
@@ -67,20 +69,40 @@ class RuleBasedCategorizer:
         self._compiled_regexes[cache_key] = compiled_regex
         return compiled_regex
 
+    def _get_raw_regex(self, pattern, ignore_case=True):
+        """Compile & cache a raw-regex keyword (used by regex_any_of /
+        regex_none_of).  Unlike _get_regex, the pattern string is treated as
+        a real regex — no escaping, no wildcard translation, no automatic
+        word boundaries.  Caller is responsible for anchors."""
+        cache_key = (pattern, ignore_case)
+        hit = self._compiled_raw_regexes.get(cache_key)
+        if hit is not None:
+            return hit
+        flags = re.IGNORECASE if ignore_case else 0
+        compiled = re.compile(pattern, flags)
+        self._compiled_raw_regexes[cache_key] = compiled
+        return compiled
+
     def get_market_override(self, clean_description, raw_description=None):
         if not isinstance(clean_description, str) or not self.override_rules:
             return None
-        
+
         for rule in self.override_rules:
             # Toggle source text and case-sensitivity based on the rule flag
             case_sensitive = rule.get('case_sensitive', False)
             text_to_search = raw_description if (case_sensitive and raw_description) else clean_description
             ignore_case = not case_sensitive
 
-            # 1. Check 'none_of' (Veto)
+            # 1. Check 'none_of' (Veto, fixed-string keywords)
             if 'none_of' in rule:
                 expanded_none_of = [kw for alias in rule['none_of'] for kw in self.aliases.get(alias, [alias])]
                 if any(self._get_regex(kw, ignore_case=ignore_case).search(text_to_search) for kw in expanded_none_of):
+                    continue
+
+            # 1b. Check 'regex_none_of' (Veto, raw regex)
+            if 'regex_none_of' in rule:
+                if any(self._get_raw_regex(p, ignore_case=ignore_case).search(text_to_search)
+                       for p in rule['regex_none_of']):
                     continue
 
             # 2. All_of check (Requirement)
@@ -94,13 +116,22 @@ class RuleBasedCategorizer:
                 if not all_conditions_met:
                     continue
                 # If all_of is the only condition and it's met, we can return
-                if 'any_of' not in rule and 'exact_any_of' not in rule:
+                if 'any_of' not in rule and 'exact_any_of' not in rule and 'regex_any_of' not in rule:
                     return rule['name']
 
             # 3. Any_of check (Match anywhere)
             if 'any_of' in rule:
                 expanded = [kw for alias in rule['any_of'] for kw in self.aliases.get(alias, [alias])]
                 if any(self._get_regex(kw, ignore_case=ignore_case).search(text_to_search) for kw in expanded):
+                    return rule['name']
+
+            # 3b. Regex_any_of check (raw-regex match, unescaped).  Lets rules
+            # express structural primer / oligo patterns (e.g. _F/_R token
+            # suffixes) that bare substring matches can't capture without
+            # massive false positives.
+            if 'regex_any_of' in rule:
+                if any(self._get_raw_regex(p, ignore_case=ignore_case).search(text_to_search)
+                       for p in rule['regex_any_of']):
                     return rule['name']
 
             # 4. Exact_any_of check (Must match full string)
@@ -141,6 +172,12 @@ class RuleBasedCategorizer:
                 expanded_any_of = [kw for alias in rule_conditions['any_of'] for kw in self.aliases.get(alias, [alias])]
                 if not any(self._get_regex(kw).search(description) for kw in expanded_any_of):
                     return None
+            # Veto if description is missing ANY of the required keyword groups
+            if 'all_of' in rule_conditions:
+                for condition in rule_conditions['all_of']:
+                    keywords = self.aliases.get(condition, [condition])
+                    if not any(self._get_regex(kw).search(description) for kw in keywords):
+                        return None
             # Veto if description contains ANY excluded keyword
             if 'none_of' in rule_conditions:
                 expanded_none_of = [kw for alias in rule_conditions['none_of'] for kw in self.aliases.get(alias, [alias])]

@@ -47,17 +47,18 @@ program event_study
     keep if inrange(year, 2009, 2019)
     drop exposure
     rename imputed exposure
-    gen q1 = exposure < `p25'
-    gen q2 = inrange(exposure , `p25', `p50')
-    gen q3 = inrange(exposure , `p50', `p75')
-    gen q4 = exposure >= `p75'
-    gen median = exposure >= `p50'
+    keep if exposure > 0
+    gen q1 = exposure < `imputed_p25'
+    gen q2 = inrange(exposure , `imputed_p25', `imputed_p50')
+    gen q3 = inrange(exposure , `imputed_p50', `imputed_p75')
+    gen q4 = exposure >= `imputed_p75'
+    gen median = exposure >= `imputed_p50'
     bys athr_id: gen num_yrs = _N
     gegen athr= group(athr_id)
     xtset athr year
     tsfill
     hashsort athr year
-    foreach var in athr_id exposure {
+    foreach var in athr_id exposure q1 q2 q3 q4 median {
         by athr: replace `var' = `var'[_n-1] if mi(`var')    
     }
     foreach var in cite_affl_wt ppr_cnt {
@@ -186,7 +187,6 @@ program event_study
         graph export ../output/figures/es_ln_`yvar'.pdf, replace
         save ../temp/es_ln_`yvar', replace
         restore
-
         forval i = 1/4 {
             preserve
             mat drop _all 
@@ -224,7 +224,6 @@ program event_study
             save ../temp/es_`yvar'_q`i', replace
             restore
         } 
-        
         preserve
         use "../temp/es_`yvar'_q1", replace                                         
         gen group = "q1"                                                                             

@@ -102,6 +102,8 @@ def preprocess_series(series: pd.Series) -> pd.Series:
         "percent_ge_symbols",
         "simple_percent",
         "stray_math_symbols",
+        "primer_suffix_fwd",
+        "primer_suffix_rev",
         "remove_hash_enclosed",
         "remove_hash_prefix",
         "remove_hash_suffix",

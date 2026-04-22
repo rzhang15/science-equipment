@@ -142,6 +142,21 @@ _NONALP_REGEX_PATTERN = r"[^a-z0-9\s" + re.escape(_ALLOWED_SYMBOLS) + r"]"
 
 CAS_REGEX = re.compile(r"\b\d{2,7}-\d{2}-\d\b")
 
+
+def _primer_suffix_repl(direction):
+    """Rewrite a primer token like AMP_1455_R to "amp1455 revprimer".
+
+    Underscores inside the primer name are stripped so the label survives
+    `nonalp` and doesn't decompose into a stopword (e.g. bare `amp`) plus a
+    loose numeric fragment.
+    """
+    def _repl(m):
+        prefix = m.group(1).replace("_", "")
+        tail = m.group(2) or ""
+        return f" {prefix} {direction}primer{tail}"
+    return _repl
+
+
 # -- Main regex dictionary: (compiled_pattern, replacement) --
 # Applied in order by clean_foia_data.py.  Keys are grouped by stage.
 REGEXES_NORMALIZE = {
@@ -154,6 +169,19 @@ REGEXES_NORMALIZE = {
         re.compile(r"\b\d+(?:\.\d+)?\s*%"), " "),
     "stray_math_symbols": (
         re.compile(r"\s*[>=<\u2264\u2265\u00b1]+\s*"), " "),
+    # Primer-suffix protection.  Tokens like `AMP_1455_R` or `PCR_F1` carry a
+    # primer-direction signal in the `_F`/`_R` suffix that would otherwise be
+    # destroyed when `nonalp` strips underscores and SpaCy drops single-char
+    # tokens.  We capture the whole primer name and strip its underscores so
+    # the label survives as a single token (e.g. `amp1455`) and isn't split
+    # into a stopword (`amp`) plus a loose numeric fragment.  The `{3,}?`
+    # length floor mirrors the market-rules veto at market_rules.yml:833.
+    "primer_suffix_fwd": (
+        re.compile(r"\b(\w{3,}?)_(?:f|fwd|forward)(\d*)(?=$|[\s\-_])", re.I),
+        _primer_suffix_repl("fwd")),
+    "primer_suffix_rev": (
+        re.compile(r"\b(\w{3,}?)_(?:r|rev|reverse)(\d*)(?=$|[\s\-_])", re.I),
+        _primer_suffix_repl("rev")),
     "remove_hash_enclosed": (
         re.compile(rf"#({_TAG_CONTENT_PATTERN})#", re.I), " "),
     "remove_hash_prefix": (

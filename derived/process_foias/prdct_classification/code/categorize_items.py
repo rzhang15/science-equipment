@@ -7,19 +7,49 @@ import joblib
 import numpy as np
 import os
 import pandas as pd
+from scipy.sparse import hstack, diags
 from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer
 
 import config
 
+
+class _WordCharVectorizer:
+    """Thin wrapper exposing a sklearn-like `.transform(X)` over the combined
+    word + char TF-IDF space with element-wise contrastive weights applied.
+    Present so downstream code (including `3_predict_product_markets.py`) can
+    keep using a single `.vectorizer.transform(...)` call unchanged."""
+
+    def __init__(self, word_vec, char_vec=None, feature_weights=None):
+        self.word_vec = word_vec
+        self.char_vec = char_vec
+        self._weights = diags(feature_weights) if feature_weights is not None else None
+
+    def transform(self, X):
+        Xw = self.word_vec.transform(X)
+        X_all = Xw if self.char_vec is None else hstack([Xw, self.char_vec.transform(X)]).tocsr()
+        return X_all @ self._weights if self._weights is not None else X_all
+
 class TfidfItemCategorizer:
     def __init__(self):
         print("  - Initializing TfidfItemCategorizer...")
         try:
-            self.vectorizer = joblib.load(config.CATEGORY_VECTORIZER_PATH)
+            word_vec = joblib.load(config.CATEGORY_VECTORIZER_PATH)
+            char_vec = None
+            feature_weights = None
+            if os.path.exists(config.CATEGORY_CHAR_VECTORIZER_PATH):
+                char_vec = joblib.load(config.CATEGORY_CHAR_VECTORIZER_PATH)
+            if os.path.exists(config.CATEGORY_FEATURE_WEIGHTS_PATH):
+                feature_weights = joblib.load(config.CATEGORY_FEATURE_WEIGHTS_PATH)
+            self.vectorizer = _WordCharVectorizer(word_vec, char_vec, feature_weights)
+
             category_data = joblib.load(config.CATEGORY_MODEL_DATA_PATH)
             self.category_names = category_data['category_names']
             self.category_vectors = category_data['category_vectors']
+            n_char = (len(char_vec.vocabulary_) if char_vec else 0)
+            print(f"  - Loaded word feats: {len(word_vec.vocabulary_)}, "
+                  f"char feats: {n_char}, "
+                  f"contrastive weights: {'yes' if feature_weights is not None else 'no'}")
         except FileNotFoundError as e:
             print(f"\nERROR: TfidfItemCategorizer: required file not found: {e.filename}")
             raise
@@ -46,11 +76,13 @@ class TfidfItemCategorizer:
     def predict_batch(self, descriptions: pd.Series) -> tuple:
         """Batch-predict categories for an entire Series at once.
 
-        Replaces repeated calls to get_item_category via progress_apply.
-        One vectorizer.transform + one cosine_similarity matrix multiply
-        for all items, instead of N separate calls.
+        One vectorizer.transform + one cosine_similarity matmul for all
+        items, instead of N separate calls via progress_apply.
 
-        Returns (predictions, scores) as pd.Series with the same index.
+        Returns (predictions, scores, item_vectors).  item_vectors is the
+        sparse TF-IDF matrix aligned to descriptions.index, so the caller
+        can reuse it downstream (e.g. to compute final similarity scores
+        against assigned category vectors) without re-transforming.
         """
         descs = descriptions.astype(str)
         empty_mask = descs.str.strip() == ''
@@ -71,6 +103,7 @@ class TfidfItemCategorizer:
         return (
             pd.Series(pred_array, index=descriptions.index),
             pd.Series(best_scores, index=descriptions.index),
+            item_vectors,
         )
 
 
@@ -105,3 +138,38 @@ class EmbeddingItemCategorizer:
         except Exception as e:
             print(f"  WARNING: Error during BERT prediction for '{description[:50]}...': {e}")
             return "Prediction Error", -1.0
+
+    def predict_batch(self, descriptions: pd.Series) -> tuple:
+        """Batch-predict categories for an entire Series at once.
+
+        One encoder.encode call (batched internally) + one cosine_similarity
+        matmul for all items, replacing N per-row encode calls.
+
+        Returns (predictions, scores, item_vectors).  item_vectors is the
+        dense (n, d) embedding matrix aligned to descriptions.index, so the
+        caller can reuse it downstream (e.g. to compute final similarity
+        scores against assigned category vectors) without re-encoding.
+        """
+        descs = descriptions.astype(str)
+        empty_mask = descs.str.strip() == ''
+
+        item_vectors = self.encoder_model.encode(
+            descs.tolist(), show_progress_bar=True, batch_size=128
+        )
+        sim_matrix = cosine_similarity(item_vectors, self.category_vectors)
+
+        best_indices = np.argmax(sim_matrix, axis=1)
+        best_scores = sim_matrix[np.arange(len(best_indices)), best_indices]
+
+        cat_array = np.array(self.category_names)
+        pred_array = cat_array[best_indices].copy()
+
+        pred_array[best_scores < config.BERT_MIN_SCORE_THRESHOLD] = "unclassified"
+        pred_array[empty_mask.values] = "No Description"
+        best_scores[empty_mask.values] = -1.0
+
+        return (
+            pd.Series(pred_array, index=descriptions.index),
+            pd.Series(best_scores, index=descriptions.index),
+            item_vectors,
+        )

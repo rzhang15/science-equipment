@@ -9,7 +9,6 @@ import joblib
 import os
 import argparse
 from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report
 
 import config
@@ -41,9 +40,31 @@ def main(embedding_name: str):
     X_train = X[df_train.index]
     y_train = df_train['label']
 
+    # Compute supplier priors from the training split so the HybridClassifier
+    # can apply them as a post-hoc overlay at inference.  Only meaningful when
+    # supplier data is available.
+    supplier_priors = None
+    if getattr(config, 'USE_SUPPLIER_PRIOR', False) and 'supplier' in df_train.columns:
+        # Dedupe before running normalize_supplier — few hundred unique
+        # suppliers across the whole training split.
+        suppliers = df_train['supplier'].fillna('')
+        tok_map = {s: config.normalize_supplier(s) for s in suppliers.unique()}
+        tok_train = suppliers.map(tok_map)
+        tmp = pd.DataFrame({'tok': tok_train, 'label': df_train['label'].values})
+        tmp = tmp[tmp['tok'] != '']
+        agg = tmp.groupby('tok')['label'].agg(['size', 'mean'])
+        supplier_priors = {tok: (int(row['size']), float(row['mean']))
+                           for tok, row in agg.iterrows()}
+        print(f"  - Supplier priors: {len(supplier_priors)} suppliers computed "
+              f"(training-split lab rates)")
+
     # 1. Train the ML model component
-    print("  - Training the Logistic Regression component...")
-    clf = LogisticRegression(solver='saga', n_jobs=-1, random_state=42, class_weight='balanced', max_iter=1000)
+    print("  - Training the LogisticRegression component...")
+    from sklearn.linear_model import LogisticRegression
+    clf = LogisticRegression(
+        C=1.0, class_weight='balanced', max_iter=1000,
+        solver='liblinear', random_state=42, n_jobs=None,
+    )
     clf.fit(X_train, y_train)
     print("  - ML component training complete.")
 
@@ -56,67 +77,124 @@ def main(embedding_name: str):
         model_object_path = os.path.join(config.OUTPUT_DIR, "model_object_all-MiniLM-L6-v2.joblib")
         vectorizer = joblib.load(model_object_path)
 
+    # Load supplier vectorizer if available
+    supplier_vectorizer = None
+    if config.USE_SUPPLIER:
+        supp_vec_path = os.path.join(config.OUTPUT_DIR, "vectorizer_supplier_tfidf.joblib")
+        if os.path.exists(supp_vec_path):
+            supplier_vectorizer = joblib.load(supp_vec_path)
+            print(f"  - Loaded supplier vectorizer from {supp_vec_path}")
+
     seed_automaton = load_keywords_and_build_automaton(config.SEED_KEYWORD_YAML)
     anti_seed_automaton = load_keywords_and_build_automaton(config.ANTI_SEED_KEYWORD_YAML)
     market_rule_automaton = extract_market_keywords_and_build_automaton(config.MARKET_RULES_YAML)
+
+    # Load second-stage bulk-chemical filter if available.  Trained separately
+    # by 2b_train_chemical_filter.py — absence is non-fatal.
+    bulk_filter = None
+    bulk_filter_vectorizer = None
+    if getattr(config, 'USE_BULK_FILTER', False):
+        bf_path = os.path.join(config.OUTPUT_DIR, "bulk_filter.joblib")
+        bfv_path = os.path.join(config.OUTPUT_DIR, "bulk_filter_vectorizer.joblib")
+        if os.path.exists(bf_path) and os.path.exists(bfv_path):
+            bulk_filter = joblib.load(bf_path)
+            bulk_filter_vectorizer = joblib.load(bfv_path)
+            print(f"  - Loaded bulk-chemical filter from {bf_path}")
+        else:
+            print(f"  - No bulk filter found at {bf_path}; run 2b_train_chemical_filter.py to enable")
 
     hybrid_model = HybridClassifier(
         ml_model=clf,
         vectorizer=vectorizer,
         seed_automaton=seed_automaton,
         anti_seed_automaton=anti_seed_automaton,
-        market_rule_automaton=market_rule_automaton
+        market_rule_automaton=market_rule_automaton,
+        supplier_vectorizer=supplier_vectorizer,
+        bulk_filter=bulk_filter,
+        bulk_filter_vectorizer=bulk_filter_vectorizer,
+        supplier_priors=supplier_priors,
     )
 
     model_path = os.path.join(config.OUTPUT_DIR, f"hybrid_classifier_{embedding_name}.joblib")
     joblib.dump(hybrid_model, model_path)
     print(f"HybridClassifier saved to: {model_path}")
 
-    # --- 3. Evaluate the HYBRID MODEL on the UT Dallas portion of the hold-out set ---
-    print("\n--- Evaluating Hybrid Model on UT Dallas Hold-Out Data (20%) ---")
+    # --- 3. Evaluate the HYBRID MODEL on hold-out slices ---
+    # Predict once on the full hold-out set, then slice by data_source for
+    # each report.  The three evaluate_holdout calls previously ran predict
+    # on overlapping subsets (UT Dallas, UMich, and their union).
+    print("\n--- Predicting on full hold-out set ---")
+    df_test = df_test.copy()
+    holdout_descs = df_test[config.CLEAN_DESC_COL].fillna('')
+    holdout_suppliers = (df_test['supplier']
+                         if config.USE_SUPPLIER and 'supplier' in df_test.columns
+                         else None)
+    df_test['predicted_label'] = hybrid_model.predict(
+        holdout_descs, suppliers=holdout_suppliers
+    )
 
-    # Filter the test set to get only the UT Dallas items
-    df_test_utdallas = df_test[df_test['data_source'] == 'ut_dallas'].copy()
+    def evaluate_holdout(df_slice, label, fp_suffix="", fn_suffix=""):
+        """Report metrics + write FP/FN CSVs for a pre-predicted slice."""
+        if df_slice.empty:
+            print(f"  - No {label} items found in the hold-out set.")
+            return
 
-    if not df_test_utdallas.empty:
-        print(f"  - Found {len(df_test_utdallas)} UT Dallas items in the hold-out set.")
-        # Use prepared_description (with supplier token if applicable) so eval
-        # matches what the gatekeeper was trained on
-        if config.USE_SUPPLIER and 'prepared_description' in df_test_utdallas.columns:
-            descriptions_utdallas = df_test_utdallas['prepared_description'].fillna('')
-        else:
-            descriptions_utdallas = df_test_utdallas[config.CLEAN_DESC_COL].fillna('')
-        y_true_utdallas = df_test_utdallas['label']
+        print(f"\n--- Evaluating Hybrid Model on {label} Hold-Out ({len(df_slice)} items) ---")
+        if 'predicted_label' not in df_slice.columns:
+            descriptions = df_slice[config.CLEAN_DESC_COL].fillna('')
+            suppliers = df_slice['supplier'] if config.USE_SUPPLIER and 'supplier' in df_slice.columns else None
+            df_slice = df_slice.copy()
+            df_slice['predicted_label'] = hybrid_model.predict(descriptions, suppliers=suppliers)
 
-        # Get predictions from the full hybrid model
-        y_pred_utdallas = hybrid_model.predict(descriptions_utdallas)
+        y_true = df_slice['label']
+        y_pred = df_slice['predicted_label']
 
-        # Generate and print the report
-        utdallas_report = classification_report(y_true_utdallas, y_pred_utdallas, target_names=["Non-Lab (0)", "Lab (1)"])
-        print("\nClassification Report (UT Dallas Hold-Out):")
-        print(utdallas_report)
+        report = classification_report(y_true, y_pred, target_names=["Non-Lab (0)", "Lab (1)"])
+        print(f"\nClassification Report ({label}):")
+        print(report)
 
-        # --- Identify and save misclassifications ---
-        print("\n  - Identifying and saving misclassifications...")
-
-        # Add predictions to the dataframe to make filtering easy
-        df_results = df_test_utdallas.copy()
-        df_results['predicted_label'] = y_pred_utdallas
-
-        # Isolate False Positives (True=0, Predicted=1)
-        df_fp = df_results[(df_results['label'] == 0) & (df_results['predicted_label'] == 1)]
-        fp_path = os.path.join(config.OUTPUT_DIR, "false_positives.csv")
+        df_fp = df_slice[(df_slice['label'] == 0) & (df_slice['predicted_label'] == 1)]
+        fp_path = os.path.join(config.OUTPUT_DIR, f"false_positives{fp_suffix}.csv")
         df_fp.to_csv(fp_path, index=False)
-        print(f"    - Saved {len(df_fp)} False Positives to: {fp_path}")
+        print(f"  - Saved {len(df_fp)} False Positives to: {fp_path}")
 
-        # Isolate False Negatives (True=1, Predicted=0)
-        df_fn = df_results[(df_results['label'] == 1) & (df_results['predicted_label'] == 0)]
-        fn_path = os.path.join(config.OUTPUT_DIR, "false_negatives.csv")
+        df_fn = df_slice[(df_slice['label'] == 1) & (df_slice['predicted_label'] == 0)]
+        fn_path = os.path.join(config.OUTPUT_DIR, f"false_negatives{fn_suffix}.csv")
         df_fn.to_csv(fn_path, index=False)
-        print(f"    - Saved {len(df_fn)} False Negatives to: {fn_path}")
+        print(f"  - Saved {len(df_fn)} False Negatives to: {fn_path}")
 
+    # Always evaluate on UT Dallas hold-out
+    evaluate_holdout(
+        df_test[df_test['data_source'] == 'ut_dallas'],
+        label="UT Dallas", fp_suffix="_utdallas", fn_suffix="_utdallas",
+    )
+
+    # UMich evaluation — source depends on variant:
+    #   - umich_supplier: UMich is in training, so only the 20% hold-out slice
+    #     is fair game (plus a combined UT Dallas + UMich hold-out report)
+    #   - baseline:       UMich is not in training, so the entire UMich corpus
+    #                     is out-of-sample and evaluated end-to-end
+    if config.USE_UMICH:
+        evaluate_holdout(
+            df_test[df_test['data_source'] == 'umich'],
+            label="UMich (hold-out)", fp_suffix="_umich", fn_suffix="_umich",
+        )
+        evaluate_holdout(
+            df_test[df_test['data_source'].isin(['ut_dallas', 'umich'])],
+            label="UT Dallas + UMich (combined)", fp_suffix="_combined", fn_suffix="_combined",
+        )
     else:
-        print("  - No UT Dallas items were found in the hold-out set for this run.")
+        if os.path.exists(config.UMICH_EVAL_DATA_PATH):
+            df_umich_eval = pd.read_parquet(config.UMICH_EVAL_DATA_PATH)
+            evaluate_holdout(
+                df_umich_eval,
+                label="UMich (full out-of-sample)",
+                fp_suffix="_umich", fn_suffix="_umich",
+            )
+        else:
+            print(f"\n  - No UMich eval data at {config.UMICH_EVAL_DATA_PATH}; "
+                  f"skipping UMich eval.  Re-run 1_build_training_dataset.py.")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train Hybrid Classifier and evaluate on hold-out data.")

@@ -47,7 +47,8 @@ program clean_names
            "dow agroscieces" "biogen" "charter" "key performance" "professional" "communication" "images" "agency" "demolition" "furniture" ///
            "personnel" "security" "talent" "linkquest" "new york times" "consulting" "sciquest" "fisheries" "telescope" "foundation" "data support" "bowling" "vacuum" "highway" ///
            "engraving" "learning" "data " "cyotometers" "world precision instrumen" "hitachi" "shimadzu" "electronics" "implen" "medtronic" "olympus" "spectrecology" "carl zeiss" "unknown vendor" "moving" "storage" ///
-           "instruments" "lighting" "filtration" "underwriters" "journal" "land planning" "water tech" "under armour" "jasco" "reliancecm" {
+           "instruments" "lighting" "filtration" "underwriters" "journal" "land planning" "water tech" "under armour" "jasco" "reliancecm" ///
+           "vascular" {
             drop if strpos(new_suppliername, "`k'") > 0
         }
         foreach k in "cem" "na" {

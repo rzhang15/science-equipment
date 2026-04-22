@@ -6,80 +6,12 @@ set scheme modern
 preliminaries
 version 17
 
-global cc_media `" "dmem" "rpmi" "emem" "mem" "bme" "imdm" "hams f12" "mccoys" "leibovitz" "medium 199" "optimem" "insect cell media" "stem cell media" "neural media" "neurobasal medium" "keratinocyte tissue media" "begm" "megem" "cardiomyocyte tissue media" "liver media" "corneal tissue media" "basal media" "proprietary media" "custom media" "hepatocyte wash medium" "'
-global cc_sera `" "fbs" "serum" "sera" "bovine growth serum" "'
-global sirna `" "synthetic sirna" "sirna transfection reagents" "sirna transfection medium" "sirna dilution buffer" "sirna buffer" "gene-specific rnai reagents" "synthetic shrna" "'
-global magnetic_beads `" "magnetic polystyrene beads" "streptavidin magnetic polystyrene beads" "magnetic ip kit" "magnetic bead-based mrna selection kit"  "'
-global tier1 "$cc_media $cc_sera $sirna $magnetic_beads"
-
-global pcr_reagents `" "taq polymerase" "high-fidelity dna polymerase" "hot start dna polymerase" "high-fidelity hot start dna polymerase" "dna polymerase i" "dntps" "pcr systems" "dye-based qpcr systems" "probe-based qpcr systems" "probe-based rt-qpcr systems" "rt-pcr systems" "high-fidelity pcr systems" "hot start pcr systems" "high-fidelity hot start pcr systems" "long template pcr systems" "tissue pcr systems" "qpcr beads" "qrt-pcr titration kit" "pre amplification kits" "pcr barcoding expansion" "taq buffers" "specialized pcr reaction buffer" "'
-global rt_cdna `" "reverse transcriptase" "first-strand cdna synthesis systems" "microrna reverse transcription kit" "'
-global cloning `" "restriction enzymes" "nucleic acid modifying enzymes" "seamless cloning kits" "blunt-end cloning kits" "ta cloning kits" "gateway cloning kits" "rapid dna ligation kits" "site-directed mutagenesis systems" "plasmid vectors" "chemically competent cells" "electrocompetent cells" "taq dna ligases" "'
-global electrophoresis `" "pre-cast tris-glycine gels" "pre-cast bis-tris gels" "pre-cast tbe gels" "pre-cast tris-tricine gels" "polyacrylamide gels casting kit" "acrylamide/bis solution" "acrylamide" "temed" "gel electrophoresis power supplies" "vertical electrophoresis systems" "horizontal electrophoresis systems" "'
-global western_blot `" "pvdf blotting membranes" "nitrocellulose blotting membranes" "precut nitrocellulose transfer blotting packs" "precut pvdf transfer blotting packs" "chemiluminescent substrates" "western blot transfer buffers" "western blot blockers" "western blot stripping buffers" "western blot boxes" "western blot pen" "western blot enhancers" "western blot rollers" "gel blotting papers" "chemiluminescence western blotting kit" "north/south chemiluminescent detection kit" "'
-global mw_standards `" "unstained dna ladders" "pre-stained dna ladders" "unstained rna ladders" "pre-stained rna ladders" "pre-stained protein molecular-weight ladder" "unstained protein molecular-weight ladder" "'
-global protein_mod `" "crosslinking reagents" "protein modifying enzymes" "protein labeling kits" "pegylation reagents" "bioconjugation reagents" "bioconjugate dye" "'
-global protein_assays `" "protein gel stains" "bca protein assay k*it" "bradford protein assay kit" "total protein assay kit" "modified lowry protein assay kit" "'
-global transfection `" "transfection reagents" "transfection kits" "'
-global na_purification `" "column-based" "spin columns" "rna extraction reagents" "magnetic-bead based purification kit" "magnetic bacterial rna purification kit" "rna stabilization reagent" "liquid-based dna plasmid purification kit" "'
-global dyes `" "fluorophore - general" "fluorophore - bioconjugate dyes" "quantum dots" "nucleic acid gel stains" "'
-global oligo_synthesis `" "synthetic dna oligonucleotide" "synthetic rna oligonucleotide" "synthetic dna primers" "synthetic dsdna gene fragment" "synthetic gene constructs" "synthetic dual-labeled probe" "synthetic bacterial expression plasmids" "synthetic mammalian expression plasmids" "'
-global tier2 "$pcr_reagents $rt_cdna $cloning $electrophoresis $western_blot $mw_standards $protein_mod $protein_assays $transfection $na_purification $dyes $oligo_synthesis"
-
-global cc_supplements `" "cell culture nutritional supplements" "cell culture antibiotics" "cell culture dissociation reagents" "cell culture coating reagents" "cell culture surface adhesion promotors" "cell culture scaffold" "cell recovery solution" "'
-global cc_plastic `" "cell culture plates" "cell culture flasks" "cell culture dishes" "cell culture tubes" "cell culture inserts" "cell culture slides" "specialty surface cellware" "chamber slide systems" "chambered coverslip" "pre-coated dishes" "cryovials" "media bottles" "cell scrapers" "cell strainers" "cell spreaders" "'
-global cc_buffers `" "phosphate-buffered saline (pbs) buffer" "dpbs" "hanks" "'
-global cell_lines `" "cell line" "bacterial strain" "ecoli" "'
-global antibodies `" "monoclonal primary antibody" "polyclonal primary antibody" "polyclonal secondary antibody" "monoclonal secondary antibody" "isotype control" "'
-global recomb_proteins `" "recombinant human protein" "recombinant mouse protein" "recombinant proteins" "'
-global inhibitors `" "protease inhibitor cocktails" "protease inhibitors" "phosphatase inhibitor cocktails" "reducing agents - dtt" "reducing agents - tcep" "'
-global cell_lysis `" "cell lysis buffers" "cell lysis detergents" "cell lysis enzymes" "cell lysis kits" "cell lysis tubes" "tissue lysis buffers" "cell lysis rt-qpcr kits" "subcellular protein fractionation kit" "'
-global cell_bio_assays `" "cell viability kits" "viability/cytotoxicity kit" "apoptosis detection kits" "cell proliferation kits" "cellular metabolism assay kits" "ldh cytotoxicity assay" "live cell imaging reagents" "viability stains" "phalloidin conjugates" "cell stimulation cocktail" "cell imaging signal enhancer" "'
-global protein_purif `" "his-tag imac affinity resins" "tag-binding affinity resins" "imac columns" "desalting columns" "spin desalting columns" "gravity flow desalting columns" "endotoxin removal resins" "streptavidin-biotin binding products" "avidin products" "column-based protein purification kit" "'
-global electro_buffers `" "tris-glycine-sds (tgs) buffer" "tris-glycine buffer" "tbe buffer" "tris-acetate-edta (tae) buffer" "mes-sds buffer" "mops-sds buffer" "tbe-urea sample buffer" "tris-tricine-sds buffer" "laemmli sample buffer" "lds sample buffer" "native-page sample buffer" "'
-global molbio_enzymes `" "rnase inhibitors" "rnase" "rnase control reagent" "nuclease enzymes" "nuclease decontaminant" "proteases" "dnase/rnase-free & molecular-biology-grade water" "'
-global na_labeling `" "nucleic acid labeling/detection kits" "dna labeling kit" "'
-global pcr_consumables `" "pcr tubes" "pcr tube strips" "pcr tube strip caps" "'
-global ivt `" "t7 in vitro transcription kit" "in-vitro translation systems" "rabbit reticulocyte lysate system" "'
-global bsa `" "bovine serum albumin" "'
-global tier3 "$cc_supplements $cc_plastic $cc_buffers $cell_lines $antibodies $recomb_proteins $inhibitors $cell_lysis $cell_bio_assays $protein_purif $electro_buffers $molbio_enzymes $na_labeling $pcr_consumables $ivt $bsa"
-
-global treated "$tier1 $tier2 $tier3"
-
 program main
     foreach t in tfidf {
-        qui select_good_categories, embed(`t')
         clean_raw, embed(`t')
         qui make_panels, embed(`t')
     }
 end
-
-program select_good_categories
-    syntax, embed(string)
-    import delimited ../external/samp/utdallas_full_report_gatekeeper_tfidf_expert_non_parametric_`embed', clear
-    cap rename v1 category
-    drop if inlist(category, "macro avg", "weighted avg", "Non-Lab", "accuracy")
-    gen treated = 0
-    gen tier1 = 0
-    gen tier2 = 0
-    gen tier3 = 0
-    foreach c of global tier1 {
-        replace tier1 = 1 if strpos(category, "`c'") > 0 
-    }
-    foreach c of global tier2 {
-        replace tier2 = 1 if strpos(category, "`c'") > 0 
-    }
-    foreach c of global tier3 {
-        replace tier3 = 1 if strpos(category, "`c'") > 0 
-    }
-    foreach c of global treated {
-        replace treated = 1 if strpos(category, "`c'") > 0 
-    }
-    *drop if inlist(category, "recombinant human protein") | strpos(category, "recombinant") > 0 | strpos(category, "growth factor") > 0  | strpos(category, "cell line") > 0 | strpos(category, "small molecule inhibitor") > 0  
-    gen keep  = (support >= 25 & precision >= 0.80 & recall >= 0.80) //| (inrange(support, 10, 25) & precision >= 0.9 & recall >=0.90) 
-    save ../output/categories_`embed', replace
-end
-
 
 program clean_raw
     syntax, embed(string)
@@ -114,13 +46,16 @@ program clean_raw
 
     qui {
         replace category = "cryovials" if strpos(clean_desc, "cryo") >0 & strpos(clean_desc, "vial") >0 
+        replace category = "us fbs" if strpos(clean_desc, "fetal")>0& strpos(clean_desc, "bovine")>0 & strpos(clean_desc, "serum")>0
+        replace category = "us fbs" if strpos(clean_desc, "calf")>0& strpos(clean_desc, "bovine")>0 & strpos(clean_desc, "serum")>0
+        replace category = "elisa kits" if strpos(clean_desc, "duoset") >0 
         // drop nonsense negatives
-        drop if price <= 0 | qty <= 0 | spend <= 0
+        drop if price <= 0 | qty < 1 | spend <= 0
         // filter to consumables
         drop if category == "Non-Lab"
         drop if category == "unclassified"
+        replace spend = price * qty  if qty != 1
         replace qty = spend / price if qty == 1
-        replace price = spend/qty 
         drop if similarity_score == 0
     }
     qui count
@@ -131,32 +66,16 @@ program clean_raw
 
     qui {
         drop if spend > 100000 | price > 100000 | qty > 100000
-        foreach v in "furnace" "vacuum" "lighting" "truck" "pump" "student" ///
-            "graduate " "cfx" "table" "library" "appliance" "charger" "dtba1d1" ///
-            "gasket"  "reader" "alfalfa" "chemidoc" "rfp" "red cross" ///
-            "imaging system" "arena" "dna library" "storm drain" "utilities" ///
-            "electricity" "hall site" "insurance" "liability" "deductible" "claim" ///
-            "athletic" "wellness" "recreation" "transit" "advertising" "install" ///
-            "semester" "guarantee" "ncaa" "newspaper" "conference" "po " "replace" ///
-            "building" "bobcat" "spectramax" "notification" "journal" "drainage"  "turnitin" ///
-            "thesis" "mail" "credits" "webcard" "s-insert assembly" "messaging" "campus" "pay" "scientist" ///
-            "notice" "annual" "firework" "delivery" "upgrade" "bedding" "sequencing" "blanket order" "drain" ///
-            "entertainment" "campaign" "textbook" "analysis"  "chair"  "datacenter" "production" "bleacher" ///
-            "relocation" "transport" "stainer" "interview" "interviewing" "door" "hardware" "surveY" "program" "expenses" ///
-            "health ins" "games" "flights" "game" "residency" "robot" "vehicle" "tournament" "basketball" "ticket" "coordinator" "completion" "lease" ///
-            "order" "concrete" "coverslipper" " ins" "for reference" "tractor" "connections" "date" "misc " "course" "review" ///
-            "book" "delivered" "deliver" "racquet" "guidewire" "wire" "fitting" "per attached quote" "lamp" "drive" "football" ///
-            "nasco" "fluorescent bulb" "edition" "accidence" "teaching" "sport" "timer" "ssd" "screw" "wall" "file" "business" "mesh" ///
-            "mask aligner" "karl suss" "procedure" "transmitter" "dues" "ura system" "accessory" "pbs detector" "billed" "monthly" "ethovision" ///
-            "generator" "accessories" "handheld" "detector" "basement" "survey" "asbestos" "vicryl plus" "ejector" "maint." ///
-            "chamber" "2010" "2011" "2012" "2013" "2014" "2015" "2016" "2017" "2018" "2019" "etching" ///
-            "development of" "steam distr" "analyzer" "spectrometer" "cytometer" "centrifuge" "incubator" "autoclave" ///
-            "freezer" "refrigerator" "oven" "microscope" "fume hood" "biosafety cabinet" ///
-            "wo#" "dining" "union up" "renovation" "construction" "flooring" "lab gases" ///
-            "glucarpidase" "voraxaze" "supplement issue" "ajph" "phssr" "capillarys" "droplet digital" ///
-            "analyses" "datalogger"  "professionalism" ".org" "lcmsms" "pre-owned" "presentation" "enterprise" "dialysis" ///
-            "pooling" "cooling" "tower" "kelvin" "lithography"  "pot holes" "catering" "sidewalk" "profit" "speaker" "depart" "arriving" ///
-            "taxes" "etc." "part number" "water bottles" {
+        foreach v in "graduate " "table" "library" "reader" "po " "replace" ///
+            "thesis" "pay" "delivery" "sequencing" "analysis" "transport" "lease" "order" " ins" "date" ///
+            "delivered" "deliver" "wire" "fitting" "lamp" "nasco" "sport" ///
+            "screw" "wall" "file" "mesh" "chamber" "analyzer" "oven" ///
+            "fume hood" "biosafety cabinet" "wo#" "construction" "flooring" ///
+            "lab gases" "glucarpidase" "voraxaze" "supplement issue" ///
+            "ajph" "phssr" "capillarys" "analyses" "datalogger" ///
+            "professionalism" ".org" "lcmsms" "pre-owned" "enterprise" ///
+            "dialysis" "tower" "kelvin" "lithography" "seal" ///
+            "array" "adverstise" {
             drop if strpos(clean_desc, "`v'") > 0
         }
         drop if (strpos(clean_desc, "plate") > 0 | strpos(clean_desc, "card")) & category == "synthetic dna oligonucleotide"
@@ -170,7 +89,7 @@ program clean_raw
         foreach v in "animal - " "fees - " "electronics - " "instrument" "office supplies" "lab furniture" "waste disposal" "equipment" "furniture" "software" ///
           "toolkit" "clamp" "tool" "tubing" "random" "unclear" "wire" "towel" "irrelevant chemicals" "oring" "caps" "gas" "first-aid" "first aid" "desk" "chair" "brushes" "trash" "cleaner" ///
           "cotton ball" "bundle of products" "tape" "miscellaneous" "clips" "flint" "accessories" "stands" "batteries" "ear protection" "apron" "pots" "pants" "stoppers" "closures" "rings" ///
-          "mortar" "pestle" "support" "trays" "applicators and swabs" "bundle" "sequencing" "tem - " {
+          "mortar" "pestle" "support" "trays" "applicators and swabs" "bundle" "sequencing" "tem - " "nonlab" {
             drop if strpos(category, "`v'") > 0
         }
     }
@@ -180,21 +99,7 @@ program clean_raw
     local total_spend : di %16.0f r(sum)
     di "[Remove Possible Non-consumables] N: `total_obs' Total Spend: `total_spend'"
     qui {
-        gen obs_cnt = 1 
-        bys category: gen cat_id = _n == 1
-        bys category year: gegen cat_yr_obs = total(obs_cnt)
-        bys category year: gen cat_yr = _n == 1
-        bys category: gegen num_yrs_cat = total(cat_yr)
-        keep if num_yrs_cat == 10
-        drop cat_id cat_yr_obs cat_yr num_yrs_cat
-    }
-    qui count
-    local total_obs = r(N)
-    qui sum spend, d
-    local total_spend : di %16.0f r(sum)
-    di "[Balance Cat-years] N: `total_obs' Total Spend: `total_spend'"
-    qui {
-        merge m:1 category using ../output/categories_`embed', assert(1 2 3)  keep(1 3) nogen
+        merge m:1 category using ../external/categories/categories_`embed', assert(1 2 3)  keep(1 3) nogen
         drop if similarity_score <= 0.10 & prediction_source == "Expert Model" 
         replace category = subinstr(category, "/","-",.)
         gen raw_price = price
@@ -205,34 +110,34 @@ program clean_raw
         replace spend = log(spend)
         bys category year : gegen spend99= pctile(raw_spend), p(99)
         bys category year : gegen spend1 = pctile(raw_spend), p(1)
-        *bys category year : gegen qty99= pctile(raw_qty), p(99)
-        *bys category year : gegen qty1 = pctile(raw_qty), p(1)
-        *bys category year : gegen price99= pctile(raw_price), p(99)
-        *bys category year : gegen price1 = pctile(raw_price), p(1)
+        bys category year : gegen qty99= pctile(raw_qty), p(99)
+        bys category year : gegen qty1 = pctile(raw_qty), p(1)
+        bys category year : gegen price99= pctile(raw_price), p(99)
+        bys category year : gegen price1 = pctile(raw_price), p(1)
         drop if raw_spend < spend1
         drop if raw_spend > spend99
-        /*drop if raw_price > price99
+        drop if raw_price > price99
         drop if raw_price < price1
         drop if raw_qty < qty1
-        drop if raw_qty > qty99*/
-        drop spend1 spend99 //price1 price99 qty1 qty99
+        drop if raw_qty > qty99
+        drop spend1 spend99 price1 price99 qty1 qty99
         bys category  : gegen spend99= pctile(raw_spend), p(99)
         bys category  : gegen spend1 = pctile(raw_spend), p(1)
-        *bys category  : gegen qty99= pctile(raw_qty), p(99)
-        *bys category  : gegen qty1 = pctile(raw_qty), p(1)
-        *bys category  : gegen price99= pctile(raw_price), p(99)
-        *bys category  : gegen price1 = pctile(raw_price), p(1)
+        bys category  : gegen qty99= pctile(raw_qty), p(99)
+        bys category  : gegen qty1 = pctile(raw_qty), p(1)
+        bys category  : gegen price99= pctile(raw_price), p(99)
+        bys category  : gegen price1 = pctile(raw_price), p(1)
         drop if raw_spend < spend1
         drop if raw_spend > spend99
-        /*drop if raw_qty < qty1
+        drop if raw_qty < qty1
         drop if raw_qty > qty99
         drop if raw_price < price1
-        drop if raw_price > price99*/
-        drop spend1 spend99 //price1 price99 qty1 qty99
+        drop if raw_price > price99
+        drop spend1 spend99 price1 price99 qty1 qty99
     }
     qui count
     local total_obs = r(N)
-    qui sum spend, d
+    qui sum raw_spend, d
     local total_spend : di %16.0f r(sum)
     di "[Windsorize] N: `total_obs' Total Spend: `total_spend'"
 
@@ -253,11 +158,12 @@ program clean_raw
     drop if support < 5  
     qui count
     local total_obs = r(N)
-    qui sum spend, d
+    qui sum raw_spend, d
     local total_spend : di %16.0f r(sum)
     di "[bad ml categories] N: `total_obs' Total Spend: `total_spend'"
     
     qui {
+        gen obs_cnt = 1
         bys suppliername year: gen supplier_yr = _n == 1
         bys suppliername: gegen tot_supplier_obs = total(obs_cnt) 
         bys suppliername: gen sup_id = _n == 1
@@ -285,11 +191,17 @@ program clean_raw
         bys category : replace spend_2013 = spend_2013[_n-1] if mi(spend_2013)
         hashsort category obs_2013
         bys category : replace obs_2013 = obs_2013[_n-1] if mi(obs_2013)
+        gegen uni_mkt = group(uni_id mkt)
+        bys uni_mkt : egen min_year = min(year)
+        bys uni_mkt : egen max_year = max(year)
+        keep if min_year < 2014 & max_year > 2014
     }
-    gegen uni_mkt = group(uni_id mkt)
-    bys uni_mkt : egen min_year = min(year)
-    bys uni_mkt : egen max_year = max(year)
-    keep if min_year < 2014 & max_year > 2014
+
+    qui count
+    local total_obs = r(N)
+    qui sum raw_spend, d
+    local total_spend : di %16.0f r(sum)
+    di "[Balance Cat-years] N: `total_obs' Total Spend: `total_spend'"
     qui sum raw_spend 
     local tot_spend = r(sum)
     qui sum raw_spend if keep == 1
