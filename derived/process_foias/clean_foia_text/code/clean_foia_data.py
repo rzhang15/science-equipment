@@ -45,6 +45,7 @@ CODE_DIR = Path(__file__).resolve().parent
 ROOT_DIR = CODE_DIR.parent
 DEFAULT_DATA_DIR = ROOT_DIR / "external" / "samp"
 CATALOG_DIR = ROOT_DIR / "external" / "catalogs"
+GOVSPEND_DIR = ROOT_DIR / "external" / "govspend"
 DEFAULT_OUT_DIR = ROOT_DIR / "output"
 
 # -- Pre-compile regexes & pre-filter keys (once, at import time) ----------- #
@@ -54,7 +55,7 @@ SKU_REGEX_KEYS = [
 ]
 UNIT_REGEX_KEYS = [
     "num_in_paren_unit_counts", "num_in_paren_quantities", "unitpack",
-    "sets_pk", "dimensions", "mult", "trailing_slash_unit",
+    "sets_pk", "dimensions", "mult", "trailing_slash_unit", "size_unit_capture",
 ]
 NOISE_REGEX_KEYS = [
     k for k in config.REGEXES_NORMALIZE
@@ -212,7 +213,7 @@ def main() -> None:
 
     # -- Resolve file list --
     if args.files:
-        search_dirs = [data_dir, CATALOG_DIR, Path.cwd()]
+        search_dirs = [data_dir, CATALOG_DIR, GOVSPEND_DIR, Path.cwd()]
         files_to_process = []
         for name in args.files.split(","):
             name = name.strip()
@@ -225,7 +226,9 @@ def main() -> None:
         files_to_process = sorted(data_dir.glob("*.csv"))
         files_to_process.extend([
             CATALOG_DIR / "non_lab.dta",
-            CATALOG_DIR / "ny_fisher_desc.csv",
+            CATALOG_DIR / "fisher_lab.xlsx",
+            CATALOG_DIR / "fisher_nonlab.xlsx",
+            GOVSPEND_DIR / "govspend_panel.csv",
         ])
 
     print(f"Found {len(files_to_process)} target workbook(s) to clean...")
@@ -249,7 +252,7 @@ def main() -> None:
             continue
 
         # -- Standardise columns --
-        df.columns = df.columns.str.lower()
+        df.columns = df.columns.str.strip().str.lower()
 
         desc_col = _resolve_desc_column(df, fp.name)
         if desc_col is None:

@@ -29,14 +29,28 @@ CA_DESC_COL = "description"
 # ==============================================================================
 # 4. Keywords & Filters
 # ==============================================================================
-UNIT_TOKENS = [
-    "ml", "ul", "dl", "cl", "g", "mg", "kg", "ug", "oz", "fl", "gal",
-    "gr", "lb", "mm", "cm", "dm", "m", "um", "pk", "cs", "ea", "dz", "bx",
-    "case", "tst", "set", "sets", "kt", "rl", "roll", "sets/pk",
-    "rx", "v", "u", "mlgrd", "grams", "pack", "pp", "in", "box",
-    "wt", "ass", "gm", "inch", "ft", "grad", "prf", "pc", "liter",
-    "microliter", "gallon", "pl",
+# Size/content units describe the product itself (volume, mass, length) and are
+# preserved in clean_desc — a 2 mL tube and a 50 mL tube are different SKUs.
+SIZE_UNITS = [
+    # volume
+    "ml", "ul", "dl", "cl", "fl", "gal", "gallon", "liter", "microliter", "pl",
+    # mass
+    "g", "mg", "kg", "ug", "oz", "gr", "lb", "grams", "gm",
+    # length
+    "mm", "cm", "dm", "um", "in", "inch", "ft",
+    # compound
+    "mlgrd",
 ]
+
+# Pack/count units describe packaging and are stripped from clean_desc.
+PACK_UNITS = [
+    "pk", "cs", "ea", "dz", "bx", "case", "tst", "set", "sets", "kt", "rl",
+    "roll", "sets/pk", "rx", "v", "u", "pack", "pp", "box",
+    "wt", "ass", "grad", "prf", "pc", "m",
+]
+
+# Union kept for stopword filtering (bare "ml" with no number is still noise).
+UNIT_TOKENS = SIZE_UNITS + PACK_UNITS
 
 CHEM_FRAGMENTS = [
     "oh", "nh2", "cooh", "sh", "boc", "fmoc", "trt", "cbz",
@@ -120,7 +134,11 @@ SPACY_MODEL_CHEM = "en_ner_bc5cdr_md"
 # ==============================================================================
 
 # -- Building blocks for regex patterns --
-_UNIT_RE = "|".join(UNIT_TOKENS)
+# Sort by length descending so longer alternatives match first (e.g. "gallon"
+# before "gal", "sets/pk" before "sets") — \b alone doesn't always prevent
+# shorter prefix matches when followed by a non-word char like "/".
+_SIZE_UNIT_RE = "|".join(sorted(SIZE_UNITS, key=len, reverse=True))
+_PACK_UNIT_RE = "|".join(sorted(PACK_UNITS, key=len, reverse=True))
 _FRAG_PATTERN = "|".join(map(re.escape, CHEM_FRAGMENTS))
 _PLACEHOLDER_PREFIX = "protectedmarker"
 _TAG_CONTENT_PATTERN = r"\S*[a-zA-Z0-9]\S*"
@@ -199,16 +217,21 @@ REGEXES_NORMALIZE = {
     "num_in_paren_unit_counts": (
         re.compile(
             r"\(\s*\d+\s*(?:ea|pk|cs|columns|bottles|units)?\s*\)", re.I), " "),
+    # Parenthesized size quantities: preserve content without parens, joined
+    # into a single token so "(500 ml)" -> "500ml" survives tokenization.
     "num_in_paren_quantities": (
         re.compile(
-            r"\(\s*\d+(\.\d+)?\s*(?:ml|ul|g|mg|kg|\xb5g)\s*\)", re.I), " "),
+            rf"\(\s*(\d+(?:\.\d+)?)\s*({_SIZE_UNIT_RE})\s*\)", re.I), r" \1\2 "),
 
     # --- Stage 2: Units, quantities, dimensions ---
+    # Strip packaging-only patterns ("500/pk", "12 ea"). Size units like
+    # "2.0ml" are intentionally excluded — those define the product identity
+    # and are handled by size_unit_capture below.
     "unitpack": (
         re.compile(
             rf"\b(\d+(\.\d+)?(\s*-\s*\d+(\.\d+)?)*\s*[-/\s]?\s*"
-            rf"(?:{_UNIT_RE}|for)"
-            rf"|(?:{_UNIT_RE})\s*[-/\s]?\s*\d+)\b",
+            rf"(?:{_PACK_UNIT_RE}|for)"
+            rf"|(?:{_PACK_UNIT_RE})\s*[-/\s]?\s*\d+)\b",
             re.I | re.X), " "),
     "sets_pk": (
         re.compile(r"\b\d+\s*sets/pk\b", re.I), " "),
@@ -217,7 +240,13 @@ REGEXES_NORMALIZE = {
     "mult": (
         re.compile(r"\b\d+\s*[x\u00d7]\s*\d+[a-z]*\b", re.I), " "),
     "trailing_slash_unit": (
-        re.compile(rf"/\s*(?:{_UNIT_RE})\b", re.I), " "),
+        re.compile(rf"/\s*(?:{_PACK_UNIT_RE})\b", re.I), " "),
+    # Normalize-and-capture size units. Joins "2.0 ml" -> "2.0ml" so it
+    # survives tokenization as one token, and the outer group lets
+    # get_potential_unit capture it into the potential_unit column.
+    "size_unit_capture": (
+        re.compile(
+            rf"\b((\d+(?:\.\d+)?)\s*({_SIZE_UNIT_RE}))\b", re.I), r"\2\3"),
 
     # --- Stage 3: SKU patterns ---
     "sku_multi_hyphen": (
