@@ -34,7 +34,7 @@ ANTI_SEED_KEYWORD_YAML = os.path.join(CODE_DIR, "anti_seed_keywords.yml")
 FISHER_LAB = os.path.join(BASE_DIR, "external", "samp", "fisher_lab_clean.csv")
 FISHER_NONLAB = os.path.join(BASE_DIR, "external", "samp", "fisher_nonlab_clean.csv")
 MARKET_RULES_YAML = os.path.join(CODE_DIR, "market_rules.yml")
-GOVSPEND_PANEL_CSV = os.path.join(BASE_DIR, "external", "govspend", "govspend_panel.csv")
+GOVSPEND_PANEL_CSV = os.path.join(BASE_DIR, "external", "samp", "govspend_panel_clean.csv")
 
 # ==============================================================================
 # 3. Intermediate & Output File Paths (variant-specific)
@@ -230,6 +230,151 @@ STRONG_LAB_SIGNALS = [
 # Expert model similarity thresholds
 TFIDF_MIN_SCORE_THRESHOLD = 0.01
 BERT_MIN_SCORE_THRESHOLD = 0.1
+
+# ------------------------------------------------------------------
+# Sibling-category consolidation.  Applied at data-ingest time (step 0)
+# so every downstream artifact (training labels, category vectors,
+# validation reports) sees the already-merged taxonomy.  Keys get
+# consolidated INTO the value.
+#
+# Only merge pairs whose distinction is not reliably expressed in the
+# item description (e.g. "centrifuge conical tubes" vs. "centrifuge
+# tubes" -- the word "conical" rarely appears; ATCC CRL numbers don't
+# reveal species).
+# ------------------------------------------------------------------
+CATEGORY_CONSOLIDATION = {
+    'centrifuge conical tubes': 'centrifuge tubes',
+    'filtering funnels': 'funnels',
+    'filling funnels': 'funnels',
+    'cellular metabolism assay kits': 'metabolism assay kits',
+    # Cell lines: species rarely appears in the description (items are
+    # often just an ATCC CRL / HTB number).
+    'human cell lines': 'cell lines',
+    'mouse cell lines': 'cell lines',
+    'mice cell lines': 'cell lines',
+    'rat cell line': 'cell lines',
+    'insect cell lines': 'cell lines',
+    # Lab-grade water: the three generic lab-water buckets collapse into
+    # one.  (Leaves heavy water, chromatography-grade water, and all
+    # instrument-part water entries alone.)
+    'dnase/rnase-free & molecular-biology-grade water': 'lab-grade water',
+    'general-lab & specialty water': 'lab-grade water',
+    'cell culture grade life science water - distilled': 'lab-grade water',
+    # Disposable pipettes (generic brands — Corning, VWR, Falcon).
+    'pasteur pipettes': 'disposable pipettes',
+    'transfer pipettes': 'disposable pipettes',
+    'aspirating pipettes': 'disposable pipettes',
+    'mohr pipettes': 'disposable pipettes',
+    'volumetric pipettes': 'disposable pipettes',
+    # Manual pipettors (Rainin/Eppendorf/Gilson territory).
+    'manual single channel pipettes': 'manual pipettors',
+    'manual multichannel pipettes': 'manual pipettors',
+    'electronic multichannel pipettes': 'manual pipettors',
+    'pipette kits': 'manual pipettors',
+    'pipettors': 'manual pipettors',
+    'positive displacement pipettes': 'manual pipettors',
+    # Beakers (Pyrex/Kimax — material distinction not in descriptions).
+    'glass beakers': 'beakers',
+    'plastic beakers': 'beakers',
+    'steel beakers': 'beakers',
+    'stainless steel beakers': 'beakers',
+    # Graduated cylinders.
+    'glass graduated cylinders': 'graduated cylinders',
+    'plastic graduated cylinders': 'graduated cylinders',
+    # Other flasks — erlenmeyer and boiling flasks kept separate.
+    'fernbach flasks': 'other flasks',
+    'volumetric flasks': 'other flasks',
+    'recovery flasks': 'other flasks',
+    'freeze drying flasks': 'other flasks',
+    'kjeldahl flasks': 'other flasks',
+    'distilling flasks': 'other flasks',
+    'stainless steel flasks': 'other flasks',
+    'serum bottles': 'other flasks',
+    # Funnels — funnel adapters kept separate.
+    'separatory funnels': 'funnels',
+    'addition funnels': 'funnels',
+    'funnel stems': 'funnels',
+    # Specialty gloves — nitrile and latex kept separate.
+    'heat resistant gloves': 'specialty gloves',
+    'cold resistant gloves': 'specialty gloves',
+    'neoprene gloves': 'specialty gloves',
+    'cotton gloves': 'specialty gloves',
+    'chemical resistant gloves': 'specialty gloves',
+    'glove box gloves': 'specialty gloves',
+    'cut resistant gloves': 'specialty gloves',
+    'vinyl gloves': 'specialty gloves',
+    'rubber gloves': 'specialty gloves',
+    'glove liners': 'specialty gloves',
+    'chloroprene gloves': 'specialty gloves',
+    'gloves': 'specialty gloves',
+    # Specialty membrane filters (Millipore/Whatman tail — syringe and
+    # bottle-top filters kept separate).
+    'nylon membrane filters': 'specialty membrane filters',
+    'polycarbonate membrane filters': 'specialty membrane filters',
+    'pes membrane filters': 'specialty membrane filters',
+    'mce membrane filters': 'specialty membrane filters',
+    'membrane filters': 'specialty membrane filters',
+    'ptfe membrane filters': 'specialty membrane filters',
+    'cellulose acetate membrane filters': 'specialty membrane filters',
+    # Specialty needles — hypodermic needles kept separate.
+    'dispensing needles': 'specialty needles',
+    'needles': 'specialty needles',
+    'blood collection needles': 'specialty needles',
+    'pipetting needles': 'specialty needles',
+    'double-tipped needles': 'specialty needles',
+    # PCR tube accessories — pcr tubes and pcr tube strips kept separate.
+    'caps and closures - pcr tube strips': 'pcr tube accessories',
+    'pcr strip tubes': 'pcr tube accessories',
+    'pcr tube strip caps': 'pcr tube accessories',
+    'caps and closures - pcr tubes': 'pcr tube accessories',
+    # Cryovial caps and autosampler vial caps roll into the vials bucket.
+    'caps and closures - cryovial': 'caps and closures - vials',
+    'autosampler vial caps': 'caps and closures - vials',
+    # Cuvettes — spectrophotometer / fluorescence / electroporation sub-types.
+    # The application (UV/Vis vs. fluorescence vs. electroporation) is often
+    # in the description, but the item itself is a cuvette; grouping keeps
+    # sibling similarity scores from splitting the cuvette bucket.
+    'spectrophotometer cuvettes': 'cuvettes',
+    'fluorescence cuvettes': 'cuvettes',
+    'electroporation cuvettes': 'cuvettes',
+    # Primary antibodies — polyclonal / monoclonal / other-host distinction
+    # is rarely expressed in descriptions (host species is often omitted, and
+    # the poly-vs-mono cue is inconsistent across vendors).  The expert model
+    # gets 0 P/R on the sub-labels on UMich eval — rolling them up gives the
+    # expert one well-populated bucket it can actually learn.
+    'polyclonal primary antibodies': 'primary antibodies',
+    'monoclonal primary antibodies': 'primary antibodies',
+    'polyclonal primary antibody': 'primary antibodies',
+    'monoclonal primary antibody': 'primary antibodies',
+    'other-host primary antibody': 'primary antibodies',
+    # Recombinant proteins — species-tagged sub-labels (human / mouse / rat /
+    # combined) bleed into each other in UMich eval because the species tag
+    # is often absent in descriptions ("recombinant VEGF-C carrier free").
+    'recombinant human protein': 'recombinant proteins',
+    'recombinant mouse protein': 'recombinant proteins',
+    'recombinant human/mouse/rat protein': 'recombinant proteins',
+    'recombinant human/mouse protein': 'recombinant proteins',
+    'recombinant human/murine/rat protein': 'recombinant proteins',
+    'recombinant cas9 protein': 'recombinant proteins',
+    # Expression plasmids — mammalian / bacterial / AAV all end up as
+    # `synthetic *** expression plasmids` in training, but the host species
+    # is often implicit in the vendor catalog rather than spelled out on
+    # each SKU.  Collapse into one `expression plasmids` bucket.  Keeps
+    # `plasmid vectors` (backbone-only SKUs) separate.
+    'synthetic mammalian expression plasmids': 'expression plasmids',
+    'synthetic bacterial expression plasmids': 'expression plasmids',
+    'synthetic plasmids': 'expression plasmids',
+    'aav plasmids': 'expression plasmids',
+    # Vials — sample / scintillation / autosampler / drosophila / screw cap
+    # variants collapse into a single `vials` bucket.  Cryovials are kept
+    # separate (distinct storage use case; usually labeled in descriptions).
+    # Cap / insert / rack accessories also stay separate.
+    'sample vials': 'vials',
+    'scintillation vials': 'vials',
+    'autosampler vials': 'vials',
+    'drosophila vials': 'vials',
+    'screw cap vials': 'vials',
+}
 
 # Additional stop words for the CATEGORY vectorizer only.
 # These terms appear across dozens of lab categories and inflate similarity
@@ -514,3 +659,273 @@ NONLAB_SUPPLIER_KEYWORDS = [
     "eckert and ziegler", "ferguson enterprise",
     "tiger",
 ]
+
+
+# ==============================================================================
+# TREATED PRODUCT MARKET CLASSIFICATION - Thermo Fisher / Life Technologies
+# Source of truth: ../../first_stage/select_categories/code/build.do
+#   tier1 = divestitures required (48 cats)
+#   tier2 = EU confirmed overlap, cleared (159 cats)
+#   tier3 = bundled with documented overlap markets (43 cats)
+#   treated = tier1 | tier2 | tier3
+# ==============================================================================
+TIER1_CATEGORIES = frozenset([
+    "affinity resins - activated coupling matrices (magnetic)",
+    "australian fbs",
+    "bovine adult serum",
+    "canadian fbs",
+    "dmem/f-12",
+    "affinity resins - anti-ig secondary (magnetic)",
+    "affinity resins - biotin/avidin (magnetic)",
+    "affinity resins - epitope tags (flag/ha/myc/v5) (magnetic)",
+    "affinity resins - glycoprotein (lectin-immobilized) (magnetic)",
+    "affinity resins - gst-tag (magnetic)",
+    "affinity resins - his-tag (imac) (magnetic)",
+    "affinity resins - mbp-tag (magnetic)",
+    "affinity resins - other (magnetic)",
+    "affinity resins - protein a (magnetic)",
+    "affinity resins - protein a/g (magnetic)",
+    "affinity resins - protein g (magnetic)",
+    "affinity resins - strep-tag (magnetic)",
+    "affinity resins - streptavidin/avidin (magnetic)",
+    "basal medium eagle",
+    "bovine calf serum",
+    "dmem",
+    "dry basal media, not chemically defined",
+    "gene-specific rnai reagents",
+    "hams f12",
+    "imdm",
+    "immunomagnetic cell separation beads",
+    "immunomagnetic cell separation columns",
+    "insect cell media",
+    "leibovitz l15 media",
+    "magnetic bead-based mrna selection kit",
+    "magnetic beads - other",
+    "magnetic cell separation kits",
+    "magnetic ip kit",
+    "mccoys 5a",
+    "mem",
+    "neurobasal media",
+    "new zealand fbs",
+    "optimem",
+    "rpmi",
+    "sirna buffers",
+    "sirna transfection medium",
+    "sirna transfection reagents",
+    "specialty cell culture media",
+    "stem cell media",
+    "synthetic crrna",
+    "synthetic shrna",
+    "synthetic sirna",
+    "us fbs",
+])
+
+TIER2_CATEGORIES = frozenset([
+    "acrylamide/bis solution",
+    "antibody labeling kits",
+    "bacterial transformation reagents",
+    "bioconjugation reagents",
+    "blunt-end cloning kits",
+    "capped mrna synthesis kits",
+    "chemically competent cells",
+    "chemiluminescent western blot detection",
+    "chemiluminescent substrates",
+    "column-based dna and rna extraction kits",
+    "column-based dna genomic purification kits",
+    "column-based dna plasmid gigaprep",
+    "column-based dna plasmid maxiprep",
+    "column-based dna plasmid megaprep",
+    "column-based dna plasmid midiprep",
+    "column-based dna plasmid miniprep",
+    "column-based dna purification kits",
+    "column-based gel dna extraction kits",
+    "column-based gel rna extraction kits",
+    "column-based microbial dna purification kits",
+    "column-based pcr and gel purification kit",
+    "column-based pcr purification kits",
+    "column-based pcr purification reagent",
+    "column-based plant dna purification kits",
+    "column-based plant rna purification kits",
+    "column-based protein purification kit",
+    "column-based rna purification kits",
+    "column-based yeast dna purification kits",
+    "crosslinking reagents",
+    "custom-designed qpcr assays",
+    "direct pcr lysis reagents",
+    "directional topo cloning kits",
+    "dnase i",
+    "dntps",
+    "dye-based qpcr systems",
+    "electrocompetent cells",
+    "expression plasmids",
+    "first-strand cdna synthesis systems",
+    "fluorophore - bioconjugate dyes",
+    "fluorophore - general",
+    "fluorophore - nucleic acid stain",
+    "gateway cloning kits",
+    "gel blotting papers",
+    "high-fidelity dna polymerase",
+    "high-fidelity hot start dna polymerase",
+    "high-fidelity hot start pcr systems",
+    "high-fidelity pcr systems",
+    "horizontal electrophoresis systems",
+    "hot start taq polymerase",
+    "hot start pcr systems",
+    "in vitro transcription kit",
+    "liquid-based dna plasmid purification kit",
+    "long template pcr systems",
+    "magnetic bacterial rna purification kit",
+    "magnetic-bead based purification kit",
+    "microrna reverse transcription kit",
+    "modified nucleotides",
+    "nitrocellulose blotting membranes",
+    "nuclease enzymes",
+    "nucleic acid gel stains",
+    "nucleic acid modifying enzymes - alkaline phosphatases",
+    "nucleic acid modifying enzymes - creatine kinase (non-nucleic acid enzyme)",
+    "nucleic acid modifying enzymes - dna fragmentases",
+    "nucleic acid modifying enzymes - dna methylases",
+    "nucleic acid modifying enzymes - end repair enzymes",
+    "nucleic acid modifying enzymes - endonucleases",
+    "nucleic acid modifying enzymes - exonucleases",
+    "nucleic acid modifying enzymes - klenow fragment",
+    "nucleic acid modifying enzymes - other",
+    "nucleic acid modifying enzymes - other dna polymerases",
+    "nucleic acid modifying enzymes - other nucleases",
+    "nucleic acid modifying enzymes - poly(a) polymerases",
+    "nucleic acid modifying enzymes - pyrophosphatases",
+    "nucleic acid modifying enzymes - recombinases",
+    "nucleic acid modifying enzymes - single-stranded dna binding proteins",
+    "nucleic acid modifying enzymes - t4 dna ligase",
+    "nucleic acid modifying enzymes - t4 dna ligase buffer",
+    "nucleic acid modifying enzymes - t4 dna polymerase",
+    "nucleic acid modifying enzymes - t4 polynucleotide kinase",
+    "nucleic acid modifying enzymes - t4 polynucleotide kinase buffer",
+    "nucleic acid modifying enzymes - t4 rna ligase",
+    "nucleic acid modifying enzymes - t4 rna ligase buffer",
+    "nucleic acid modifying enzymes - t7 dna ligase",
+    "nucleic acid modifying enzymes - taq dna ligase",
+    "nucleic acid modifying enzymes - terminal transferase",
+    "nucleic acid modifying enzymes - topoisomerases",
+    "nucleic acid modifying enzymes - transposases",
+    "nucleic acid quantitation",
+    "pcr barcoding expansion",
+    "pcr systems",
+    "phosphoprotein electrophoresis reagents",
+    "plasmid vectors",
+    "polyacrylamide gels casting kit",
+    "pre amplification kits",
+    "pre-cast bis-tris gels",
+    "pre-cast tbe gels",
+    "pre-cast tris-acetate gels",
+    "pre-cast tris-glycine gels",
+    "pre-cast tris-hcl gels",
+    "pre-cast tris-tricine gels",
+    "pre-designed qpcr assays",
+    "pre-stained dna ladders",
+    "pre-stained protein molecular-weight ladder",
+    "pre-stained rna ladders",
+    "precut nitrocellulose transfer blotting packs",
+    "precut pvdf transfer blotting packs",
+    "probe-based qpcr systems",
+    "probe-based rt-qpcr systems",
+    "protein and antibody labeling kits",
+    "protein gel stains",
+    "protein modifying enzymes",
+    "pvdf blotting membranes",
+    "qpcr beads",
+    "qrt-pcr titration kit",
+    "quantum dots",
+    "radiolabeled nucleotides",
+    "rapid dna ligation kits",
+    "restriction enzyme buffers",
+    "restriction enzymes",
+    "reverse transcriptase",
+    "rna extraction reagents",
+    "rna polymerases",
+    "rna stabilization reagent",
+    "rnase",
+    "rnase inhibitors",
+    "rt-pcr systems",
+    "seamless cloning kits",
+    "silica bead based gel purification kit",
+    "site-directed mutagenesis systems",
+    "spin columns",
+    "streptavidin conjugates",
+    "ta cloning kits",
+    "taq buffers",
+    "taq dna ligases",
+    "taq polymerases",
+    "tissue pcr systems",
+    "topo ta cloning kits",
+    "protein quantitation assay kits",
+    "transfection reagents",
+    "transfection reagents - cellfectin (insect cell)",
+    "transfection reagents - electroporation kits",
+    "transfection reagents - electroporation reagent",
+    "transfection reagents - in vivo delivery reagents",
+    "transfection reagents - lentiviral packaging kits",
+    "transfection reagents - other",
+    "transfection reagents - polybrene (viral transduction)",
+    "transfection reagents - protein transfection reagents",
+    "unstained dna ladders",
+    "unstained protein molecular-weight ladder",
+    "unstained rna ladders",
+    "vertical electrophoresis systems",
+    "western blot blockers",
+    "western blot boxes",
+    "western blot enhancers",
+    "western blot pen",
+    "western blot rollers",
+    "western blot stripping buffers",
+    "western blot transfer buffers",
+    "zero blunt topo cloning kits",
+])
+
+TIER3_CATEGORIES = frozenset([
+    "cell culture dissociation reagents",
+    "cell culture nutritional supplements - amino acids",
+    "cell culture nutritional supplements - b27",
+    "cell culture nutritional supplements - casamino acids",
+    "cell culture nutritional supplements - glucose",
+    "cell culture nutritional supplements - insulin",
+    "cell culture nutritional supplements - its-g",
+    "cell culture nutritional supplements - l-glutamine",
+    "cell culture nutritional supplements - lif",
+    "cell culture nutritional supplements - other",
+    "cell culture nutritional supplements - peptone",
+    "cell culture nutritional supplements - sodium pyruvate",
+    "cell culture nutritional supplements - sugars",
+    "cell culture nutritional supplements - tryptone",
+    "cell culture nutritional supplements - vitamins",
+    "cell culture nutritional supplements - yeast",
+    "dulbecco's phosphate-buffered saline (dpbs) buffer",
+    "fluorophore - calcium indicators",
+    "fluorophore - cell tracer",
+    "fluorophore - glutathione indicator",
+    "fluorophore - lysosome indicators",
+    "fluorophore - protein hydrophobicity",
+    "fluorophore - ros indicators",
+    "viability stains",
+    "fluorophore - voltage indicators",
+    "growth medium supplement",
+    "hanks' balanced salt solution (hbss) buffer",
+    "laemmli sample buffer",
+    "lds sample buffer",
+    "ligation reaction buffer",
+    "mes-sds buffer",
+    "mops-sds buffer",
+    "native page running buffers",
+    "native-page sample buffer",
+    "phosphate-buffered saline (pbs) buffer",
+    "reaction buffers",
+    "reducing agents - bme",
+    "tbe buffer",
+    "tris-aceate-sds running buffer",
+    "tris-acetate-edta (tae) buffer",
+    "tris-glycine buffer",
+    "tris-glycine-sds (tgs) buffer",
+    "tris-tricine-sds buffer",
+])
+
+TREATED_CATEGORIES = TIER1_CATEGORIES | TIER2_CATEGORIES | TIER3_CATEGORIES

@@ -62,6 +62,16 @@ TYPO_CORRECTIONS = {
     "donkey-host anti-goat polyclonal conjugated secondary antiboddy": "donkey-host anti-goat polyclonal conjugated secondary antibody",
     "donkey-host anti-rat polyclonal conjugated secondary antiboddy": "donkey-host anti-rat polyclonal conjugated secondary antibody",
     "horse-host anti-moust polyclonal conjugated secondary antibody": "horse-host anti-mouse polyclonal conjugated secondary antibody",
+    "labatory spatulas": "laboratory spatulas",
+    "drosophilia vials": "drosophila vials",
+    "pastuer pipettes": "pasteur pipettes",
+    "reverse transcriptiase": "reverse transcriptase",
+    "xray casettes": "xray cassettes",
+    "thin layer chromatography alumnium sheets": "thin layer chromatography aluminum sheets",
+    "nuclease enyzmes": "nuclease enzymes",
+    "microarry chips": "microarray chips",
+    "tissue clearning solution": "tissue clearing solution",
+    "nonlab - bundle of producs": "nonlab - bundle of products",
 }
 
 # Known irregular plural mappings (singular -> plural form to keep)
@@ -126,6 +136,36 @@ def clean_category_string(text):
     # Strip again after all transformations
     text = text.strip()
     return text
+
+
+def clean_category_series(s):
+    """Vectorized clean_category_string over a pandas Series (C-level str ops)."""
+    out = normalize_unicode_series(s.astype(str))
+    out = out.str.lower().str.strip()
+    out = out.str.replace(r'^#+\s*', '', regex=True)
+    out = out.str.replace(r'\s{2,}', ' ', regex=True)
+    out = out.str.strip()
+    return out
+
+
+def apply_sibling_consolidation(df, cat_col):
+    """Apply config.CATEGORY_CONSOLIDATION in-place: rename sibling categories
+    whose distinction isn't reliably carried by the description (e.g. centrifuge
+    conical vs. centrifuge tubes).  Runs at step 0 so every downstream artifact
+    -- training labels, category vectors, validation reports -- sees the
+    merged taxonomy."""
+    cons_map = getattr(config, 'CATEGORY_CONSOLIDATION', None)
+    if not cons_map:
+        return
+    hit_mask = df[cat_col].isin(cons_map.keys())
+    n_rows = int(hit_mask.sum())
+    if n_rows == 0:
+        print("  No sibling-consolidation matches.")
+        return
+    df.loc[hit_mask, cat_col] = df.loc[hit_mask, cat_col].map(cons_map)
+    print(f"  Consolidated {n_rows} rows across {len(cons_map)} sibling renames:")
+    for src, dst in cons_map.items():
+        print(f"    '{src}' -> '{dst}'")
 
 
 def build_plural_map(unique_categories):
@@ -201,7 +241,9 @@ def report_unmatched_cat_keys(df_raw, df_cat, merge_keys, unmatched_csv=None,
     #   raw_<K>_example:      one example of those raw values
     # If raw_<K>_n_candidates > 0 and raw_<K>_example differs from the
     # combined row's value of K, then K is the key causing the mismatch.
-    raw_keys_unique = df_raw[merge_keys].drop_duplicates()
+    raw_keys_unique = df_raw[merge_keys].drop_duplicates().copy()
+    for k in merge_keys:
+        raw_keys_unique[k] = raw_keys_unique[k].astype(str)
     for drop_key in merge_keys:
         other = [k for k in merge_keys if k != drop_key]
         if not other:
@@ -209,12 +251,10 @@ def report_unmatched_cat_keys(df_raw, df_cat, merge_keys, unmatched_csv=None,
         raw_grouped = (
             raw_keys_unique
             .groupby(other, dropna=False)[drop_key]
-            .agg(
-                **{
-                    f'raw_{drop_key}_n_candidates': lambda s: len({str(v) for v in s}),
-                    f'raw_{drop_key}_example': lambda s: sorted({str(v) for v in s})[0],
-                }
-            )
+            .agg(**{
+                f'raw_{drop_key}_n_candidates': 'nunique',
+                f'raw_{drop_key}_example': 'min',
+            })
             .reset_index()
         )
         unmatched = unmatched.merge(raw_grouped, on=other, how='left')
@@ -268,10 +308,10 @@ def main():
     # 3a. Basic normalization: unicode, lowercase, strip, collapse whitespace
     print("  Step 3a: Normalizing unicode, lowercase, stripping whitespace...")
     if config.UT_CAT_COL in df_cat.columns:
-        df_cat[config.UT_CAT_COL] = df_cat[config.UT_CAT_COL].astype(str).apply(clean_category_string)
+        df_cat[config.UT_CAT_COL] = clean_category_series(df_cat[config.UT_CAT_COL])
 
     if 'old_category' in df_cat.columns:
-        df_cat['old_category'] = df_cat['old_category'].astype(str).apply(clean_category_string)
+        df_cat['old_category'] = clean_category_series(df_cat['old_category'])
         df_cat[config.UT_CAT_COL] = df_cat[config.UT_CAT_COL].replace('', pd.NA).fillna(df_cat['old_category'])
 
     n_categories_before = df_cat[config.UT_CAT_COL].nunique()
@@ -339,36 +379,33 @@ def main():
     if rows_dropped > 0:
         print(f"  - Dropped {rows_dropped} rows due to missing descriptions or categories.")
 
-    # --- Consolidate antibody categories ---
+    # --- Consolidate antibody + pipette tip categories (shared lowercase pass) ---
+    cat_col_lower = df_merged[config.UT_CAT_COL].astype(str).str.lower()
+
     print("\nConsolidating antibody categories...")
-    cat_col = df_merged[config.UT_CAT_COL].astype(str).str.lower()
-    is_antibody = cat_col.str.contains("antibod", na=False)
-    is_primary = cat_col.str.contains("primary", na=False)
-    is_secondary = cat_col.str.contains("secondary", na=False)
-    n_ab_before = cat_col[is_antibody].nunique()
-    df_merged.loc[is_antibody & is_primary, config.UT_CAT_COL] = "primary antibodies"
+    is_antibody = cat_col_lower.str.contains("antibod", na=False)
+    is_primary = cat_col_lower.str.contains("primary", na=False)
+    is_secondary = cat_col_lower.str.contains("secondary", na=False)
+    is_poly = cat_col_lower.str.contains("polyclonal", na=False)
+    is_mono = cat_col_lower.str.contains("monoclonal", na=False)
+    n_ab_before = cat_col_lower[is_antibody].nunique()
+    df_merged.loc[is_antibody & is_primary & is_poly, config.UT_CAT_COL] = "polyclonal primary antibodies"
+    df_merged.loc[is_antibody & is_primary & is_mono, config.UT_CAT_COL] = "monoclonal primary antibodies"
     df_merged.loc[is_antibody & is_secondary, config.UT_CAT_COL] = "secondary antibodies"
     n_ab_after = df_merged.loc[is_antibody, config.UT_CAT_COL].nunique()
     print(f"  Merged {n_ab_before} antibody subcategories -> {n_ab_after} "
-          f"({is_antibody.sum()} rows: primary antibodies + secondary antibodies)")
+          f"({is_antibody.sum()} rows: polyclonal/monoclonal primary + secondary)")
 
-    # --- Consolidate ELISA kit subcategories ---
-    print("\nConsolidating ELISA kit subcategories...")
-    cat_col = df_merged[config.UT_CAT_COL].astype(str).str.lower()
-    is_elisa = cat_col.str.contains("elisa", na=False) & ~cat_col.str.contains("buffer", na=False)
-    n_elisa_before = cat_col[is_elisa].nunique()
-    n_elisa_rows = is_elisa.sum()
-    df_merged.loc[is_elisa, config.UT_CAT_COL] = "elisa kits"
-    print(f"  Merged {n_elisa_before} ELISA subcategories ({n_elisa_rows} rows) -> 'elisa kits'")
-
-    # --- Consolidate pipette tip subcategories ---
     print("\nConsolidating pipette tip subcategories...")
-    cat_col = df_merged[config.UT_CAT_COL].astype(str).str.lower()
-    is_pipette_tip = cat_col.str.contains("pipette tip", na=False)
+    is_pipette_tip = cat_col_lower.str.contains("pipette tip", na=False)
     n_tip_consolidated = is_pipette_tip.sum()
+    tip_cats_merged = cat_col_lower[is_pipette_tip].nunique()
     df_merged.loc[is_pipette_tip, config.UT_CAT_COL] = "pipette tips"
-    tip_cats_merged = cat_col[is_pipette_tip].nunique()
     print(f"  Merged {tip_cats_merged} pipette tip subcategories ({n_tip_consolidated} rows) -> 'pipette tips'")
+
+    # --- Sibling consolidation from config.CATEGORY_CONSOLIDATION ---
+    print("\nApplying sibling consolidation from config.CATEGORY_CONSOLIDATION...")
+    apply_sibling_consolidation(df_merged, config.UT_CAT_COL)
 
     # 7. Generate and save category counts for review
     print("\nGenerating and saving category counts...")
@@ -406,10 +443,10 @@ def main_umich():
 
     print("  Step 3a: Normalizing unicode, lowercase, stripping whitespace...")
     if config.UT_CAT_COL in df_cat.columns:
-        df_cat[config.UT_CAT_COL] = df_cat[config.UT_CAT_COL].astype(str).apply(clean_category_string)
+        df_cat[config.UT_CAT_COL] = clean_category_series(df_cat[config.UT_CAT_COL])
 
     if 'old_category' in df_cat.columns:
-        df_cat['old_category'] = df_cat['old_category'].astype(str).apply(clean_category_string)
+        df_cat['old_category'] = clean_category_series(df_cat['old_category'])
         df_cat[config.UT_CAT_COL] = df_cat[config.UT_CAT_COL].replace('', pd.NA).fillna(df_cat['old_category'])
 
     n_categories_before = df_cat[config.UT_CAT_COL].nunique()
@@ -486,36 +523,33 @@ def main_umich():
     if rows_dropped > 0:
         print(f"  - Dropped {rows_dropped} rows due to missing descriptions or categories.")
 
-    # Consolidate antibody categories
+    # --- Consolidate antibody + pipette tip categories (shared lowercase pass) ---
+    cat_col_lower = df_merged[config.UT_CAT_COL].astype(str).str.lower()
+
     print("\nConsolidating antibody categories...")
-    cat_col = df_merged[config.UT_CAT_COL].astype(str).str.lower()
-    is_antibody = cat_col.str.contains("antibod", na=False)
-    is_primary = cat_col.str.contains("primary", na=False)
-    is_secondary = cat_col.str.contains("secondary", na=False)
-    n_ab_before = cat_col[is_antibody].nunique()
-    df_merged.loc[is_antibody & is_primary, config.UT_CAT_COL] = "primary antibodies"
+    is_antibody = cat_col_lower.str.contains("antibod", na=False)
+    is_primary = cat_col_lower.str.contains("primary", na=False)
+    is_secondary = cat_col_lower.str.contains("secondary", na=False)
+    is_poly = cat_col_lower.str.contains("polyclonal", na=False)
+    is_mono = cat_col_lower.str.contains("monoclonal", na=False)
+    n_ab_before = cat_col_lower[is_antibody].nunique()
+    df_merged.loc[is_antibody & is_primary & is_poly, config.UT_CAT_COL] = "polyclonal primary antibodies"
+    df_merged.loc[is_antibody & is_primary & is_mono, config.UT_CAT_COL] = "monoclonal primary antibodies"
     df_merged.loc[is_antibody & is_secondary, config.UT_CAT_COL] = "secondary antibodies"
     n_ab_after = df_merged.loc[is_antibody, config.UT_CAT_COL].nunique()
     print(f"  Merged {n_ab_before} antibody subcategories -> {n_ab_after} "
-          f"({is_antibody.sum()} rows: primary antibodies + secondary antibodies)")
+          f"({is_antibody.sum()} rows: polyclonal/monoclonal primary + secondary)")
 
-    # Consolidate ELISA kit subcategories
-    print("\nConsolidating ELISA kit subcategories...")
-    cat_col = df_merged[config.UT_CAT_COL].astype(str).str.lower()
-    is_elisa = cat_col.str.contains("elisa", na=False) & ~cat_col.str.contains("buffer", na=False)
-    n_elisa_before = cat_col[is_elisa].nunique()
-    n_elisa_rows = is_elisa.sum()
-    df_merged.loc[is_elisa, config.UT_CAT_COL] = "elisa kits"
-    print(f"  Merged {n_elisa_before} ELISA subcategories ({n_elisa_rows} rows) -> 'elisa kits'")
-
-    # Consolidate pipette tip subcategories
     print("\nConsolidating pipette tip subcategories...")
-    cat_col = df_merged[config.UT_CAT_COL].astype(str).str.lower()
-    is_pipette_tip = cat_col.str.contains("pipette tip", na=False)
+    is_pipette_tip = cat_col_lower.str.contains("pipette tip", na=False)
     n_tip_consolidated = is_pipette_tip.sum()
+    tip_cats_merged = cat_col_lower[is_pipette_tip].nunique()
     df_merged.loc[is_pipette_tip, config.UT_CAT_COL] = "pipette tips"
-    tip_cats_merged = cat_col[is_pipette_tip].nunique()
     print(f"  Merged {tip_cats_merged} pipette tip subcategories ({n_tip_consolidated} rows) -> 'pipette tips'")
+
+    # --- Sibling consolidation from config.CATEGORY_CONSOLIDATION ---
+    print("\nApplying sibling consolidation from config.CATEGORY_CONSOLIDATION...")
+    apply_sibling_consolidation(df_merged, config.UT_CAT_COL)
 
     # Generate and save category counts for review
     print("\nGenerating and saving category counts...")
@@ -587,10 +621,10 @@ def main_combined():
 
     print("  Step 3a: Normalizing unicode, lowercase, stripping whitespace...")
     if config.UT_CAT_COL in df_cat.columns:
-        df_cat[config.UT_CAT_COL] = df_cat[config.UT_CAT_COL].astype(str).apply(clean_category_string)
+        df_cat[config.UT_CAT_COL] = clean_category_series(df_cat[config.UT_CAT_COL])
 
     if 'old_category' in df_cat.columns:
-        df_cat['old_category'] = df_cat['old_category'].astype(str).apply(clean_category_string)
+        df_cat['old_category'] = clean_category_series(df_cat['old_category'])
         df_cat[config.UT_CAT_COL] = df_cat[config.UT_CAT_COL].replace('', pd.NA).fillna(df_cat['old_category'])
 
     n_categories_before = df_cat[config.UT_CAT_COL].nunique()
@@ -652,34 +686,33 @@ def main_combined():
     if rows_dropped > 0:
         print(f"  - Dropped {rows_dropped} rows due to missing descriptions or categories.")
 
-    # --- Consolidations: antibodies / ELISA / pipette tips (same as main/main_umich) ---
+    # --- Consolidate antibody + pipette tip categories (shared lowercase pass) ---
+    cat_col_lower = df_merged[config.UT_CAT_COL].astype(str).str.lower()
+
     print("\nConsolidating antibody categories...")
-    cat_col = df_merged[config.UT_CAT_COL].astype(str).str.lower()
-    is_antibody = cat_col.str.contains("antibod", na=False)
-    is_primary = cat_col.str.contains("primary", na=False)
-    is_secondary = cat_col.str.contains("secondary", na=False)
-    n_ab_before = cat_col[is_antibody].nunique()
-    df_merged.loc[is_antibody & is_primary, config.UT_CAT_COL] = "primary antibodies"
+    is_antibody = cat_col_lower.str.contains("antibod", na=False)
+    is_primary = cat_col_lower.str.contains("primary", na=False)
+    is_secondary = cat_col_lower.str.contains("secondary", na=False)
+    is_poly = cat_col_lower.str.contains("polyclonal", na=False)
+    is_mono = cat_col_lower.str.contains("monoclonal", na=False)
+    n_ab_before = cat_col_lower[is_antibody].nunique()
+    df_merged.loc[is_antibody & is_primary & is_poly, config.UT_CAT_COL] = "polyclonal primary antibodies"
+    df_merged.loc[is_antibody & is_primary & is_mono, config.UT_CAT_COL] = "monoclonal primary antibodies"
     df_merged.loc[is_antibody & is_secondary, config.UT_CAT_COL] = "secondary antibodies"
     n_ab_after = df_merged.loc[is_antibody, config.UT_CAT_COL].nunique()
     print(f"  Merged {n_ab_before} antibody subcategories -> {n_ab_after} "
-          f"({is_antibody.sum()} rows: primary antibodies + secondary antibodies)")
-
-    print("\nConsolidating ELISA kit subcategories...")
-    cat_col = df_merged[config.UT_CAT_COL].astype(str).str.lower()
-    is_elisa = cat_col.str.contains("elisa", na=False) & ~cat_col.str.contains("buffer", na=False)
-    n_elisa_before = cat_col[is_elisa].nunique()
-    n_elisa_rows = is_elisa.sum()
-    df_merged.loc[is_elisa, config.UT_CAT_COL] = "elisa kits"
-    print(f"  Merged {n_elisa_before} ELISA subcategories ({n_elisa_rows} rows) -> 'elisa kits'")
+          f"({is_antibody.sum()} rows: polyclonal/monoclonal primary + secondary)")
 
     print("\nConsolidating pipette tip subcategories...")
-    cat_col = df_merged[config.UT_CAT_COL].astype(str).str.lower()
-    is_pipette_tip = cat_col.str.contains("pipette tip", na=False)
+    is_pipette_tip = cat_col_lower.str.contains("pipette tip", na=False)
     n_tip_consolidated = is_pipette_tip.sum()
+    tip_cats_merged = cat_col_lower[is_pipette_tip].nunique()
     df_merged.loc[is_pipette_tip, config.UT_CAT_COL] = "pipette tips"
-    tip_cats_merged = cat_col[is_pipette_tip].nunique()
     print(f"  Merged {tip_cats_merged} pipette tip subcategories ({n_tip_consolidated} rows) -> 'pipette tips'")
+
+    # --- Sibling consolidation from config.CATEGORY_CONSOLIDATION ---
+    print("\nApplying sibling consolidation from config.CATEGORY_CONSOLIDATION...")
+    apply_sibling_consolidation(df_merged, config.UT_CAT_COL)
 
     print("\nGenerating and saving category counts...")
     category_counts = df_merged[config.UT_CAT_COL].value_counts().reset_index()

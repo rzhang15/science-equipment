@@ -90,6 +90,71 @@ def extract_market_keywords_and_build_automaton(rules_filepath, min_keyword_len=
         print(f"Warning: Error building market rule automaton: {e}")
         return None
 
+def build_enzyme_regex(rules_filepath, min_keyword_len=4):
+    """Builds a CASE-SENSITIVE word-bounded regex for restriction enzymes.
+
+    Procurement descriptions spell enzymes several ways:
+      - CamelCase catalog form:   "SpeI", "HindIII", "EcoRI"
+      - ALL-CAPS procurement:     "SPEI", "HINDIII", "ECORI"
+      - Spaced:                   "Spe I",  "Hind III", "Eco RI"
+      - Hyphenated:               "Spe-I",  "Hind-III"
+      - Arabic numeral suffix:    "Spe1" / "Spe-1" / "Hind3"
+      - With -HF / -HFv2 suffix:  "SpeI-HF", "HindIII-HFv2"
+    English collisions ('saline', 'pacific', 'bearing') only appear in
+    lowercase, so the CamelCase / ALL-CAPS case sensitivity avoids them.
+
+    The returned regex matches each enzyme as
+        <prefix>[\\s\\-]?<suffix>(-HF(?:v\\d+)?)?
+    where <suffix> accepts both the Roman numeral (I / II / III / IV / V)
+    and the Arabic-digit equivalent (1 / 2 / 3 / 4 / 5).  The separator
+    between prefix and suffix is optional (allows "SpeI", "Spe I", "Spe-I").
+    """
+    try:
+        with open(rules_filepath, 'r') as f:
+            rules = yaml.safe_load(f)
+        enzymes = rules.get('keyword_groups', {}).get('RESTRICTION_ENZYME', [])
+        roman_to_arabic = {'I': '1', 'II': '2', 'III': '3', 'IV': '4', 'V': '5'}
+        # (prefix, roman_suffix, hf_tail) — case-distinct entries stored as
+        # tuples of raw strings; we emit both CamelCase and ALL-CAPS forms.
+        parsed = []
+        for name in enzymes:
+            name = str(name).strip()
+            if len(name) < min_keyword_len:
+                continue
+            # Strip optional -HF / -HFv2 tail; keep it on the pattern so we
+            # still match it but allow variants without it.
+            m = re.match(r'^((?:Nb\.|Nt\.)?.+?)(III|IV|II|I|V)(-HF(?:v\d+)?)?$', name)
+            if not m:
+                # Name doesn't end in a Roman numeral — fall back to the
+                # literal form (e.g., rare names like "Acc65I" where the
+                # digit is inline); still match it exactly.
+                parsed.append((name, '', ''))
+                continue
+            prefix, suffix, hf = m.group(1), m.group(2), m.group(3) or ''
+            parsed.append((prefix, suffix, hf))
+        patterns = set()
+        for prefix, suffix, hf in parsed:
+            if not suffix:  # literal-form fallback
+                patterns.add(re.escape(prefix))
+                patterns.add(re.escape(prefix.upper()))
+                continue
+            arabic = roman_to_arabic.get(suffix, '')
+            suffix_alt = f'(?:{suffix}|{arabic})' if arabic else suffix
+            hf_opt = r'(?:\-HF(?:v\d+)?)?'  # always optional to be lenient
+            sep = r'[\s\-]?'
+            for case_prefix in (prefix, prefix.upper()):
+                patterns.add(re.escape(case_prefix) + sep + suffix_alt + hf_opt)
+        if not patterns:
+            return None
+        # Longer patterns first so e.g. HindIII wins over HindII when both
+        # could match a prefix.
+        sorted_patterns = sorted(patterns, key=len, reverse=True)
+        pattern = r'(?<!\w)(?:' + '|'.join(sorted_patterns) + r')(?!\w)'
+        return re.compile(pattern)  # NO re.IGNORECASE — case matters
+    except FileNotFoundError:
+        return None
+
+
 def has_match(description, automaton):
     """Checks if a description matches the given matcher.  Accepts either a
     compiled regex (seed / anti-seed, word-bounded) or an Aho-Corasick
@@ -152,12 +217,13 @@ class HybridClassifier:
     def __init__(self, ml_model, vectorizer, seed_automaton, anti_seed_automaton,
                  market_rule_automaton=None, supplier_vectorizer=None,
                  bulk_filter=None, bulk_filter_vectorizer=None,
-                 supplier_priors=None):
+                 supplier_priors=None, enzyme_regex=None):
         self.ml_model = ml_model
         self.vectorizer = vectorizer
         self.seed_automaton = seed_automaton
         self.anti_seed_automaton = anti_seed_automaton
         self.market_rule_automaton = market_rule_automaton
+        self.enzyme_regex = enzyme_regex
         self.supplier_vectorizer = supplier_vectorizer
         self.bulk_filter = bulk_filter
         self.bulk_filter_vectorizer = bulk_filter_vectorizer
@@ -243,6 +309,22 @@ class HybridClassifier:
         else:
             market_mask = np.zeros(n, dtype=bool)
 
+        # Case-sensitive restriction enzyme match: runs on the RAW description
+        # (not clean_for_model output) because clean_for_model strips patterns
+        # like 'ALWI-500' as catalog numbers — which is exactly the shape real
+        # enzyme orders take.  Case-sensitive matching on CamelCase + ALL-CAPS
+        # forms keeps 'saline' / 'pacific' / 'bearing' (lowercase prose) dark.
+        enzyme_regex = getattr(self, 'enzyme_regex', None)
+        if enzyme_regex is not None:
+            raw_series = pd.Series(
+                [str(d) if isinstance(d, str) else '' for d in (
+                    descriptions if isinstance(descriptions, (list, pd.Series)) else [descriptions]
+                )]
+            )
+            enzyme_mask = raw_series.str.contains(enzyme_regex, na=False).to_numpy()
+        else:
+            enzyme_mask = np.zeros(n, dtype=bool)
+
         lab_supp_mask = np.zeros(n, dtype=bool)
         if lab_supplier_regex is not None and suppliers_list is not None:
             supp_series = pd.Series(['' if s is None else str(s) for s in suppliers_list])
@@ -253,7 +335,7 @@ class HybridClassifier:
         else:
             primer_mask = np.zeros(n, dtype=bool)
 
-        strong_lab_mask = (seed_mask | market_mask | lab_supp_mask | primer_mask) & ~anti_mask
+        strong_lab_mask = (seed_mask | market_mask | enzyme_mask | lab_supp_mask | primer_mask) & ~anti_mask
         ml_mask = ~anti_mask & ~strong_lab_mask
 
         cleaned_descs = dict(enumerate(cleaned_list))

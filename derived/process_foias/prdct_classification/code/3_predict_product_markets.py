@@ -96,7 +96,11 @@ def main(gatekeeper_name: str, expert_choice: str, source_abbrev: str = None):
                         df_gov[config.RAW_DESC_COL] = df_gov[candidate]
                         break
 
-            dataframes_to_process.append(('govspend_panel.csv', df_gov))
+            # GovSpend uses 'suppliername'; training/inference code expects 'supplier'.
+            if 'supplier' not in df_gov.columns and 'suppliername' in df_gov.columns:
+                df_gov['supplier'] = df_gov['suppliername']
+
+            dataframes_to_process.append((os.path.basename(config.GOVSPEND_PANEL_CSV), df_gov))
         except FileNotFoundError:
             print(f"ERROR:GovSpend file not found at: {config.GOVSPEND_PANEL_CSV}")
             return
@@ -178,16 +182,18 @@ def main(gatekeeper_name: str, expert_choice: str, source_abbrev: str = None):
             print(f"  - Step 2: Predicting markets with '{expert_choice}' expert (batched)...")
             # One transform/encode + one cosine matmul for all lab rows.
             # item_vectors are cached for Step 5 to avoid re-encoding.
+            lab_suppliers = (suppliers.loc[lab_descriptions.index]
+                             if suppliers is not None else None)
             expert_predictions, expert_scores, step2_vectors = (
-                expert_predictor.predict_batch(lab_descriptions)
+                expert_predictor.predict_batch(lab_descriptions, suppliers=lab_suppliers)
             )
             step2_indices = lab_descriptions.index
 
             print("  - Step 3: Applying prediction veto rules...")
-            validated_predictions = pd.Series(
-                [rule_categorizer.validate_prediction(pred, desc) for pred, desc in zip(expert_predictions, lab_descriptions)],
-                index=lab_descriptions.index
+            validated_predictions = rule_categorizer.validate_predictions_batch(
+                expert_predictions, lab_descriptions
             )
+            validated_predictions.index = lab_descriptions.index
             num_vetoed = validated_predictions.isna().sum()
             if num_vetoed > 0:
                 print(f"  - WARNING:Vetoed {num_vetoed} expert predictions.")
@@ -199,24 +205,82 @@ def main(gatekeeper_name: str, expert_choice: str, source_abbrev: str = None):
 
         print("  - Step 4: Applying final market override rules...")
         has_raw_col = config.RAW_DESC_COL in df_new.columns
-        clean_list = df_new[config.CLEAN_DESC_COL].astype(str).tolist()
-        if has_raw_col:
-            raw_list = df_new[config.RAW_DESC_COL].astype(str).tolist()
-            pairs = list(zip(clean_list, raw_list))
-        else:
-            pairs = [(c, None) for c in clean_list]
+        clean_series_full = df_new[config.CLEAN_DESC_COL].astype(str)
+        raw_series_full = df_new[config.RAW_DESC_COL].astype(str) if has_raw_col else None
 
         # FOIA product data is highly repetitive (same item ordered many
-        # times).  Dedupe on (clean, raw) so the rule regex chain runs once
-        # per unique pair instead of per row.
-        unique_pairs = set(pairs)
-        print(f"  - {len(unique_pairs)} unique description pairs among {len(pairs)} rows")
-        pair_to_override = {
-            p: rule_categorizer.get_market_override(p[0], p[1])
-            for p in unique_pairs
-        }
+        # times).  Dedupe (clean, raw) pairs so the batch runs on uniques
+        # only; then broadcast results back to every row.  Uses factorize on
+        # a concatenated string key (C-level hashing) + numpy fancy-index to
+        # broadcast — avoids Python tuple construction / hashing for the
+        # 300k-row path.
+        if has_raw_col:
+            pair_key = clean_series_full.str.cat(raw_series_full, sep='\x1f')
+        else:
+            pair_key = clean_series_full
+        codes, _ = pd.factorize(pair_key.to_numpy())
+        # factorize assigns codes in first-appearance order, so the k-th
+        # unique row is the first row with codes == k.
+        n_unique = int(codes.max()) + 1 if len(codes) else 0
+        first_pos = np.unique(codes, return_index=True)[1]
+        print(f"  - {n_unique} unique description pairs among {len(pair_key)} rows")
+        unique_clean = clean_series_full.iloc[first_pos].reset_index(drop=True)
+        unique_raw = (raw_series_full.iloc[first_pos].reset_index(drop=True)
+                      if has_raw_col else None)
+        unique_overrides = rule_categorizer.get_market_overrides_batch(
+            unique_clean, unique_raw)
+
+        # Remap rule outputs to the collapsed taxonomy the expert was trained
+        # on.  market_rules.yml is deliberately kept granular (e.g. "extended
+        # length pipette tips", "glass beakers", "rabbit-host anti-mouse
+        # polyclonal primary antibody") so rollups are reversible later --
+        # script 3 collapses at inference so the expert's category vectors
+        # can be matched.
+        #
+        # Two kinds of rollup, both mirroring script 0:
+        #   (a) explicit 1:1 renames from config.CATEGORY_CONSOLIDATION
+        #   (b) keyword-based buckets: any "pipette tip*" -> "pipette tips";
+        #       antibody + primary + polyclonal/monoclonal split + "secondary"
+        #       -> the three antibody buckets.
+        cons_map = getattr(config, 'CATEGORY_CONSOLIDATION', None)
+        if cons_map:
+            unique_overrides = unique_overrides.replace(cons_map)
+
+        _lower = unique_overrides.str.lower()
+        unique_overrides.loc[
+            _lower.str.contains("pipette tip", na=False)] = "pipette tips"
+        _is_ab = _lower.str.contains("antibod", na=False)
+        _is_prim = _lower.str.contains("primary", na=False)
+        _is_sec = _lower.str.contains("secondary", na=False)
+        _is_poly = _lower.str.contains("polyclonal", na=False)
+        _is_mono = _lower.str.contains("monoclonal", na=False)
+        unique_overrides.loc[_is_ab & _is_prim & _is_poly] = "polyclonal primary antibodies"
+        unique_overrides.loc[_is_ab & _is_prim & _is_mono] = "monoclonal primary antibodies"
+        unique_overrides.loc[_is_ab & _is_sec] = "secondary antibodies"
+
+        # Script 0 also applies keyword-based rollups (pipette tips + antibody
+        # primary/secondary split) on df_merged, so the training data carries
+        # the collapsed labels and the expert model only ever sees the
+        # collapsed names.  Mirror those rollups on rule outputs so rule
+        # categories like "extended length pipette tips" or "rabbit-host
+        # anti-mouse polyclonal primary antibody" don't fall off the expert's
+        # category list.
+        _lower = unique_overrides.str.lower()
+        unique_overrides.loc[
+            _lower.str.contains("pipette tip", na=False)] = "pipette tips"
+        _is_ab = _lower.str.contains("antibod", na=False)
+        _is_prim = _lower.str.contains("primary", na=False)
+        _is_sec = _lower.str.contains("secondary", na=False)
+        _is_poly = _lower.str.contains("polyclonal", na=False)
+        _is_mono = _lower.str.contains("monoclonal", na=False)
+        unique_overrides.loc[_is_ab & _is_prim & _is_poly] = "polyclonal primary antibodies"
+        unique_overrides.loc[_is_ab & _is_prim & _is_mono] = "monoclonal primary antibodies"
+        unique_overrides.loc[_is_ab & _is_sec] = "secondary antibodies"
+
+        # Broadcast unique -> every row via numpy fancy-index on codes.
         overrides = pd.Series(
-            [pair_to_override[p] for p in pairs], index=df_new.index
+            unique_overrides.to_numpy()[codes],
+            index=df_new.index,
         )
         valid_overrides = overrides.dropna()
         y_pred.update(valid_overrides)
@@ -225,22 +289,15 @@ def main(gatekeeper_name: str, expert_choice: str, source_abbrev: str = None):
             df_new.loc[valid_overrides.index, 'prediction_source'] = 'Market Rules'
 
         y_pred.fillna("unclassified", inplace=True)
-        cat_col = y_pred.astype(str).str.lower()
-        
-        # Consolidate Antibodies
-        is_antibody = cat_col.str.contains("antibod", na=False)
-        is_primary = cat_col.str.contains("primary", na=False)
-        is_secondary = cat_col.str.contains("secondary", na=False)
-        y_pred[is_antibody & is_primary] = "primary antibodies"
-        y_pred[is_antibody & is_secondary] = "secondary antibodies"
 
-        # Consolidate ELISA
-        is_elisa = cat_col.str.contains("elisa", na=False)
-        y_pred[is_elisa] = "elisa kits"
-
-        # Consolidate Pipette Tips
-        is_pipette_tip = cat_col.str.contains("pipette tip", na=False)
-        y_pred[is_pipette_tip] = "pipette tips"
+        # Deliberately no post-override re-consolidation here.  Previously
+        # this step flattened every antibody to "primary antibodies"/
+        # "secondary antibodies" and every elisa to "elisa kits", which
+        # overwrote the expert's fine-grained labels (e.g. polyclonal /
+        # monoclonal primary antibodies, pre-coated sandwich colorimetric
+        # elisa kits) and zeroed their precision/recall at eval.  Any
+        # taxonomy roll-up belongs in script 0's CATEGORY_CONSOLIDATION so
+        # the expert learns the collapsed labels in the first place.
 
         # +++ Step 5: Calculate FINAL similarity scores +++
         print("  - Step 5: Calculating final similarity scores for lab predictions...")
@@ -254,16 +311,20 @@ def main(gatekeeper_name: str, expert_choice: str, source_abbrev: str = None):
             # Reuse Step 2's cached vectors when all final-lab rows were in
             # the gatekeeper lab set.  Market overrides (Step 4) can promote
             # rows outside is_lab_mask to a category — encode those fresh.
+            lab_final_suppliers = (suppliers.loc[lab_indices]
+                                   if suppliers is not None else None)
             if step2_vectors is not None and lab_indices.isin(step2_indices).all():
                 positions = step2_indices.get_indexer(lab_indices)
                 lab_embeddings = step2_vectors[positions]
             else:
                 if expert_choice == 'bert':
-                    lab_embeddings = vectorizer_for_similarity.encode(
-                        lab_final_descs.tolist(), show_progress_bar=True, batch_size=128
+                    lab_embeddings = expert_predictor._encode_with_supplier(
+                        lab_final_descs.tolist(), lab_final_suppliers
                     )
                 else:
-                    lab_embeddings = vectorizer_for_similarity.transform(lab_final_descs)
+                    lab_embeddings = vectorizer_for_similarity.transform(
+                        lab_final_descs, suppliers=lab_final_suppliers
+                    )
 
             # Vectorized row-wise cosine: gather each row's assigned category
             # vector in one fancy-index, L2-normalize both sides, dot per row.
@@ -300,6 +361,13 @@ def main(gatekeeper_name: str, expert_choice: str, source_abbrev: str = None):
 
             df_new.loc[lab_indices, 'similarity_score'] = final_scores
 
+            # Release big intermediates before to_csv so peak memory isn't
+            # (item vectors + full output frame) during write.
+            del lab_embeddings
+
+        if step2_vectors is not None:
+            del step2_vectors
+            step2_vectors = None
 
         # Assign final predictions
         df_new['predicted_market'] = y_pred

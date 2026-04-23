@@ -11,6 +11,7 @@ import os
 import joblib
 from sklearn.feature_extraction.text import TfidfVectorizer, ENGLISH_STOP_WORDS
 from sklearn.feature_selection import chi2
+from sklearn.preprocessing import normalize
 from tqdm import tqdm
 import numpy as np
 from scipy.sparse import vstack, hstack, csr_matrix, diags
@@ -52,7 +53,8 @@ def _batched_transform(vectorizer, descriptions, batch_size=5000, desc=""):
 
 
 def prepare_and_save_tfidf_category_vectors(df_lab_only, word_vectorizer,
-                                            char_vectorizer, output_path):
+                                            char_vectorizer, output_path,
+                                            supplier_vectorizer=None):
     """Build category centroids in the combined, contrastively-weighted space.
 
     The stacked feature space is [word_tfidf | char_tfidf].  Chi-square against
@@ -87,6 +89,21 @@ def prepare_and_save_tfidf_category_vectors(df_lab_only, word_vectorizer,
         n_char = (X_all.shape[1] - n_word)
         print(f"    Feature weights: word={n_word}, char={n_char}, "
               f"weight mean={feature_weights.mean():.3f}, max={feature_weights.max():.2f}")
+
+    # If a supplier vectorizer is available, add a supplier block to the item
+    # vectors (L2-normalized desc + L2-normalized supplier, weighted by
+    # config.DESC_WEIGHT / SUPPLIER_WEIGHT).  Mirrors the gatekeeper's
+    # combined representation in classifier.py so the expert sees the same
+    # signal structure at training and inference.
+    if supplier_vectorizer is not None and 'supplier_token' in df_lab_only.columns:
+        supp_tokens = df_lab_only['supplier_token'].fillna('').astype(str).tolist()
+        X_supp = supplier_vectorizer.transform(supp_tokens)
+        X_desc_norm = normalize(X_all, norm='l2')
+        X_supp_norm = normalize(X_supp, norm='l2')
+        X_all = hstack([X_desc_norm * config.DESC_WEIGHT,
+                        X_supp_norm * config.SUPPLIER_WEIGHT]).tocsr()
+        print(f"  - Added supplier block: {X_supp.shape[1]} feats, "
+              f"weights desc={config.DESC_WEIGHT:.2f}/supp={config.SUPPLIER_WEIGHT:.2f}")
 
     print("  - Calculating mean category vectors...")
     grouping_matrix = csr_matrix(
@@ -142,6 +159,16 @@ def main():
     print("- Combining all data sources...")
     df_combined = pd.concat(labeled_frames + [df_ca_non_lab, df_fisher_lab, df_fisher_non_lab], ignore_index=True)
 
+    # Drop rows with empty/whitespace-only descriptions — useless as training
+    # examples and they drive a huge block of spurious "conflicts" at dedup.
+    n_before_empty = len(df_combined)
+    empty_mask = df_combined['cleaned_description'].fillna('').str.strip() == ''
+    n_empty = int(empty_mask.sum())
+    if n_empty:
+        df_combined = df_combined.loc[~empty_mask].reset_index(drop=True)
+        print(f"  - Dropped {n_empty} rows with empty cleaned_description "
+              f"({n_before_empty} -> {len(df_combined)})")
+
     # Ensure supplier column exists (some sources may not carry it)
     if config.USE_SUPPLIER:
         if 'supplier' not in df_combined.columns:
@@ -186,7 +213,22 @@ def main():
         df_combined.loc[matches, 'label'] = 0
         print(f"  - Anti-seed keywords: {matches.sum()} items labeled as non-lab (overrides all)")
 
+    # 4. Apply definitive non-lab category override for labeled sources.
+    #    Runs BEFORE dedup so rows like ("freight charge", "fees - shipping")
+    #    are flipped to 0 and no longer conflict with the ca_non_lab copy.
+    if config.UT_CAT_COL in df_combined.columns:
+        labeled_sources = ['ut_dallas'] + (['umich'] if config.USE_UMICH else [])
+        is_labeled = df_combined['data_source'].isin(labeled_sources)
+        is_nonlab_category = (df_combined[config.UT_CAT_COL].astype(str)
+                              .str.contains(config.NONLAB_REGEX, na=False))
+        final_nonlab_mask = is_labeled & is_nonlab_category
+        df_combined.loc[final_nonlab_mask, 'label'] = 0
+        print(f"  - Non-lab category override: {final_nonlab_mask.sum()} labeled-data items set to non-lab")
+
     # --- Deduplication with logging ---
+    # Conflict resolution: if the same description appears across sources with
+    # different labels, force the final label to 0 (non-lab).  Consistent with
+    # the "downgrades win" principle — a single non-lab vote is enough.
     n_before = len(df_combined)
     dupes = df_combined[df_combined.duplicated(subset=['cleaned_description'], keep=False)]
     if len(dupes) > 0:
@@ -195,7 +237,18 @@ def main():
         n_conflicting = conflicting['cleaned_description'].nunique()
         print(f"\n  - Deduplication: {dupes['cleaned_description'].nunique()} duplicate descriptions found")
         if n_conflicting > 0:
-            print(f"  - WARNING: {n_conflicting} descriptions have conflicting labels across sources (keeping first occurrence)")
+            print(f"  - {n_conflicting} descriptions have conflicting labels across sources — forcing all to non-lab")
+            conflicts_path = os.path.join(config.OUTPUT_DIR, 'training_label_conflicts.csv')
+            conflict_cols = [c for c in ['cleaned_description', 'label', 'data_source',
+                                         config.UT_CAT_COL, 'supplier']
+                             if c in conflicting.columns]
+            (conflicting[conflict_cols]
+             .sort_values(['cleaned_description', 'data_source'])
+             .to_csv(conflicts_path, index=False))
+            print(f"  - Conflicting rows saved to: {conflicts_path}")
+            # Force every row whose description is in a conflict cluster to 0.
+            conflict_descs = set(conflicting['cleaned_description'].unique())
+            df_combined.loc[df_combined['cleaned_description'].isin(conflict_descs), 'label'] = 0
 
     df_combined.drop_duplicates(subset=['cleaned_description'], keep='first', inplace=True)
     print(f"  - Dropped {n_before - len(df_combined)} duplicate rows, {len(df_combined)} remaining")
@@ -212,16 +265,6 @@ def main():
         }
         df_combined['supplier_token'] = df_combined['supplier'].map(supplier_map)
     df_prepared = df_combined.drop(columns=['cleaned_description'])
-
-    # 4. Apply FINAL definitive non-lab category override for labeled data
-    #    Uses word-boundary regex from config to avoid substring false matches
-    if config.UT_CAT_COL in df_prepared.columns:
-        labeled_sources = ['ut_dallas'] + (['umich'] if config.USE_UMICH else [])
-        is_labeled = df_prepared['data_source'].isin(labeled_sources)
-        is_nonlab_category = df_prepared[config.UT_CAT_COL].astype(str).str.contains(config.NONLAB_REGEX, na=False)
-        final_nonlab_mask = is_labeled & is_nonlab_category
-        df_prepared.loc[final_nonlab_mask, 'label'] = 0
-        print(f"  - Non-lab category override: {final_nonlab_mask.sum()} labeled-data items set to non-lab")
 
     print("\nFinal label distribution for training data:")
     print(df_prepared['label'].value_counts(normalize=True))
@@ -260,6 +303,21 @@ def main():
     elif os.path.exists(config.CATEGORY_CHAR_VECTORIZER_PATH):
         os.remove(config.CATEGORY_CHAR_VECTORIZER_PATH)
 
+    # Supplier vectorizer -- same token-level vocabulary used by the gatekeeper
+    # in step 1b.  Fit once here on the full training set so both the expert's
+    # category vectors (built below) and the gatekeeper's combined embeddings
+    # (step 1b) index into the same supplier space.
+    supplier_vectorizer = None
+    supp_vec_path = os.path.join(config.OUTPUT_DIR, "vectorizer_supplier_tfidf.joblib")
+    if config.USE_SUPPLIER and 'supplier_token' in df_prepared.columns:
+        print("Fitting a supplier TF-IDF vectorizer (shared with gatekeeper step 1b)...")
+        supplier_vectorizer = TfidfVectorizer(ngram_range=(1, 1), min_df=1)
+        supplier_vectorizer.fit(df_prepared['supplier_token'].fillna('').astype(str))
+        joblib.dump(supplier_vectorizer, supp_vec_path)
+        print(f"  Supplier vectorizer saved ({len(supplier_vectorizer.vocabulary_)} features).")
+    elif os.path.exists(supp_vec_path):
+        os.remove(supp_vec_path)
+
     # Filter labeled data to lab-only categories for category vectors
     lab_frames = []
     is_nonlab_ut = df_ut_dallas[config.UT_CAT_COL].astype(str).str.contains(config.NONLAB_REGEX, na=False)
@@ -269,11 +327,20 @@ def main():
         lab_frames.append(df_umich[~is_nonlab_um])
     df_lab_only = pd.concat(lab_frames, ignore_index=True)
 
+    # Compute supplier_token on the lab-only frame so the category vectors can
+    # include a supplier block.  df_lab_only is built from raw parquet slices
+    # that predate supplier_token's computation in df_prepared.
+    if config.USE_SUPPLIER and 'supplier' in df_lab_only.columns:
+        unique_supp = df_lab_only['supplier'].fillna('').unique()
+        supp_map = {s: config.normalize_supplier(str(s)) for s in unique_supp}
+        df_lab_only['supplier_token'] = df_lab_only['supplier'].fillna('').map(supp_map)
+
     prepare_and_save_tfidf_category_vectors(
         df_lab_only=df_lab_only,
         word_vectorizer=category_vectorizer,
         char_vectorizer=char_vectorizer,
-        output_path=os.path.join(config.OUTPUT_DIR, "category_vectors_tfidf.joblib")
+        output_path=os.path.join(config.OUTPUT_DIR, "category_vectors_tfidf.joblib"),
+        supplier_vectorizer=supplier_vectorizer,
     )
 
     columns_to_save = ['prepared_description', 'label', config.UT_CAT_COL, config.CLEAN_DESC_COL, config.RAW_DESC_COL, 'data_source']

@@ -12,7 +12,12 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report
 
 import config
-from classifier import HybridClassifier, load_keywords_and_build_automaton, extract_market_keywords_and_build_automaton
+from classifier import (
+    HybridClassifier,
+    load_keywords_and_build_automaton,
+    extract_market_keywords_and_build_automaton,
+    build_enzyme_regex,
+)
 
 def main(embedding_name: str):
     print(f"--- Training Hybrid Model with '{embedding_name}' Embeddings [Variant: {config.VARIANT}] ---")
@@ -88,6 +93,7 @@ def main(embedding_name: str):
     seed_automaton = load_keywords_and_build_automaton(config.SEED_KEYWORD_YAML)
     anti_seed_automaton = load_keywords_and_build_automaton(config.ANTI_SEED_KEYWORD_YAML)
     market_rule_automaton = extract_market_keywords_and_build_automaton(config.MARKET_RULES_YAML)
+    enzyme_regex = build_enzyme_regex(config.MARKET_RULES_YAML, min_keyword_len=4)
 
     # Load second-stage bulk-chemical filter if available.  Trained separately
     # by 2b_train_chemical_filter.py — absence is non-fatal.
@@ -113,6 +119,7 @@ def main(embedding_name: str):
         bulk_filter=bulk_filter,
         bulk_filter_vectorizer=bulk_filter_vectorizer,
         supplier_priors=supplier_priors,
+        enzyme_regex=enzyme_regex,
     )
 
     model_path = os.path.join(config.OUTPUT_DIR, f"hybrid_classifier_{embedding_name}.joblib")
