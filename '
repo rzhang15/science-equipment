@@ -215,7 +215,7 @@ program event_study
         restore*/
 
         // heterogeneity by author & inst characteristics        
-        foreach cond in young old r1 r2 above_median below_median {
+        foreach cond in young old r1 r2 {
             preserve
             mat drop _all 
             reghdfe `yvar' `int_leads' `int_lags' int_lead1 if `cond' == 1, absorb(`fes') vce(cluster athr_id)

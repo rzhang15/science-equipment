@@ -861,6 +861,52 @@ keyword_groups:
   # SgsI cuts the same GG^CGCGCC site as AscI but is a distinct vendor product
   # (Thermo / Anza) that appears in procurement under its own name.
   - SgsI
+  # ---- Missing enzymes that appeared in UMich GT but were never in the
+  # keyword group (FastDigest / Anza catalog).  Add the canonical CamelCase
+  # form so the case-sensitive substring rule + the enzyme-regex fallback
+  # in classifier.py both pick them up.
+  - FspEI
+  - BpiI
+  - Bsu15I
+  - Bsu36I-HF
+  - Psp1406I
+  - Eco31I
+  - Eco53KI
+  - Eco53kI-HF
+  - BcuI
+  - LguI
+  - Cfr9I
+  - Aor51HI
+  - Mph1103I
+  # ---- Procurement typos: lowercase 'l' substituted for 'I' in the Roman-
+  # numeral suffix or anywhere mid-name.  These show up routinely in NEB
+  # catalog descriptions ("Catalog # R0145S - Xbal"), email orders ("BgIII"
+  # for "BglII"), and OCR'd PDFs.  Adding both the canonical CamelCase form
+  # and the lowercase-l typo lets rule 1 / the enzyme-regex fallback claim
+  # them.
+  - Smal           # SmaI typo
+  - Notl           # NotI typo
+  - Xhol           # XhoI typo
+  - Xbal           # XbaI typo
+  - Sphl           # SphI typo
+  - Pstl           # PstI typo
+  - Pvul           # PvuI typo
+  - Pvul-HF        # PvuI-HF typo
+  - Sall           # SalI typo
+  - Sail-HF        # SalI-HF typo
+  - SaII-HF        # SalI-HF typo (capital I doubled)
+  - Ndel           # NdeI typo
+  - Ncol           # NcoI typo
+  - Nsil           # NsiI typo
+  - Bcll           # BclI typo
+  - BspEl          # BspEI typo
+  - Bglll          # BglII typo (3 lowercase l's)
+  - BgIII          # BglII typo (capital I in middle)
+  - Sacl           # SacI typo
+  - Snabl          # SnaBI typo
+  - SNABL          # SnaBI all-caps typo
+  - Hindlll        # HindIII typo
+  - Eco-R1-HF      # EcoRI-HF formatting variant
 market_rules:
 # If, after cleaning (lowercase, stopwords like "and"/"the" removed, units &
 # SKUs stripped, whitespace collapsed), the description is nothing but a
@@ -902,6 +948,19 @@ market_rules:
   - delivery charges
   - delivery fee
   - delivery fees
+# UMich procurement order-confirmation note text — reproduced verbatim on
+# every line item ("******SEND ORDER CONFIRMATION TO KASI@MED.UMICH.EDU******").
+# Contains "KASI" which the enzyme-regex fallback in rule_based_categorizer.py
+# parses as the KasI restriction enzyme, sweeping ~330 fees rows into
+# `restriction enzymes` because the fallback runs without a none_of guard.
+# Claim them as Non-Lab here so they're locked before the fallback fires.
+- name: Non-Lab
+  any_of:
+  - '*send order confirmation*'
+  - '*send an order confirmation*'
+  - '*send the order confirmation*'
+  - '*please send order confirmation*'
+  - '*order confirmation to*@*'
 # ---------------------------------------------------------------------------
 # Oligonucleotide rules MUST come before `restriction enzymes` — synthetic
 # primers and oligos routinely carry restriction-site names in their
@@ -1048,6 +1107,30 @@ market_rules:
   # only "oligo" (and never reaches here for paint/spray primers because
   # the gatekeeper already filtered those as non-lab).
   - '(?i)\boligo\w*'
+# Plasmid / cloning-construct rule.  Catches the GenScript / IDT / custom-
+# cloning order descriptions that pack vector name, insert, and cloning
+# site into a single procurement line ("Vector name:pET-21a(+) Cloning
+# site:NdeI/HindIII", "ExpressCloning:GFPxm163_pcDNA3.1(+)Plasmid Name:...",
+# "Mutagenesis:..._pET21a(+)Cloning site:..."). Without this rule, those
+# rows fall through to the enzyme-regex fallback and get tagged as
+# `restriction enzymes` because they mention enzyme cut sites.  Placed
+# BEFORE the oligo-rescue rule so plasmid constructs (which carry
+# `vector name:` / `plasmid name:` / `mutagenesis:` markers) are claimed as
+# plasmids rather than oligos.  All four sibling categories listed below
+# collapse to `expression plasmids` via CATEGORY_CONSOLIDATION at script 0
+# / script 3, so the rule's emitted name is interchangeable.
+- name: synthetic bacterial expression plasmids
+  any_of:
+  - '*vector name:*'
+  - '*vector name :*'
+  - '*plasmid name:*'
+  - '*plasmid name :*'
+  - '*expresscloning:*'
+  - '*express cloning:*'
+  - '*genpluscloning*'
+  - '*custom cloning:*'
+  - '*mutagenesis:*'
+  - '*target insert name:*'
 # Enzyme-name + oligo-marker rule.  Verified 0/1047 true restriction-enzyme
 # items in UMich contain tokens like fwd/sense/adaptor/sequence/promoter/
 # chip/gene — real enzyme orders are bone-simple (enzyme + maybe fastdigest
@@ -1066,6 +1149,30 @@ market_rules:
   - '(?i)\bprom(?:oter)?\b'
   - '(?i)\bchip\b'
   - '(?i)\bgene\b'
+  # Primer-direction suffix tokens: ".F" / "-F" / "_F" / " F" (and Fwd/Rev
+  # variants, with optional trailing index digits) at end of description.
+  # Matches "0744 AscI F", "GeneX-R", "construct.Fwd", "name_R2".
+  - '(?i)[._\-\s]([FR]|[Ff]wd|[Rr]ev)\d*\s*$'
+  # Forward/reverse synonyms commonly used in primer naming.
+  - '(?i)\bstart\b'
+  - '(?i)\bend\b'
+  - '(?i)\bupstream\b'
+  - '(?i)\bdownstream\b'
+  - '(?i)\b(?:upper|lower)\b'
+  # Cloning-construct / synthetic-DNA context markers — if any appear next
+  # to an enzyme name, the row is a primer / gene fragment / plasmid, not
+  # an enzyme order.
+  - '(?i)\bplasmid\b'
+  - '(?i)\bvector\b'
+  - '(?i)\bconstruct\b'
+  - '(?i)\bfragment\b'
+  - "(?i)\\b\\d+\\s?bp\\b"
+  - '(?i)\bkb\b'
+  - '(?i)\bnmole?\b'
+  - '(?i)\bpmole?\b'
+  - '(?i)\bdesalt\w*'
+  - '(?i)\bpurification\b'
+  - '(?i)\bsynthesis\b'
 - name: restriction enzymes
   case_sensitive: true
   any_of:
@@ -1099,6 +1206,11 @@ market_rules:
   - '(?i)sticky[\s_]end'
   - '(?i)_(?:fwd|rev|forward|reverse)(?=$|[\s\-])'
   - '(?i)(?<=\w{3})_[FR]\d*(?=$|[\s\-])'
+  # Bare F/R / Fwd/Rev primer-direction tokens that follow the enzyme name
+  # with any of the common primer-naming delimiters (.  -  _  space) and sit
+  # at the end of the description.  Catches e.g. "0744 AscI F", "X.f",
+  # "geneX-R2", "construct.Fwd".
+  - '(?i)[._\-\s]([FR]|[Ff]wd|[Rr]ev)\d*\s*$'
   - '(?i)\batt[bplr]\d?\b'
   # Direction / strand / primer-design markers (0 FN verified)
   - '(?i)\b(?:fw|fwd|forward|rev|reverse)\b'
@@ -1111,6 +1223,28 @@ market_rules:
   - '(?i)\bdna\b'
   - '(?i)\brna\b'
   - '(?i)\bgene\b'
+  # Forward/reverse synonyms used in primer naming — "5' start", "3' end",
+  # "upper", "lower", "top", "bottom", "upstream", "downstream".  Real enzyme
+  # descriptions never carry these tokens.
+  - '(?i)\bstart\b'
+  - "(?i)5['′]?[\\s\\-_]?\\bstart\\b"
+  - "(?i)3['′]?[\\s\\-_]?\\bend\\b"
+  - '(?i)\bupstream\b'
+  - '(?i)\bdownstream\b'
+  - '(?i)\b(?:upper|lower)\b'
+  # Cloning-construct / plasmid / synthetic-DNA markers.  Real enzyme
+  # descriptions never carry these tokens; if any of them shows up alongside
+  # an enzyme name, the row is a plasmid, gene fragment, or oligo construct.
+  - '(?i)\bplasmid\b'
+  - '(?i)\bvector\b'
+  - '(?i)\bconstruct\b'
+  - '(?i)\bfragment\b'
+  - "(?i)\\b\\d+\\s?bp\\b"
+  - '(?i)\bnmole?\b'
+  - '(?i)\bpmole?\b'
+  - '(?i)\bdesalt\w*'
+  - '(?i)\bpurification\b'
+  - '(?i)\bsynthesis\b'
   # Cloning-construct protein/tag markers.  Items like "gfp kdel noti" or
   # "mcherry-xhoi" are plasmid/oligo constructs that mention restriction
   # sites, not enzyme orders.  Verified against UMich enzyme hold-out: real
@@ -4141,10 +4275,128 @@ market_rules:
 - name: nucleic acid modifying enzymes - endonucleases 
   any_of:
   - '*t7 endo*' 
-- name: nucleic acid modifying enzymes - creatine kinase (non-nucleic acid enzyme) 
+- name: nucleic acid modifying enzymes - creatine kinase (non-nucleic acid enzyme)
   any_of:
   - '*creatine kinase*'
   - '*creatine phosphokinase*'
+# Purified enzymes - transferases.  Audited against UMich ground-truth
+# (`category` column, post-step-0 consolidation): this bucket is a broad
+# procurement label for "purified enzymes sourced from organisms" rather
+# than a strict EC-class-2 grouping — it lumps in many hydrolases / lyases
+# / isomerases / ligases (apyrase, aldolase, glucosidases, amylases,
+# invertase, isomerases, deaminases, cellulase, amidase, ubiquitin
+# activating enzyme) alongside the actual transferases (GST, transaminase,
+# transglutaminase, hexokinase, pyruvate kinase, etc.).
+#
+# Rule searches `clean_desc` (case-insensitive default), which strips the
+# Sigma packaging stopwords FROM / GRADE / TYPE, so anchored patterns like
+# "*apyrase from*" never match.  Use bare enzyme names with a strong
+# none_of to keep antibody clones, primer gene names, OriGene cDNA clones,
+# kits, and small-molecule inhibitors out of the bucket.  Placed AFTER
+# terminal transferase / T4 PNK / creatine kinase rules so the nucleic-
+# acid-modifying variants claim their rows first.  Antibody rules at L~1110
+# fire even earlier and steal "RABBIT MUSC" / "RABBIT MUSCLE" patterns
+# verbatim — those losses are documented and tracked separately.
+- name: purified enzymes - transferases
+  any_of:
+  # ---- Actual transferases (GST / transaminase / kinase family) ----
+  - '*glutathione s-transferase*'
+  - '*glutathion-s-transferase*'
+  - '*glutathione transferase*'
+  - '*aspartate aminotransferase*'
+  - '*alanine aminotransferase*'
+  - '*aminotransferase*'
+  - '*transaminase*'
+  - '*transglutaminase*'
+  - '*sulfotransferase*'
+  - '*glycosyltransferase*'
+  - '*hexokinase*'
+  - '*pyruvate kinase*'
+  - '*acetate kinase*'
+  - '*adenylate kinase*'
+  - '*myokinase*'
+  - '*phosphoglycerate kinase*'
+  - '*phosphoglyceric phosphokinase*'
+  - '*phosphofructokinase*'
+  - '*protein kinase a, catalytic*'
+  - '*protein kinase*catalytic subunit*'
+  - '*rhodanese*'
+  # ---- Hydrolases lumped into this bucket by the GT taxonomy ----
+  - '*apyrase*'
+  - '*aldolase*'
+  - '*b-glucosidase*'
+  - '*β-glucosidase*'
+  - '*beta-glucosidase*'
+  - '*alpha-glucosidase*'
+  - '*a-glucosidase*'
+  - '*α-glucosidase*'
+  - '*b-galactosidase*'
+  - '*β-galactosidase*'
+  - '*beta-galactosidase*'
+  - '*amyloglucosidase*'
+  - '*a-amylase*'
+  - '*α-amylase*'
+  - '*alpha-amylase*'
+  - '*b-amylase*'
+  - '*β-amylase*'
+  - '*beta-amylase*'
+  - '*invertase*'
+  - '*amidase recombinant*'
+  - '*amidase*'
+  - '*cellulase*'
+  # ---- Isomerases / ligases / deaminases also lumped here ----
+  - '*triosephosphate isomerase*'
+  # Ubiquitin-activating enzyme: only the Sigma abbreviated form
+  # ("HMN UBIQUITIN ACT. ENZ") is in GT transferases.  The "E-305 Ubiquitin
+  # Activating Enzyme (UBE1)" / "UBIQUITIN ACTIVATING ENZYME E1, HUMAN"
+  # variants live in `other` / `purified proteins` / `recombinant proteins`,
+  # so we deliberately don't match the full-word form.
+  - '*ubiquitin act. enz*'
+  - '*hmn ubiquitin act*'
+  # Adenosine deaminase: only the "(ADA); from <organism>" Sigma form is in
+  # GT transferases.  Bare "ADENOSINE DEAMINASE BOVINE IN" / "LS009043
+  # ADENOSINE DEAMINASE" live in other / deaminases / dehydrogenases.
+  - '*adenosine deaminase (ada)*'
+  none_of:
+  - '*antibod*'
+  - '*anti-*'
+  - '*anti *'
+  - '*conjug*'
+  - '*hrp*'
+  - '*secondary*'
+  - '*kit*'
+  - '*assay*'
+  - '*inhibitor*'
+  - '*plasmid*'
+  - '*vector*'
+  - '*substrate*'
+  - '*buffer*'
+  - '*stain*'
+  - '*reporter gene*'
+  - '*ladder*'
+  - '*marker*'
+  - '*recombinant human*'
+  - '*recombinant mouse*'
+  - '*tagged*'
+  - '*gfp*'
+  - '*myc-ddk*'
+  - '*moo gloo*'
+  - '*meat glue*'
+  - '*colorimet*'
+  - '*synthetic gene*'
+  - '*expression plasmid*'
+  - '*transcript variant*'
+  - '*configurationid*'
+  - '*creatine kinase*'
+  - '*terminal transferase*'
+  - '* mab*'
+  - '*neuromab*'
+  - '* ab2*'
+  - '* ab1*'
+  - '*binding domain peptide*'
+  - '*cell-permeable peptide*'
+  - '*ohu1*'
+  - '*ohu2*'
 - name: hams f12
   any_of:
   - '*ham*f*12*'
@@ -4800,6 +5052,61 @@ market_rules:
   - '*cell culture*'
   - '*cm2*'
   - tc
+# ----------------------------------------------------------------------------
+# TBE buffer / TBE gels / tubing — pre-empt the $TUBE alias.  $TUBE expands
+# to '*tube*|*tb*|*tbe*|*tub*', and the bare '*tbe*' / '*tub*' tokens leak
+# into "TBE Buffer" / "TBE Gel" / "MICRO RENATHANE TUBING" / "TYG TUB ..."
+# descriptions whenever a $TUBE-using rule's none_of doesn't list them.
+# Claim these as their correct categories here so the tube rules below
+# never see them.  GT label counts in UMich: tbe buffer (64), pre-cast tbe
+# gels (82), nonlab - tubing (843).
+- name: tbe buffer
+  any_of:
+  - '*tbe buffer*'
+  - '*tbe 10x*'
+  - '*10x tbe*'
+  - '*10 x tbe*'
+  - '*5x tbe*'
+  - '*tris/boric*edta*'
+  - '*tris-borate-edta*'
+  - '*tris borate edta*'
+  - '*tbe ne diluent*'
+  none_of:
+  - '*gel*'
+  - '*precast*'
+  - '*pre-cast*'
+- name: pre-cast tbe gels
+  any_of:
+  - '*tbe gel*'
+  - '*tbe-urea gel*'
+  - '*tbe urea gel*'
+  - '*mini-protean*tbe*'
+  - '*mini protean*tbe*'
+  - '*criterion*tbe*'
+  - '*tbe precast*'
+  - '*tbe pre-cast*'
+- name: Non-Lab
+  any_of:
+  - '*tubing*'
+  - '*tygon*'
+  - '*tygn*'
+  - '*tyg tub*'
+  - '*tyg-tub*'
+  - '*renathane*'
+  - '*polyethylene tub*'
+  - '*pe tub*'
+  - '*silicone tub*'
+  - '*peek tub*'
+  - '*ptfe tub*'
+  - '*latex tub*'
+  - '*vinyl tub*'
+  none_of:
+  - '*test tube*'
+  - '*centrifuge tube*'
+  - '*microcentrifuge*'
+  - '*conical*'
+  - '*cell culture*'
+  - '*pcr*'
 - name: microcentrifuge tubes
   all_of:
   - mct
@@ -4854,6 +5161,53 @@ market_rules:
   none_of:
   - '*rack*'
   - '*pcr*'
+# Size-based microcentrifuge rule.  Standard micro tube volumes are 0.5 / 1.5
+# / 2.0 mL — these are unambiguously microcentrifuge regardless of whether
+# the description says "micro" or "conical screw cap".  Placed BEFORE the
+# `centrifuge conical tubes` rule so 1.5 mL / 2.0 mL "conical screw cap"
+# microtubes (Sigma/Fisher style) reach this rule first.  0.2 mL is omitted
+# — those are PCR tubes.  Uses literal '*tube*' (not the $TUBE alias) since
+# $TUBE expands to '*tb*'/'*tbe*'/'*tub*' which collide with TBE buffer and
+# "tubing" descriptions.
+- name: microcentrifuge tubes
+  all_of:
+  - '*tube*'
+  any_of:
+  - '*1.5 ml*'
+  - '*1.5ml*'
+  - '*2.0 ml*'
+  - '*2.0ml*'
+  - '*0.5 ml*'
+  - '*0.5ml*'
+  none_of:
+  - '*rack*'
+  - '*pcr*'
+  - '*configurationid*'
+  - '*oligo*'
+  - '*sequence*'
+  - '*block*'
+  - '*holder*'
+  - '*box*'
+  - '*adapter*'
+  - '*adaptor*'
+  - '*cryo*'
+  - '*spin*'
+  - '*basket*'
+  - '*paddle*'
+  - '*pestle*'
+  - '*foam*'
+  - '*geneamp*'
+  - '*reaction tube*'
+  - '*cap lock*'
+  - '*cap-lock*'
+  - '*caps for*'
+  - '*lid*'
+  - '*tag*'
+  - '*label*'
+  - '*15 ml*'
+  - '*15ml*'
+  - '*50 ml*'
+  - '*50ml*'
 - name: pcr tube strips
   all_of:
   - '*pcr*'
@@ -4911,6 +5265,87 @@ market_rules:
   any_of:
   - '*50mltbe*'
   - '*15mltbe*'
+# Size-based conical rule.  15 / 50 mL tubes are unambiguously conical
+# centrifuge tubes — catches "VWR TUBE PP ST GRD 50ML" style descriptions
+# that don't contain the literal word "conical" and would otherwise fall
+# through to Non-Lab.  Placed AFTER the size-based microcentrifuge rule so
+# combined sizes ("rack for 1.5 / 15 / 50 mL tubes") are blocked by *rack*
+# first.  Uses literal '*tube*' (see microcentrifuge note above).
+- name: centrifuge conical tubes
+  all_of:
+  - '*tube*'
+  any_of:
+  - '*15 ml*'
+  - '*15ml*'
+  - '*50 ml*'
+  - '*50ml*'
+  - '*30 ml*'
+  - '*30ml*'
+  none_of:
+  - '*rack*'
+  - '*microcent*'
+  - '*microfuge*'
+  - '*configurationid*'
+  - '*oligo*'
+  - '*sequence*'
+  - '*pcr*'
+  - '*block*'
+  - '*holder*'
+  - '*rotor*'
+  - '*rtr*'
+  - '*adapter*'
+  - '*adaptor*'
+  - '*box*'
+  - '*stand*'
+  - '*filter*'
+  - '*fltr*'
+  - '*buffer*'
+  - '*cassette*'
+  - '*funnel*'
+  - '*loop*'
+  - '*shaker*'
+  - '*perfusion*'
+  - '*frzer*'
+  - '*freezer*'
+  - '*flask*'
+  - '*foam*'
+  - '*pestle*'
+  - '*paddle*'
+  - '*shaft*'
+  - '*sleeve*'
+  - '*round bottom*'
+  - '*round-bottom*'
+  - '*roundbottom*'
+  - '*rotisserie*'
+  - '*brush*'
+  - '*general purpose*'
+  - '*oakr*'
+  - '*oak r*'
+  - '*oak-r*'
+  - '*oakridge*'
+  - '*oak ridge*'
+  - '*cult tb*'
+  - '*1.5 ml*'
+  - '*1.5ml*'
+  - '*2.0 ml*'
+  - '*2.0ml*'
+  - '*0.5 ml*'
+  - '*0.5ml*'
+  # Exclude larger volumes that contain "15ml"/"50ml" as a substring (250mL,
+  # 150mL, 500mL etc. are media bottles, not conical centrifuge tubes).
+  - '*100 ml*'
+  - '*100ml*'
+  - '*150 ml*'
+  - '*150ml*'
+  - '*250 ml*'
+  - '*250ml*'
+  - '*500 ml*'
+  - '*500ml*'
+  - '*1000 ml*'
+  - '*1000ml*'
+  - '*test tube*'
+  - '*culture tube*'
+  - '*cryo*'
 - name: syringes
   all_of:
   - '*syr*'
@@ -4977,38 +5412,89 @@ market_rules:
   - '*ppr*'
   - '*paper*'
   - "*papr*"
+  # === Chambered coverslips (chamber slides) — list BEFORE plain coverslips ===
+- name: chambered coverslip
+  any_of:
+  - '*chamber*slide*'
+  - '*chambered*cover*'
+  - '*chamber*cover*'
+  - '*chamber*slip*'
+  - '*lab-tek*'
+  - '*lab tek*'
+  - '*labtek*'
+  - '*nunc*lab*tek*'
+  - '*ibidi*'
+  - '*µ-slide*'
+  - '*u-slide*'
+  - '*mu-slide*'
+- name: chambered coverslip
+  all_of:
+  - '*chamber*'
+  any_of:
+  - '*well*'
+  - '*cover*'
+  - '*glas*'
+  - '*gls*'
+  - '*slide*'
+# === Plain coverslips — exclude chambered patterns ===
 - name: coverslips
   all_of:
   - '*cover*'
   - '*glas*'
+  none_of:
+  - '*chamber*'
+  - '*lab-tek*'
+  - '*lab tek*'
+  - '*labtek*'
+  - '*ibidi*'
+  - '*µ-slide*'
+  - '*u-slide*'
 - name: coverslips
   all_of:
   - '*cover*'
   - '*gls*'
+  none_of:
+  - '*chamber*'
+  - '*lab-tek*'
+  - '*lab tek*'
+  - '*labtek*'
+  - '*ibidi*'
 - name: coverslips
   all_of:
   - '*cv*'
   - '*glas*'
+  none_of:
+  - '*chamber*'
 - name: coverslips
   all_of:
   - '*cv*'
   - '*gls*'
+  none_of:
+  - '*chamber*'
 - name: coverslips
   all_of:
   - '*cvr*'
   - '*glas*'
+  none_of:
+  - '*chamber*'
 - name: coverslips
   all_of:
   - '*cvr*'
   - '*gls*'
+  none_of:
+  - '*chamber*'
 - name: coverslips
   all_of:
   - '*cvr*'
   - '*slip*'
+  none_of:
+  - '*chamber*'
 - name: coverslips
   all_of:
   - '*cover*'
   - '*slip*'
+  none_of:
+  - '*chamber*'
 - name: cryogenic and freezer boxes
   all_of:
   - container
@@ -7458,10 +7944,17 @@ market_rules:
 # Restriction enzymes — bare enzyme names written with a space between the
 # prefix and the "I" ("Mse I", "Sfi I") that the word-bounded existing rule
 # misses.  Regex allows "Xxx I", "Xxx II", "Xxx III" optionally followed by
-# a digit (unit size) or end-of-token.
+# a digit (unit size) or end-of-token.  Prefix list extended with
+# `bgl|fspe|sap|ahd|sfo|bpi|bsu|psp|bsmb|eco53|cfr|aor|mph|lgu|pme`
+# for enzymes seen in UMich GT but absent from the original alternation.
+# Suffix kept at `i+` (NOT `[iIlL1]+`) — the lowercase-l-for-I typo path is
+# handled by adding typo variants to the RESTRICTION_ENZYME keyword group
+# instead.  `[iIlL1]+` was tested and immediately matched "smaLL", "taiL",
+# "smaLLEST" via the `sma`/`tai` prefixes, sweeping ~1100 unrelated rows
+# (lab coats, cell scrapers, rat tail products) into restriction enzymes.
 - name: restriction enzymes
   regex_any_of:
-  - '(?i)\b(?:mse|dde|sfi|ssp|bspe|bsph|srf|mfe|mme|blp|aar|bamh|bbs|bcu|bsa|bsb|bsm|bst|cla|dpn|eag|eco[rt]?|hae|hind|kpn|nco|nde|nhe|not|pac|pci|pst|pvu|rsr|sal|sbf|sma|sph|stu|swa|xba|xho|xma|sau3a|alu|sac|nar|spe|scai?|sge|agei?|hinf|msc|mly|mnl|mva|nae|nru|pfoi?|plei?|psi|pshai?|ssti?|taqi?|tli?|tsp|ava|banii?|bmgbi|btgi|dra|drdi|fsei?|hgai?|mboii?|mfei?|mjai?|mlui?|mslii?|pci|pvu|sal|spli?|taii?)\s*i+\s*(?:\d|$|\b|u\b|units)'
+  - '(?i)\b(?:mse|dde|sfi|ssp|bspe|bsph|srf|mfe|mme|blp|aar|bamh|bbs|bcu|bsa|bsb|bsm|bsmb|bst|bsu|cla|dpn|eag|eco[rt]?|eco53|hae|hind|kpn|nco|nde|nhe|not|pac|pci|pst|pvu|rsr|sal|sbf|sma|sph|stu|swa|xba|xho|xma|sau3a|alu|sac|nar|spe|scai?|sge|agei?|hinf|msc|mly|mnl|mva|nae|nru|pfoi?|plei?|psi|pshai?|ssti?|taqi?|tli?|tsp|ava|banii?|bmgbi|btgi|dra|drdi|fsei?|fspe|hgai?|mboii?|mfei?|mjai?|mlui?|mslii?|pci|pvu|sal|spli?|taii?|bgl|sap|ahd|sfo|bpi|psp|cfr|aor|mph|lgu|pme)\s*i+\s*(?:\d|$|\b|u\b|units)'
 
 # Purified proteins — native proteins sourced from specific organisms / tissues
 # (collagen from calf skin, myosin from rabbit muscle, keyhole limpet

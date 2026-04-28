@@ -1,104 +1,185 @@
 # initial_seed.yml
-# This file contains a comprehensive and organized list of seed keywords
-# for identifying lab consumables, including common variations and abbreviations.
+# Comprehensive list of seed keywords for identifying lab consumables,
+# including common variations, brand names, and abbreviations.
+#
+# Reorganized by topic. Audit notes from prior FN/FP rounds are preserved
+# inline — they record *why* a term was added or rejected, which matters
+# when retuning precision/recall.
+#
+# MATCHING SEMANTICS (see classifier.load_keywords_and_build_automaton):
+#   * Word-bounded matching with optional `(?:e?s)?` plural suffix.
+#   * Internal hyphens and whitespace are equivalent — a single entry
+#     `pipet-aid` also matches `pipet aid` (and vice versa). Closed-spelling
+#     variants like `coverslip` (no separator) still need their own entry.
+#   * Optional `all_of_groups:` section at the bottom of this file lets you
+#     fire on token co-occurrence: each group is a list of word-bounded
+#     tokens that must ALL appear (any order, anywhere in the description).
+#     Use it when no single token is precise enough but the combination is.
 
 keywords:
   # ====================================================================
-  # Liquid Handling & Pipetting
+  # LIQUID HANDLING & PIPETTING
   # ====================================================================
-  - aspirator pes
-  - barrier tip
-  - beveled-tip
-  - beveled tip
-  - bevldtip
-  
+  # Pipettes & pipettors
   - channel-pipette
-  - cliptip
-  - combitip
-  - eptips
-  - filter tip
-  - finntip
-  - graduated tip
-  - latex bulb
-  - low retention
-  - lts tip
-  - pipet-aid
-  - pipet controller
-  - powerpette
-  - macro tip
-  - maxi tips
-  - microtip
   - pipet
-  - pipet tip
   - pipetman
   - pipette
-  - pipette tip
   - pipettor
+  - pipetter
+  - powerpette
+  - alphapette
+  - multichannel pipette
+  - rainin classic
+  - research plus
+  - xplorer pipette
+
+  # Pipette aids / controllers / bulbs / reservoirs
+  - aspirator pes
+  - latex bulb
+  - pipet-aid
+  - pipet controller
   - reagent reservoir
-  - refill tip
-  - repeater tip
   - reservoir rgnt
   - rubber bulb
   - serological
-  - softfitl
   - stripette
+
+  # Pipette tips (general)
+  - barrier tip
+  - beveled tip
+  - bevldtip
+  - filter tip
+  - filtered tip
+  - graduated tip
+  - low retention
+  - lts tip
+  - macro tip
+  - maxi tips
+  - microtip
+  - pipet tip
+  - pipette tip
+  - refill tip
+  - repeater tip
+  - softfitl
   - tip bulk
   - xl tip
-  # Pipette-tip brands
+  - aerosol tip
+  - racked tips
+
+  # Pipette-tip brands & feature phrases
   - aerofilter
   - aerosol barr
   - bestips
+  - biopur               # Eppendorf combitip Biopur sterile tips
+  - cliptip
+  - combitip
+  - dart tip
+  - darts tip
+  - dualfilter
+  - eptips
+  - finntip
+  - gps-l
+  - gps-l10
+  - gps-l250
+  - gps-l1000
+  - gps-lts
   - griptip
   - griptips
+  - pl-lts
   - spacesaver tip
-  - gps-lts
-  - gps-l10
-  - darts tip
-  - dart tip
+  - talltip
+  - ultraflux
+  - zapslik             # VWR ZAPSLIK pipette tips
 
   # ====================================================================
-  # Tubes, Vials, & Plates
+  # TUBES, VIALS & PLATES
   # ====================================================================
-  # Tubes & Vials
+  # Tubes & vials (general)
   - capillary tube
   - centrifuge tube
+  - conical
+  - conicals
   - conical tube
-  - cryotube
-  - cryovial
   - culture tube
   - eppendorf
   - lobnd
+  - microcen
   - microcentrifuge
   - microfuge
   - microtube
   - nmr tube
   - pcr tube
+  - polycarbonate tube
+  - polypro cylinder
+  - polypropylene tube
   - safe-lock
   - sample vial
   - scintillation vial
+  - screw cap tube
   - test tube
+  - thickwall
+  - thinwall
   - tube strip
   - vial
   - quick seal ultra clear
+  # Microtube brands
+  - posi-click
+  - posiclick
 
-  # Plates
+  # Cryogenic tubes & vials
+  - cryotube
+  - cryovial
+  - cryule
+  - cryo vial
+  - cryo-color
+  - coolcell
+  - cryostor
+
+  # Microplates & well plates
   - 96wl
   - assay plate
   - culture plate
   - culture well
-  - multidish
   - microplate
   - microseal
+  - multidish
   - nupage
   - pcr plate
   - pcr well
   - plate 96
   - well plate
 
+  # Racks
+  - 96 rack
+  - tube rack
+
   # ====================================================================
-  # Cell & Tissue Culture
+  # MICROPLATE SEALING, FILMS & TAPES
   # ====================================================================
-  # Vessels & Dishes
+  - adhesive plate
+  - aluminum seal
+  - aluminum tape
+  - alum tape
+  - breathe easy
+  - cap strip
+  - clearseal
+  - microporous film
+  - microseal
+  - optical adhesive
+  - optical seal
+  - plate seal
+  - plate sealer
+  - sealing film
+  - sealing tape
+  - strip cap
+  - thermal seal
+  - top seal
+
+  # ====================================================================
+  # CELL & TISSUE CULTURE
+  # ====================================================================
+  # Vessels & dishes
   - cell culture
   - cell dish
   - cellstar
@@ -111,8 +192,8 @@ keywords:
   - spinner flask
   - tc-flsk
   - tissue culture
-  
-  # Slides & Inserts
+
+  # Slides, coverslips, inserts
   - chamber slide
   - cover glass
   - coverslip
@@ -124,7 +205,16 @@ keywords:
   - mounting medium
   - slide chamber
 
-  # Tools & Reagents
+  # Slide mounting media (UMich FN audit additions)
+  - eukitt
+  - gel mount
+  - histomount
+  - mounting media
+  - mowiol
+  - vector shield
+  - vectashield
+
+  # Dissociation & cell-handling reagents/tools
   - accutase
   - cell scraper
   - cell strainer
@@ -135,52 +225,75 @@ keywords:
   - trypan blue
 
   # ====================================================================
-  # Filtration, Separation & Chromatography
+  # FILTRATION & MEMBRANES
   # ====================================================================
-  # Filters & Membranes
+  # Filters & membranes (general)
   - amicon
+  - amicn
   - bottle top filter
-  - centrifugal filter
   - filter column
   - filter paper
   - immobilon
+  - membrane filter
   - millipak
+  - milx                  # Millex / Millipore syringe filter abbreviation
   - nitrocellulose
   - pvdf membrane
   - stericup
   - syringe filter
   - whatman
-  - cntrfugl 
-  - amicn
-  - vivaspin
+
+  # Specialty membrane filters
+  - biodyne
+  - ezflow
+  - nuclepore
+  - ultracel
+  - ultrafiltration
+
+  # Centrifugal filtration / ultrafiltration
+  - centrifugal concentrator
+  - centrifugal filter
+  - centriprep
+  - cntrfugl
+  - nanosep
   - percoll
-  
-  # Chromatography & Purification
+  - ultrafree-mc
+  - ultra free-mc
+  - vivaspin
+
+  # ====================================================================
+  # CHROMATOGRAPHY & PURIFICATION
+  # ====================================================================
+  - amberlite
   - bio-gel
   - chromatography column
+  - dowex
   - float-a-lyzer
   - guard column
-  - hiload
   - gstrap
-  - streptrap
+  - hiload
   - histrap
   - hitrap
   - hplc column
+  - mobispin
   - nativemark
   - puradisc
   - redisep
+  - sephacel
   - sephadex
   - sepharose
   - slide-a-lyzer
   - spin column
+  - streptrap
   - superdex
+  - superose
   - uplc column
   - zorbax
 
   # ====================================================================
-  # General Labware & Storage
+  # GENERAL GLASSWARE & LABWARE
   # ====================================================================
-  # Labware
+  # Glassware
   - beaker
   - carboy
   - cork-ring
@@ -189,91 +302,122 @@ keywords:
   - crystallising dish
   - cuvette
   - cylinder ml
-  - graduated cylinder
   - funnel
-  - inoculating loop
-  - lab scoop
-  - micro spatula
-  - needle
-  - scoopula
-  - spin-bar
-  - spinbar
-  - spin bar
-  - stir bar
-  - spoonula
-  - stir-bar
-  - stirbar
-  - stirring bar
-  - stop-cock
-  - syringe
+  - graduated cylinder
   - thimble
   - thimble sgl
   - extract thimble
   - extraction thimble
+
+  # Stir bars, spatulas, loops, scoops
+  - inoculating loop
+  - lab scoop
+  - micro spatula
+  - scoopula
+  - spinbar
+  - spin bar
+  - spoonula
+  - stir bar
+  - stirbar
+  - stirring bar
+  # Stopcock: 70% lab in training, most non-lab hits are "instrument part -
+  # glass stopcock" classifications of what are really lab consumables.
+  - stopcock
+  - stop cock
+
+  # Syringes & needles
+  - needle
+  - syringe
+
+  # Weighing supplies
   - weigh boat
   - weighing paper
-  
-  # Storage & Bottles
+
+  # ====================================================================
+  # STORAGE: BOTTLES, BOXES & RACKS
+  # ====================================================================
+  # Bottles
   - bottle
   - btl
   - btle
-  - cardboard freezer box
-  - cryobox
-  - cryo fiberbox
-  - freezer box
+  - fltrbtpa
   - media bottle
   - storage bottle
-  - fltrbtpa
+
   # Freezer / cryogenic storage boxes
-  - 81-place
-  - 81 place
+  # (Numeric "81-place / 81-cell" describe vial-array boxes)
   - 81-cell
+  - 81 place
+  - cardboard freezer box
+  - cryobox
+  - cryo box
+  - cryo fiberbox
+  - cryo freezer
   - cryogenic box
+  - cryogenic storage
   - cryostore
-  - hinged freezer
-  - freezer storage
+  - freezer box
   - freezer hinged
-  
-  # Sealing & Labeling
-  - aluminum foil
-  - cap strip
-  - strip cap
-  - clearseal
-  - cryodot
-  - cryolabel
-  - kimwipe
-  - kimwipes
-  - kim wipe
-  - kimtech
-  - kaydry
-  - wypall
-  - task wiper
-  - delicate task
-  - parafilm
-  - pap pen
-  - sealing film
-  - top seal
-  - wrapping film
-  # Microplate sealing films / tapes
-  - sealing tape
-  - plate sealer
-  - plate seal
-  - breathe-easy
-  - breathe easy
-  - microseal
-  - thermal seal
-  - adhesive plate
-  - aluminum seal
-  
-  # Racks
-  - 96 rack
-  - tube rack
+  - freezer storage
+  - hinged freezer
+
+  # Cryogenic / freezer racks & dividers
+  - cryogenic rack
+  - freezer divider
+  - freezer rack
 
   # ====================================================================
-  # Reagents, Chemicals & Kits
+  # SEALING, WRAPPING, WIPES & LABELS
   # ====================================================================
-  # Buffers, Dyes & Solutions
+  # Wraps & films
+  - aluminum foil
+  - parafilm
+  - wrapping film
+
+  # Wipes
+  - delicate task
+  - kaydry
+  - kim wipe
+  - kimtech
+  - kimwipe
+  - kimwipes
+  - task wiper
+  - wypall
+
+  # Labels & pens
+  - cryodot
+  - cryolabel
+  - pap pen
+
+  # ====================================================================
+  # SAFETY & PPE (DISPOSABLE)
+  # ====================================================================
+  # Audit note: "lab coat", "safety glasses", "respirator", "hand sanitizer",
+  # "pelco", "contrad" were REJECTED from earlier seed rounds because the
+  # training set already labels 45-93% of matching items as non-lab.
+  # Some were re-added later (safety glasses) per user direction; keep
+  # both groups visible so future audits can revisit.
+  - face mask
+  - glove
+  - glv
+  - labcoat                 # closed-spelling variant
+  - lab coat
+  - latex glove
+  - mask
+  - n95
+  - nitrile glove
+  - vinyl glove
+  # User-directed adds
+  - antifog
+  - laser safety
+  - safety glasses
+  - uvex
+
+  # ====================================================================
+  # BUFFERS & SOLUTIONS
+  # ====================================================================
   - buffer
+  - bufr
   - dpbs
   - eagle s
   - eliza buffer
@@ -292,373 +436,512 @@ keywords:
   - tcep
   - temed
   - tris
+  - tris base
   - tween
   - live dead
   - live/dead
 
-  # Solvents & Bulk Chemicals
-  - acrylamide/bisacrylamide
-  - acrylamide
-  - acryl/bis
-  - methylenebisacrylamide
-  - bleach
-  - clorox
+  # ====================================================================
+  # SOLVENTS & BULK CHEMICALS
+  # ====================================================================
+  # Alcohols
   - 2-propanol
-  - acetic ac
-  - acet acid
-  - acrylic acid
-  - alanine
-  - ammonium chloride
-  - aluminum chloride
+  - alcohol
+  - eth alc
+  - ethano
+  - ethanol
+  - ethyl alcohol
+  - isopropanol
+  - isopropyl alcohol
+  - isprpyl alch
+  - methanol
+
+  # Other solvents
   - acetone
   - acetonitrile
-  - alcohol
-  - ammonium persulfate
-  - boric acid
-  - calcium chloride
   - chloroform
-  - citric acid
-  - carbon dioxide
-  - sodium nitrite
-  - griess reagent
-  - isprpyl alch
-  - isopropyl alcohol
-  - hydrogen peroxide
   - deionized water
   - deuterium oxide
   - dimetformamide
   - dimethyl-sulfoxide
   - dmf
   - dmso
+  - ethyl acetate
+  - hexanes
+  - methylene chlor
+  - methylene chloride
+  - phenol
+  - tetrahydrofuran
+  - water molecular bio
+  - heavy water
+  - chromatography-grade water
+  - xylene
+  - xylenes
+
+  # Bulk reagents / misc chemicals
+  - acrylamide
+  - acrylamide/bisacrylamide
+  - acryl/bis
+  - acrylic acid
+  - alanine
+  - ammonium persulfate
+  - bicinchoninic
+  - boric acid
+  - carbon dioxide
   - drierite
   - edta
-  - ethano
-  - ethanol
-  - ethyl acetate
+  - ethylene glycol
   - formaldehyde
-  - formic acid
   - glycerol
   - glycine
-  - hexanes
+  - imidazole
+  - iptg
+  - methylenebisacrylamide
+  - molecular sieve
+  - paraformaldehyde
+  - peg
+  - poly ethylene glycol
+  - polyethylene glycol
+  - reducing agents
+  - sds
+  - silica gel
+  - sodium dodecyl sulfate
+  - sodium azide
+  - sucrose
+  - transit lt
+  - triton
+  - urea
+  - x-gal
+
+  # ====================================================================
+  # ACIDS, BASES & INORGANIC SALTS
+  # ====================================================================
+  # Acids
+  - acet acid
+  - acetic ac
+  - acetic acid
+  - citric acid
+  - formic acid
   - hydrochloric acid
   - hydrogen perox
-  - isopropanol
-  - lithium chloride
-  - magnesium chloride
-  - methanol
-  - methylene chlor
-  - molecular sieve
-  - phenol
+  - hydrogen peroxide
+  - nitric acid
+  - ortho-phosphoric
   - phosphoric acid
   - phosporic ac
-  - ortho-phosphoric
-  - bicinchoninic
-  - transit lt
-  - poly ethylene glycol
+  - sulfuric ac
+  - sulfuric acid
+  - trifluoroacetic acid
+
+  # Bases
+  - potassium hydroxide
+  - sodium hydride
+  - sodium hydroxide
+
+  # Salts
+  - aluminum chloride
+  - ammonium chloride
+  - calcium chloride
+  - lithium chloride
+  - magnesium chloride
+  - magnesium sulfate
   - potassium carbonate
   - potassium chloride
   - potassium phosphate
-  - sds
-  - silica gel
   - sodium acetate
-  - sodium azide
   - sodium bicarbonate
   - sodium carbonate
   - sodium chloride
-  - sodium dodecyl sulfate
-  - sodium hydride
-  - sodium hydroxide
-  - sodium phosphate
-  - sucrose
-  - sulfuric ac
-  - tetrahydrofuran
-  - triton
-  - urea
-  - water molecular bio
-  - xylene
-  - xylenes
-  - zinc chloride
-  - x-gal
-  # Named-chemical lab categories added from category audit:
-  - methylene chloride
-  - ethylene glycol
-  - polyethylene glycol
-  - nitric acid
-  - sulfuric acid
-  - acetic acid
-  - trifluoroacetic acid
-  - formaldehyde
-  - paraformaldehyde
-  - potassium hydroxide
-  - sodium sulfate
   - sodium citrate
-  - magnesium sulfate
-  - imidazole
-  - iptg
-  - tris base
-  - hydrogen peroxide
-  - heavy water
-  - chromatography-grade water
-  - agarose
-  - dntps
-  - glucose test strip
-  - reducing agents
+  - sodium nitrite
+  - sodium phosphate
+  - sodium sulfate
+  - zinc chloride
 
-  # Molecular Biology (Enzymes, Kits, Reagents)
-  - cdna
-  - cloning
-  - competent cell
-  - deoxynucleotide
-  - dna
-  - dnase
-  - dntp
-  - dtt
-  - dynabead
-  - enzyme
-  - ez-10 column
-  - eagles minimum
-  - electrocompetent cells
-  - competent cells
-  - genejet
-  - generuler
-  - gibco
-  - hot-start
-  - hotstart
-  - high-fidelity
-  - hi-fidelity
-  - hi-fid
-  - hi-fi
-  - hifi
-  - iscript
-  - itaq
-  - ligase
-  - ligation
-  - mastermix
-  - hotmastermix
-  - master-mix
-  - megascript
-  - minelute
-  - mini-prep
-  - midi-prep
-  - maxi-prep
-  - maxiprep
-  - miniprep
-  - midiprep
-  - trizol
-  - tri-reagent
-  - qiazol
-  - pmsf
-  - trypsin inhibitor
-  - dynabeads
-  - optical seal
-  - mutagenesis
-  - nucleofector
-  - nucleospin
-  - dna oligo
-  - oligo
-  - peg
-  - pgem
-  - plasmid
-  - polymerase
-  - powerupsybrgreen
-  - primer
-  - protease
-  - proteinase
-  - qpcr
-  - pcr
-  - rt pcr
-  - rt-pcr
-  - rev transcription
-  - reverse transcriptase
-  - ribolock
-  - ribominus
-  - rna
-  - rnaclean
-  - rnai
-  - rnase
-  - rneasy
-  - smartflare
-  - supersignal
-  - superscript
-  - sybr-green
-  - synthesis
-  - t4 dna
-  - t7
-  - taq
-  - Tth111I
-  - turbofect
-  - zymoprepa
-  - zymolyase
-  - taqmangeneexpresasy
-  - taqman
+  # Niche / oxidants
+  - griess reagent
 
-  # Proteins, Purification & Western Blot
-  - albumin
-  - antibody
-  - anti-mouse
-  - anti-rabbit
-  - anti-rat
-  - anti-human
-  - anti-goat
-  - anti-histone
-  - anti-phospho
-  - monoclonal
-  - polyclonal
-  - bca
-  - biotin
-  - bradford
-  - bsa
-  - casein
-  - coomassie
-  - donkey serum
-  - elisa
-  - goat serum
-  - horse serum
-  - hrp
-  - igg
-  - lectin
-  - ni-nta
-  - nativepage
-  - pageruler
-  - pierce protein
-  - ponceau
-  - precision plus
-  - protease inhib
-  - protein
-  - protogel
-  - streptavidin
-  - trans-blot
-  - western blot
-  
-  # Stains, Imaging & Cell Viability
-  - acridine orange
-  - actinomycin
-  - alcian blue
-  - alexa fluor
-  - aniline blue
-  - antifade
-  - brilliant violet
-  - celltiter
-  - crystal violet
-  - dapi
-  - deadend system
-  - digitonin
-  - em stain
-  - eosin y
-  - ethidium bromide
-  - fast green
-  - fitc
-  - fluoro gel
-  - fluoromount
-  - gel stain
-  - hematoxylin
-  - hoechst
-  - live/dead
-  - luciferase
-  - luciferin
-  - lysotracker
-  - mitosox
-  - mtt
-  - nile red
-  - neurotrace
-  - rhodamine
-  - rose bengal
-  - sypro
-  - texas red
-  - toluidine blue
-  - western blotting
-  
-  # Cell Culture Media & Supplements
+  # ====================================================================
+  # LAB DETERGENTS, DISINFECTANTS & CLEANERS
+  # ====================================================================
+  # Bleach products
+  - bleach
+  - clorox
+
+  # Lab detergents (validated >=91% lab in Dallas + UMich training)
+  - 7x detergent
+  - 7x cleaning           # ES 7X cleaning solution
+  - alconox
+  - bioclenz
+  - citranox
+  - contrad
+  - decon 90
+  - liqui-nox
+  - liquinox
+  - micro-90
+  - rbs-35
+  - softcide
+  - solujet               # Alconox Solujet phosphate-free detergent
+  - sparkleen             # Fisher Sparkleen lab glassware detergent
+  - sporgon
+  - tergazyme
+  - versa-clean
+
+  # Household-brand soaps used as labware detergents
+  # (per user guidance, household soaps belong to "labware detergents and
+  # cleaners", NOT anti-seed)
+  - dawn dish
+  - dish detergent
+  - dish soap
+  - dishwashing liquid
+  - foaming wash
+  - gojo
+  - hand soap
+  - hand wash
+  - liquid soap
+  - palmolive
+  - softsoap
+
+  # Disinfectants & germicidals
+  - antimicrobial
+  - bacdown
+  - cavicide              # CaviCide surface disinfectant
+  - chlorhexidine
+  - cidex
+  - contrex
+  - disinfectant
+  - envrocide
+  - germicidal
+  - mikro quat
+  - nolvasan              # chlorhexidine-based vet/lab disinfectant
+  - opti-cide
+  - opticide
+  - sanosil
+  - vionex
+  - virkon
+
+  # General cleaners (lab & non-lab labeled to "labware detergents")
+  - floor cleaner
+  - glass cleaner
+
+  # Specialty / decontamination
+  - etbr destroyer
+  - spill kit
+
+  # ====================================================================
+  # pH PAPER & INDICATORS
+  # ====================================================================
+  - indicator paper
+  - ph indicator
+  - ph paper
+
+  # ====================================================================
+  # CELL CULTURE MEDIA & SUPPLEMENTS
+  # ====================================================================
+  # Base media
   - b-27
   - broth
   - dmem
+  - eagles minimum
   - f-12 nutrient
-  - fbs
-  - fetal bovine serum
-  - geneticin
-  - glutamax
-  - l-glutamine
   - ham s
   - hyclone
   - keratinocyte sfm
   - lb broth
   - lb media
+  - mem earle
+  - earle's
   - mem non-essential
   - minimum essential medium
   - neurobasal
   - opti-mem
+
+  # Sera & supplements
+  - fbs
+  - fetal bovine serum
+  - geneticin
+  - glutamax
+  - glutamn
+  - glutmn
+  - l-glutamine
+  - lysozyme
   - pen-strep
+  - pen strp
   - penicillin-streptomycin
   - peptone
   - serum-free
+  - sodium deoxycholate
+  - sodium pyruvt
   - stempro
   - tryptone
-  - glutamn
-  - glutmn
-  - sodium pyruvt
-  - sodium deoxycholate
-  - lysozyme
-  # Antibiotics & Small Molecules
+
+  # Specialty cell culture media
+  - begm                  # bronchial epithelial growth medium
+  - co2 independent
+  - epilife
+  - fibrolife
+  - hibernate a           # BrainBits/Gibco neuronal medium (Hibernate-A)
+  - hibernate medium
+  - iscove
+  - ksom                  # mouse embryo culture medium
+  - mcdb
+  - mesenpro
+  - methocult
+  - mtesr
+  - mtesr1
+  - mvgs                  # microvascular growth supplement medium
+  - nbactiv4
+  - rseT feeder-free
+  - schneider drosophila
+  - smem
+  - stemspan
+  - williams medium
+
+  # Sugars / carbohydrates (cell culture nutritionals)
+  - fructose
+  - lactose
+  - mannitol
+  - mannose
+  - raffinose
+  - trehalose
+  - xylose
+
+  # Vitamins (research reagents; word-boundary regex keeps "vitamin" from
+  # colliding with "multivitamin" or other word-internal substrings)
+  - vitamin
+
+  # ====================================================================
+  # ANTIBIOTICS & ANTIMYCOTICS
+  # ====================================================================
+  - amoxicillin
   - ampicillin
   - antimycin
   - antimycotic
+  - apramycin
+  - aureobasidin
+  - aztreonam
+  - bacitracin
   - blasticidin
+  - ceftriaxone
   - chloramphenicol
+  - ciprofloxacin
+  - enrofloxacin
+  - erythromycin
+  - filipin
   - g418
+  - genistein
   - gentamicin
   - hygromycin
   - kanamycin
-  - neomycin
-  - nystatin
-  - puromycin
-  - spectinomycin
-  - streptomycin
-  - tetracycline
-  - zeocin
-  - genistein
   - lactimidomycin
+  - levofloxacin
+  - linezolid
   - manumycin
   - mitomycin
-  - rapamycin
+  - neomycin
+  - nisin
   - norfloxacin
+  - novobiocin
+  - nouseothricin
+  - nystatin
   - oligomycin
-  - pen strp
+  - phosphomycin
+  - plasmocin
+  - polymyxin
+  - primocin
+  - puromycin
+  - rapamycin
   - ribostamycin
   - rifampin
+  - sparfloxacin
+  - spectinomycin
+  - streptomycin
   - streptoxotocin
-
-  # Ladders & Standards
-  - bp ladder
-  - dna ladder
-  - ladder dna
-  - protein laddera
-  - protladder
-  - protein standard
-  - rna ladder
-  - molecular weight marker
-  - molecular weight standard
-  - kb ladder
-
+  - tetracycline
+  - thiamphenicol
+  - ticarcillin
+  - timentin
+  - zeocin
 
   # ====================================================================
-  # Safety & Apparel (Disposable)
+  # MEMBRANE PROTEIN DETERGENTS
   # ====================================================================
-  - face-mask
-  - glove
-  - glv
-  - lab-coat
-  - mask
-  - nitrile glove
-  - latex glove
-  - vinyl glove
-  - face mask
-  - n95
-  - lab coat
-
+  - anagrade
+  - anapoe
+  - anzergent
+  - dodecyl maltoside
+  - lysofos
+  - neopentyl glycol
+  - nonidet
+  - np-40
+  - np40
 
   # ====================================================================
-  # Restriction Enzymes (Common examples)
+  # MOLECULAR BIOLOGY: NUCLEIC ACIDS, ENZYMES, KITS
   # ====================================================================
+  # Generic terms
+  - agarose
+  - antisense
+  - cdna
+  - cloning
+  - competent cell
+  - competent cells
+  - deoxynucleotide
+  - dna
+  - dnase
+  - dntp
+  - dntps
+  - dtt
+  - duplex
+  - electrocompetent cells
+  - enzyme
+  - exon
+  - intron
+  - mutagenesis
+  - pmsf
+  - plasmid
+  - polymerase
+  - protease
+  - proteinase
+  - rna
+  - rnai
+  - rnase
+  - synthesis
+  - trypsin inhibitor
+
+  # Beads / cleanup / extraction
+  - ampure                  # SPRI magnetic-bead cleanup
+  - dynabead
+  - dynabeads
+  - ez-10 column
+  - genejet
+  - generuler
+  - gibco
+  - megascript
+  - midi-prep
+  - midiprep
+  - mini-prep
+  - miniprep
+  - minelute
+  - maxi-prep
+  - maxiprep
+  - nucleospin
+  - qiazol
+  - rnaclean
+  - rneasy
+  - tri-reagent
+  - trizol
+  - zymolyase
+  - zymoprepa
+
+  # CRISPR / gene markers / reporters
+  - cas9
+  - cd44
+  - crispr guide
+  - crispr template
+  - egfp
+  - gapdh
+  - igg1
+  - isotype
+  - lacz
+  - mcherry
+  - sox10
+  - sv40
+
+  # Polymerase / cloning brand lines
+  - hi-fi
+  - hi-fid
+  - hi-fidelity
+  - hifi
+  - high-fidelity
+  - hot-start
+  - hotstart
+  - iscript
+  - itaq
+  - hotmastermix
+  - master-mix
+  - mastermix
+  - nebuilder
+  - nucleofector
+  - on-targetplus
+  - pentr
+  - pgem
+  - powerupsybrgreen
+  - primetime
+  - ribolock
+  - ribominus
+  - sigenome
+  - smartflare
+  - smartpool
+  - supersignal
+  - superscripta
+  - sybr-green
+  - taq
+  - taqman
+  - taqmangeneexpresasy
+  - turbofect
+  - t4 dna
+  - t7
+  - alphascreen
+
+  # Ligation / in vitro chemistry
+  - ligase
+  - ligation
+
+  # Primers / oligos
+  - dna oligo
+  - oligo
+  - fwdprimer
+  - primer
+  - revprimer
+
+  # PCR / qPCR / RT-PCR
+  - pcr
+  - qpcr
+  - rt pcr
+  - rt-pcr
+  - rtpcr
+  - rev transcription
+  - reverse transcriptase
+
+  # Misc reagent / kit additions
+  - amplite
+  - bapta
+  - cal-520
+  - denhardt              # Denhardt's solution for hybridization
+  - dharmafect
+  - dnafectin
+  - fugene
+  - fugenehd
+  - hcr probe
+  - lipofectamine
+  - lumavidia
+  - perfect-focus
+  - stembeads
+  - stellaris fish
+  - surefish
+  - zymobiomics
+
+  # Restriction enzyme (not in main list — rare named enzyme)
+  - Tth111I
+
+  # ====================================================================
+  # NUCLEOTIDES, NUCLEOSIDES & FRAGMENTS
+  # ====================================================================
+  - amp-pnp
+  - deoxyadenosine
+  - deoxyguanosine
+  - deoxyuridine
+  - diphosphate
+  - monophosphate
+  - thymidine
+  - thiotriphosphate
+  - triphosphate
+
+  # ====================================================================
+  # RESTRICTION ENZYMES
+  # ====================================================================
+  # Common base set
   - AatII
   - Acc65I
   - AccI
@@ -702,7 +985,7 @@ keywords:
   - SwaI
   - XbaI
   - XhoI
-  # Additions from UMich FN audit (Promega/NEB catalogs, not in base list):
+  # UMich FN audit additions (Promega/NEB catalogs, not in base list)
   - AclI
   - AfeI
   - AflII
@@ -743,7 +1026,6 @@ keywords:
   - HpaII
   - KasI
   - MboI
-  - MfeI
   - MluCI
   - MseI
   - MspI
@@ -778,18 +1060,183 @@ keywords:
   - ZraI
 
   # ====================================================================
-  # Research Peptides (from UMich FN audit: Bachem / Phoenix / Sigma)
-  # Add as seed so keyword-match triggers lab classification even when
-  # the surrounding description is catalog-number-heavy.
+  # PROTEINS, ANTIBODIES & WESTERN BLOT
   # ====================================================================
-  - angiotensin
+  # Proteins / blocking / blotting reagents
+  - albumin
+  - bca
+  - biotin
+  - bradford
+  - bsa
+  - casein
+  - coomassie
+  - hrp
+  - lectin
+  - ni-nta
+  - nativepage
+  - pageruler
+  - pierce protein
+  - ponceau
+  - precision plus
+  - protease inhib
+  - protein
+  - protogel
+  - pyrophosphatase
+  - streptavidin
+  - trans-blot
+  - western blot
+  - western blotting
+  - westernsure
+  # Western blot blockers
+  - non-fat dry milk
+  - nonfat dry milk
+
+  # Antibodies & antibody context
+  - affinipure
+  - antibody
+  - anti-goat
+  - anti-histone
+  - anti-human
+  - anti-mouse
+  - anti-phospho
+  - anti-rabbit
+  - anti-rat
+  - donkey serum
+  - elisa
+  - goat serum
+  - horse serum
+  - igg
+  - monoclonal
+  - mouse monoclonal
+  - polyclonal
+  - rabbit polyclonal
+  - rabmab                # Abcam/Epitomics rabbit monoclonal abs
+
+  # Mini-Protean precast gels (only consumable-specific phrases — bare
+  # "mini-protean" hits 50% instrument parts: combs, spacers, tanks)
+  - mini-protean precast
+  - mini-protean tgx
+  - protean tgx
+
+  # Gel blotting papers (UMich FN audit additions)
+  - blot paper
+  - blotting pad
+  - blotting sheet
+
+  # ====================================================================
+  # STAINS, DYES & IMAGING REAGENTS
+  # ====================================================================
+  - acridine orange
+  - actinomycin
+  - alexa fluor
+  - antifade
+  - brilliant violet
+  - carboxyfluorescein
+  - celltiter
+  - citifluor
+  - cytoseal
+  - dapi
+  - deadend system
+  - digitonin
+  - em stain
+  - ethidium bromide
+  - fitc
+  - fluoro gel
+  - fluoromount
+  - gel stain
+  - gelmax
+  - gelred
+  - hoechst
+  - immersion oil
+  - live/dead
+  - luciferase
+  - luciferin
+  - lysotracker
+  - mitobrilliant
+  - mitosox
+  - mitoview
+  - mtt
+  - neurotrace
+  - nile red
+  - rhodamine
+  - sypro
+  - syto green
+  - syto red
+  - texas red
+
+  # ====================================================================
+  # HISTOLOGY STAINS
+  # ====================================================================
+  - alcian blue
+  - alcoholic saffron
+  - aniline blue
+  - biebrich scarlet
+  - bis-benzimide
+  - bisbenzimide
+  - bluing reagent
+  - crystal violet
+  - ehrlich solution
+  - eosin
+  - eosin y
+  - fast green
+  - fluoro-jade
+  - fluorojade
+  - hematox
+  - hematoxylin
+  - heamatoxylin           # common misspelling in vendor catalogs
+  - hemtoxlyn              # abbreviated catalog spelling
+  - nucspot
+  - oil red
+  - pararosaniline
+  - picrosirius
+  - picrosiruis            # vendor misspelling
+  - pyronine
+  - rose bengal
+  - safranin
+  - schiff reagent
+  - thioflavin
+  - toluidine blue
+
+  # ====================================================================
+  # ELECTRON MICROSCOPY / TEM CONSUMABLES
+  # (low non-lab overlap in training)
+  # ====================================================================
+  - carbon adhesive
+  - cryoloop
+  - em grid
+  - formvar
+  - laceycarbon
+  - lacey carbon
+  - quantum dot
+
+  # ====================================================================
+  # AUTORADIOGRAPHY
+  # ====================================================================
+  - autoradiograph
+  - autoradiography film
+  - biomax
+  - glogos
+  - hyperfilm
+  - x-omat
+
+  # ====================================================================
+  # RESEARCH PEPTIDES (UMich FN audit: Bachem / Phoenix / Sigma)
+  # Seed so keyword-match triggers lab classification even when the
+  # surrounding description is catalog-number-heavy.
+  # ====================================================================
+  - activin
+  - amyloid
   - amyloid beta
+  - angiotensin
+  - apamin
+  - bee venom
   - beta-amyloid
   - bombesin
   - bradykinin
   - calcitonin
   - dynorphin
   - endothelin
+  - enkephalin
   - galanin
   - ghrelin
   - gnrh
@@ -797,8 +1244,10 @@ keywords:
   - kisspeptin
   - lhrh
   - melanocortin
-  - neurotensin
+  - melanocyte stimulating
+  - muramyl dipeptide
   - neuropeptide
+  - neurotensin
   - orexin
   - oxytocin
   - secretin
@@ -806,344 +1255,116 @@ keywords:
   - synthetic peptide
   - vasopressin
 
+  # Recombinant growth factors / cytokines
+  - bdnf
+  - bfgf
+  - gdnf
+  - vegf
+
   # ====================================================================
-  # Cell Lines (common names, min 5 chars to avoid Aho-Corasick collateral)
+  # CELL LINES (min 5 chars to avoid Aho-Corasick collateral)
   # ====================================================================
   - hek-293
   - hl-60
   - jurkat
-  - thp-1
   - mcf-7
-  - sh-sy5y
+  - mdck
   - raw 264
+  - sh-sy5y
+  - thp-1
   - u-937
   - vero cell
-  - mdck
 
   # ====================================================================
-  # Chemicals & Reagents (missed by existing seeds -- from FN analysis)
+  # RESEARCH DRUGS / ANESTHETICS / VET-RESEARCH
   # ====================================================================
-  - histamine
-  - cesium chloride
-  - bacitracin
-  - diethyl pyrocarbonate
-  - depc
-  - immersion oil
-  - cytoseal
-  - westernsure
-  - spill kit
-  - corn oil
-  - sulfur
-  - pyrophosphatase
-  - n-ethylmaleimide
-
-  # ====================================================================
-  # PPE, EM supplies, and lab brand gaps (from FN analysis)
-  # ====================================================================
-  # Audit note: "lab coat", "safety glasses", "respirator", "hand sanitizer",
-  # "pelco", "contrad" were REJECTED here because the training set already
-  # labels 45-93% of matching items as non-lab.  Making them seeds would
-  # hurt non-lab recall more than it fixes lab recall.
-  - labcoat  # closed-spelling variant; space-form "lab coat" too ambiguous
-
-  # Electron microscopy / TEM consumables (low non-lab overlap in training)
-  - cryoloop
-  - formvar
-  - laceycarbon
-  - lacey carbon
-  - em grid
-  - quantum dot
-  - carbon adhesive
-
-  # Lab reagent / kit brand names (low non-lab overlap in training)
-  - nebuilder
-  - nonidet
-  - np-40
-  - np40
-  - bapta
-  - lipofectamine
-  - tergazyme
-  - softcide
-  - mitoview
-  - mitobrilliant
-  - zymobiomics
-  - superose
-  - gelred
-  - gelmax
-
-  # ====================================================================
-  # UMich FN additions (validated >=98% lab in both UMich and UT Dallas
-  # training data, or Dallas-absent; safe for baseline precision)
-  # ====================================================================
-  # Molecular biology / gene symbols / CRISPR
-  - cas9
-  - exon
-  - intron
-  - antisense
-  - duplex
-  - isotype
-  - igg1
-  - egfp
-  - mcherry
-  - lacz
-  - sv40
-  - gapdh
-  - cd44
-  - sox10
-
-  # Commercial reagent / product lines (siRNA, qPCR, cloning, antibody)
-  - smartpool
-  - on-targetplus
-  - sigenome
-  - primetime
-  - pentr
-  - rtpcr
-  - affinipure
-
-  # Hand-pulled from UMich FN review (validated)
-  - stembeads
-  - amplite
-  - cal-520
-  - perfect-focus
-  - hcr probe
-  - lumavidia
-
-  # FN-mining round 2 (validated: ≥91% lab rate on both Dallas + UMich)
-  # Lab detergents
-  - alconox
-  - liquinox
-  - citranox
-  - tergazyme
-  - contrad
-  - micro-90
-  - rbs-35
-  - dish soap
-  - dishwashing liquid
-  - dish detergent
-  - palmolive
-  - dawn dish
-  # Magnetic-bead / cleanup products
-  - ampure
-  # Autoradiography film + markers
-  - biomax
-  - hyperfilm
-  - glogos
-  - autoradiograph
-  - x-omat
-  - autoradiography film
-  # Pipette-tip brands
-  - dualfilter
-  - talltip
-  # Microtube brands
-  - posi-click
-  - posiclick
-  # Millex / Millipore syringe filters (abbreviation)
-  - milx
-  # Western blot blockers
-  - nonfat dry milk
-  - non-fat dry milk
-
-  # User-directed adds.
-  # Targeted "mini-protean" variants — bare "mini-protean" hits 50% instrument
-  # parts (combs, spacers, tanks) so only consumable-specific phrases are safe.
-  - mini-protean precast
-  - mini-protean tgx
-  - protean tgx
-  # Stopcock: 70% lab in training, most non-lab hits are "instrument part -
-  # glass stopcock" classifications of what are really lab consumables.
-  - stopcock
-  - stop cock
-  - activin
-  # Cell culture media abbrev (e.g. "MEM Earle's salts")
-  - mem earle
-  - earle's
-  - iscove
-  # Liquid / hand soaps sold as labware detergents (per prior user guidance,
-  # household-brand soaps belong to "labware detergents and cleaners", not anti-seed)
-  - liquid soap
-  - hand soap
-  - softsoap
-  - bioclenz
-  - liqui-nox
-  - versa-clean
-  - sporgon
-  - virkon
-  - 7x detergent
-  # Vitamins (research reagents; word-boundary regex keeps this from colliding
-  # with "multivitamin" or other word-internal substrings)
-  - vitamin
-  # Alcohols beyond ethanol/methanol/isopropanol already in the list
-  - ethyl alcohol
-  - eth alc
-  # Common research anesthetics / analgesics / vet-research drugs
-  - isoflurane
-  - meloxicam
-  - carprofen
-  - telazol
-  - ketamine
-  - xylazine
-  - buprenorphine
-  - lidocaine
-  - heparin
+  # Anesthetics / analgesics
   - anased
+  - beuthanasia
+  - buprenex
+  - buprenorphine
+  - bupivacaine
+  - carprofen
+  - chloral hydrate
+  - fatal plus
   - fluriso
+  - heparin
+  - isoflurane
   - isothesia
-  # Cryogenic storage — freezer box already seeded; add adjacent terms
-  - cryo vial
-  - cryo box
-  - cryo freezer
-  - freezer rack
-  - freezer divider
-  - cryogenic rack
-  # Antibody context phrases (antibody already seeded; these catch clone-ID-only rows)
-  - rabbit polyclonal
-  - mouse monoclonal
-  # Manual pipettor brand phrases
-  - rainin classic
-  - alphapette
-  - multichannel pipette
-  - research plus
-  - xplorer pipette
-  - pipetter
-  - pl-lts
-  # Pipette tips — brand / feature phrases
-  - gps-l
-  - aerosol tip
-  - filtered tip
-  - racked tips
-  # Tube / cryogenic storage additions
-  - coolcell
-  - cryostor
-  - cryule
-  - cryo-color
-  - cryogenic storage
-  - conical
-  - conicals
-  - thinwall
-  - thickwall
-  - polypropylene tube
-  - polycarbonate tube
-  - screw cap tube
-  - microcen
-  - polypro cylinder
-  # Safety / PPE
-  - safety glasses
-  - laser safety
-  - uvex
-  - antifog
-  # Microplate sealing
-  - aluminum tape
-  - alum tape
-  - microporous film
-  - optical adhesive
-  # Specialty membrane filters
-  - nuclepore
-  - biodyne
-  - ezflow
-  - ultrafiltration
-  - ultracel
-  - membrane filter
-  # Centrifugal ultrafiltration devices
-  - nanosep
-  - centrifugal concentrator
-  # Additional labware detergents / disinfectants
-  - disinfectant
-  - germicidal
-  - contrex
-  - cidex
-  - mikro quat
-  - sanosil
-  - envrocide
-  - bacdown
-  - vionex
-  - etbr destroyer
-  - foaming wash
-  - hand wash
-  - gojo
-  - antimicrobial
-  # pH paper / indicator strips
-  - ph paper
-  - ph indicator
-  - indicator paper
-  # Histology / cell stains
-  - safranin
-  - eosin
-  - hematox
-  - thioflavin
-  - pyronine
-  - oil red
-  - ehrlich solution
-  - schiff reagent
-  - syto green
-  - syto red
-  # Membrane protein detergents
-  - dodecyl maltoside
-  - anapoe
-  - anzergent
-  - anagrade
-  - lysofos
-  - neopentyl glycol
-  # Cell culture antibiotics
-  - ciprofloxacin
-  - erythromycin
-  - levofloxacin
-  - sparfloxacin
-  - amoxicillin
-  - ceftriaxone
-  - ticarcillin
-  - apramycin
-  - thiamphenicol
-  - filipin
-  - timentin
-  - primocin
-  - plasmocin
-  # Cell culture nutritional sugars
-  - lactose
-  - mannitol
-  - mannose
-  - fructose
-  - trehalose
-  - raffinose
-  - xylose
-  # Specialty cell culture media
-  - hibernate medium
-  - methocult
-  - fibrolife
-  - nbactiv4
-  - epilife
-  - schneider drosophila
+  - ketamine
+  - ketathesia
+  - lidocaine
+  - loxicam
+  - meloxicam
+  - propofol
+  - propoflo
+  - telazol
+  - xylamed
+  - xylazine
+
   # Chemotherapy / research drugs
-  - doxorubicin
-  - tamoxifen
   - bleomycin
-  - vincristine
-  - streptozotocin
   - carboplatin
-  # Metabolism assay kits
+  - cyclophosphamide
+  - decitabine
+  - doxorubicin
+  - enzalutamide
+  - paclitaxel
+  - streptozotocin
+  - tamoxifen
+  - temozolomide
+  - vinblastine
+  - vincristine
+
+  # Misc bioactive / research chemicals
+  - cesium chloride
+  - corn oil
+  - depc
+  - diethyl pyrocarbonate
+  - histamine
+  - hydrocortisone
+  - isoproterenol
+  - n-ethylmaleimide
+  - sulfur
+  - tubocurarine
+
+  # ====================================================================
+  # METABOLISM & ASSAY KITS
+  # ====================================================================
   - activity assay
-  - seahorse
-  - fluxpak
-  - triglyceride
   - bilirubin
-  - cholesterol kit
   - bile acids
+  - cholesterol kit
+  - fluxpak
+  - glucose test strip
+  - seahorse
+  - triglyceride
   - uric acid kit
-  # Nucleotide fragments
-  - triphosphate
-  - monophosphate
-  - diphosphate
-  - deoxyadenosine
-  - deoxyguanosine
-  - deoxyuridine
-  - thymidine
-  - thiotriphosphate
-  - amp-pnp
-  # Oligo / CRISPR templates
-  - revprimer
-  - fwdprimer
-  - crispr template
-  - crispr guide
-  # Peptides
-  - amyloid
-  - enkephalin
-  - muramyl dipeptide
+
+  # ====================================================================
+  # LADDERS & STANDARDS
+  # ====================================================================
+  - bp ladder
+  - dna ladder
+  - kb ladder
+  - ladder dna
+  - molecular weight marker
+  - molecular weight standard
+  - protein laddera
+  - protein standard
+  - protladder
+  - rna ladder
+
+# ======================================================================
+# ALL-OF TOKEN GROUPS (co-occurrence)
+# ======================================================================
+# Each group is a list of word-bounded tokens. The seed matcher fires
+# when EVERY token in the group appears anywhere in the description
+# (any order). Use for combinations that signal lab only together —
+# neither token alone is precise enough, but the pair is.
+#
+# Tokens follow the same matching rules as `keywords` above
+# (word-bounded, optional plural, hyphen/space equivalence). Anti-seed
+# still vetoes co-occurrence hits.
+all_of_groups:
+  - [ph, strip]
