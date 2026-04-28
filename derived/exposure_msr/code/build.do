@@ -8,10 +8,9 @@ set seed 8975
 set maxvar 120000
 
 program main
-   * foia_pis
-   * clean_foia_data
-    gen_utdallas_exposure
-    stop 
+    foia_pis
+    clean_foia_data
+    gen_true_exposure
     gen_exposure
 end
 
@@ -137,13 +136,13 @@ program clean_foia_data
     save ../output/cleaned_merged_fois, replace
 end
 
-program gen_utdallas_exposure
+program gen_true_exposure
     use ../external/foia/merged_foias_with_pis, clear
     drop if mi(athr_id)
     drop predicted_market
     gen year = year(date(date, "YMD"))
     drop if year > 2013
-    keep if uni == "utdallas"
+    keep if inlist(uni, "utdallas", "umich")
     merge m:1 category using ../external/ml/categories_tfidf, keep(1 3) 
     keep if keep == 1
     gcollapse (sum) spend, by(athr_id category)
@@ -202,7 +201,6 @@ program gen_exposure
         legend(on order(- "Min: `min'" "Q1 = `p25'" "Median = `p50'" "Mean: `mean'" "SD = `sd'" "Q3 = `p75'" "Max = `max'") pos(1) ring(0) size(vsmall))
     graph export ../output/figures/exposure_density.pdf, replace
     save ../output/athr_exposure, replace
-    stop 
     preserve
     contract athr_id
     drop _freq

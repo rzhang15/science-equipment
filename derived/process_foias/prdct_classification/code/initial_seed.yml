@@ -116,6 +116,7 @@ keywords:
   - chamber slide
   - cover glass
   - coverslip
+  - cover slip
   - cvr glas
   - culture insert
   - microscope slide
@@ -197,6 +198,8 @@ keywords:
   - scoopula
   - spin-bar
   - spinbar
+  - spin bar
+  - stir bar
   - spoonula
   - stir-bar
   - stirbar
@@ -234,6 +237,7 @@ keywords:
   # Sealing & Labeling
   - aluminum foil
   - cap strip
+  - strip cap
   - clearseal
   - cryodot
   - cryolabel
@@ -314,6 +318,12 @@ keywords:
   - calcium chloride
   - chloroform
   - citric acid
+  - carbon dioxide
+  - sodium nitrite
+  - griess reagent
+  - isprpyl alch
+  - isopropyl alcohol
+  - hydrogen peroxide
   - deionized water
   - deuterium oxide
   - dimetformamide
@@ -423,6 +433,8 @@ keywords:
   - itaq
   - ligase
   - ligation
+  - mastermix
+  - hotmastermix
   - master-mix
   - megascript
   - minelute
@@ -477,6 +489,8 @@ keywords:
   - turbofect
   - zymoprepa
   - zymolyase
+  - taqmangeneexpresasy
+  - taqman
 
   # Proteins, Purification & Western Blot
   - albumin
@@ -639,6 +653,7 @@ keywords:
   - vinyl glove
   - face mask
   - n95
+  - lab coat
 
 
   # ====================================================================
@@ -939,3 +954,196 @@ keywords:
   - stopcock
   - stop cock
   - activin
+  # Cell culture media abbrev (e.g. "MEM Earle's salts")
+  - mem earle
+  - earle's
+  - iscove
+  # Liquid / hand soaps sold as labware detergents (per prior user guidance,
+  # household-brand soaps belong to "labware detergents and cleaners", not anti-seed)
+  - liquid soap
+  - hand soap
+  - softsoap
+  - bioclenz
+  - liqui-nox
+  - versa-clean
+  - sporgon
+  - virkon
+  - 7x detergent
+  # Vitamins (research reagents; word-boundary regex keeps this from colliding
+  # with "multivitamin" or other word-internal substrings)
+  - vitamin
+  # Alcohols beyond ethanol/methanol/isopropanol already in the list
+  - ethyl alcohol
+  - eth alc
+  # Common research anesthetics / analgesics / vet-research drugs
+  - isoflurane
+  - meloxicam
+  - carprofen
+  - telazol
+  - ketamine
+  - xylazine
+  - buprenorphine
+  - lidocaine
+  - heparin
+  - anased
+  - fluriso
+  - isothesia
+  # Cryogenic storage — freezer box already seeded; add adjacent terms
+  - cryo vial
+  - cryo box
+  - cryo freezer
+  - freezer rack
+  - freezer divider
+  - cryogenic rack
+  # Antibody context phrases (antibody already seeded; these catch clone-ID-only rows)
+  - rabbit polyclonal
+  - mouse monoclonal
+  # Manual pipettor brand phrases
+  - rainin classic
+  - alphapette
+  - multichannel pipette
+  - research plus
+  - xplorer pipette
+  - pipetter
+  - pl-lts
+  # Pipette tips — brand / feature phrases
+  - gps-l
+  - aerosol tip
+  - filtered tip
+  - racked tips
+  # Tube / cryogenic storage additions
+  - coolcell
+  - cryostor
+  - cryule
+  - cryo-color
+  - cryogenic storage
+  - conical
+  - conicals
+  - thinwall
+  - thickwall
+  - polypropylene tube
+  - polycarbonate tube
+  - screw cap tube
+  - microcen
+  - polypro cylinder
+  # Safety / PPE
+  - safety glasses
+  - laser safety
+  - uvex
+  - antifog
+  # Microplate sealing
+  - aluminum tape
+  - alum tape
+  - microporous film
+  - optical adhesive
+  # Specialty membrane filters
+  - nuclepore
+  - biodyne
+  - ezflow
+  - ultrafiltration
+  - ultracel
+  - membrane filter
+  # Centrifugal ultrafiltration devices
+  - nanosep
+  - centrifugal concentrator
+  # Additional labware detergents / disinfectants
+  - disinfectant
+  - germicidal
+  - contrex
+  - cidex
+  - mikro quat
+  - sanosil
+  - envrocide
+  - bacdown
+  - vionex
+  - etbr destroyer
+  - foaming wash
+  - hand wash
+  - gojo
+  - antimicrobial
+  # pH paper / indicator strips
+  - ph paper
+  - ph indicator
+  - indicator paper
+  # Histology / cell stains
+  - safranin
+  - eosin
+  - hematox
+  - thioflavin
+  - pyronine
+  - oil red
+  - ehrlich solution
+  - schiff reagent
+  - syto green
+  - syto red
+  # Membrane protein detergents
+  - dodecyl maltoside
+  - anapoe
+  - anzergent
+  - anagrade
+  - lysofos
+  - neopentyl glycol
+  # Cell culture antibiotics
+  - ciprofloxacin
+  - erythromycin
+  - levofloxacin
+  - sparfloxacin
+  - amoxicillin
+  - ceftriaxone
+  - ticarcillin
+  - apramycin
+  - thiamphenicol
+  - filipin
+  - timentin
+  - primocin
+  - plasmocin
+  # Cell culture nutritional sugars
+  - lactose
+  - mannitol
+  - mannose
+  - fructose
+  - trehalose
+  - raffinose
+  - xylose
+  # Specialty cell culture media
+  - hibernate medium
+  - methocult
+  - fibrolife
+  - nbactiv4
+  - epilife
+  - schneider drosophila
+  # Chemotherapy / research drugs
+  - doxorubicin
+  - tamoxifen
+  - bleomycin
+  - vincristine
+  - streptozotocin
+  - carboplatin
+  # Metabolism assay kits
+  - activity assay
+  - seahorse
+  - fluxpak
+  - triglyceride
+  - bilirubin
+  - cholesterol kit
+  - bile acids
+  - uric acid kit
+  # Nucleotide fragments
+  - triphosphate
+  - monophosphate
+  - diphosphate
+  - deoxyadenosine
+  - deoxyguanosine
+  - deoxyuridine
+  - thymidine
+  - thiotriphosphate
+  - amp-pnp
+  # Oligo / CRISPR templates
+  - revprimer
+  - fwdprimer
+  - crispr template
+  - crispr guide
+  # Peptides
+  - amyloid
+  - enkephalin
+  - muramyl dipeptide

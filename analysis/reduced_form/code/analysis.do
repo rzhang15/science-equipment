@@ -6,17 +6,33 @@ set scheme modern
 preliminaries
 version 17
 
-program main   
-    event_study
-    *output_tables
-end
-
-program event_study
+program main  
     import delimited ../external/exposure/final_imputed_exposure, clear
     rename exposure imputed
     save ../temp/exposure, replace
 
-    use ../external/samp/athr_panel_full_year_last_all_jrnls,clear 
+    foreach s in all_jrnls top_jrnls {
+       cap mkdir "../output/figures/`s'" 
+        event_study, samp(`s') r1(1) public(1)
+        event_study, samp(`s') r1(1) public(0)
+        event_study, samp(`s') r1(0) public(0)
+    }
+end
+
+program event_study
+    syntax, samp(string) [, r1(int 0) public(int 0)]
+    local suf ""
+    if `r1' == 1 & `public' == 0 {
+        local suf "_r1"
+        use ../external/samp/athr_panel_full_year_last_`samp'_r1,clear 
+    }
+    if `r1' == 1 & `public' == 1 {
+        local suf "_r1_public"
+        use ../external/samp/athr_panel_full_year_last_`samp'_r1_public,clear 
+    }
+    if `r1' == 0 & `public' == 0 {
+        use ../external/samp/athr_panel_full_year_last_`samp',clear 
+    }
     bys athr_id: egen min_year = min(year)
     gen age = 2025-min_year + 25 
     merge m:1 athr_id using ../temp/exposure, assert(1 2 3) keep(3) nogen
@@ -42,7 +58,7 @@ program event_study
     tw kdensity exposure || kdensity imputed, xtitle("Exposure Measure", size(small)) ytitle("Density", size(small)) ///
         ylab(, labsize(vsmall)) xlab(#15, labsize(vsmall)) ///
         legend(on label(1 "FOIA PI Observed Exposure (mean = `mean', sd = `sd')") label(2 "Imputed Exposure (mean = `imputed_mean', sd = `imputed_sd')") pos(1) ring(0) size(vsmall))
-    graph export ../output/figures/exposure_dist.pdf, replace
+    graph export ../output/figures/`samp'/exposure_dist`suf'.pdf, replace
     keep if min_year <= 2013
     keep if inrange(year, 2009, 2019)
     drop exposure
@@ -109,7 +125,7 @@ program event_study
         tw line avg year , lcolor(ebblue) || line `yvar' year if med == 1, lcolor(lavender) || line `yvar' year if med == 0, lcolor(dkorange) ///
             xtitle("Year", size(small)) ytitle("`var_name'", size(small)) ///
             legend(on order(1 "All Authors" 2 "Top 50% Exposed" 3 "Bottom 50% Exposed") pos(1) ring(0) size(vsmall))
-        graph export ../output/figures/trend_`yvar'.pdf, replace
+        graph export ../output/figures/`samp'/trend_`yvar'`suf'.pdf, replace
         restore
 
         preserve
@@ -147,7 +163,7 @@ program event_study
           ytitle("`var_name'", size(small)) ylab(#8, labsize(vsmall)) ///
           yline(0, lcolor(gs10) lpattern(solid)) ///
           legend(on order(- "Pre-Period Avg : `pre_mean'") pos(7) ring(0) rows(2)) plotregion(margin(sides))
-        graph export ../output/figures/es_`yvar'.pdf, replace
+        graph export ../output/figures/`samp'/es_`yvar'`suf'.pdf, replace
         save ../temp/es_`yvar', replace
         restore
 
@@ -184,7 +200,7 @@ program event_study
           xlab(-5(1)5, labsize(vsmall)) xtitle("Relative Year", size(small)) ///
           ytitle("`var_name'", size(small)) ylab(-1(.2)1, labsize(vsmall)) ///
           yline(0, lcolor(gs10) lpattern(solid))  legend(off) plotregion(margin(sides))
-        graph export ../output/figures/es_ln_`yvar'.pdf, replace
+        graph export ../output/figures/`samp'/es_ln_`yvar'`suf'.pdf, replace
         save ../temp/es_ln_`yvar', replace
         restore
         forval i = 1/4 {
@@ -220,7 +236,7 @@ program event_study
               xlab(-5(1)5, labsize(vsmall)) xtitle("Relative Year", size(small)) ///
               ytitle("`var_name'", size(small)) ylab(`ymin'(`gap')`ymax', labsize(vsmall)) ///
               yline(0, lcolor(gs10) lpattern(solid)) legend(off) plotregion(margin(sides))
-            graph export ../output/figures/es_`yvar'_q`i'.pdf, replace
+            graph export ../output/figures/`samp'/es_`yvar'_q`i'`suf'.pdf, replace
             save ../temp/es_`yvar'_q`i', replace
             restore
         } 
@@ -256,7 +272,7 @@ program event_study
            xlab(-5(1)5, labsize(small)) ylab(#8, labsize(vsmall)) ///                         
               yline(0, lcolor(black) lpattern(solid)) ///                                               
               legend(on order(2 "Q1 Exposed (Post Period Avg: `q1_mean')" 4 "Q2 Exposed (Post Period Avg: `q2_mean')" 6 "Q3 Exposed (Post Period Avg: `q3_mean')" 8 "Q4 Exposed (Post Period Avg: `q4_mean')") pos(11) ring(0) size(small) region(fcolor(none))) xtitle("Relative Year", size(small)) ytitle("`var_name'", size(small)) plotregion(margin(sides))
-        graph export ../output/figures/es_`yvar'_split.pdf, replace     
+        graph export ../output/figures/`samp'/es_`yvar'_split`suf'.pdf, replace     
         restore
     }
 end

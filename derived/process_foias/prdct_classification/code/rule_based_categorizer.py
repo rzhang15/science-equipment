@@ -6,6 +6,7 @@ regex builder, now with support for exact-string matching.
 """
 import yaml
 import re
+import numpy as np
 import pandas as pd
 
 class RuleBasedCategorizer:
@@ -48,10 +49,77 @@ class RuleBasedCategorizer:
             print(f"  - Loaded {len(self.veto_rules)} exact-match veto rules.")
             print(f"  - Loaded {len(self.hierarchical_veto_rules)} hierarchical veto rules.")
 
+            self._precompile_override_rules()
+
         except Exception as e:
             print(f"ERROR:Error parsing market rules file: {e}")
             self.override_rules, self.veto_rules, self.hierarchical_veto_rules = [], {}, []
             self._enzyme_regex = None
+            self._rule_compiled = []
+            self._tube_vial_cat_re = re.compile(r'(?:tube|vial)', re.IGNORECASE)
+            self._tube_vial_accessory_re = re.compile(
+                r'\b(?:rack|racks|plate|plates|plt|dish|dishes|dsh|'
+                r'tray|trays|box|boxes|holder|holders)\b',
+                re.IGNORECASE,
+            )
+
+    def _precompile_override_rules(self):
+        """Precompile each override rule's combined regexes once so
+        get_market_overrides_batch doesn't rebuild them on every call.
+        Mirrors the clause logic of the per-row get_market_override exactly
+        (none_of / regex_none_of / all_of / any_of / regex_any_of /
+        exact_any_of), just with the regex construction lifted out of the
+        hot loop.
+        """
+        self._rule_compiled = []
+        for rule in self.override_rules:
+            case_sensitive = rule.get('case_sensitive', False)
+            ignore_case = not case_sensitive
+            comp = {
+                'name': rule['name'],
+                'case_sensitive': case_sensitive,
+                'none_of': None,
+                'regex_none_of': None,
+                'all_of': None,
+                'any_of': None,
+                'regex_any_of': None,
+                'exact_any_of': None,
+            }
+            if 'none_of' in rule:
+                comp['none_of'] = self._combine_keywords_regex(
+                    self._expand_aliases(rule['none_of']),
+                    ignore_case=ignore_case)
+            if 'regex_none_of' in rule:
+                comp['regex_none_of'] = self._combine_raw_regex(
+                    rule['regex_none_of'], ignore_case=ignore_case)
+            if 'all_of' in rule:
+                conds = []
+                for condition in rule['all_of']:
+                    keywords = self.aliases.get(condition, [condition])
+                    conds.append(self._combine_keywords_regex(
+                        keywords, ignore_case=ignore_case))
+                comp['all_of'] = conds  # entries may be None -> abort signal
+            if 'any_of' in rule:
+                comp['any_of'] = self._combine_keywords_regex(
+                    self._expand_aliases(rule['any_of']),
+                    ignore_case=ignore_case)
+            if 'regex_any_of' in rule:
+                comp['regex_any_of'] = self._combine_raw_regex(
+                    rule['regex_any_of'], ignore_case=ignore_case)
+            if 'exact_any_of' in rule:
+                comp['exact_any_of'] = self._combine_keywords_regex(
+                    self._expand_aliases(rule['exact_any_of']),
+                    exact_match=True, ignore_case=ignore_case)
+            self._rule_compiled.append(comp)
+
+        # Tube/vial sibling guard regexes -- precompile once instead of on
+        # every batch call.
+        self._tube_vial_cat_re = re.compile(r'(?:tube|vial)', re.IGNORECASE)
+        self._tube_vial_accessory_re = re.compile(
+            r'\b(?:rack|racks|plate|plates|plt|dish|dishes|dsh|'
+            r'tray|trays|box|boxes|holder|holders)\b',
+            re.IGNORECASE,
+        )
 
     def _build_pattern_string(self, keyword, exact_match=False):
         """Translate a wildcard/plain keyword into its raw regex pattern
@@ -244,101 +312,99 @@ class RuleBasedCategorizer:
         with clean_series.index.  Preserves first-match-wins semantics and
         all clause logic of the per-row path.
 
-        Key perf trick: each rule only evaluates against rows that haven't
-        been assigned a category yet.  Early rules (shipping / freight,
-        high-priority oligo patterns) claim most rows; later rules run on a
-        much shrunken Series, which is what makes the batch beat the per-row
-        loop despite evaluating whole-Series regex calls.
+        Perf notes:
+        - Per-rule regexes are precompiled at init (`_rule_compiled`) so
+          the hot loop does one `str.contains` per clause, no `re.compile`.
+        - The still-unassigned set is a numpy bool mask (`still_open`) with
+          O(1) updates, instead of a pandas Index rebuilt with .difference
+          after every match (that was O(N) * 786 rules).
+        - Each rule evaluates only on the still-unassigned slice; early
+          rules claim most rows so later rules run on a much shorter array.
+        - Tube/vial sibling guard is vectorized (single str.contains pass
+          over assigned category names, no per-row apply(lambda)).
         """
-        if not self.override_rules:
-            return pd.Series([None] * len(clean_series),
-                             index=clean_series.index, dtype='object')
+        n = len(clean_series)
+        out_index = clean_series.index
+        if not self._rule_compiled or n == 0:
+            return pd.Series([None] * n, index=out_index, dtype='object')
 
-        clean_series = clean_series.astype(str)
-        if raw_series is not None:
-            raw_series = raw_series.astype(str)
+        # Underlying string arrays -- we do pandas str.contains on freshly
+        # sliced views of these, but track the unassigned set with a numpy
+        # bool mask so we don't pay Index.difference on every rule.
+        clean_arr = clean_series.astype(str).to_numpy()
+        raw_arr = (raw_series.astype(str).to_numpy()
+                   if raw_series is not None else None)
 
-        overrides = pd.Series([None] * len(clean_series),
-                              index=clean_series.index, dtype='object')
-        # Track unassigned rows as an Index for O(k) shrinking each rule.
-        unassigned_idx = clean_series.index
+        overrides_np = np.full(n, None, dtype=object)
+        still_open = np.ones(n, dtype=bool)
 
-        for rule in self.override_rules:
-            if len(unassigned_idx) == 0:
+        for comp in self._rule_compiled:
+            if not still_open.any():
                 break
 
-            case_sensitive = rule.get('case_sensitive', False)
-            src = (raw_series if (case_sensitive and raw_series is not None)
-                   else clean_series)
-            ignore_case = not case_sensitive
+            src_arr = (raw_arr if (comp['case_sensitive'] and raw_arr is not None)
+                       else clean_arr)
 
-            # Run all str.contains calls against ONLY the still-unassigned
-            # slice -- this is what makes the batch version scale.
-            text = src.loc[unassigned_idx]
-            survivors = pd.Series(True, index=unassigned_idx)
+            sub_pos = np.flatnonzero(still_open)
+            sub_text = pd.Series(src_arr[sub_pos])
 
-            # none_of exclusions
-            if 'none_of' in rule:
-                rgx = self._combine_keywords_regex(
-                    self._expand_aliases(rule['none_of']), ignore_case=ignore_case)
-                if rgx is not None:
-                    survivors &= ~text.str.contains(rgx, na=False)
-                    if not survivors.any():
-                        continue
-            if 'regex_none_of' in rule:
-                rgx = self._combine_raw_regex(rule['regex_none_of'], ignore_case=ignore_case)
-                if rgx is not None:
-                    survivors &= ~text.str.contains(rgx, na=False)
-                    if not survivors.any():
-                        continue
+            survivors = np.ones(len(sub_pos), dtype=bool)
 
-            # all_of: each condition must have >=1 matching keyword
-            if 'all_of' in rule:
+            # none_of / regex_none_of exclusions
+            rgx = comp['none_of']
+            if rgx is not None:
+                survivors &= ~sub_text.str.contains(rgx, na=False).to_numpy()
+                if not survivors.any():
+                    continue
+            rgx = comp['regex_none_of']
+            if rgx is not None:
+                survivors &= ~sub_text.str.contains(rgx, na=False).to_numpy()
+                if not survivors.any():
+                    continue
+
+            # all_of: each condition must match >=1 keyword.  A None entry
+            # means the condition resolved to an empty keyword list at init
+            # time -- preserve original abort-on-None semantics.
+            if comp['all_of'] is not None:
                 aborted = False
-                for condition in rule['all_of']:
-                    keywords = self.aliases.get(condition, [condition])
-                    rgx = self._combine_keywords_regex(keywords, ignore_case=ignore_case)
+                for rgx in comp['all_of']:
                     if rgx is None:
                         aborted = True
                         break
-                    survivors &= text.str.contains(rgx, na=False)
+                    survivors &= sub_text.str.contains(rgx, na=False).to_numpy()
                     if not survivors.any():
                         aborted = True
                         break
-                if aborted or not survivors.any():
+                if aborted:
                     continue
 
             # any_of / regex_any_of / exact_any_of -- union, at least one
             # required for the rule to fire.
-            has_any_clause = any(k in rule for k in ('any_of', 'regex_any_of', 'exact_any_of'))
+            any_rgx = comp['any_of']
+            rxany_rgx = comp['regex_any_of']
+            exact_rgx = comp['exact_any_of']
+            has_any_clause = (any_rgx is not None
+                              or rxany_rgx is not None
+                              or exact_rgx is not None)
             if has_any_clause:
-                any_mask = pd.Series(False, index=unassigned_idx)
-                if 'any_of' in rule:
-                    rgx = self._combine_keywords_regex(
-                        self._expand_aliases(rule['any_of']), ignore_case=ignore_case)
-                    if rgx is not None:
-                        any_mask |= text.str.contains(rgx, na=False)
-                if 'regex_any_of' in rule:
-                    rgx = self._combine_raw_regex(rule['regex_any_of'], ignore_case=ignore_case)
-                    if rgx is not None:
-                        any_mask |= text.str.contains(rgx, na=False)
-                if 'exact_any_of' in rule:
-                    rgx = self._combine_keywords_regex(
-                        self._expand_aliases(rule['exact_any_of']),
-                        exact_match=True, ignore_case=ignore_case)
-                    if rgx is not None:
-                        any_mask |= text.str.contains(rgx, na=False)
+                any_mask = np.zeros(len(sub_pos), dtype=bool)
+                if any_rgx is not None:
+                    any_mask |= sub_text.str.contains(any_rgx, na=False).to_numpy()
+                if rxany_rgx is not None:
+                    any_mask |= sub_text.str.contains(rxany_rgx, na=False).to_numpy()
+                if exact_rgx is not None:
+                    any_mask |= sub_text.str.contains(exact_rgx, na=False).to_numpy()
                 survivors &= any_mask
-            elif 'all_of' not in rule:
+            elif comp['all_of'] is None:
                 # No positive clause -- rule cannot fire.
                 continue
 
             if not survivors.any():
                 continue
 
-            matched_idx = survivors[survivors].index
-            overrides.loc[matched_idx] = rule['name']
-            unassigned_idx = unassigned_idx.difference(matched_idx)
+            matched_pos = sub_pos[survivors]
+            overrides_np[matched_pos] = comp['name']
+            still_open[matched_pos] = False
 
         # --- Implicit enzyme-regex fallback --------------------------------
         # The YAML `restriction enzymes` rules are case-sensitive, word-
@@ -346,44 +412,36 @@ class RuleBasedCategorizer:
         # numeral variants ("Spe I", "Spe-I", "Spe1").  Run the shared
         # flexible-separator regex on any rows still unassigned after the
         # YAML pass.  Matches the raw description when available (case-
-        # distinctive); clean_series is used otherwise.
-        if self._enzyme_regex is not None and len(unassigned_idx) > 0:
-            src = raw_series if raw_series is not None else clean_series
-            tail = src.loc[unassigned_idx]
-            enzyme_hits = tail.str.contains(self._enzyme_regex, na=False)
+        # distinctive); clean array is used otherwise.
+        if self._enzyme_regex is not None and still_open.any():
+            src_arr = raw_arr if raw_arr is not None else clean_arr
+            sub_pos = np.flatnonzero(still_open)
+            tail = pd.Series(src_arr[sub_pos])
+            enzyme_hits = tail.str.contains(self._enzyme_regex, na=False).to_numpy()
             if enzyme_hits.any():
-                hit_idx = enzyme_hits[enzyme_hits].index
-                overrides.loc[hit_idx] = 'restriction enzymes'
+                overrides_np[sub_pos[enzyme_hits]] = 'restriction enzymes'
 
-        # --- Tube / vial sibling guard -------------------------------------
-        # Applies to ANY rule that emitted a tube- or vial-named category.
+        # --- Tube / vial sibling guard (fully vectorized) ------------------
+        # Applies to any rule that emitted a tube- or vial-named category.
         # If the description also contains rack / plate / dish / tray / box /
-        # holder (likely a sibling accessory), clear the override so the
-        # row falls through to the expert model (which can disambiguate
-        # between e.g. `microcentrifuge tubes` and `microtube racks`).
-        # Cheaper than adding none_of guards to 40+ individual tube rules,
-        # and automatically extends to future tube/vial rules.
-        tube_vial_cat_re = re.compile(r'(?:tube|vial)', re.IGNORECASE)
-        accessory_re = re.compile(
-            r'\b(?:rack|racks|plate|plates|plt|dish|dishes|dsh|'
-            r'tray|trays|box|boxes|holder|holders)\b',
-            re.IGNORECASE,
-        )
-        # Build mask of assigned rows with a tube/vial category name
-        assigned = overrides.dropna()
-        if len(assigned) > 0:
-            tv_mask = assigned.apply(
-                lambda v: bool(tube_vial_cat_re.search(str(v)))
-            )
-            tv_idx = tv_mask[tv_mask].index
-            if len(tv_idx) > 0:
-                texts = clean_series.loc[tv_idx]
-                has_accessory = texts.str.contains(accessory_re, na=False)
-                clear_idx = has_accessory[has_accessory].index
-                if len(clear_idx) > 0:
-                    overrides.loc[clear_idx] = None
+        # holder (likely a sibling accessory), clear the override so the row
+        # falls through to the expert model.  Replaces the old
+        # assigned.apply(lambda v: ...) with a single str.contains pass.
+        assigned_mask = pd.notna(overrides_np)
+        if assigned_mask.any():
+            assigned_pos = np.flatnonzero(assigned_mask)
+            assigned_names = pd.Series(overrides_np[assigned_pos])
+            tv_mask = assigned_names.str.contains(
+                self._tube_vial_cat_re, na=False).to_numpy()
+            if tv_mask.any():
+                tv_pos = assigned_pos[tv_mask]
+                tv_texts = pd.Series(clean_arr[tv_pos])
+                has_accessory = tv_texts.str.contains(
+                    self._tube_vial_accessory_re, na=False).to_numpy()
+                if has_accessory.any():
+                    overrides_np[tv_pos[has_accessory]] = None
 
-        return overrides
+        return pd.Series(overrides_np, index=out_index, dtype='object')
 
     def validate_predictions_batch(self, predictions, descriptions):
         """Vectorized equivalent of iterating `validate_prediction` over a

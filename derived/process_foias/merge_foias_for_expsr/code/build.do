@@ -22,6 +22,7 @@ program merge_foias
     tostring purchase_id, replace
     tostring sku, replace
     tostring funder, replace
+    tostring unit, replace
     save ../temp/ecu, replace
 
     import delimited "../external/samp/ttu_2010_2025_standardized_clean_classified_with_tfidf.csv", clear
@@ -32,6 +33,7 @@ program merge_foias
     tostring supplier, replace
     tostring purchase_id, replace
     tostring sku, replace
+    tostring unit, replace
     cap tostring funder, replace
     save ../temp/ttu, replace
 
@@ -42,6 +44,7 @@ program merge_foias
     tostring supplier_id, replace
     tostring supplier, replace
     tostring purchase_id, replace
+    tostring unit, replace
     tostring sku, replace
     cap tostring funder, replace
     save ../temp/ukansas, replace
@@ -54,22 +57,36 @@ program merge_foias
     tostring supplier, replace
     tostring purchase_id, replace
     tostring sku, replace
+    tostring unit, replace
     cap tostring funder, replace
     save ../temp/utaustin, replace
 
     import delimited "../external/samp/utdallas_merged_clean_classified_with_tfidf.csv", clear
-    gen uni = "utdallas"
+    cap gen uni = "utdallas"
     tostring fund_id, replace 
     tostring purchaser, replace 
     tostring supplier_id, replace
     tostring supplier, replace
     tostring purchase_id, replace
     tostring sku, replace
+    tostring unit, replace
     cap tostring funder, replace
     save ../temp/utdallas, replace
 
+    import delimited "../external/samp/umich_merged_clean_classified_with_tfidf.csv", clear
+    cap gen uni = "umich"
+    tostring fund_id, replace 
+    tostring purchaser, replace 
+    tostring supplier_id, replace
+    tostring supplier, replace
+    tostring purchase_id, replace
+    tostring sku, replace
+    tostring unit, replace
+    cap tostring funder, replace
+    save ../temp/umich, replace
+
     clear
-    foreach u in utaustin utdallas ecu ttu ukansas {
+    foreach u in utaustin utdallas ecu ttu ukansas umich {
         append using ../temp/`u'
     }
     foreach v in fund_id purchaser supplier_id supplier purchase_id sku funder {
@@ -100,15 +117,21 @@ program clean_pi_id
     rename PrincipalInvestigator purchaser
     tostring middle_name, force replace
     save ../output/ttu_pi, replace
+    
+    import excel using ../external/pis/umich_pi, firstrow clear
+    rename sponsoraward fund_id
+    collapse (firstnm) *name, by(fund_id athr_id)
+    save ../output/umich_pi, replace
 end
 
 program merge_ids_foia
     use ../output/merged_foias, clear    
-    keep if inlist(uni, "ecu", "utdallas", "utaustin", "ttu")
+    keep if inlist(uni, "ecu", "utdallas", "utaustin", "ttu", "umich")
     fmerge m:1 purchaser using ../output/utaustin_pi, assert(1 3) keep(1 3) nogen
     merge m:1 purchaser using ../output/ttu_pi, assert(1 2 3 4) keep(1 3 4) nogen update
     merge m:1 fund_id using ../output/utdallas_pi, assert(1 2 3 4) keep(1 3 4) nogen update 
     merge m:1 fund_id using ../output/ecu_pi, assert(1 2 3 4) keep(1 3 4) nogen update
+    merge m:1 fund_id using ../output/umich_pi, assert(1 2 3 4) keep(1 3 4) nogen update
     save ../output/merged_foias_with_pis, replace
     contract athr_id
     drop _freq

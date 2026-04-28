@@ -14,17 +14,27 @@ program main
     gduplicates tag poid clean_desc, gen(dup_order)
     bys poid clean_desc: gegen has_neg = max(qty<0)
     drop if has_neg == 1 & dup_order > 0
+    drop if agencyname == "university of michigan at ann arbor"
+    drop if agencyname == "university of texas at dallas"
     rename id purchase_id
-    rename suppliername supplier
+    *rename suppliername supplier
     rename purchasedate date
     keep agencyname product_desc clean_desc supplier price qty spend purchase_id date prediction_source similarity_score category 
     save ../temp/govspend_`embed', replace
     
-    // dallas+oregon
+    // dallas+oregon+michigan
+    import delimited  ../external/samp/umich_merged_clean_classified_with_`embed'.csv,clear 
+    drop predicted_market
+    keep product_desc clean_desc supplier price qty spend purchase_id date prediction_source similarity_score category
+    cap tostring purchase_id, replace force
+    gen agencyname = "university of michigan at ann arbor"
+    save ../temp/umich_`embed', replace
+
     import delimited  ../external/samp/utdallas_merged_clean_classified_with_`embed'.csv,clear 
     drop predicted_market
     keep product_desc clean_desc supplier price qty spend purchase_id date prediction_source similarity_score category 
     gen agencyname = "university of texas at dallas"
+    cap tostring purchase_id, replace force
     save ../temp/utdallas_`embed', replace
     
     import delimited  ../external/samp/oregonstate_2010_2019_standardized_clean_classified_with_`embed'.csv,clear 
@@ -32,11 +42,12 @@ program main
     keep product_desc clean_desc supplier price qty spend purchase_id date prediction_source similarity_score category 
     gen agencyname = "oregon state university"
     replace spend = price * qty
+    cap tostring purchase_id, replace force
     save ../temp/oregonstate_`embed', replace
 
     clear
     save ../output/first_stage_data_`embed', replace emptyok
-    foreach f in govspend utdallas oregonstate {
+    foreach f in govspend utdallas oregonstate umich {
         append using ../temp/`f'_`embed'
     }
     rename supplier suppliername

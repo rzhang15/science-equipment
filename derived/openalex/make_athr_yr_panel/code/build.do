@@ -7,9 +7,10 @@ pause on
 set seed 8975
 
 program main
-    foreach s in top_jrnls { 
+    foreach s in all_jrnls top_jrnls { 
         local t year 
-        make_panel, time(`t') last(1) samp(`s') us(1)
+       * make_panel, time(`t') last(1) samp(`s') us(1)
+        merge_ipeds, time(`t') last(1) samp(`s') us(1)
     }
 end
 
@@ -30,7 +31,7 @@ program make_panel
     if `last' == 1 {
         use id pmid which_athr which_affl pub_date year jrnl cite_count athr_id athr_name  country_code msa_comb msa_c_world inst inst_id msacode using ../external/sub_athrs/last/cleaned_`samp', clear
         local suf = "_last" 
-
+    }
     if `first' == 1 {
         use id pmid which_athr which_affl pub_date year jrnl cite_count athr_id athr_name country_code msa_comb msa_c_world inst inst_id msacode using ../external/sub_athrs/first/cleaned_`samp', clear
         local suf = "_first" 
@@ -257,5 +258,34 @@ program make_panel
     restore
 end
 
-** 
+program merge_ipeds
+    syntax, time(string) samp(str) [, last(int 0) first(int 0) firstlast(int 0) second(int 0) us(int 0)]
+    local suf = "" 
+    import excel ../external/ipeds/ipeds_openalex.xlsx, clear firstrow
+    rename openalex_id inst_id
+    replace inst_id = subinstr(inst_id, "i", "I", .)
+    contract ipeds inst_id
+    drop _freq
+    merge 1:1 ipeds_id using ../external/ipeds/ipeds_clean, assert(1 2 3) keep(3) nogen
+    save ../temp/ipeds_inst_id, replace
+    if `last' == 1 {
+        local suf = "_last" 
+    }
+    if `firstlast' == 1 {
+        local suf = "_firstlast" 
+    }
+    if `second' == 1 {
+        local suf = "_second" 
+    }
+    if `first' == 1 {
+        local suf = "_first" 
+    }
+    use ../output/athr_panel_full_`time'`suf'_`samp', replace
+    merge m:1 inst_id using ../temp/ipeds_inst_id, assert(1 2 3) keep(3) nogen
+    gen public = sector == 1
+    save ../output/athr_panel_full_`time'`suf'_`samp'_r1, replace
+    keep if public == 1
+    save ../output/athr_panel_full_`time'`suf'_`samp'_r1_public, replace
+end
+**k 
 main

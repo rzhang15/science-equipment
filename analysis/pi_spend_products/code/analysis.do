@@ -8,7 +8,7 @@ version 17
 
 program main   
     use ../external/samp/merged_foias_with_pis,  clear
-    keep if uni == "utdallas"
+    keep if inlist(uni , "utdallas", "umich")
     drop if mi(athr_id)
     drop predicted_market
     gen year = year(date(date, "YMD"))
@@ -40,7 +40,7 @@ program main
     gen perc_treated_lq = treated_lq/lq* 100
     bys athr_id: egen tot_athr_spend =total(tot_spend)
     stop
-    gcollapse (mean) tot_spend nonlab_spend lab_spend labspend_kept treated_spend perc_treated_kept perc_lab_spend perc_nonlab_spend perc_labspend_kept [aw=tot_athr_spend], by(year)
+    gcollapse (mean) tot_spend nonlab_spend lab_spend hq treated_hq perc_treated_hq perc_lab_spend perc_nonlab_spend perc_hq [aw=tot_athr_spend], by(year)
     tw line tot_spend year || line lab_spend year || line nonlab_spend year, legend(label(1 "Total Spend") label(2 "Lab Spend") label(3 "Non-Lab Spend")) ytitle("Average Spend") xtitle("Year") title("Average Spend by Year")
     graph export ../output/figures/avg_spend_by_year.pdf, replace
     graph hbar (mean) perc_lab_spend perc_nonlab_spend, over(year) stack ///
@@ -48,7 +48,7 @@ program main
       ytitle("Average Percentage of Spend") ///
       title("Average Percentage of Lab vs Non-Lab Spend by Year")
     graph export ../output/figures/perc_lab_nonlab_spend_by_year.pdf, replace
-    tw line perc_labspend_kept year, legend(label(1 "Perc Lab Spend Kept")) ytitle("Average Percentage of Lab Spend Kept") xtitle("Year") title("Average Percentage of Lab Spend Kept by Year")
+    tw line perc_hq_kept year, legend(label(1 "Perc Lab Spend Kept")) ytitle("Average Percentage of Lab Spend Kept") xtitle("Year") title("Average Percentage of Lab Spend Kept by Year")
     graph export ../output/figures/perc_labspend_kept_by_year.pdf,replace 
 end
 

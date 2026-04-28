@@ -7,8 +7,10 @@ Includes prediction source and final similarity score in the output.
 import pandas as pd
 import glob
 import os
+import re
 import joblib
 import argparse
+import multiprocessing as mp
 from scipy import sparse
 from sklearn.preprocessing import normalize
 import numpy as np # Added for NaN
@@ -16,6 +18,48 @@ import numpy as np # Added for NaN
 import config
 from rule_based_categorizer import RuleBasedCategorizer
 from categorize_items import TfidfItemCategorizer, EmbeddingItemCategorizer
+
+
+# ---------------------------------------------------------------------------
+# Multiprocessing helpers for step 4 (market override rules).
+#
+# The rule evaluation is embarrassingly parallel by row, and the single-core
+# cost (~1us/rule/row x 793 rules) dominates runtime on the 11M-obs job.
+# Workers each hold their own RuleBasedCategorizer so the 793 precompiled
+# rule regexes exist once per process.
+# ---------------------------------------------------------------------------
+_WORKER_CATEGORIZER = None
+
+
+def _init_override_worker(rules_path):
+    """Pool initializer: build the per-worker categorizer ONCE so every
+    task in the chunk doesn't reload the YAML + recompile regexes."""
+    global _WORKER_CATEGORIZER
+    _WORKER_CATEGORIZER = RuleBasedCategorizer(rules_path)
+
+
+def _apply_overrides_chunk(args):
+    clean_chunk, raw_chunk = args
+    return _WORKER_CATEGORIZER.get_market_overrides_batch(
+        clean_chunk, raw_chunk
+    )
+
+
+def _default_override_workers():
+    """Honor MARKET_RULES_WORKERS first, then the Slurm allocation, then
+    the process's CPU affinity (respects cgroups).  Falls back to a capped
+    os.cpu_count() only when none of the above are available."""
+    for var in ('MARKET_RULES_WORKERS', 'SLURM_CPUS_PER_TASK'):
+        v = os.environ.get(var)
+        if v:
+            try:
+                return max(1, int(v))
+            except ValueError:
+                pass
+    try:
+        return max(1, len(os.sched_getaffinity(0)))
+    except (AttributeError, OSError):
+        return min(os.cpu_count() or 1, 16)
 
 def main(gatekeeper_name: str, expert_choice: str, source_abbrev: str = None):
     print(f"--- Starting Prediction Pipeline [Variant: {config.VARIANT}] ---")
@@ -158,13 +202,22 @@ def main(gatekeeper_name: str, expert_choice: str, source_abbrev: str = None):
         # --- Step 1.5: Supplier-based Non-Lab filter ---
         if 'supplier' in df_new.columns:
             supplier_lower = df_new['supplier'].astype(str).str.lower().str.strip()
-            supplier_nonlab_mask = pd.Series(False, index=df_new.index)
-            # Exact matches
-            for exact_name in config.NONLAB_SUPPLIER_EXACT:
-                supplier_nonlab_mask |= (supplier_lower == exact_name.lower().strip())
-            # Keyword substring matches
-            for kw in config.NONLAB_SUPPLIER_KEYWORDS:
-                supplier_nonlab_mask |= supplier_lower.str.contains(kw.lower(), na=False)
+            # Exact matches -- single isin instead of a loop of == comparisons.
+            exact_set = {n.lower().strip() for n in config.NONLAB_SUPPLIER_EXACT}
+            if exact_set:
+                supplier_nonlab_mask = supplier_lower.isin(exact_set)
+            else:
+                supplier_nonlab_mask = pd.Series(False, index=df_new.index)
+            # Keyword substring matches -- fold every keyword into a single
+            # alternation regex and do ONE str.contains pass.  Pandas treats
+            # the pattern as regex by default, so we preserve the original
+            # (un-escaped) interpretation.
+            if config.NONLAB_SUPPLIER_KEYWORDS:
+                kw_re = re.compile(
+                    '|'.join(f'(?:{kw.lower()})'
+                             for kw in config.NONLAB_SUPPLIER_KEYWORDS)
+                )
+                supplier_nonlab_mask |= supplier_lower.str.contains(kw_re, na=False)
             # Force matched items to Non-Lab (remove from lab mask)
             supplier_override_count = (is_lab_mask & supplier_nonlab_mask).sum()
             if supplier_override_count > 0:
@@ -227,8 +280,46 @@ def main(gatekeeper_name: str, expert_choice: str, source_abbrev: str = None):
         unique_clean = clean_series_full.iloc[first_pos].reset_index(drop=True)
         unique_raw = (raw_series_full.iloc[first_pos].reset_index(drop=True)
                       if has_raw_col else None)
-        unique_overrides = rule_categorizer.get_market_overrides_batch(
-            unique_clean, unique_raw)
+
+        # Run market rules in parallel across worker processes.  The rule
+        # evaluation is CPU-bound (793 rules x N rows of re.search calls)
+        # and embarrassingly parallel by row, so we shard unique_clean /
+        # unique_raw into chunks and fan out.  Single-process path kicks in
+        # for small inputs where pool startup would dominate.
+        n_workers = _default_override_workers()
+        PARALLEL_MIN = 20_000
+        if n_unique >= PARALLEL_MIN and n_workers > 1:
+            # Aim for ~4 chunks per worker so a slow chunk doesn't idle the
+            # rest of the pool.  Chunk via iloc slices, which inherit the
+            # parent's RangeIndex (so pd.concat stacks them contiguously).
+            target_chunks = n_workers * 4
+            chunk_size = max(1, (n_unique + target_chunks - 1) // target_chunks)
+            chunks = []
+            for start in range(0, n_unique, chunk_size):
+                end = min(start + chunk_size, n_unique)
+                chunks.append((
+                    unique_clean.iloc[start:end],
+                    unique_raw.iloc[start:end] if unique_raw is not None else None,
+                ))
+            print(f"  - Applying market rules in parallel: "
+                  f"{n_workers} workers x {len(chunks)} chunks "
+                  f"(~{chunk_size} rows/chunk).")
+            # fork start method (Linux default) skips re-import of this
+            # module in the children; initializer still builds a fresh
+            # categorizer per worker so we don't depend on parent state.
+            ctx = mp.get_context('fork')
+            with ctx.Pool(
+                n_workers,
+                initializer=_init_override_worker,
+                initargs=(config.MARKET_RULES_YAML,),
+            ) as pool:
+                results = pool.map(_apply_overrides_chunk, chunks)
+            # ignore_index=True gives us a clean 0..n_unique-1 RangeIndex
+            # matching the input order (pool.map preserves input order).
+            unique_overrides = pd.concat(results, ignore_index=True)
+        else:
+            unique_overrides = rule_categorizer.get_market_overrides_batch(
+                unique_clean, unique_raw)
 
         # Remap rule outputs to the collapsed taxonomy the expert was trained
         # on.  market_rules.yml is deliberately kept granular (e.g. "extended
@@ -246,25 +337,10 @@ def main(gatekeeper_name: str, expert_choice: str, source_abbrev: str = None):
         if cons_map:
             unique_overrides = unique_overrides.replace(cons_map)
 
-        _lower = unique_overrides.str.lower()
-        unique_overrides.loc[
-            _lower.str.contains("pipette tip", na=False)] = "pipette tips"
-        _is_ab = _lower.str.contains("antibod", na=False)
-        _is_prim = _lower.str.contains("primary", na=False)
-        _is_sec = _lower.str.contains("secondary", na=False)
-        _is_poly = _lower.str.contains("polyclonal", na=False)
-        _is_mono = _lower.str.contains("monoclonal", na=False)
-        unique_overrides.loc[_is_ab & _is_prim & _is_poly] = "polyclonal primary antibodies"
-        unique_overrides.loc[_is_ab & _is_prim & _is_mono] = "monoclonal primary antibodies"
-        unique_overrides.loc[_is_ab & _is_sec] = "secondary antibodies"
-
-        # Script 0 also applies keyword-based rollups (pipette tips + antibody
-        # primary/secondary split) on df_merged, so the training data carries
-        # the collapsed labels and the expert model only ever sees the
-        # collapsed names.  Mirror those rollups on rule outputs so rule
+        # Mirror script 0's keyword-based rollups on rule outputs so rule
         # categories like "extended length pipette tips" or "rabbit-host
-        # anti-mouse polyclonal primary antibody" don't fall off the expert's
-        # category list.
+        # anti-mouse polyclonal primary antibody" don't fall off the expert
+        # model's category list (which only knows the collapsed names).
         _lower = unique_overrides.str.lower()
         unique_overrides.loc[
             _lower.str.contains("pipette tip", na=False)] = "pipette tips"
