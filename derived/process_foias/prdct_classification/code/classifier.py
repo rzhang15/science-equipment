@@ -10,31 +10,119 @@ from sklearn.preprocessing import normalize
 import config
 
 # --- Helper Functions ---
-def load_keywords_and_build_automaton(filepath):
-    """Loads keywords from a YAML file and compiles a word-bounded regex that
-    matches each keyword as a whole word (optionally with an s/es plural
-    suffix).  Using lookarounds `(?<!\\w)` / `(?!\\w)` instead of `\\b` so
-    keywords with leading/trailing punctuation (e.g. "d(-)fructose") still
-    match correctly.  Long phrases are placed first in the alternation so
-    they take precedence over shorter keyword prefixes.
+def _normalize_separator_pattern(token):
+    """Build a regex fragment from `token` where any internal run of
+    hyphen/whitespace becomes `[-\\s]+`, so a single seed line like
+    `pipet-aid` also matches `pipet aid` (and vice versa).  Other
+    characters are re.escape'd."""
+    out = []
+    i, n = 0, len(token)
+    while i < n:
+        ch = token[i]
+        if ch == '-' or ch.isspace():
+            out.append(r'[-\s]+')
+            j = i + 1
+            while j < n and (token[j] == '-' or token[j].isspace()):
+                j += 1
+            i = j
+        else:
+            out.append(re.escape(ch))
+            i += 1
+    return ''.join(out)
 
-    Returns a compiled regex.  The legacy name is kept so call sites don't
-    have to change; has_match() duck-types between regex and Aho-Corasick
-    automaton (market rules still use the automaton).
+
+class SeedMatcher:
+    """Two-mode matcher for seed YAML files:
+      * `single_regex`  — word-bounded regex matching any one keyword
+      * `group_regexes` — list of token-regex lists; a group fires when
+                          EVERY token regex hits the description (any order)
+
+    Duck-types like a compiled regex via `.search()` so `has_match()` works,
+    and exposes `.batch_match()` so `batch_has_match()` can vectorize the
+    co-occurrence check via pandas `str.contains`.
+    """
+
+    def __init__(self, single_regex, group_regexes):
+        self.single_regex = single_regex
+        self.group_regexes = group_regexes
+
+    def search(self, text):
+        if self.single_regex is not None and self.single_regex.search(text):
+            return self
+        for group in self.group_regexes:
+            if all(r.search(text) for r in group):
+                return self
+        return None
+
+    def batch_match(self, series):
+        if self.single_regex is not None:
+            mask = series.str.contains(self.single_regex, na=False)
+        else:
+            mask = pd.Series(False, index=series.index)
+        for group in self.group_regexes:
+            if not group:
+                continue
+            group_mask = pd.Series(True, index=series.index)
+            for r in group:
+                group_mask &= series.str.contains(r, na=False)
+            mask |= group_mask
+        return mask
+
+
+def load_keywords_and_build_automaton(filepath):
+    """Loads keywords (and optional all_of_groups) from a YAML file and
+    returns a SeedMatcher.
+
+    YAML schema:
+        keywords:        list of single tokens / phrases (existing)
+        all_of_groups:   optional list of token-lists; each group fires
+                         when every token in the list appears anywhere in
+                         the description (word-bounded, any order)
+
+    Single-keyword matching is word-bounded with `(?<!\\w)…(?!\\w)`, an
+    optional `(?:e?s)?` plural suffix, and treats internal hyphens and
+    whitespace as equivalent (so `pipet-aid` covers `pipet aid` too).
+    Long phrases are placed first in the alternation so they take
+    precedence over shorter keyword prefixes.
+
+    The legacy name is kept so call sites don't have to change;
+    has_match() / batch_has_match() duck-type between SeedMatcher,
+    plain compiled regex, and Aho-Corasick automaton.
     """
     try:
         with open(filepath, 'r') as f:
-            keywords = yaml.safe_load(f).get('keywords', [])
-        if not keywords:
-            return None
-        clean = sorted({str(k).lower().strip() for k in keywords if str(k).strip()},
-                       key=len, reverse=True)
-        escaped = [re.escape(k) for k in clean]
-        pattern = r'(?<!\w)(?:' + '|'.join(escaped) + r')(?:e?s)?(?!\w)'
-        return re.compile(pattern, flags=re.IGNORECASE)
+            data = yaml.safe_load(f) or {}
     except FileNotFoundError:
         print(f"Warning: Keyword file not found: {filepath}")
         return None
+
+    raw_keywords = data.get('keywords') or []
+    raw_groups = data.get('all_of_groups') or []
+
+    clean = sorted({str(k).lower().strip() for k in raw_keywords if str(k).strip()},
+                   key=len, reverse=True)
+    if clean:
+        token_patterns = [_normalize_separator_pattern(k) for k in clean]
+        pattern = r'(?<!\w)(?:' + '|'.join(token_patterns) + r')(?:e?s)?(?!\w)'
+        single_regex = re.compile(pattern, flags=re.IGNORECASE)
+    else:
+        single_regex = None
+
+    group_regexes = []
+    for g in raw_groups:
+        tokens = [str(t).lower().strip() for t in (g or []) if str(t).strip()]
+        if not tokens:
+            continue
+        compiled = []
+        for t in tokens:
+            tp = _normalize_separator_pattern(t)
+            compiled.append(re.compile(r'(?<!\w)' + tp + r'(?:e?s)?(?!\w)',
+                                       flags=re.IGNORECASE))
+        group_regexes.append(compiled)
+
+    if single_regex is None and not group_regexes:
+        return None
+    return SeedMatcher(single_regex, group_regexes)
 
 def extract_market_keywords_and_build_automaton(rules_filepath, min_keyword_len=5):
     """
@@ -156,12 +244,14 @@ def build_enzyme_regex(rules_filepath, min_keyword_len=4):
 
 
 def has_match(description, automaton):
-    """Checks if a description matches the given matcher.  Accepts either a
-    compiled regex (seed / anti-seed, word-bounded) or an Aho-Corasick
-    automaton (market rules, substring)."""
+    """Checks if a description matches the given matcher.  Accepts a
+    SeedMatcher (seed / anti-seed), a compiled regex (legacy single-mode
+    matchers), or an Aho-Corasick automaton (market rules, substring)."""
     if not isinstance(description, str) or automaton is None:
         return False
     text = description.lower()
+    if hasattr(automaton, 'batch_match'):  # SeedMatcher
+        return automaton.search(text) is not None
     if hasattr(automaton, 'search'):
         return automaton.search(text) is not None
     try:
@@ -174,10 +264,11 @@ def has_match(description, automaton):
 def batch_has_match(descriptions, automaton):
     """Vectorized equivalent of `descriptions.apply(has_match, automaton=automaton)`.
 
-    For compiled-regex matchers (seed / anti-seed), dispatches to pandas
-    `Series.str.contains`, which runs the match loop in C.  For Aho-Corasick
-    automatons (market rules), falls back to a list comprehension over
-    `.tolist()` — still avoids per-row pandas apply overhead.
+    For SeedMatcher, dispatches to its own vectorized batch_match which
+    folds together the single-keyword regex and any all_of token groups.
+    For plain compiled regex, dispatches to pandas `Series.str.contains`.
+    For Aho-Corasick automatons (market rules), falls back to a list
+    comprehension over `.tolist()` — still avoids per-row pandas apply.
 
     Behavior matches has_match row-for-row: non-string values return False;
     the regex IGNORECASE flag is preserved; AC matching is lowercase.
@@ -185,6 +276,8 @@ def batch_has_match(descriptions, automaton):
     idx = descriptions.index
     if automaton is None:
         return pd.Series(False, index=idx)
+    if hasattr(automaton, 'batch_match'):  # SeedMatcher
+        return automaton.batch_match(descriptions)
     if hasattr(automaton, 'search'):
         # Compiled regex already has re.IGNORECASE; na=False matches the
         # non-string guard in has_match.

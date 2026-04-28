@@ -4,10 +4,17 @@ A pattern-based categorizer that applies three types of rules from a YAML file.
 This version has corrected logic to handle nested conditions and a more robust
 regex builder, now with support for exact-string matching.
 """
+import warnings
 import yaml
 import re
 import numpy as np
 import pandas as pd
+
+warnings.filterwarnings(
+    "ignore",
+    message="This pattern is interpreted as a regular expression, and has match groups",
+    category=UserWarning,
+)
 
 class RuleBasedCategorizer:
     def __init__(self, rules_filepath):
