@@ -1,0 +1,160 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 120,000; see help set_maxvar.
+
+. do /tmp/diag3.do 
+
+. set more off
+
+. use output/cleaned_merged_fois, clear
+
+. keep if year <= 2013
+(160,964 observations deleted)
+
+. keep if keep == 1
+(15,234 observations deleted)
+
+. merge m:1 athr_id using output/foia_athrs_with_clusters_10, assert(1 2 3) kee
+> p(3) nogen
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                            47,290  
+    -----------------------------------------
+
+. gcollapse (sum) spend (mean) treated cluster_label, by(athr_id category)
+
+. bys athr_id: egen tot_lab_spend = total(spend)
+
+. gen lab_spend_shr = spend / tot_lab_spend
+(12 missing values generated)
+
+. merge m:1 category using external/betas/did_coefs, keep(1 3)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                         6,154
+        from master                     6,154  (_merge==1)
+        from using                          0  (_merge==2)
+
+    Matched                             1,155  (_merge==3)
+    -----------------------------------------
+
+. gen has_beta = (_merge == 3)
+
+. drop _merge
+
+. 
+. * current measure
+. gen exposure_current = b * lab_spend_shr
+(6,157 missing values generated)
+
+. * alternative: restrict denominator to beta-having spend
+. bys athr_id: egen tot_beta_spend = total(spend) if has_beta == 1
+(6,154 missing values generated)
+
+. bys athr_id: egen tot_beta_spend_max = max(tot_beta_spend)
+(370 missing values generated)
+
+. gen lab_spend_shr_beta = spend / tot_beta_spend_max if has_beta == 1
+(6,160 missing values generated)
+
+. gen exposure_restricted = b * lab_spend_shr_beta
+(6,160 missing values generated)
+
+. 
+. collapse (sum) exposure_current exposure_restricted spend (max) tot_beta_spen
+> d_max, by(athr_id treated)
+
+. gen beta_share = tot_beta_spend_max / spend
+(61 missing values generated)
+
+. replace beta_share = 0 if mi(tot_beta_spend_max)
+(57 real changes made)
+
+. 
+. drop if mi(exposure_current)
+(0 observations deleted)
+
+. di "==== current exposure ===="
+==== current exposure ====
+
+. sum exposure_current, d
+
+                   (sum) exposure_current
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%    -.0251856      -.0341071
+ 5%            0        -.03371
+10%            0      -.0324236       Obs                 436
+25%            0      -.0295972       Sum of wgt.         436
+
+50%            0                      Mean           .0113514
+                        Largest       Std. dev.      .0289289
+75%     .0092879       .1527122
+90%     .0377125        .153308       Variance       .0008369
+95%     .0674226       .1570892       Skewness       3.477254
+99%     .1448828       .2272087       Kurtosis       17.72034
+
+. di "==== exposure with denom restricted to beta-covered spend ===="
+==== exposure with denom restricted to beta-covered spend ====
+
+. sum exposure_restricted, d
+
+                  (sum) exposure_restricted
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%    -.0684451      -.1113668
+ 5%            0      -.0982822
+10%            0      -.0940758       Obs                 436
+25%            0      -.0731436       Sum of wgt.         436
+
+50%            0                      Mean           .0521485
+                        Largest       Std. dev.      .1023693
+75%     .0887048       .4788327
+90%     .1768026       .5067076       Variance       .0104795
+95%     .2684509       .5315024       Skewness       2.327891
+99%     .4686759       .5332316       Kurtosis       8.893894
+
+. di "==== per-author share of spend with a beta ===="
+==== per-author share of spend with a beta ====
+
+. sum beta_share, d
+
+                         beta_share
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            0              0
+ 5%            0              0
+10%            0              0       Obs                 432
+25%     .1133056              0       Sum of wgt.         432
+
+50%     .5999608                      Mean           .5679861
+                        Largest       Std. dev.      .4525567
+75%            1       1.778839
+90%            1       2.133071       Variance       .2048076
+95%            1       2.254661       Skewness       .4198528
+99%     1.256044        2.93529       Kurtosis       3.581799
+
+. 
+end of do-file

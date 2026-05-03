@@ -16,6 +16,7 @@ CANONICAL_MAPPING = {
     'thermofisher': 'thermo fisher scientific',
     'fisher science': 'thermo fisher scientific',
     'fisher scntfcpossible': 'thermo fisher scientific',
+    'fisher scntfcpossible mssnethanol only': 'thermo fisher scientific',
     'fisher sci': 'thermo fisher scientific',
     'fisher healthcare': 'thermo fisher scientific',
     'tfs fishersci': 'thermo fisher scientific',
@@ -100,6 +101,13 @@ CANONICAL_MAPPING = {
     'bio rad labratories': 'bio-rad laboratories',
     'bio rad abd serotec': 'bio-rad laboratories',
     'bio rad life science': 'bio-rad laboratories',
+    'biorad lab': 'bio-rad laboratories',
+    'biorad lab life science': 'bio-rad laboratories',
+    'biorad lab customer service': 'bio-rad laboratories',
+    'biorad lab sano': 'bio-rad laboratories',
+    'biorad abd serotec': 'bio-rad laboratories',
+    'bioraduse biorad lab': 'bio-rad laboratories',
+    'biorad laboratories': 'bio-rad laboratories',
 
     # New England Biolabs
     'new england biolabs': 'new england biolabs',
@@ -273,6 +281,384 @@ CANONICAL_MAPPING = {
 
     # Flinn Scientific
     'flinn scientific': 'flinn scientific',
+
+    # Promega (consolidate cleaned variants)
+    'promegacorp': 'promega corporation',
+
+    # Mettler-Toledo
+    'mettler toledo': 'mettler-toledo',
+    'mettlertoledo': 'mettler-toledo',
+    'mettler-toledo': 'mettler-toledo',
+    'mettler toledo lab': 'mettler-toledo',
+    'mettler toledo intl': 'mettler-toledo',
+    'mettler toledo international': 'mettler-toledo',
+    'mettler toledo process analytics': 'mettler-toledo',
+    'mettler toledo rainin': 'mettler-toledo',
+    'mettler toledo raining': 'mettler-toledo',
+    'mettler toledo thorton': 'mettler-toledo',
+    'mettler toledo thornton': 'mettler-toledo',
+    'mettler toledo ingold': 'mettler-toledo',
+    'mettler toledo autochem': 'mettler-toledo',
+    'mettlertoledo autochem': 'mettler-toledo',
+    'mettlertoledo ingold': 'mettler-toledo',
+    'mettlertoledo rainin': 'mettler-toledo',
+
+    # Cole-Parmer
+    'cole parmer': 'cole-parmer',
+    'coleparmer': 'cole-parmer',
+    'cole-parmer': 'cole-parmer',
+    'coleparmer instrument': 'cole-parmer',
+    'cole parmer instrument': 'cole-parmer',
+    'idex health and sciencecole parmer': 'cole-parmer',
+
+    # Cell Signaling Technology
+    'cell signaling': 'cell signaling technology',
+    'cell signaling tech': 'cell signaling technology',
+    'cell signaling technology': 'cell signaling technology',
+
+    # Santa Cruz Biotechnology (distinct from UC Santa Cruz)
+    'santa cruz biotech': 'santa cruz biotechnology',
+    'santa cruz biotechnology': 'santa cruz biotechnology',
+    'santa cruz bio technology': 'santa cruz biotechnology',
+
+    # Novus Biologicals
+    'novus biological': 'novus biologicals',
+    'novus biologicals': 'novus biologicals',
+
+    # Sartorius
+    'sartorius': 'sartorius',
+    'sartorius biotech': 'sartorius',
+    'sartorius mechatronics': 'sartorius',
+    'sartorius stedim': 'sartorius',
+    'sartorius stedim north america': 'sartorius',
+    'sartorius stedim north amer': 'sartorius',
+    'sartorius cellgenix': 'sartorius',
+
+    # Lonza
+    'lonza': 'lonza',
+    'lonza walkersville': 'lonza',
+    'lonza rockland': 'lonza',
+
+    # Tecan
+    'tecan': 'tecan',
+    'tecan us': 'tecan',
+    'tecan sp': 'tecan',
+    'tecan genomics': 'tecan',
+
+    # Kimberly-Clark
+    'kimberly clark': 'kimberly-clark',
+    'kimberly-clark': 'kimberly-clark',
+    'kimberly clark global sales': 'kimberly-clark',
+    'kimberly clark healthcare': 'kimberly-clark',
+
+    # Sherwin-Williams
+    'sherwin williams': 'sherwin-williams',
+    'sherwinwilliams': 'sherwin-williams',
+    'sherwin-williams': 'sherwin-williams',
+    'sherwinwilliams paint': 'sherwin-williams',
+    'sherwinwilliams store': 'sherwin-williams',
+
+    # Hach
+    'hach': 'hach',
+    'hach company': 'hach',
+    'hach co': 'hach',
+    'hach chemical': 'hach',
+    'hach environmental': 'hach',
+    'hach hydromet': 'hach',
+    'radiometer analytical hach': 'hach',
+
+    # Honeywell
+    'honeywell': 'honeywell',
+    'honeywell intl': 'honeywell',
+    'honeywell international': 'honeywell',
+    'honeywell analytics': 'honeywell',
+    'honeywell analytics distribution': 'honeywell',
+    'honeywell sensing and control': 'honeywell',
+    'honeywell sensotec': 'honeywell',
+    'honeywell sensotechoneywell': 'honeywell',
+    'honeywell building solutions': 'honeywell',
+    'honeywell process solutions': 'honeywell',
+    'honeywell federal manufacturing and tech': 'honeywell',
+    'honeywell fm and t': 'honeywell',
+    'honeywell hom med': 'honeywell',
+
+    # Bayer
+    'bayer': 'bayer',
+    'bayer healthcare': 'bayer',
+    'bayer healthcare pharmaceuticals': 'bayer',
+    'bayer materialscience': 'bayer',
+
+    # Hitachi
+    'hitachi': 'hitachi',
+    'hitachi america': 'hitachi',
+    'hitachi data systems': 'hitachi',
+    'hitachi high tech': 'hitachi',
+    'hitachi high tech amer': 'hitachi',
+    'hitachi high technology': 'hitachi',
+    'hitachi high technology america': 'hitachi',
+    'hitachi hightech': 'hitachi',
+    'hitachi hightech canada': 'hitachi',
+    'hitachi medical systems': 'hitachi',
+    'hitachi medical systems america': 'hitachi',
+    'hitachi aloka medical': 'hitachi',
+
+    # Panasonic (industrial / healthcare)
+    'panasonic': 'panasonic',
+    'panasonic healthcare': 'panasonic',
+    'panasonic healthcare corporati': 'panasonic',
+    'panasonic healthcare of na': 'panasonic',
+    'panasonic healthcare of north america': 'panasonic',
+    'panasonic of na': 'panasonic',
+    'panasonic of north america': 'panasonic',
+
+    # Leica
+    'leica': 'leica',
+    'leica microsystems': 'leica',
+    'leica biosystems': 'leica',
+    'leica biosystems imaging': 'leica',
+    'leica biosystems richmond': 'leica',
+
+    # Olympus (Olympus Corp; "olympus controls" is a separate industrial firm and is left alone)
+    'olympus america': 'olympus',
+    'olympus scientific solutions americas': 'olympus',
+
+    # Cisco (use multi-word aliases only; bare 'cisco' would catch unrelated "cisco equipment")
+    'cisco systems': 'cisco systems',
+    'cisco webex': 'cisco systems',
+
+    # Lenovo
+    'lenovo': 'lenovo',
+    'lenovo us': 'lenovo',
+    'lenovo usa': 'lenovo',
+    'lenovo united states': 'lenovo',
+    'lenovo united state': 'lenovo',
+    'direct lenovo': 'lenovo',
+    'lenovo global technology us': 'lenovo',
+
+    # Ricoh / Xerox (single-token canonicals)
+    'ricoh': 'ricoh',
+    'xerox': 'xerox',
+
+    # Microsoft / Adobe / Oracle (bare-token aliases — distinctive enough)
+    'microsoft': 'microsoft',
+    'adobe': 'adobe',
+    'adobe systems': 'adobe',
+    'oracle america': 'oracle',
+    'oracle amer': 'oracle',
+    'oracle amercia': 'oracle',
+    'oracle micros systems': 'oracle',
+
+    # FedEx / Federal Express
+    'fedex': 'fedex',
+    'fed ex': 'fedex',
+    'federal express': 'fedex',
+    'fedex express': 'fedex',
+    'fedex ground': 'fedex',
+    'fedex freight': 'fedex',
+    'fedex kinkos': 'fedex',
+    'fedex custom critical': 'fedex',
+    'fedex supply chain': 'fedex',
+    'fedex supply chain systems': 'fedex',
+    'fedex trade networks': 'fedex',
+    'federal express and fedex ground package system': 'fedex',
+
+    # United Parcel Service (multi-token only — bare 'ups' is too generic)
+    'united parcel service': 'united parcel service',
+    'ups freight': 'united parcel service',
+    'ups store': 'united parcel service',
+    'ups supply chain': 'united parcel service',
+    'ups supply chain solutions': 'united parcel service',
+    'ups expedited mail': 'united parcel service',
+    'ups expedited mail service': 'united parcel service',
+
+    # Verizon
+    'verizon': 'verizon',
+    'verizon wireless': 'verizon',
+    'verizon online': 'verizon',
+    'verizon communications': 'verizon',
+    'verizon select services': 'verizon',
+    'verizon select service': 'verizon',
+    'verizon internet solutions': 'verizon',
+    'verizon pennsylvania': 'verizon',
+    'verizon network service on behalf': 'verizon',
+
+    # Sprint
+    'sprint': 'sprint',
+    'sprint pcs': 'sprint',
+    'sprint nextel': 'sprint',
+    'sprint spectrum': 'sprint',
+
+    # Comcast
+    'comcast': 'comcast',
+    'comcast cable': 'comcast',
+    'comcast communications': 'comcast',
+    'comcast spotlight': 'comcast',
+    'comcast cablevision': 'comcast',
+
+    # AT&T
+    'at and t': 'at&t',
+    'atandt': 'at&t',
+    'at&t': 'at&t',
+    'at and t mobility': 'at&t',
+    'atandt mobility': 'at&t',
+    'at and t wireless service': 'at&t',
+    'at and t business service': 'at&t',
+    'at and t global service': 'at&t',
+
+    # Pearson Education
+    'pearson education': 'pearson education',
+    'pearson clinical': 'pearson education',
+    'pearson clinical assessment': 'pearson education',
+    'pearson assessment': 'pearson education',
+    'pearson evaluation systems': 'pearson education',
+    'pearson vue': 'pearson education',
+    'pearson ncs': 'pearson education',
+    'ncs pearson': 'pearson education',
+    'ncs pearson assessments': 'pearson education',
+    'awl pearson education': 'pearson education',
+
+    # Cengage Learning
+    'cengage learning': 'cengage learning',
+    'cengage': 'cengage learning',
+    'cengage learninggale': 'cengage learning',
+    'gale cengage learning': 'cengage learning',
+    'galecengage learning': 'cengage learning',
+    'ed2go cengage': 'cengage learning',
+
+    # McGraw-Hill (use multi-token forms — bare 'mcgraw' would catch people)
+    'mcgrawhill': 'mcgraw-hill',
+    'mcgraw hill': 'mcgraw-hill',
+    'mcgraw-hill': 'mcgraw-hill',
+    'mcgraw hill publishers': 'mcgraw-hill',
+    'mcgraw hill publishing': 'mcgraw-hill',
+    'mcgrawhill companies': 'mcgraw-hill',
+    'mcgrawhill companies business week': 'mcgraw-hill',
+    'mcgrawhill education': 'mcgraw-hill',
+    'mcgrawhill higher education': 'mcgraw-hill',
+    'mcgrawhill school education': 'mcgraw-hill',
+    'glencoe mcgrawhill': 'mcgraw-hill',
+    'sramcgrawhill': 'mcgraw-hill',
+
+    # John Wiley & Sons (Wiley alone too generic — common surname)
+    'john wiley and sons': 'john wiley and sons',
+    'john wiley sons': 'john wiley and sons',
+    'john wiley and son': 'john wiley and sons',
+    'john wiley': 'john wiley and sons',
+    'john wiley and sons bus jrnl': 'john wiley and sons',
+    'wiley subscription service': 'john wiley and sons',
+    'wiley subscription services': 'john wiley and sons',
+    'wiley subscription svc': 'john wiley and sons',
+    'wiley vch': 'john wiley and sons',
+    'wileyvch': 'john wiley and sons',
+    'wiley vch verlag': 'john wiley and sons',
+    'wileyvch verlag': 'john wiley and sons',
+    'wileyvch verlag and': 'john wiley and sons',
+    'wileyvch veriag and kgaa': 'john wiley and sons',
+    'wiley vch verlag and kgaa': 'john wiley and sons',
+    'wiley blackwell': 'john wiley and sons',
+    'wileyblackwell': 'john wiley and sons',
+    'wiley jossey bass': 'john wiley and sons',
+    'wileyjosseybass': 'john wiley and sons',
+
+    # Springer Nature (kept distinct from Springer Publishing Co)
+    'springer nature': 'springer nature',
+    'springer verlag': 'springer nature',
+    'springer sci and bus media': 'springer nature',
+    'springer science and business media': 'springer nature',
+    'springer sciencebusiness media': 'springer nature',
+    'springer customer service center': 'springer nature',
+    'springer nature amer': 'springer nature',
+    'springer nature customer service center': 'springer nature',
+
+    # Elsevier
+    'elsevier': 'elsevier',
+    'elsevier bv': 'elsevier',
+
+    # Thomson Reuters
+    'thomson reuters': 'thomson reuters',
+    'thomson reuters scientific': 'thomson reuters',
+    'thomson reuters markets': 'thomson reuters',
+    'thomson reuters tax and accounting': 'thomson reuters',
+    'thomson reuters r and g': 'thomson reuters',
+    'thomson reuters endnote': 'thomson reuters',
+    'thomson reuters grc': 'thomson reuters',
+
+    # LexisNexis
+    'lexisnexis': 'lexisnexis',
+    'lexis nexis': 'lexisnexis',
+    'lexisnexis matthew bender': 'lexisnexis',
+    'matthew bender lexisnexis': 'lexisnexis',
+
+    # Wolters Kluwer
+    'wolters kluwer': 'wolters kluwer',
+    'wolterskluwer': 'wolters kluwer',
+    'wolters kluwer health': 'wolters kluwer',
+
+    # Big-box / retail
+    'home depot': 'home depot',
+    'home depot pro': 'home depot',
+    'office depot': 'office depot',
+    'office max': 'office max',
+    'staples': 'staples',
+    'staples office superstore': 'staples',
+    'best buy': 'best buy',
+    'best buy stores': 'best buy',
+    'costco': 'costco',
+    'costco wholesale': 'costco',
+    'lowes home center': 'lowes home improvement',
+    'lowes home centers': 'lowes home improvement',
+    'lowes home improvement': 'lowes home improvement',
+    'lowes home improvement warehouse': 'lowes home improvement',
+    'lowes companies': 'lowes home improvement',
+    'walmart community': 'walmart',
+    'walmart stores': 'walmart',
+    'walmart aransas county': 'walmart',
+
+    # B&H Photo Video
+    'b and h photo': 'b and h photo video',
+    'b and h photo and video': 'b and h photo video',
+    'b and h photo video': 'b and h photo video',
+    'b and h photovideo': 'b and h photo video',
+    'b and h photovideopro audio': 'b and h photo video',
+    'b and h foto and electronics': 'b and h photo video',
+    'b&h photo': 'b and h photo video',
+    'b&h photo video': 'b and h photo video',
+
+    # Wells Fargo
+    'wells fargo': 'wells fargo',
+    'wells fargo insurance': 'wells fargo',
+    'wells fargo insurance service': 'wells fargo',
+    'wells fargo trade capital': 'wells fargo',
+
+    # Nestle
+    'nestle': 'nestle',
+    'nestle usa': 'nestle',
+    'nestle waters': 'nestle',
+    'nestle waters north america': 'nestle',
+    'nestle pure life direct': 'nestle',
+    'readyrefresh by nestle': 'nestle',
+
+    # Barnes & Noble
+    'barnes and noble': 'barnes and noble',
+    'barnes and noble bookseller': 'barnes and noble',
+    'barnes and noble booksellers': 'barnes and noble',
+    'barnes and noble booksellers usa': 'barnes and noble',
+    'barnes and noble bookstores': 'barnes and noble',
+    'barnes and noble college bookseller': 'barnes and noble',
+    'barnes and noble collegebook': 'barnes and noble',
+
+    # IT resellers (consolidate stragglers)
+    'tigerdirect': 'tigerdirect',
+    'tiger direct': 'tigerdirect',
+    'tiger direct corporate sales': 'tigerdirect',
+    'shi internatl': 'shi',
+    'shi international': 'shi',
+    'shi intl': 'shi',
+    'shi international corp': 'shi',
+    'govconnection': 'govconnection',
+    'gov connection': 'govconnection',
+    'pcmg': 'pcmg',
+    'pcm g': 'pcmg',
 
     # Misc
     'zen bio': 'zenbio',

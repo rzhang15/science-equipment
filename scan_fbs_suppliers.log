@@ -1,0 +1,135 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 120,000; see help set_maxvar.
+
+. do scan_fbs_suppliers.do 
+
+. set more off
+
+. use /n/holylabs/pakes_lab/Lab/sci_eq/derived/first_stage/make_mkt_panel/outpu
+> t/full_item_level_tfidf.dta, clear
+
+. keep if category == "us fbs"
+(1,192,554 observations deleted)
+
+. collapse (sum) raw_spend (count) obs_cnt = price, by(suppliername)
+
+. gsort -raw_spend
+
+. gen mkt_shr = raw_spend/`=r(sum)' * 100
+(84 missing values generated)
+
+. egen tot = total(raw_spend)
+
+. replace mkt_shr = raw_spend/tot * 100
+(84 real changes made)
+
+. list suppliername raw_spend obs_cnt mkt_shr, clean noobs
+
+                              suppliername   raw_sp~d   obs_cnt    mkt_shr  
+                  thermo fisher scientific    1688855      2117   29.49443  
+                         life technologies    1181289      1294   20.63023  
+                       atlanta biologicals    1062798       563   18.56088  
+                            milliporesigma   607771.9       445   10.61423  
+                        gemini bioproducts   333086.5       201   5.817076  
+                                       vwr   319136.5       489   5.573452  
+                                      atcc    95235.3       167   1.663205  
+                        geneese scientific   40487.52        29   .7070806  
+                             ge healthcare    38343.9        23   .6696441  
+                            r and d system    33285.6        13   .5813051  
+                       denville scientific   25558.74        39    .446362  
+                               hyclone lab   22620.05        16   .3950402  
+                             biofluid tech      20314         7    .354767  
+                              clontech lab   19524.22        41   .3409741  
+                                  meditech   18503.01        19   .3231395  
+                             stemcell tech    15582.8        15   .2721405  
+                          atlas biological   15322.46        10   .2675939  
+                         fort bend service      13330         7   .2327973  
+                              serum source   11710.64        15   .2045165  
+                tissue culture biologicals      10450         2   .1825005  
+                            bd biosciences     9202.7         7   .1607174  
+                            takara bio usa       8001        21   .1397308  
+                                   corning    7847.85         6   .1370561  
+                            usa scientific       7515        11   .1312432  
+    fisher scntfcpossible mssnethanol only    7142.41        15   .1247362  
+                      velcura therapeutics       6750         4   .1178831  
+                                   biowest       6000         1    .104785  
+                          omega scientific       5517         3   .0963498  
+                                peak serum       5360         5   .0936079  
+                                  gendepot       5289         6    .092368  
+                                    amazon     5110.8         2   .0892558  
+                                   milegon    4990.32         5   .0871518  
+                    seracare life sciences       4250         2   .0742227  
+                                 iroa tech     4223.5         3   .0737599  
+                         alkali scientific    3734.65         7   .0652225  
+                        products unlimited    3451.75         5   .0602819  
+                                  turnitin       3000         2   .0523925  
+                             evco partners     2875.8         6   .0502234  
+                               equitechbio    2814.38         5   .0491508  
+                        system biosciences     2798.4        11   .0488717  
+                        midwest scientific    2790.18         6   .0487282  
+        global life sciences solutions usa    2714.28         2   .0474026  
+             rocky mountain biological lab       2573         4   .0449353  
+                   texas agrilife research    2450.78         9   .0428008  
+                 advanced cell diagnostics       2040         1   .0356269  
+                      turnkey intelligence       2000         2   .0349283  
+                  phenix research products    1995.25         4   .0348454  
+                             omega science       1960         1   .0342298  
+                      x and y cell culture       1910         2   .0333565  
+                            kse scientific       1888         4   .0329723  
+                         arriba scientific       1880         2   .0328326  
+                                  bioworld    1804.62         2   .0315162  
+               applied biological material       1800         1   .0314355  
+                                   burgoon     1509.5         2   .0263622  
+                                bioexpress       1491         3   .0260391  
+                         thomas scientific    1192.68         3   .0208292  
+                           miltenyi biotec    1183.88         1   .0206755  
+                             ls scientific       1150         1   .0200838  
+                                 neuromics       1116         2     .01949  
+                                fisher alt     998.97         2   .0174462  
+                                    midsci        950         2    .016591  
+                        intracel resources        895         2   .0156304  
+                                   quartzy     861.97         2   .0150536  
+                                       emd        740         1   .0129235  
+                       amazon web services        710         1   .0123996  
+                     life science products        698         1     .01219  
+                           ca3 biosciences        678         1   .0118407  
+                                    t3 lab      619.2         1   .0108138  
+                                   teknion        596         1   .0104086  
+                               caisson lab     517.64         2   .0090401  
+                                biopioneer        445         1   .0077716  
+                       innovative research        395         1   .0068983  
+                                  milipore        370         1   .0064617  
+                    sciencell research lab        305         1   .0053266  
+                                   p212121        269         1   .0046979  
+                  intermountain scientific     266.94         1   .0046619  
+                            michlin metals     213.38         1   .0037265  
+                     cambridge isotape lab        194         1    .003388  
+                                nelson lab        191         1   .0033357  
+                         sunstone circuits      178.5         1   .0031174  
+                                     lonza        146         2   .0025498  
+                  santa cruz biotechnology     100.88         1   .0017618  
+                                     remel      81.81         1   .0014287  
+                            tecniplast usa       61.9         1    .001081  
+
+. 
+end of do-file

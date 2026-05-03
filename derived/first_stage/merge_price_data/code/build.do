@@ -8,7 +8,7 @@ version 17
 
 program main
     local embed tfidf
-    import delimited ../external/samp/govspend_panel_classified_with_`embed'.csv, clear
+    import delimited ../external/samp/govspend_panel_clean_classified_with_`embed'.csv, clear
     // get rid of negated orders these are returns
     rename predicted_market category
     gduplicates tag poid clean_desc, gen(dup_order)

@@ -12,6 +12,7 @@ library(tidyverse)
 library(MatchIt)
 library(haven)
 library(broom)
+library(fixest)
 set.seed(8975)
 
 setwd("~/sci_eq/derived/first_stage/match_control/code")
@@ -26,6 +27,280 @@ panel <- read_dta("../external/samp/category_yr_tfidf.dta") %>%
 
 cat("Panel:", n_distinct(panel$category), "categories x",
     n_distinct(panel$year), "years\n\n")
+
+# Load uni-category-year panel for spec-level event-study residualization
+cat("Loading uni-cat-year panel for event-study pretrend plots...\n")
+uni_panel <- read_dta("../external/samp/uni_category_yr_tfidf.dta") %>%
+  mutate(category = as.character(category)) %>%
+  select(uni_id, category, mkt, year, treated, spend_2013,
+         avg_log_price, log_raw_qty, log_raw_spend) %>%
+  filter(!is.na(spend_2013))
+cat("Uni panel:", nrow(uni_panel), "rows |",
+    n_distinct(uni_panel$uni_id), "unis x",
+    n_distinct(uni_panel$category), "cats\n\n")
+
+# ---------------------------
+# Raw pre-trends: weighted average of outcomes by treatment status over time
+# ---------------------------
+# Average log_price / log_qty / log_spend across categories within each
+# (treated, year) cell, weighted by category-level 2013 spending. This matches
+# the spend_2013-weighted event study in analysis.do, so the visual reflects
+# what the event study coefficients will look like.
+cat("Plotting raw pre-trends by treatment status (spend_2013-weighted)...\n")
+
+trend_plot_vars <- c("avg_log_price", "log_raw_qty", "log_raw_spend")
+
+raw_trends <- panel %>%
+  select(category, year, treated, spend_2013, all_of(trend_plot_vars)) %>%
+  pivot_longer(all_of(trend_plot_vars), names_to = "variable", values_to = "value") %>%
+  filter(!is.na(value), !is.na(spend_2013)) %>%
+  group_by(variable, treated, year) %>%
+  summarise(wmean = weighted.mean(value, w = spend_2013, na.rm = TRUE),
+            n_cat = n(), .groups = "drop") %>%
+  mutate(treated_lbl = factor(treated, levels = c(0, 1),
+                              labels = c("Control", "Treated")),
+         variable = factor(variable, levels = trend_plot_vars,
+                           labels = c("log price", "log qty", "log spend")))
+
+p_levels <- ggplot(raw_trends, aes(x = year, y = wmean,
+                                   color = treated_lbl, group = treated_lbl)) +
+  geom_line(linewidth = 0.8) +
+  geom_point(size = 1.5) +
+  geom_vline(xintercept = 2013, linetype = "dashed", color = "grey40") +
+  facet_wrap(~ variable, scales = "free_y") +
+  scale_color_manual(values = c("Control" = "#1f78b4", "Treated" = "#e31a1c")) +
+  labs(x = "Year", y = "Spend-weighted mean", color = NULL,
+       title = "Weighted means by treatment status (weights = spend_2013)") +
+  theme_bw() +
+  theme(legend.position = "bottom")
+
+# Also normalize to 2013 = 0 to make pretrend visual comparison easier
+raw_trends_norm <- raw_trends %>%
+  group_by(variable, treated_lbl) %>%
+  mutate(wmean_norm = wmean - wmean[year == 2013]) %>%
+  ungroup()
+
+p_norm <- ggplot(raw_trends_norm, aes(x = year, y = wmean_norm,
+                                      color = treated_lbl, group = treated_lbl)) +
+  geom_line(linewidth = 0.8) +
+  geom_point(size = 1.5) +
+  geom_hline(yintercept = 0, color = "grey70") +
+  geom_vline(xintercept = 2013, linetype = "dashed", color = "grey40") +
+  facet_wrap(~ variable, scales = "free_y") +
+  scale_color_manual(values = c("Control" = "#1f78b4", "Treated" = "#e31a1c")) +
+  labs(x = "Year", y = "Weighted mean, relative to 2013", color = NULL,
+       title = "Pre-trend alignment (normalized to 2013 = 0)") +
+  theme_bw() +
+  theme(legend.position = "bottom")
+
+dir.create("../output/spec_search", recursive = TRUE, showWarnings = FALSE)
+dir.create("../output/spec_search/spec_pretrends", recursive = TRUE, showWarnings = FALSE)
+ggsave("../output/spec_search/pretrends_unmatched_levels.png", p_levels,
+       width = 10, height = 4, dpi = 150)
+ggsave("../output/spec_search/pretrends_unmatched_normalized.png", p_norm,
+       width = 10, height = 4, dpi = 150)
+
+cat("Saved unmatched-baseline pre-trend plots to ../output/spec_search/\n\n")
+
+# ---------------------------
+# Per-spec trend plotter: treated vs matched-control weighted means over time
+# ---------------------------
+# Given a match_pairs table (treated_market, control_market) for a spec, build
+# the spend-weighted mean of price/qty/spend in each year for treated vs the
+# matched controls, and save a PNG into spec_pretrends/. Controls used for
+# multiple treateds are weighted by spend_2013 * (# times matched), mirroring
+# how a stacked spend_2013-weighted event study would treat them.
+plot_match_trends <- function(match_pairs, panel, spec_name, match_ratio,
+                              vars = c("avg_log_price", "log_raw_qty", "log_raw_spend")) {
+  treated_cats <- unique(match_pairs$treated_market)
+  control_weights <- match_pairs %>%
+    count(control_market, name = "n_matched")
+
+  treated_long <- panel %>%
+    filter(category %in% treated_cats) %>%
+    select(category, year, spend_2013, all_of(vars)) %>%
+    mutate(eff_weight = spend_2013, group = "Treated")
+
+  control_long <- panel %>%
+    filter(category %in% control_weights$control_market) %>%
+    inner_join(control_weights, by = c("category" = "control_market")) %>%
+    mutate(eff_weight = spend_2013 * n_matched, group = "Matched control") %>%
+    select(category, year, eff_weight, group, all_of(vars))
+
+  combined <- bind_rows(
+    treated_long %>% select(category, year, eff_weight, group, all_of(vars)),
+    control_long
+  ) %>%
+    pivot_longer(all_of(vars), names_to = "variable", values_to = "value") %>%
+    filter(!is.na(value), !is.na(eff_weight)) %>%
+    group_by(variable, group, year) %>%
+    summarise(wmean = weighted.mean(value, w = eff_weight, na.rm = TRUE),
+              .groups = "drop") %>%
+    group_by(variable, group) %>%
+    mutate(wmean_norm = wmean - wmean[year == 2013]) %>%
+    ungroup() %>%
+    mutate(variable = factor(variable, levels = vars,
+                             labels = c("log price", "log qty", "log spend")))
+
+  p <- ggplot(combined, aes(x = year, y = wmean_norm,
+                            color = group, group = group)) +
+    geom_line(linewidth = 0.8) +
+    geom_point(size = 1.5) +
+    geom_hline(yintercept = 0, color = "grey70") +
+    geom_vline(xintercept = 2013, linetype = "dashed", color = "grey40") +
+    facet_wrap(~ variable, scales = "free_y") +
+    scale_color_manual(values = c("Matched control" = "#1f78b4",
+                                  "Treated" = "#e31a1c")) +
+    labs(x = "Year", y = "Spend-weighted mean, relative to 2013", color = NULL,
+         title = sprintf("%s (ratio=%d)", spec_name, match_ratio),
+         subtitle = sprintf("n_treated = %d  |  n_controls used = %d",
+                            length(treated_cats), nrow(control_weights))) +
+    theme_bw() +
+    theme(legend.position = "bottom")
+
+  ggsave(sprintf("../output/spec_search/spec_pretrends/pretrends_%s.png", spec_name),
+         p, width = 10, height = 4, dpi = 150)
+}
+
+# ---------------------------
+# Per-spec event-study-style trend plot: residualize on uni + mkt FE first
+# ---------------------------
+# Mirrors the analysis.do event study setup more closely than plot_match_trends:
+#   1. uni-category-year panel (not category-year)
+#   2. balanced filter: keep uni-mkt cells with min(year)<2014 AND max(year)>2014
+#   3. residualize each outcome on uni_id + mkt FE, weighted by spend_2013
+#   4. plot weighted mean of residuals by year x treated, normalized to 2013 = 0
+# This shows the differential time path that the lead/lag dummies would identify
+# in the actual event study.
+plot_match_trends_es <- function(match_pairs, uni_panel, spec_name, match_ratio,
+                                 vars = c("avg_log_price", "log_raw_qty", "log_raw_spend")) {
+  cats <- unique(c(match_pairs$treated_market, match_pairs$control_market))
+
+  sub <- uni_panel %>%
+    filter(category %in% cats) %>%
+    group_by(uni_id, mkt) %>%
+    filter(min(year) < 2014, max(year) > 2014) %>%
+    ungroup()
+
+  if (nrow(sub) == 0) return(invisible(NULL))
+
+  resid_df <- sub %>% select(uni_id, mkt, year, treated, spend_2013)
+  for (v in vars) {
+    rows <- !is.na(sub[[v]])
+    if (sum(rows) < 100) { resid_df[[v]] <- NA_real_; next }
+    fit <- feols(as.formula(paste(v, "~ 1 | uni_id + mkt")),
+                 data = sub[rows, ], weights = sub$spend_2013[rows],
+                 notes = FALSE, warn = FALSE)
+    resid_df[[v]] <- NA_real_
+    resid_df[[v]][rows] <- residuals(fit)
+  }
+
+  long <- resid_df %>%
+    pivot_longer(all_of(vars), names_to = "variable", values_to = "value") %>%
+    filter(!is.na(value), !is.na(spend_2013)) %>%
+    group_by(variable, treated, year) %>%
+    summarise(wmean = weighted.mean(value, w = spend_2013), .groups = "drop") %>%
+    group_by(variable, treated) %>%
+    mutate(wmean_norm = wmean - wmean[year == 2013]) %>%
+    ungroup() %>%
+    mutate(group = factor(treated, levels = c(0, 1),
+                          labels = c("Matched control", "Treated")),
+           variable = factor(variable, levels = vars,
+                             labels = c("log price", "log qty", "log spend")))
+
+  n_uni <- n_distinct(sub$uni_id)
+  n_mkt_t <- n_distinct(sub$mkt[sub$treated == 1])
+  n_mkt_c <- n_distinct(sub$mkt[sub$treated == 0])
+
+  p <- ggplot(long, aes(x = year, y = wmean_norm, color = group, group = group)) +
+    geom_line(linewidth = 0.8) +
+    geom_point(size = 1.5) +
+    geom_hline(yintercept = 0, color = "grey70") +
+    geom_vline(xintercept = 2013, linetype = "dashed", color = "grey40") +
+    facet_wrap(~ variable, scales = "free_y") +
+    scale_color_manual(values = c("Matched control" = "#1f78b4",
+                                  "Treated" = "#e31a1c")) +
+    labs(x = "Year", y = "Residualized weighted mean (rel. to 2013)", color = NULL,
+         title = sprintf("%s (ratio=%d) - uni+mkt FE residualized", spec_name, match_ratio),
+         subtitle = sprintf("Balanced uni-mkt panel | n_uni=%d  treated mkts=%d  control mkts=%d",
+                            n_uni, n_mkt_t, n_mkt_c)) +
+    theme_bw() +
+    theme(legend.position = "bottom")
+
+  dir.create("../output/spec_search/spec_pretrends_es", recursive = TRUE, showWarnings = FALSE)
+  ggsave(sprintf("../output/spec_search/spec_pretrends_es/pretrends_es_%s.png", spec_name),
+         p, width = 10, height = 4, dpi = 150)
+}
+
+# ---------------------------
+# Per-spec EVENT-STUDY GAP plot: implied (treated - control) coefficient curve.
+# Mirrors what the actual event study with uni + mkt FE will identify:
+#   1. Same balanced uni-mkt sample
+#   2. Residualize each outcome on uni_id + mkt FE, weighted by spend_2013
+#   3. Compute spend-weighted mean of residuals by (treated, year)
+#   4. gap_t = treated_mean_t - control_mean_t
+#   5. Normalize to gap_2013 = 0 (matches event study with 2013 base)
+# Each year's y-value ≈ the lead/lag coefficient the event study would estimate.
+# Pretrend OK ↔ pre-2013 line near zero. Treatment effect ↔ post-2013 jump.
+plot_match_trends_gap <- function(match_pairs, uni_panel, spec_name, match_ratio,
+                                  vars = c("avg_log_price", "log_raw_qty", "log_raw_spend")) {
+  cats <- unique(c(match_pairs$treated_market, match_pairs$control_market))
+
+  sub <- uni_panel %>%
+    filter(category %in% cats) %>%
+    group_by(uni_id, mkt) %>%
+    filter(min(year) < 2014, max(year) > 2014) %>%
+    ungroup()
+
+  if (nrow(sub) == 0) return(invisible(NULL))
+
+  resid_df <- sub %>% select(uni_id, mkt, year, treated, spend_2013)
+  for (v in vars) {
+    rows <- !is.na(sub[[v]])
+    if (sum(rows) < 100) { resid_df[[v]] <- NA_real_; next }
+    fit <- feols(as.formula(paste(v, "~ 1 | uni_id + mkt")),
+                 data = sub[rows, ], weights = sub$spend_2013[rows],
+                 notes = FALSE, warn = FALSE)
+    resid_df[[v]] <- NA_real_
+    resid_df[[v]][rows] <- residuals(fit)
+  }
+
+  long <- resid_df %>%
+    pivot_longer(all_of(vars), names_to = "variable", values_to = "value") %>%
+    filter(!is.na(value), !is.na(spend_2013)) %>%
+    group_by(variable, treated, year) %>%
+    summarise(wmean = weighted.mean(value, w = spend_2013), .groups = "drop") %>%
+    pivot_wider(names_from = treated, values_from = wmean,
+                names_prefix = "grp") %>%
+    mutate(gap = grp1 - grp0) %>%
+    group_by(variable) %>%
+    mutate(gap_norm = gap - gap[year == 2013]) %>%
+    ungroup() %>%
+    mutate(variable = factor(variable, levels = vars,
+                             labels = c("log price", "log qty", "log spend")))
+
+  n_uni <- n_distinct(sub$uni_id)
+  n_mkt_t <- n_distinct(sub$mkt[sub$treated == 1])
+  n_mkt_c <- n_distinct(sub$mkt[sub$treated == 0])
+
+  p <- ggplot(long, aes(x = year, y = gap_norm)) +
+    geom_line(linewidth = 0.8, color = "#1f78b4") +
+    geom_point(size = 2, color = "#1f78b4") +
+    geom_hline(yintercept = 0, color = "grey70") +
+    geom_vline(xintercept = 2013, linetype = "dashed", color = "grey40") +
+    facet_wrap(~ variable, scales = "free_y") +
+    labs(x = "Year",
+         y = "Treated - control (uni+mkt FE residualized, rel. to 2013)",
+         title = sprintf("%s (ratio=%d) - implied event-study coefficient",
+                         spec_name, match_ratio),
+         subtitle = sprintf("Balanced uni-mkt panel | n_uni=%d  treated mkts=%d  control mkts=%d",
+                            n_uni, n_mkt_t, n_mkt_c)) +
+    theme_bw()
+
+  dir.create("../output/spec_search/spec_pretrends_gap", recursive = TRUE, showWarnings = FALSE)
+  ggsave(sprintf("../output/spec_search/spec_pretrends_gap/pretrends_gap_%s.png", spec_name),
+         p, width = 10, height = 4, dpi = 150)
+}
 
 # ---------------------------
 # Compute pre-treatment trend coefficients per category
@@ -54,7 +329,7 @@ get_trend <- function(df, var) {
 cat("Computing per-category pre-treatment trends...\n")
 
 trend_vars <- c("avg_log_price", "log_raw_spend", "log_raw_price",
-                "raw_spend", "raw_price", "num_suppliers")
+                "log_raw_qty", "raw_spend", "raw_price", "raw_qty")
 
 trends <- pre_panel %>%
   group_by(category, treated, spend_2013) %>%
@@ -77,20 +352,27 @@ levels_2013 <- panel %>%
   select(category, avg_log_price_2013 = avg_log_price,
          log_raw_spend_2013 = log_raw_spend,
          log_raw_price_2013 = log_raw_price,
-         num_suppliers_2013 = num_suppliers,
-         raw_spend_2013 = raw_spend)
+         log_raw_qty_2013 = log_raw_qty,
+         raw_spend_2013 = raw_spend,
+         raw_qty_2013 = raw_qty)
 
 # Merge trends + 2013 levels
 data_wide <- trends %>%
   left_join(levels_2013, by = "category") %>%
   mutate(log_spend_2013 = log(spend_2013 + 1))
 
-# Also get year-specific levels for the R2 winner benchmark
+# Year-specific levels for 2010-2012 (avoid 2013 — already in levels_2013).
+# Expanded to include all key outcomes (log price, log qty, log spend, raw
+# qty, raw spend) so specs can reference e.g. `log_raw_qty_2012` directly
+# instead of using a fitted intercept.
 levels_wide <- panel %>%
-  filter(year <= 2013) %>%
-  select(category, year, avg_log_price) %>%
-  pivot_wider(names_from = year, names_prefix = "avg_log_price_",
-              values_from = avg_log_price)
+  filter(year <= 2012) %>%
+  select(category, year, avg_log_price, log_raw_price, log_raw_qty,
+         log_raw_spend, raw_qty, raw_spend) %>%
+  pivot_wider(names_from = year,
+              values_from = c(avg_log_price, log_raw_price, log_raw_qty,
+                              log_raw_spend, raw_qty, raw_spend),
+              names_glue = "{.value}_{year}")
 
 data_wide <- data_wide %>%
   left_join(levels_wide, by = "category")
@@ -111,67 +393,38 @@ for (v in c("avg_log_price_slope", "avg_log_price_intercept",
 # ---------------------------
 # Define specifications
 # ---------------------------
+# Trimmed to specs that span the trade-off:
+#   qty-heavy matching  -> flat qty pre + post (small qty event-study coefficient)
+#   price-light matching -> preserve large post price gap (treatment effect)
+#   anchor price pretrend without over-matching post
+# All covariates are either: a slope (log or raw), or an actual year-specific
+# level (log or raw). No fitted intercepts.
 specs <- list(
-  # === Pure trend-based ===
-  # Price slope only
-  t01_alp_slope = c("avg_log_price_slope"),
-  
-  # Price slope + intercept (captures both level and trajectory)
-  t02_alp_slope_int = c("avg_log_price_slope", "avg_log_price_intercept"),
-  
-  # log_raw_price slope only
-  t03_lrp_slope = c("log_raw_price_slope"),
-  
-  # log_raw_price slope + intercept
-  t04_lrp_slope_int = c("log_raw_price_slope", "log_raw_price_intercept"),
-  
-  # === Trend + 2013 level hybrids ===
-  # Price slope + 2013 price level
-  t05_alp_slope_level13 = c("avg_log_price_slope", "avg_log_price_2013"),
-  
-  # Price slope + intercept + 2013 level (redundant? intercept ≈ 2012 level)
-  t06_alp_slope_int_level13 = c("avg_log_price_slope", "avg_log_price_intercept",
-                                "avg_log_price_2013"),
-  
-  # Price slope + 2013 spend level
-  t07_alp_slope_spend13 = c("avg_log_price_slope", "log_raw_spend_2013"),
-  
-  # Price slope + 2013 price level + 2013 spend level
-  t08_alp_slope_level13_spend13 = c("avg_log_price_slope", "avg_log_price_2013",
-                                    "log_raw_spend_2013"),
-  
-  # Price slope + intercept + spend 2013
-  t09_alp_slope_int_spend13 = c("avg_log_price_slope", "avg_log_price_intercept",
-                                "log_raw_spend_2013"),
-  
-  # === Multi-variable trends ===
-  # Price slope + spend slope
+  # === Slope-only baselines: max post-price gap, but level mismatch on qty ===
   t10_alp_spend_slopes = c("avg_log_price_slope", "log_raw_spend_slope"),
-  
-  # Price slope + spend slope + price intercept
-  t11_alp_spend_slopes_int = c("avg_log_price_slope", "log_raw_spend_slope",
-                               "avg_log_price_intercept"),
-  
-  # Price slope + spend slope + 2013 levels
-  t12_slopes_levels13 = c("avg_log_price_slope", "log_raw_spend_slope",
-                          "avg_log_price_2013", "log_raw_spend_2013"),
-  
-  # Price slope + supplier trend
-  t13_alp_supp_slopes = c("avg_log_price_slope", "num_suppliers_slope"),
-  
-  # All slopes: price + spend + suppliers
-  t14_three_slopes = c("avg_log_price_slope", "log_raw_spend_slope",
-                       "num_suppliers_slope"),
-  
-  # === Price intercept + slope with secondary market chars ===
-  t15_alp_slope_int_suppliers = c("avg_log_price_slope", "avg_log_price_intercept",
-                                  "num_suppliers_2013"),
-  
-  # Everything: slope + intercept + spend + suppliers
-  t16_kitchen_sink = c("avg_log_price_slope", "avg_log_price_intercept",
-                       "log_raw_spend_2013", "num_suppliers_2013"),
-  
-  # === R2 winner as benchmark ===
+  t13_alp_qty_slopes   = c("avg_log_price_slope", "log_raw_qty_slope"),
+  t14_three_slopes     = c("avg_log_price_slope", "log_raw_spend_slope",
+                           "log_raw_qty_slope"),
+
+  # === Qty-heavy, NO price covariates: qty flat throughout, max post-price ===
+  t29_qty_slope_qty13   = c("log_raw_qty_slope", "log_raw_qty_2013"),
+  t31_qty_slope_qty12   = c("log_raw_qty_slope", "log_raw_qty_2012"),
+  t46_qty13_spend13     = c("log_raw_qty_2013", "log_raw_spend_2013"),
+
+  # === Price slope (light) + qty level (heavy): pretrend anchored, flat qty ===
+  t39_alp_slope_qty12       = c("avg_log_price_slope", "log_raw_qty_2012"),
+  t48_alp_slope_alp13_qty13 = c("avg_log_price_slope", "avg_log_price_2013",
+                                "log_raw_qty_2013"),
+  t35_annual_alp_11_13_qty  = c("avg_log_price_2011", "avg_log_price_2012",
+                                "avg_log_price_2013", "log_raw_qty_slope"),
+
+  # === Hybrid (price + qty both matched): slopes + year-specific levels ===
+  t17_price_qty_slopes_levels13 = c("avg_log_price_slope", "log_raw_qty_slope",
+                                    "avg_log_price_2013", "log_raw_qty_2013"),
+  t44_price_qty_slopes_levels12 = c("avg_log_price_slope", "log_raw_qty_slope",
+                                    "avg_log_price_2012", "log_raw_qty_2012"),
+
+  # === Annual price levels benchmark ===
   bench_alp_levels_11_13 = c("avg_log_price_2011", "avg_log_price_2012",
                              "avg_log_price_2013")
 )
@@ -182,6 +435,8 @@ cat("\nTesting", length(specs), "specifications\n\n")
 # Evaluation function (same as R2)
 # ---------------------------
 OUTCOME_VAR <- "avg_log_price"
+# Outcomes scored for pretrend alignment ("across the board" metric)
+PRETREND_VARS <- c("avg_log_price", "log_raw_qty", "log_raw_spend")
 
 evaluate_spec <- function(spec_name, covariates, data_wide, panel, match_ratio) {
   cat(sprintf("--- %s (ratio=%d): %s ---\n", spec_name, match_ratio,
@@ -241,40 +496,96 @@ evaluate_spec <- function(spec_name, covariates, data_wide, panel, match_ratio) 
   
   if (length(match_pairs_list) == 0) return(NULL)
   match_pairs <- do.call(rbind, match_pairs_list)
-  
-  # Pre-trend alignment
-  pre_trend_gaps <- c()
+
+  # Save per-spec pre/post trend plot (treated vs matched controls)
+  tryCatch(
+    plot_match_trends(match_pairs, panel, spec_name, match_ratio),
+    error = function(e) cat("  PLOT FAILED:", e$message, "\n")
+  )
+
+  # Save event-study-style residualized plot (uni+mkt FE, balanced uni-mkt panel)
+  tryCatch(
+    plot_match_trends_es(match_pairs, uni_panel, spec_name, match_ratio),
+    error = function(e) cat("  ES PLOT FAILED:", e$message, "\n")
+  )
+
+  # Save event-study gap plot: single line per outcome showing the
+  # implied (treated - control) coefficient curve, residualized on uni + mkt FE.
+  # This is what the actual event study identifies — read coefficients off it.
+  tryCatch(
+    plot_match_trends_gap(match_pairs, uni_panel, spec_name, match_ratio),
+    error = function(e) cat("  GAP PLOT FAILED:", e$message, "\n")
+  )
+
+  # Pre- AND post-trend alignment: compute gaps per outcome (price/qty/spend)
+  # in deviation-from-2013 form. post_gap_<v> measures how flat the implied
+  # event-study coefficient curve is in the post period — a small post_gap_qty
+  # means qty stays at parallel-trend baseline post-treatment (no qty effect).
+  gaps_by_var <- setNames(vector("list", length(PRETREND_VARS)), PRETREND_VARS)
+  post_gaps_by_var <- setNames(vector("list", length(PRETREND_VARS)), PRETREND_VARS)
+
   for (treated_cat in unique(match_pairs$treated_market)) {
     controls <- match_pairs %>%
       filter(treated_market == treated_cat) %>% pull(control_market) %>% unique()
-    
+
     trend_data <- panel %>%
-      filter(category %in% c(treated_cat, controls), year <= 2013) %>%
-      select(category, year, treated, spend_2013, all_of(OUTCOME_VAR)) %>%
-      group_by(category) %>%
-      mutate(outcome_adj = .data[[OUTCOME_VAR]] - .data[[OUTCOME_VAR]][year == 2013]) %>%
-      ungroup()
-    
-    treated_trend <- trend_data %>% filter(category == treated_cat) %>%
-      select(year, outcome_adj) %>% rename(treated_outcome = outcome_adj)
-    
-    control_trend <- trend_data %>% filter(category %in% controls) %>%
-      group_by(year) %>%
-      summarise(control_outcome = weighted.mean(outcome_adj, w = spend_2013, na.rm = TRUE),
-                .groups = "drop")
-    
-    merged <- inner_join(treated_trend, control_trend, by = "year")
-    if (nrow(merged) > 0)
-      pre_trend_gaps <- c(pre_trend_gaps,
-                          mean(abs(merged$treated_outcome - merged$control_outcome), na.rm = TRUE))
+      filter(category %in% c(treated_cat, controls)) %>%
+      select(category, year, treated, spend_2013, all_of(PRETREND_VARS))
+
+    for (v in PRETREND_VARS) {
+      sub <- trend_data %>%
+        select(category, year, spend_2013, value = all_of(v)) %>%
+        group_by(category) %>%
+        mutate(value_adj = value - value[year == 2013]) %>%
+        ungroup()
+
+      t_trend <- sub %>% filter(category == treated_cat) %>%
+        select(year, t_out = value_adj)
+
+      c_trend <- sub %>% filter(category %in% controls) %>%
+        group_by(year) %>%
+        summarise(c_out = weighted.mean(value_adj, w = spend_2013, na.rm = TRUE),
+                  .groups = "drop")
+
+      merged <- inner_join(t_trend, c_trend, by = "year")
+      if (nrow(merged) == 0) next
+
+      pre_rows <- merged %>% filter(year <= 2013)
+      post_rows <- merged %>% filter(year >= 2014)
+
+      if (nrow(pre_rows) > 0)
+        gaps_by_var[[v]] <- c(gaps_by_var[[v]],
+                              mean(abs(pre_rows$t_out - pre_rows$c_out), na.rm = TRUE))
+      if (nrow(post_rows) > 0)
+        post_gaps_by_var[[v]] <- c(post_gaps_by_var[[v]],
+                                   mean(abs(post_rows$t_out - post_rows$c_out), na.rm = TRUE))
+    }
   }
-  
+
+  # Price-only metrics (kept for backward compatibility)
+  pre_trend_gaps <- gaps_by_var[[OUTCOME_VAR]]
   mean_pre_gap <- mean(pre_trend_gaps, na.rm = TRUE)
   median_pre_gap <- median(pre_trend_gaps, na.rm = TRUE)
   p75_pre_gap <- quantile(pre_trend_gaps, 0.75, na.rm = TRUE)
   p90_pre_gap <- quantile(pre_trend_gaps, 0.90, na.rm = TRUE)
   pct_good <- mean(pre_trend_gaps < 0.05)
   pct_ok <- mean(pre_trend_gaps < 0.10)
+
+  # Per-outcome means + across-outcome average (the "across the board" metric)
+  pre_gap_price <- mean(gaps_by_var[["avg_log_price"]], na.rm = TRUE)
+  pre_gap_qty   <- mean(gaps_by_var[["log_raw_qty"]],   na.rm = TRUE)
+  pre_gap_spend <- mean(gaps_by_var[["log_raw_spend"]], na.rm = TRUE)
+  pre_gap_avg   <- mean(c(pre_gap_price, pre_gap_qty, pre_gap_spend), na.rm = TRUE)
+  pre_gap_max   <- max(c(pre_gap_price, pre_gap_qty, pre_gap_spend), na.rm = TRUE)
+
+  # Post-period deviation gaps (event-study-coefficient-style): low values
+  # mean the implied event-study curve stays near zero post-2013. Useful for
+  # picking specs where qty/spend show no treatment effect (parallel post too).
+  post_gap_price_dev <- mean(post_gaps_by_var[["avg_log_price"]], na.rm = TRUE)
+  post_gap_qty_dev   <- mean(post_gaps_by_var[["log_raw_qty"]],   na.rm = TRUE)
+  post_gap_spend_dev <- mean(post_gaps_by_var[["log_raw_spend"]], na.rm = TRUE)
+  qty_total_dev      <- pre_gap_qty + post_gap_qty_dev
+  spend_total_dev    <- pre_gap_spend + post_gap_spend_dev
   
   # Post gap
   post_gaps <- c()
@@ -293,9 +604,10 @@ evaluate_spec <- function(spec_name, covariates, data_wide, panel, match_ratio) 
     if (!is.na(t_post) && !is.na(c_post)) post_gaps <- c(post_gaps, t_post - c_post)
   }
   
-  cat(sprintf("  SMD: mean=%.4f max=%.4f | Pre-gap: mean=%.4f med=%.4f | Good: %.0f%% | OK: %.0f%%\n",
-              bal, max_smd, mean_pre_gap, median_pre_gap, pct_good*100, pct_ok*100))
-  
+  cat(sprintf("  SMD: mean=%.4f max=%.4f | Pre-gap (price): mean=%.4f | Pre-gap avg(p/q/s): %.4f (p=%.3f q=%.3f s=%.3f)\n",
+              bal, max_smd, mean_pre_gap, pre_gap_avg,
+              pre_gap_price, pre_gap_qty, pre_gap_spend))
+
   data.frame(
     spec = spec_name,
     covariates = paste(covariates, collapse = " + "),
@@ -312,7 +624,17 @@ evaluate_spec <- function(spec_name, covariates, data_wide, panel, match_ratio) 
     pre_trend_p90_gap = round(p90_pre_gap, 4),
     pct_good_pretrend = round(pct_good, 4),
     pct_ok_pretrend = round(pct_ok, 4),
+    pre_gap_price = round(pre_gap_price, 4),
+    pre_gap_qty   = round(pre_gap_qty,   4),
+    pre_gap_spend = round(pre_gap_spend, 4),
+    pre_gap_avg   = round(pre_gap_avg,   4),
+    pre_gap_max   = round(pre_gap_max,   4),
     post_mean_gap = round(mean(post_gaps, na.rm = TRUE), 4),
+    post_gap_price_dev = round(post_gap_price_dev, 4),
+    post_gap_qty_dev   = round(post_gap_qty_dev,   4),
+    post_gap_spend_dev = round(post_gap_spend_dev, 4),
+    qty_total_dev      = round(qty_total_dev,      4),
+    spend_total_dev    = round(spend_total_dev,    4),
     stringsAsFactors = FALSE
   )
 }
@@ -331,31 +653,24 @@ for (spec_name in names(specs)) {
   if (!is.null(res)) results_list[[spec_name]] <- res
 }
 
-# Ratio sensitivity for top trend specs
-cat("\n--- Ratio sensitivity ---\n\n")
-ratio_test <- c("t01_alp_slope", "t02_alp_slope_int", "t05_alp_slope_level13")
-
-for (spec_name in ratio_test) {
-  for (r in c(1, 5)) {
-    res_name <- paste0(spec_name, "_r", r)
-    res <- tryCatch(
-      evaluate_spec(res_name, specs[[spec_name]], data_wide, panel, match_ratio = r),
-      error = function(e) { cat("  ERROR:", e$message, "\n\n"); NULL }
-    )
-    if (!is.null(res)) results_list[[res_name]] <- res
-  }
-}
-
 # ---------------------------
 # Compile and rank
 # ---------------------------
 results <- do.call(rbind, results_list) %>%
   as_tibble() %>%
   mutate(
-    rank_pretrend = rank(pre_trend_mean_gap),
-    rank_balance = rank(mean_abs_smd),
-    rank_coverage = rank(n_treated_dropped),
-    composite_rank = (2 * rank_pretrend + rank_balance + rank_coverage) / 4
+    abs_post_gap        = abs(post_mean_gap),
+    rank_pretrend_price = rank(pre_trend_mean_gap),
+    rank_pretrend_avg   = rank(pre_gap_avg),
+    rank_pretrend_max   = rank(pre_gap_max),
+    rank_balance        = rank(mean_abs_smd),
+    rank_coverage       = rank(n_treated_dropped),
+    rank_post_price     = rank(-abs_post_gap),     # bigger |post gap| = better
+    rank_simplicity     = rank(n_covariates),      # fewer covs = better
+    composite_rank = (2 * rank_pretrend_avg + rank_balance + rank_coverage) / 4,
+    # User-target composite: small pretrend across all 3 outcomes,
+    # large |post gap| on price, and simple formula.
+    target_rank = (2 * rank_pretrend_avg + 2 * rank_post_price + rank_simplicity) / 5
   ) %>%
   arrange(composite_rank)
 
@@ -366,11 +681,27 @@ cat("================================================================\n\n")
 results %>%
   select(spec, covariates, match_ratio, n_treated_matched, n_treated_dropped,
          mean_abs_smd, max_abs_smd,
-         pre_trend_mean_gap, pre_trend_median_gap, pre_trend_p90_gap,
+         pre_gap_price, pre_gap_qty, pre_gap_spend, pre_gap_avg, pre_gap_max,
          pct_good_pretrend, pct_ok_pretrend, composite_rank) %>%
   print(n = Inf, width = Inf)
 
-cat("\n--- Top 5 by pre-trend alignment ---\n")
+cat("\n--- Top 5 by ACROSS-OUTCOME pre-trend alignment (avg of price/qty/spend) ---\n")
+results %>%
+  arrange(pre_gap_avg) %>%
+  slice_head(n = 5) %>%
+  select(spec, covariates, match_ratio, mean_abs_smd,
+         pre_gap_price, pre_gap_qty, pre_gap_spend, pre_gap_avg, pre_gap_max) %>%
+  print(width = Inf)
+
+cat("\n--- Top 5 by WORST-OUTCOME pre-trend (minimize the max across price/qty/spend) ---\n")
+results %>%
+  arrange(pre_gap_max) %>%
+  slice_head(n = 5) %>%
+  select(spec, covariates, match_ratio, mean_abs_smd,
+         pre_gap_price, pre_gap_qty, pre_gap_spend, pre_gap_avg, pre_gap_max) %>%
+  print(width = Inf)
+
+cat("\n--- Top 5 by price-only pre-trend (legacy ranking) ---\n")
 results %>%
   arrange(pre_trend_mean_gap) %>%
   slice_head(n = 5) %>%
@@ -378,13 +709,73 @@ results %>%
          mean_abs_smd, pre_trend_mean_gap, pct_good_pretrend, pct_ok_pretrend) %>%
   print(width = Inf)
 
-cat("\n--- Trend specs vs R2 benchmark ---\n")
+cat("\n--- All specs at ratio=3, sorted by across-outcome pre-trend ---\n")
 results %>%
   filter(match_ratio == 3) %>%
-  arrange(pre_trend_mean_gap) %>%
-  select(spec, covariates, mean_abs_smd, pre_trend_mean_gap,
-         pct_good_pretrend, pct_ok_pretrend) %>%
+  arrange(pre_gap_avg) %>%
+  select(spec, covariates, mean_abs_smd,
+         pre_gap_price, pre_gap_qty, pre_gap_spend, pre_gap_avg, pre_gap_max) %>%
   print(n = Inf, width = Inf)
+
+# ---------------------------
+# User target: small pretrend (price/qty/spend) + large |post-price gap| + simple
+# ---------------------------
+cat("\n=================================================================\n")
+cat("SIMPLE SPECS (<=3 covariates) ranked by user target\n")
+cat("  -> low pre_gap_avg + large |post_mean_gap| on price\n")
+cat("=================================================================\n")
+results %>%
+  filter(match_ratio == 3, n_covariates <= 3) %>%
+  arrange(target_rank) %>%
+  select(spec, covariates, n_covariates,
+         pre_gap_price, pre_gap_qty, pre_gap_spend, pre_gap_avg,
+         post_mean_gap, abs_post_gap, mean_abs_smd, target_rank) %>%
+  print(n = Inf, width = Inf)
+
+cat("\n--- Same, but only n_covariates <= 2 (simplest formulas) ---\n")
+results %>%
+  filter(match_ratio == 3, n_covariates <= 2) %>%
+  arrange(target_rank) %>%
+  select(spec, covariates, n_covariates,
+         pre_gap_price, pre_gap_qty, pre_gap_spend, pre_gap_avg,
+         post_mean_gap, abs_post_gap, mean_abs_smd) %>%
+  print(n = Inf, width = Inf)
+
+# Pareto frontier: simple specs where no other simple spec dominates on
+# (pre_gap_avg lower, abs_post_gap higher).
+cat("\n--- Pareto frontier: simple specs (<=3 covs) on (pre_gap_avg, |post|) ---\n")
+simple <- results %>% filter(match_ratio == 3, n_covariates <= 3)
+is_pareto <- sapply(seq_len(nrow(simple)), function(i) {
+  !any(simple$pre_gap_avg <= simple$pre_gap_avg[i] &
+       simple$abs_post_gap >= simple$abs_post_gap[i] &
+       (simple$pre_gap_avg < simple$pre_gap_avg[i] |
+        simple$abs_post_gap > simple$abs_post_gap[i]))
+})
+simple %>%
+  filter(is_pareto) %>%
+  arrange(pre_gap_avg) %>%
+  select(spec, covariates, n_covariates,
+         pre_gap_price, pre_gap_qty, pre_gap_spend, pre_gap_avg,
+         post_mean_gap, abs_post_gap) %>%
+  print(n = Inf, width = Inf)
+
+# ---------------------------
+# Specs where qty event-study coefficient stays near 0 (pre AND post),
+# AND price pretrend is small. Useful when you want flat qty throughout
+# and only a price treatment effect.
+# ---------------------------
+cat("\n=================================================================\n")
+cat("RANKED: low qty gap (pre+post) + low price pretrend\n")
+cat("  -> sort by (pre_gap_qty + post_gap_qty_dev) + pre_gap_price\n")
+cat("=================================================================\n")
+results %>%
+  filter(match_ratio == 3) %>%
+  mutate(qty_flat_score = qty_total_dev + pre_gap_price) %>%
+  arrange(qty_flat_score) %>%
+  select(spec, covariates, n_covariates,
+         pre_gap_price, pre_gap_qty, post_gap_qty_dev, qty_total_dev,
+         post_gap_price_dev, post_mean_gap, mean_abs_smd) %>%
+  print(n = 15, width = Inf)
 
 write_csv(results, "../output/spec_search/spec_comparison_r3.csv")
 cat("\nSaved to ../output/spec_search/spec_comparison_r3.csv\n")

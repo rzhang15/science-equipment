@@ -403,6 +403,12 @@ def main():
     df_merged.loc[is_pipette_tip, config.UT_CAT_COL] = "pipette tips"
     print(f"  Merged {tip_cats_merged} pipette tip subcategories ({n_tip_consolidated} rows) -> 'pipette tips'")
 
+    print("\nConsolidating ELISA kit categories...")
+    is_elisa = cat_col_lower.str.contains("elisa", na=False)
+    n_elisa_before = cat_col_lower[is_elisa].nunique()
+    df_merged.loc[is_elisa, config.UT_CAT_COL] = "elisa kits"
+    print(f"  Merged {n_elisa_before} elisa subcategories ({is_elisa.sum()} rows) -> 'elisa kits'")
+
     # --- Sibling consolidation from config.CATEGORY_CONSOLIDATION ---
     print("\nApplying sibling consolidation from config.CATEGORY_CONSOLIDATION...")
     apply_sibling_consolidation(df_merged, config.UT_CAT_COL)
@@ -546,6 +552,12 @@ def main_umich():
     tip_cats_merged = cat_col_lower[is_pipette_tip].nunique()
     df_merged.loc[is_pipette_tip, config.UT_CAT_COL] = "pipette tips"
     print(f"  Merged {tip_cats_merged} pipette tip subcategories ({n_tip_consolidated} rows) -> 'pipette tips'")
+
+    print("\nConsolidating ELISA kit categories...")
+    is_elisa = cat_col_lower.str.contains("elisa", na=False)
+    n_elisa_before = cat_col_lower[is_elisa].nunique()
+    df_merged.loc[is_elisa, config.UT_CAT_COL] = "elisa kits"
+    print(f"  Merged {n_elisa_before} elisa subcategories ({is_elisa.sum()} rows) -> 'elisa kits'")
 
     # --- Sibling consolidation from config.CATEGORY_CONSOLIDATION ---
     print("\nApplying sibling consolidation from config.CATEGORY_CONSOLIDATION...")
@@ -709,6 +721,12 @@ def main_combined():
     tip_cats_merged = cat_col_lower[is_pipette_tip].nunique()
     df_merged.loc[is_pipette_tip, config.UT_CAT_COL] = "pipette tips"
     print(f"  Merged {tip_cats_merged} pipette tip subcategories ({n_tip_consolidated} rows) -> 'pipette tips'")
+
+    print("\nConsolidating ELISA kit categories...")
+    is_elisa = cat_col_lower.str.contains("elisa", na=False)
+    n_elisa_before = cat_col_lower[is_elisa].nunique()
+    df_merged.loc[is_elisa, config.UT_CAT_COL] = "elisa kits"
+    print(f"  Merged {n_elisa_before} elisa subcategories ({is_elisa.sum()} rows) -> 'elisa kits'")
 
     # --- Sibling consolidation from config.CATEGORY_CONSOLIDATION ---
     print("\nApplying sibling consolidation from config.CATEGORY_CONSOLIDATION...")

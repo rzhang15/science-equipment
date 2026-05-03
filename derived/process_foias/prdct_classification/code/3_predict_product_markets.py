@@ -344,6 +344,9 @@ def main(gatekeeper_name: str, expert_choice: str, source_abbrev: str = None):
         _lower = unique_overrides.str.lower()
         unique_overrides.loc[
             _lower.str.contains("pipette tip", na=False)] = "pipette tips"
+        unique_overrides.loc[
+            _lower.str.contains("elisa", na=False)] = "elisa kits"
+        _lower = unique_overrides.str.lower()  # recompute after elisa rollup
         _is_ab = _lower.str.contains("antibod", na=False)
         _is_prim = _lower.str.contains("primary", na=False)
         _is_sec = _lower.str.contains("secondary", na=False)
@@ -461,12 +464,13 @@ def main(gatekeeper_name: str, expert_choice: str, source_abbrev: str = None):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run product market predictions on new data.")
     parser.add_argument("source_abbrev", type=str, nargs='?', default=None, help="Abbreviation of data source (e.g., 'utdallas', 'govspend', university prefix). If empty, processes all non-UTDallas, non-GovSpend files.")
-    parser.add_argument("--gatekeeper", type=str, required=True, choices=['tfidf', 'bert'])
-    parser.add_argument(
-        "--expert",
-        type=str,
-        required=True,
-        choices=['tfidf', 'bert'],
-    )
+    parser.add_argument("model", type=str, nargs='?', default=None, choices=['tfidf', 'bert'], help="Shortcut: use this model for BOTH gatekeeper and expert. Overridden per-role by --gatekeeper / --expert.")
+    parser.add_argument("--gatekeeper", type=str, default=None, choices=['tfidf', 'bert'])
+    parser.add_argument("--expert", type=str, default=None, choices=['tfidf', 'bert'])
     args = parser.parse_args()
-    main(gatekeeper_name=args.gatekeeper, expert_choice=args.expert, source_abbrev=args.source_abbrev)
+
+    gatekeeper = args.gatekeeper or args.model
+    expert = args.expert or args.model
+    if gatekeeper is None or expert is None:
+        parser.error("Must specify the model positionally (e.g. 'tfidf') or via --gatekeeper and --expert.")
+    main(gatekeeper_name=gatekeeper, expert_choice=expert, source_abbrev=args.source_abbrev)

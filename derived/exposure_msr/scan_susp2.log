@@ -1,0 +1,59 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 120,000; see help set_maxvar.
+
+. do /tmp/scan_susp2.do 
+
+. set more off
+
+. use output/cleaned_merged_fois, clear
+
+. keep if keep == 1
+(55,213 observations deleted)
+
+. keep if category == "synthetic dna oligonucleotide - desalted"
+(102,425 observations deleted)
+
+. * which suspect token is firing?
+. foreach v in "service" "repair" "calibrat" "install" "rental" "lease" "warran
+> ty" ///
+>     "subscription" "license" "training" "consult" "shipping" "freight" ///
+>     "labor" "hourly" "professional" "agreement" "contract" "estimate" "quote"
+>  ///
+>     "centrifuge" "microscope" "spectrometer" "spectrophotom" "fluorimeter" "f
+> reezer" "refrigerator" ///
+>     "incubator" "shaker" "vortex" "thermocycler" "luminometer" "imager" "scan
+> ner" "printer" {
+  2.     qui count if strpos(clean_desc, "`v'") > 0
+  3.     if r(N) > 0 di "`v'  N=" r(N)
+  4. }
+repair  N=44
+shipping  N=5762
+labor  N=1
+hourly  N=1
+quote  N=7
+freezer  N=2
+shaker  N=1
+vortex  N=4
+
+. 
+end of do-file

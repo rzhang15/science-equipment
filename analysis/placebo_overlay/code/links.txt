@@ -1,0 +1,2 @@
+./real/    | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/analysis/first_stage/output
+./placebo/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/analysis/placebo_first_stage/output

@@ -438,8 +438,8 @@ class RuleBasedCategorizer:
         if assigned_mask.any():
             assigned_pos = np.flatnonzero(assigned_mask)
             assigned_names = pd.Series(overrides_np[assigned_pos])
-            tv_mask = assigned_names.str.contains(
-                self._tube_vial_cat_re, na=False).to_numpy()
+            tv_mask = (assigned_names.str.contains(self._tube_vial_cat_re, na=False) &
+                       ~assigned_names.str.startswith('animal')).to_numpy()
             if tv_mask.any():
                 tv_pos = assigned_pos[tv_mask]
                 tv_texts = pd.Series(clean_arr[tv_pos])

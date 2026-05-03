@@ -14,10 +14,29 @@ dir.create("../output/balance_plots", recursive = TRUE, showWarnings = FALSE)
 # ---------------------------
 # Configuration
 # ---------------------------
-# Matching covariates: pre-treatment outcome trajectory (year-specific levels)
-MATCH_COVARIATES <- c( "avg_log_price_slope", "spend_2013")
+# Matching covariates. Picked via explore_specs.R: spend-weighted across-outcome
+# (price/qty/spend) pretrend search at ratio=3.
+#
+# t13 (current pick): price slope + qty slope.
+#   Composite target_rank=5.1 — best balance of pretrend across price/qty/spend
+#   and post-period gap among the 2-covariate specs. Also strong on individual
+#   covariate balance (mean SMD=0.033). Preferred for parsimony + multi-outcome
+#   pretrend coverage.
+#
+# t11 (alternative): price slope + spend slope + price intercept.
+#   Lowest worst-outcome pretrend (max=0.199). Preferred when balancing the
+#   price level (intercept) explicitly matters.
+#
+# t27 (alternative): annual pre-period prices + spend slope.
+#   Best price-only pretrend (0.095). Preferred when price is the headline
+#   outcome and qty/spend pretrends are secondary.
+ MATCH_COVARIATES <- c("avg_log_price_2011","avg_log_price_2012",
+                       "avg_log_price_2013")
+ #MATCH_COVARIATES <- c("avg_log_price_2010", "avg_log_price_2011",
+ #                      "avg_log_price_2012", "avg_log_price_2013",
+ #                      "log_raw_spend_slope")
 
-# Number of controls per treated unit
+# Number of controls per treated unit (specs evaluated at ratio=3)
 MATCH_RATIO <- 3
 
 # Outcome variables to plot
@@ -45,17 +64,23 @@ data_wide <- all_data_pre %>%
     names_sep = "_",
     id_cols = c(category, treated, spend_2013),
     values_from = c(avg_log_price, log_raw_spend, obs_cnt, item_price,
-                    raw_spend, raw_price, raw_qty, log_raw_price)
+                    raw_spend, raw_price, raw_qty, log_raw_price, log_raw_qty)
   ) %>%
   mutate(
     # Log-transform spend to reduce skew — huge markets won't dominate distance
     log_spend_2013 = log(spend_2013 + 1)
   )
+# Pre-period regression: slope on year and intercept centered at 2012 (year-2012),
+# computed for price, spend, and qty so t13/t27/t11 specs work without code changes.
 pre_slopes <- panel %>%
   filter(year <= 2013) %>%
+  mutate(year_c = year - 2012) %>%
   group_by(category) %>%
   summarise(
-    avg_log_price_slope = coef(lm(avg_log_price ~ year))[2],
+    avg_log_price_slope     = coef(lm(avg_log_price ~ year_c))[2],
+    avg_log_price_intercept = coef(lm(avg_log_price ~ year_c))[1],
+    log_raw_spend_slope     = coef(lm(log_raw_spend ~ year_c))[2],
+    log_raw_qty_slope       = coef(lm(log_raw_qty   ~ year_c))[2],
     .groups = "drop"
   )
 

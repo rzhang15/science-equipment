@@ -39,7 +39,7 @@ program main
     gen perc_treated_hq = treated_hq/hq* 100
     gen perc_treated_lq = treated_lq/lq* 100
     bys athr_id: egen tot_athr_spend =total(tot_spend)
-    stop
+    stop 
     gcollapse (mean) tot_spend nonlab_spend lab_spend hq treated_hq perc_treated_hq perc_lab_spend perc_nonlab_spend perc_hq [aw=tot_athr_spend], by(year)
     tw line tot_spend year || line lab_spend year || line nonlab_spend year, legend(label(1 "Total Spend") label(2 "Lab Spend") label(3 "Non-Lab Spend")) ytitle("Average Spend") xtitle("Year") title("Average Spend by Year")
     graph export ../output/figures/avg_spend_by_year.pdf, replace

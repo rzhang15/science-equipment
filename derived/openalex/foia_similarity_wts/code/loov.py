@@ -17,10 +17,10 @@ def validate_imputation():
 
     # 1. Load Data
     print("Loading data...")
-    W = scipy.sparse.load_npz(WEIGHTS_FILE) # Shape: (N_universe, 94)
+    W = scipy.sparse.load_npz(WEIGHTS_FILE) # Shape: (N_universe, 188)
     W = W.tocsr()
     df_univ = pd.read_parquet(UNIVERSE_IDS_FILE) # Shape: (N_universe, 1)
-    df_foia = pd.read_csv(FOIA_IDS_FILE) # Shape: (94, 1) - Columns of W
+    df_foia = pd.read_csv(FOIA_IDS_FILE) # Shape: (188, 1) - Columns of W
     df_exp = pd.read_stata(USER_EXPOSURE_FILE)
 
     # 2. Align Actual Exposure (Ground Truth)
@@ -50,7 +50,7 @@ def validate_imputation():
             foia_col_indices.append(col_idx) # This author is at this column in W
             valid_actuals.append(E_actual[col_idx])
             found_count += 1
-            
+
     print(f"Found {found_count} of {len(df_foia)} FOIA authors in the Universe dataset.")
     
     if found_count < 10:
@@ -74,7 +74,7 @@ def validate_imputation():
     print("Calculating predictions for different K (neighbors)...")
     
     # We will test using all neighbors (current) vs Top 5 vs Top 10
-    k_values = [3, 5, 10, 20, 93] 
+    k_values = [3, 5, 10, 20, 50, 100, 187]
     results = {}
 
     for k in k_values:

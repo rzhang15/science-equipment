@@ -1,0 +1,164 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 120,000; see help set_maxvar.
+
+. do /tmp/verify_drops.do 
+
+. set more off
+
+. use output/cleaned_merged_fois, clear
+
+. keep if keep == 1
+(55,213 observations deleted)
+
+. qui sum spend
+
+. local s_pre = r(sum)
+
+. local n_pre = r(N)
+
+. di "PRE-FILTER: N=`n_pre'  spend=`s_pre'"
+PRE-FILTER: N=176528  spend=16796794.19032887
+
+. 
+. * (1) Non-Lab drop
+. qui count if prediction_source == "Non-Lab"
+
+. local n1 = r(N)
+
+. qui sum spend if prediction_source == "Non-Lab"
+
+. local s1 = r(sum)
+
+. drop if prediction_source == "Non-Lab"
+(2,327 observations deleted)
+
+. di "(1) Non-Lab drop: N=`n1'  spend=`s1'"
+(1) Non-Lab drop: N=2327  spend=346857.925235996
+
+. 
+. * (2) Market Rules sim<0.05
+. qui count if similarity_score < 0.05 & prediction_source == "Market Rules"
+
+. local n2 = r(N)
+
+. qui sum spend if similarity_score < 0.05 & prediction_source == "Market Rules
+> "
+
+. local s2 = r(sum)
+
+. drop if similarity_score < 0.05 & prediction_source == "Market Rules"
+(6,364 observations deleted)
+
+. di "(2) Market Rules sim<0.05 drop: N=`n2'  spend=`s2'"
+(2) Market Rules sim<0.05 drop: N=6364  spend=397600.8200454656
+
+. 
+. * (3) Equipment keyword drops (regardless of source)
+. local eq_n_total = 0
+
+. local eq_s_total = 0
+
+. foreach v in "homogenizer" "sonicator" "thermocycler" "nutator" "ph meter" //
+> /
+>     "bead mill" "tirf mounted" "tank row" "aspirator system" "stirrer " ///
+>     "steponeplus" "viia7" "viia 7" "vortex mixer" "minimixer" {
+  2.     qui count if strpos(clean_desc, "`v'") > 0
+  3.     local n = r(N)
+  4.     qui sum spend if strpos(clean_desc, "`v'") > 0
+  5.     local s = r(sum)
+  6.     if `n' > 0 di "    `v': N=`n' spend=`s'"
+  7.     drop if strpos(clean_desc, "`v'") > 0
+  8. }
+(0 observations deleted)
+(0 observations deleted)
+(0 observations deleted)
+(0 observations deleted)
+(0 observations deleted)
+(0 observations deleted)
+(0 observations deleted)
+(0 observations deleted)
+(0 observations deleted)
+    stirrer : N=2 spend=41.95999908447266
+(2 observations deleted)
+(0 observations deleted)
+(0 observations deleted)
+(0 observations deleted)
+    vortex mixer: N=2 spend=605.2700042724609
+(2 observations deleted)
+(0 observations deleted)
+
+. 
+. * (4) Borderline keyword drops at any source if sim<0.20
+. foreach v in "service" "repair" "maintenance" "consulting" "training" ///
+>     "rental" "subscription" "license" "software" "warranty" "support contract
+> " ///
+>     "calibration" "installation" "shipping" "freight" "estimate" ///
+>     "contract" "agreement" "professional" "hourly" {
+  2.     qui count if strpos(clean_desc, "`v'") > 0 & similarity_score < 0.20 &
+>  prediction_source != "Expert Model"
+  3.     local n = r(N)
+  4.     qui sum spend if strpos(clean_desc, "`v'") > 0 & similarity_score < 0.
+> 20 & prediction_source != "Expert Model"
+  5.     local s = r(sum)
+  6.     if `n' > 0 di "    `v' (newly caught - non-Expert): N=`n' spend=`s'"
+  7.     drop if strpos(clean_desc, "`v'") > 0 & similarity_score < 0.20
+  8. }
+    service (newly caught - non-Expert): N=1 spend=0
+(1 observation deleted)
+    repair (newly caught - non-Expert): N=1 spend=89
+(1 observation deleted)
+(0 observations deleted)
+(0 observations deleted)
+(0 observations deleted)
+(0 observations deleted)
+(0 observations deleted)
+(0 observations deleted)
+(0 observations deleted)
+(0 observations deleted)
+(0 observations deleted)
+(0 observations deleted)
+(0 observations deleted)
+    shipping (newly caught - non-Expert): N=64 spend=6418.729989767075
+(64 observations deleted)
+(0 observations deleted)
+(0 observations deleted)
+(0 observations deleted)
+(0 observations deleted)
+(0 observations deleted)
+(0 observations deleted)
+
+. 
+. qui sum spend
+
+. di "POST-FILTER: N=" r(N) "  spend=" r(sum)
+POST-FILTER: N=168095  spend=16045180
+
+. di "REMOVED: N=" `n_pre' - r(N) "  spend=" `s_pre' - r(sum)
+REMOVED: N=8433  spend=751613.71
+
+. di "  i.e., " %5.2f (`s_pre' - r(sum))/`s_pre' * 100 "% of prior keep==1 spen
+> d"
+  i.e.,  4.47% of prior keep==1 spend
+
+. 
+end of do-file

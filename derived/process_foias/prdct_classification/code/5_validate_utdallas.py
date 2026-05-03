@@ -178,8 +178,14 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Validate pipeline output against ground truth."
     )
-    parser.add_argument("--gatekeeper", type=str, required=True, choices=['tfidf', 'bert'])
-    parser.add_argument("--expert", type=str, required=True, choices=['tfidf', 'bert'])
+    parser.add_argument("model", type=str, nargs='?', default=None, choices=['tfidf', 'bert'], help="Shortcut: use this model for BOTH gatekeeper and expert. Overridden per-role by --gatekeeper / --expert.")
+    parser.add_argument("--gatekeeper", type=str, default=None, choices=['tfidf', 'bert'])
+    parser.add_argument("--expert", type=str, default=None, choices=['tfidf', 'bert'])
     parser.add_argument("--min_support", type=int, default=25)
     args = parser.parse_args()
-    main(gatekeeper_name=args.gatekeeper, expert_choice=args.expert, min_support=args.min_support)
+
+    gatekeeper = args.gatekeeper or args.model
+    expert = args.expert or args.model
+    if gatekeeper is None or expert is None:
+        parser.error("Must specify the model positionally (e.g. 'tfidf') or via --gatekeeper and --expert.")
+    main(gatekeeper_name=gatekeeper, expert_choice=expert, min_support=args.min_support)

@@ -35,7 +35,7 @@ def analyze_foia():
 
     # 2. CLUSTERING (K-MEANS)
     # We choose 6 clusters to capture broad fields (Neuro, Immuno, Cell Bio, etc.)
-    k = 6
+    k = 10
     print("\n" + "="*40)
     print(f"CLUSTERING AUTHORS INTO {k} GROUPS")
     print("="*40)

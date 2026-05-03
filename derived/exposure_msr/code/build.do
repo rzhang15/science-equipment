@@ -34,6 +34,71 @@ program clean_foia_data
         gen year = year(purchase_date)
         keep if inrange(year, 2010, 2019)
         drop if mi(athr_id)
+        // 1. Antibody buckets (collapse poly/mono primary into "primary antibodies")
+        replace category = "primary antibodies" if strpos(category, "antibod") > 0 & strpos(category, "primary") > 0
+        replace category = "secondary antibodies" if strpos(category, "antibod") > 0 & strpos(category, "secondary") > 0
+
+        // 2. Pipette tip variants
+        replace category = "pipette tips" if strpos(category, "pipette tip") > 0
+
+        // 3. ELISA variants
+        replace category = "elisa kits" if strpos(category, "elisa") > 0
+
+        // 4. Sibling consolidation map (config.CATEGORY_CONSOLIDATION)
+        replace category = "centrifuge tubes" if category == "centrifuge conical tubes"
+        replace category = "metabolism assay kits" if category == "cellular metabolism assay kits"
+
+        // Cell lines
+        replace category = "cell lines" if inlist(category, "human cell lines", "mouse cell lines", "mice cell lines", "rat cell line", "insect cell lines")
+
+        // Lab-grade water
+        replace category = "lab-grade water" if inlist(category, "dnase/rnase-free & molecular-biology-grade water", "general-lab & specialty water", "cell culture grade life science water - distilled")
+
+        // Disposable pipettes
+        replace category = "disposable pipettes" if inlist(category, "pasteur pipettes", "transfer pipettes", "aspirating pipettes", "mohr pipettes", "volumetric pipettes")
+
+        // Manual pipettors
+        replace category = "manual pipettors" if inlist(category, "manual single channel pipettes", "manual multichannel pipettes", "electronic multichannel pipettes", "pipette kits", "pipettors", "positive displacement pipettes")
+
+        // Beakers
+        replace category = "beakers" if inlist(category, "glass beakers", "plastic beakers", "steel beakers", "stainless steel beakers")
+
+        // Graduated cylinders
+        replace category = "graduated cylinders" if inlist(category, "glass graduated cylinders", "plastic graduated cylinders")
+
+        // Other flasks
+        replace category = "other flasks" if inlist(category, "fernbach flasks", "volumetric flasks", "recovery flasks", "freeze drying flasks", "kjeldahl flasks", "distilling flasks", "stainless steel flasks", "serum bottles")
+
+        // Funnels
+        replace category = "funnels" if inlist(category, "filtering funnels", "filling funnels", "separatory funnels", "addition funnels", "funnel stems")
+
+        // Specialty gloves (split — inlist max 10)
+        replace category = "specialty gloves" if inlist(category, "heat resistant gloves", "cold resistant gloves", "neoprene gloves", "cotton gloves", "chemical resistant gloves", "glove box gloves", "cut resistant gloves", "vinyl gloves", "rubber gloves")
+        replace category = "specialty gloves" if inlist(category, "glove liners", "chloroprene gloves", "gloves")
+
+        // Specialty membrane filters
+        replace category = "specialty membrane filters" if inlist(category, "nylon membrane filters", "polycarbonate membrane filters", "pes membrane filters", "mce membrane filters", "membrane filters", "ptfe membrane filters", "cellulose acetate membrane filters")
+
+        // Specialty needles
+        replace category = "specialty needles" if inlist(category, "dispensing needles", "needles", "blood collection needles", "pipetting needles", "double-tipped needles")
+
+        // PCR tube accessories
+        replace category = "pcr tube accessories" if inlist(category, "caps and closures - pcr tube strips", "pcr strip tubes", "pcr tube strip caps", "caps and closures - pcr tubes")
+
+        // Caps and closures - vials
+        replace category = "caps and closures - vials" if inlist(category, "caps and closures - cryovial", "autosampler vial caps")
+
+        // Cuvettes
+        replace category = "cuvettes" if inlist(category, "spectrophotometer cuvettes", "fluorescence cuvettes", "electroporation cuvettes")
+
+        // Recombinant proteins
+        replace category = "recombinant proteins" if inlist(category, "recombinant human protein", "recombinant mouse protein", "recombinant human/mouse/rat protein", "recombinant human/mouse protein", "recombinant human/murine/rat protein", "recombinant cas9 protein")
+
+        // Expression plasmids
+        replace category = "expression plasmids" if inlist(category, "synthetic mammalian expression plasmids", "synthetic bacterial expression plasmids", "synthetic plasmids", "aav plasmids")
+
+        // Vials
+        replace category = "vials" if inlist(category, "sample vials", "scintillation vials", "autosampler vials", "drosophila vials", "screw cap vials")
     }
     qui count
     local total_obs = r(N)
@@ -48,6 +113,7 @@ program clean_foia_data
         bys suppliername: gen num_sup_obs = _N
         drop if num_sup_obs == 1
         replace suppliername = "thermo fisher scientific" if suppliername == "possible missions" & strpos(uni, "dallas") > 0
+        replace suppliername = "thermo fisher scientific" if suppliername == "life technologies" & year >= 2014
         bys suppliername: gegen tot_sup_spend = total(spend)
         drop if tot_sup_spend  < 0 
     }
@@ -58,16 +124,15 @@ program clean_foia_data
     di "[Supplier Cut]  N: `total_obs' Total Spend: `total_spend'"
 
     qui {
-        replace predicted_market = category if uni == "utdallas"
+        replace predicted_market = category if inlist(uni, "utdallas", "umich")
         drop category
         rename predicted_market category
-        replace category = "cryovials" if strpos(clean_desc, "cryo") >0 & strpos(clean_desc, "vial") >0 
         drop if price <= 0 | qty < 1 | spend <= 0
         gen lab = !inlist(category , "Non-Lab", "unclassified")
         foreach v in "animal - " "fees - " "electronics - " "instrument" "office supplies" "lab furniture" "waste disposal" "equipment" "furniture" "software" ///
           "toolkit" "clamp" "tool" "tubing" "random" "unclear" "wire" "towel" "irrelevant chemicals" "oring" "caps" "gas" "first-aid" "first aid" "desk" "chair" "brushes" "trash" "cleaner" ///
           "cotton ball" "bundle of products" "tape" "miscellaneous" "clips" "flint" "accessories" "stands" "batteries" "ear protection" "apron" "pots" "pants" "stoppers" "closures" "rings" ///
-          "mortar" "pestle" "support" "trays" "applicators and swabs" "bundle" "sequencing" "tem - " {
+          "mortar" "pestle" "support" "trays" "applicators and swabs" "bundle" "sequencing" "tem - " "nonlab" "racks" "electronics" {
             drop if strpos(category, "`v'") > 0
         }
         keep if lab == 1
@@ -82,7 +147,7 @@ program clean_foia_data
     di "[ML Consumables & Negative Orders] N: `total_obs' Total Spend: `total_spend'"
     qui {
     // get rid of negated orders
-        drop if (spend > 100000 & !mi(spend)) | price > 100000 & !mi(price) 
+        drop if (spend > 100000 & !mi(spend)) | (price > 100000 & !mi(price)) | (qty > 100000 & !mi(qty))
         foreach v in "graduate " "table" "library" "reader" "po " "replace" ///
             "thesis" "pay" "delivery" "sequencing" "analysis" "transport" "lease" "order" " ins" "date" ///
             "delivered" "deliver" "wire" "fitting" "lamp" "nasco" "sport" ///
@@ -92,21 +157,35 @@ program clean_foia_data
             "ajph" "phssr" "capillarys" "analyses" "datalogger" ///
             "professionalism" ".org" "lcmsms" "pre-owned" "enterprise" ///
             "dialysis" "tower" "kelvin" "lithography" "seal" ///
-            "array" "adverstise" {
+            "array" "adverstise" ///
+            "generator" "compressor" "spectrophotometer" "incubator" ///
+            "rotor" "monitor" "paint" "wafer" "hvac" "cycler" ///
+            "machine" "workstation" "monocular" "binocular" "blotter" {
             drop if strpos(clean_desc, "`v'") > 0
         }
         drop if (strpos(clean_desc, "plate") > 0 | strpos(clean_desc, "card")) & category == "synthetic dna oligonucleotide"
-        // drop borderline terms only when model confidence is low
+        drop if category == "chromatography-grade water" & ///
+            (strpos(clean_desc, "water") == 0 & strpos(clean_desc, "h2o") == 0)
+        drop if inlist(category, "ddpcr systems", "dialyzer midi", ///
+            "dna loading dye", "cloning cylinders")
+        // unambiguous equipment / instrument descriptions — drop regardless of source/sim
+        foreach v in "homogenizer" "sonicator" "thermocycler" "nutator" "ph meter" ///
+            "bead mill" "tirf mounted" "tank row" "aspirator system" "stirrer " ///
+            "steponeplus" "viia7" "viia 7" "vortex mixer" "minimixer" {
+            drop if strpos(clean_desc, "`v'") > 0
+        }
+        // drop borderline terms when model confidence is low (any source)
+        // NB: skipping "quote" and "labor" — false positives on order#s and "laboratory"
         foreach v in "service" "repair" "maintenance" "consulting" "training" ///
             "rental" "subscription" "license" "software" "warranty" "support contract" ///
-            "calibration" "installation" "shipping" "freight" "quote" "estimate" ///
-            "contract" "agreement" "professional" "labor" "hourly" {
-            drop if strpos(clean_desc, "`v'") > 0 & prediction_source == "Expert Model" & similarity_score < 0.20
-        } 
+            "calibration" "installation" "shipping" "freight" "estimate" ///
+            "contract" "agreement" "professional" "hourly" {
+            drop if strpos(clean_desc, "`v'") > 0 & similarity_score < 0.20
+        }
         foreach v in "animal - " "fees - " "electronics - " "instrument" "office supplies" "lab furniture" "waste disposal" "equipment" "furniture" "software" ///
           "toolkit" "clamp" "tool" "tubing" "random" "unclear" "wire" "towel" "irrelevant chemicals" "oring" "caps" "gas" "first-aid" "first aid" "desk" "chair" "brushes" "trash" "cleaner" ///
           "cotton ball" "bundle of products" "tape" "miscellaneous" "clips" "flint" "accessories" "stands" "batteries" "ear protection" "apron" "pots" "pants" "stoppers" "closures" "rings" ///
-          "mortar" "pestle" "support" "trays" "applicators and swabs" "bundle" "sequencing" "tem - " "nonlab" {
+          "mortar" "pestle" "support" "trays" "applicators and swabs" "bundle" "sequencing" "tem - " "nonlab" "racks" {
             drop if strpos(category, "`v'") > 0
           }
     }
@@ -116,7 +195,11 @@ program clean_foia_data
     local total_spend : di %16.0f r(sum)
     di "[Remove Possible Non-consumables] N: `total_obs' Total Spend: `total_spend'"
     merge m:1 category using ../external/ml/categories_tfidf, assert(2 3) keep(3) nogen
-    drop if similarity_score <= 0.10 & prediction_source == "Expert Model" 
+    drop if prediction_source == "Non-Lab"
+    drop if similarity_score < 0.20 & prediction_source == "Expert Model"
+    drop if similarity_score < 0.10 & prediction_source == "Market Rules"
+    drop if price < 1
+    drop if precision < 0.10 & !mi(precision)
     drop if support < 5
     qui sum spend, d
     local total_spend : di %16.0f r(sum)
@@ -143,13 +226,16 @@ program gen_true_exposure
     gen year = year(date(date, "YMD"))
     drop if year > 2013
     keep if inlist(uni, "utdallas", "umich")
-    merge m:1 category using ../external/ml/categories_tfidf, keep(1 3) 
+    merge m:1 category using ../external/ml/categories_tfidf, keep(1 3)
     keep if keep == 1
     gcollapse (sum) spend, by(athr_id category)
     qui sum spend
     local raw_spend = r(sum)
     bys athr_id: egen tot_lab_spend = total(spend)
     gen lab_spend_shr = spend / tot_lab_spend
+    // align slash → hyphen so the two betas in did_coefs merge
+    replace category = "acrylamide-bis solution" if category == "acrylamide/bis solution"
+    replace category = "dmem-f-12" if category == "dmem/f-12"
     merge m:1 category using ../external/betas/did_coefs, assert(1 2 3) keep(1 3) nogen
     gen exposure = b*lab_spend_shr
     gcollapse (sum) exposure, by(athr_id)
@@ -164,6 +250,9 @@ program gen_exposure
     gcollapse (sum) spend (mean) treated cluster_label, by(athr_id category)
     bys athr_id: egen tot_lab_spend = total(spend)
     gen lab_spend_shr = spend / tot_lab_spend
+    // align slash → hyphen so the two betas in did_coefs merge
+    replace category = "acrylamide-bis solution" if category == "acrylamide/bis solution"
+    replace category = "dmem-f-12" if category == "dmem/f-12"
     merge m:1 category using ../external/betas/did_coefs, assert(1 2 3) keep(1 3)
     rename _merge has_beta
     replace has_beta = 0 if has_beta == 1

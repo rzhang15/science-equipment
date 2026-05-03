@@ -1,0 +1,328 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 120,000; see help set_maxvar.
+
+. do /tmp/scan_mr.do 
+
+. set more off
+
+. use output/cleaned_merged_fois, clear
+
+. keep if keep == 1
+(55,213 observations deleted)
+
+. keep if prediction_source == "Market Rules"
+(42,564 observations deleted)
+
+. * distribution of similarity_score for Market Rules
+. sum similarity_score, d
+
+                      similarity_score
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%     .0060675       8.28e-07
+ 5%     .0769333       8.28e-07
+10%     .2304738       8.28e-07       Obs             142,647
+25%     .4122688       .0000364       Sum of wgt.     142,647
+
+50%     .6881187                      Mean           .6035592
+                        Largest       Std. dev.      .2563294
+75%     .8191814       .9924104
+90%     .8626437       .9924104       Variance       .0657048
+95%     .8776397       .9924104       Skewness      -.7376154
+99%     .9677814       .9924104       Kurtosis       2.483548
+
+. * spend at very low similarity
+. qui sum spend if similarity_score < 0.05
+
+. di "MR sim<0.05  spend = " r(sum) "  N=" r(N)
+MR sim<0.05  spend = 397600.82  N=6037
+
+. qui sum spend if similarity_score < 0.10
+
+. di "MR sim<0.10  spend = " r(sum) "  N=" r(N)
+MR sim<0.10  spend = 714197.92  N=9395
+
+. qui sum spend if similarity_score < 0.20
+
+. di "MR sim<0.20  spend = " r(sum) "  N=" r(N)
+MR sim<0.20  spend = 1178989.9  N=11975
+
+. qui sum spend
+
+. di "MR total     spend = " r(sum) "  N=" r(N)
+MR total     spend = 10567069  N=135975
+
+. * sample low-sim Market Rules entries
+. preserve
+
+. keep if similarity_score < 0.05
+(136,334 observations deleted)
+
+. gsort -spend
+
+. list clean_desc category spend similarity_score in 1/30, sep(0) noobs ab(50)
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | nd onec step                                                              |
+  |---------------------------------------------------------------------------|
+  |                                 category  |    spend  | similarity_score  |
+  | synthetic dna oligonucleotide - desalted  | 10095.71  |         .0013424  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | ethovision xt 11 base multiple arena modules video tracking system auto.. |
+  |---------------------------------------------------------------------------|
+  |                                 category  |    spend  | similarity_score  |
+  |                             pipette tips  |     9100  |         .0300608  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | olympus 100x oil objective super-apochromat coverslip-corrected           |
+  |---------------------------------------------------------------------------|
+  |                                 category  |    spend  | similarity_score  |
+  | synthetic dna oligonucleotide - desalted  |     5940  |         .0044291  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | promo legend micro 21                                                     |
+  |---------------------------------------------------------------------------|
+  |                                 category  |    spend  | similarity_score  |
+  | synthetic dna oligonucleotide - desalted  |     4175  |         .0137263  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | nc1203398 legend micro 17 vendor original number                          |
+  |---------------------------------------------------------------------------|
+  |                                 category  |    spend  | similarity_score  |
+  | synthetic dna oligonucleotide - desalted  |  3636.39  |         .0100606  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | 0010 steponeplus real-time pcr system ab rc support                       |
+  |---------------------------------------------------------------------------|
+  |                                 category  |    spend  | similarity_score  |
+  |                       primary antibodies  |  3408.54  |         .0085937  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | 3lrow6-r-3l tank row (no dividers) (12 3l tanks                           |
+  |---------------------------------------------------------------------------|
+  |                                 category  |    spend  | similarity_score  |
+  | synthetic dna oligonucleotide - desalted  |   3304.8  |         .0050562  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | k401111-2 rabbit primary dako envision system-hrp (dab) 1100 tests        |
+  |---------------------------------------------------------------------------|
+  |                                 category  |    spend  | similarity_score  |
+  |                     secondary antibodies  |     2910  |           .04358  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | k401111-2 rabbit primary dako envision system-hrp (dab) 1100 tests        |
+  |---------------------------------------------------------------------------|
+  |                                 category  |    spend  | similarity_score  |
+  |                     secondary antibodies  |     2910  |           .04358  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | sf-n2 microtiter plate                                                    |
+  |---------------------------------------------------------------------------|
+  |                                 category  |    spend  | similarity_score  |
+  | synthetic dna oligonucleotide - desalted  |   2881.2  |          .002077  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | sf-n2 microplate special purpose microplates. metabolic characterizatio.. |
+  |---------------------------------------------------------------------------|
+  |                                 category  |    spend  | similarity_score  |
+  | synthetic dna oligonucleotide - desalted  |   2708.1  |         .0167937  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | faststart sybrgreen mastr(rox)                                            |
+  |---------------------------------------------------------------------------|
+  |                                 category  |    spend  | similarity_score  |
+  |                  nucleic acid gel stains  |     2603  |         .0495498  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | faststart sybrgreen mastr(rox)                                            |
+  |---------------------------------------------------------------------------|
+  |                                 category  |    spend  | similarity_score  |
+  |                  nucleic acid gel stains  |     2603  |         .0495498  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | 100mg-y- 100mg. r-01537035a atta                                          |
+  |---------------------------------------------------------------------------|
+  |                                 category  |    spend  | similarity_score  |
+  | synthetic dna oligonucleotide - desalted  |   2248.5  |          .002253  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | pac-1 fitc                                                                |
+  |---------------------------------------------------------------------------|
+  |                                 category  |    spend  | similarity_score  |
+  |                       primary antibodies  |     2150  |         .0394531  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | superose increase 10 300gl                                                |
+  |---------------------------------------------------------------------------|
+  |                                 category  |    spend  | similarity_score  |
+  |                    size-exclusion resins  |  1957.57  |         .0295546  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | opioid receptor-mu (mor) antibody                                         |
+  |---------------------------------------------------------------------------|
+  |                                 category  |    spend  | similarity_score  |
+  |                       primary antibodies  |     1500  |          .001494  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | et495/25x zt502rdc-uf2 91032 nikon te2000/ti tirf mounted                 |
+  |---------------------------------------------------------------------------|
+  |                                 category  |    spend  | similarity_score  |
+  | synthetic dna oligonucleotide - desalted  |     1475  |         .0023971  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | scientific bead mill                                                      |
+  |---------------------------------------------------------------------------|
+  |                                 category  |    spend  | similarity_score  |
+  | synthetic dna oligonucleotide - desalted  |  1412.46  |         .0075569  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | zet365/20x zt365bcm-uf2 91032 nikon te2000/ti tirf mounted                |
+  |---------------------------------------------------------------------------|
+  |                                 category  |    spend  | similarity_score  |
+  | synthetic dna oligonucleotide - desalted  |     1325  |         .0016696  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | et555/20x zt561rdc-uf2 91032 nikon te2000/ti tirf mounted                 |
+  |---------------------------------------------------------------------------|
+  |                                 category  |    spend  | similarity_score  |
+  | synthetic dna oligonucleotide - desalted  |     1275  |         .0017147  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | et480/30x zt488rdc-uf2 91032 nikon te2000/ti tirf mounted                 |
+  |---------------------------------------------------------------------------|
+  |                                 category  |    spend  | similarity_score  |
+  | synthetic dna oligonucleotide - desalted  |     1275  |         .0022875  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | zet635/20x zt647rdc-uf2 91032 nikon te2000/ti tirf mounted                |
+  |---------------------------------------------------------------------------|
+  |                                 category  |    spend  | similarity_score  |
+  | synthetic dna oligonucleotide - desalted  |     1275  |          .001675  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | 1000rxn dual luciferase reagents                                          |
+  |---------------------------------------------------------------------------|
+  |                                 category  |    spend  | similarity_score  |
+  |                bioluminescence assay kit  |  1248.05  |         .0030551  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | b- e-vac aspirator system barbed tube                                     |
+  |---------------------------------------------------------------------------|
+  |                                 category  |    spend  | similarity_score  |
+  | synthetic dna oligonucleotide - desalted  |     1163  |         .0144086  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | gene pulser-micropulser- electroporation cuvettes 1cm gap pkg 500 1cm-g.. |
+  |---------------------------------------------------------------------------|
+  |                                 category  |    spend  | similarity_score  |
+  | synthetic dna oligonucleotide - desalted  |   1162.4  |         .0093994  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | gene pulser-micropulser- electroporation cuvettes 2cm gap pkg 500 steri.. |
+  |---------------------------------------------------------------------------|
+  |                                 category  |    spend  | similarity_score  |
+  | synthetic dna oligonucleotide - desalted  |   1162.4  |         .0094132  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | rabbit primary dako envision system-hrp (dab) k401011-2                   |
+  |---------------------------------------------------------------------------|
+  |                                 category  |    spend  | similarity_score  |
+  |                     secondary antibodies  |     1140  |          .041425  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | gene pulser-micropulser- electroporation cuvettes 2cm gap pkg 500 steri.. |
+  |---------------------------------------------------------------------------|
+  |                                 category  |    spend  | similarity_score  |
+  | synthetic dna oligonucleotide - desalted  |   1128.8  |         .0094132  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | gene pulser-micropulser- electroporation cuvettes 2cm gap pkg 500 steri.. |
+  |---------------------------------------------------------------------------|
+  |                                 category  |    spend  | similarity_score  |
+  | synthetic dna oligonucleotide - desalted  |   1128.8  |         .0094132  |
+  +---------------------------------------------------------------------------+
+
+. restore
+
+. 
+end of do-file

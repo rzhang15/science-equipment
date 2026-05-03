@@ -1,0 +1,103 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 120,000; see help set_maxvar.
+
+. do /tmp/diag_merge.do 
+
+. set more off
+
+. * (1) which beta categories merge into the spend data?
+. use external/betas/did_coefs, clear
+
+. keep category b
+
+. rename b beta_b
+
+. tempfile betas
+
+. save `betas'
+file /tmp/St1014586.000001 saved as .dta format
+
+. 
+. use output/cleaned_merged_fois, clear
+
+. keep if year <= 2013
+(160,964 observations deleted)
+
+. keep if keep == 1
+(15,234 observations deleted)
+
+. gcollapse (sum) spend, by(category)
+
+. merge 1:1 category using `betas'
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                           149
+        from master                       147  (_merge==1)
+        from using                          2  (_merge==2)
+
+    Matched                                45  (_merge==3)
+    -----------------------------------------
+
+. * _merge==1: spend with no beta; ==2: beta with no spend; ==3: matched
+. tab _merge
+
+   Matching result from |
+                  merge |      Freq.     Percent        Cum.
+------------------------+-----------------------------------
+        Master only (1) |        147       75.77       75.77
+         Using only (2) |          2        1.03       76.80
+            Matched (3) |         45       23.20      100.00
+------------------------+-----------------------------------
+                  Total |        194      100.00
+
+. 
+. di "MERGE RESULTS"
+MERGE RESULTS
+
+. qui sum spend if _merge == 1
+
+. di "  cats in spend, no beta. spend=" r(sum) "  N_cats=" r(N)
+  cats in spend, no beta. spend=4433385  N_cats=147
+
+. qui sum spend if _merge == 3
+
+. di "  cats matched.            spend=" r(sum) "  N_cats=" r(N)
+  cats matched.            spend=1025767.5  N_cats=45
+
+. 
+. * show beta cats with no matching spend
+. di "BETA CATS WITH NO SPEND:"
+BETA CATS WITH NO SPEND:
+
+. list category if _merge == 2, sep(0) noobs ab(60)
+
+  +-------------------------+
+  |                category |
+  |-------------------------|
+  | acrylamide-bis solution |
+  |               dmem-f-12 |
+  +-------------------------+
+
+. 
+end of do-file

@@ -1,0 +1,2951 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 120,000; see help set_maxvar.
+
+. do /tmp/pcr_check.do 
+
+. set more off
+
+. clear all
+
+. cd /n/holylabs/pakes_lab/Lab/sci_eq/derived/first_stage/make_mkt_panel/output
+/n/holylabs/pakes_lab/Lab/sci_eq/derived/first_stage/make_mkt_panel/output
+
+. 
+. * find categories matching pcr/amplification
+. use full_item_level_tfidf, clear
+
+. gen flag = strpos(category, "pcr") > 0 | strpos(category, "amplif") > 0
+
+. levelsof category if flag, local(cats)
+`"column-based pcr and gel purification kit"' `"column-based pcr purification k
+> its"' `"ddpcr systems"' `"direct pcr lysis reagents"' `"dye-based qpcr system
+> s"' `"genome amplification kits"' `"high-fidelity hot start pcr systems"' `"h
+> igh-fidelity pcr systems"' `"hot start pcr systems"' `"long template pcr syst
+> ems"' `"pcr systems"' `"pcr tube strips"' `"pcr tubes"' `"pre amplification k
+> its"' `"pre-designed qpcr assays"' `"probe-based qpcr systems"' `"probe-based
+>  rt-qpcr systems"' `"qpcr reaction dyes"' `"tissue pcr systems"'
+
+. di "Matching cats:"
+Matching cats:
+
+. foreach c in `cats' {
+  2.     di "  - `c'"
+  3. }
+  - column-based pcr and gel purification kit
+  - column-based pcr purification kits
+  - ddpcr systems
+  - direct pcr lysis reagents
+  - dye-based qpcr systems
+  - genome amplification kits
+  - high-fidelity hot start pcr systems
+  - high-fidelity pcr systems
+  - hot start pcr systems
+  - long template pcr systems
+  - pcr systems
+  - pcr tube strips
+  - pcr tubes
+  - pre amplification kits
+  - pre-designed qpcr assays
+  - probe-based qpcr systems
+  - probe-based rt-qpcr systems
+  - qpcr reaction dyes
+  - tissue pcr systems
+
+. 
+. foreach c in `cats' {
+  2.     di _newline _newline "================================================
+> ==="
+  3.     di "CATEGORY: `c'"
+  4.     di "==================================================="
+  5.     use full_item_level_tfidf if category == "`c'", clear
+  6.     qui count
+  7.     di "N items = " r(N)
+  8.     
+.     di "----- yearly aggregates -----"
+  9.     preserve
+ 10.     gcollapse (count) n=raw_price (mean) mean_price=raw_price (sum) tot_sp
+> end=raw_spend tot_qty=raw_qty (median) med_price=raw_price (firstnm) precisio
+> n recall support, by(year)
+ 11.     list year n mean_price med_price tot_qty tot_spend, sep(0) noobs
+ 12.     di "precision/recall/support (constant):"
+ 13.     list precision recall support in 1, sep(0) noobs
+ 14.     restore
+ 15.     
+.     di "----- top 5 suppliers by spend -----"
+ 16.     preserve
+ 17.     gcollapse (sum) raw_spend (count) n=raw_spend, by(suppliername)
+ 18.     gsort -raw_spend
+ 19.     qui keep if _n <= 5
+ 20.     list suppliername n raw_spend, sep(0) noobs ab(40)
+ 21.     restore
+ 22.     
+.     di "----- top 5 priciest items 2010-2011 -----"
+ 23.     preserve
+ 24.     keep if inrange(year, 2010, 2011)
+ 25.     gsort -raw_price
+ 26.     qui keep if _n <= 5
+ 27.     list clean_desc suppliername raw_price raw_qty raw_spend year, sep(0) 
+> noobs ab(60)
+ 28.     restore
+ 29.     
+.     di "----- top 5 priciest items 2018-2019 -----"
+ 30.     preserve
+ 31.     keep if inrange(year, 2018, 2019)
+ 32.     gsort -raw_price
+ 33.     qui keep if _n <= 5
+ 34.     list clean_desc suppliername raw_price raw_qty raw_spend year, sep(0) 
+> noobs ab(60)
+ 35.     restore
+ 36.     
+.     di "----- 5 random items from 2013 (base year) -----"
+ 37.     preserve
+ 38.     keep if year == 2013
+ 39.     qui count
+ 40.     if r(N) >= 5 sample 5, count
+ 41.     list clean_desc raw_price raw_qty, sep(0) noobs ab(70)
+ 42.     restore
+ 43. }
+
+
+===================================================
+CATEGORY: column-based pcr and gel purification kit
+===================================================
+N items = 127
+----- yearly aggregates -----
+
+  +------------------------------------------------------+
+  | year    n   mean_p~e   med_pr~e   tot_qty   tot_sp~d |
+  |------------------------------------------------------|
+  | 2010    3     263.96     313.94         5    1119.88 |
+  | 2011    3   84.84334      89.68         6     568.48 |
+  | 2012    7   153.0257      107.8        13    1654.38 |
+  | 2013   21   173.3109     107.79        23    4121.18 |
+  | 2014   18   187.9333    103.935        21    3857.97 |
+  | 2015   19   225.9516        187        21    4663.08 |
+  | 2016   11   260.9509      199.9        12    3062.86 |
+  | 2017   16   187.3494     108.26        19    3562.06 |
+  | 2018   17   249.7565      304.8        21    4658.96 |
+  | 2019   12     213.49     157.74        13    3002.78 |
+  +------------------------------------------------------+
+precision/recall/support (constant):
+
+  +-------------------------------+
+  | precis~n     recall   support |
+  |-------------------------------|
+  |        1   .2571429        70 |
+  +-------------------------------+
+----- top 5 suppliers by spend -----
+
+  +-------------------------------------------+
+  |             suppliername    n   raw_spend |
+  |-------------------------------------------|
+  | thermo fisher scientific   70    16828.32 |
+  |      denville scientific   14     3888.28 |
+  |                      vwr   14     3343.99 |
+  |             clontech lab   15     2752.95 |
+  |           takara bio usa    6      1740.8 |
+  +-------------------------------------------+
+----- top 5 priciest items 2010-2011 -----
+(121 observations deleted)
+
+  +-----------------------------------------------------------------------+
+  |                     clean_desc |             suppliername | raw_price |
+  |     wizard sv gelpcr clean sys | thermo fisher scientific |    313.94 |
+  |-----------------------------------------------------------------------|
+  |        raw_qty        |        raw_spend        |        year         |
+  |              1        |           313.94        |        2010         |
+  +-----------------------------------------------------------------------+
+
+  +-----------------------------------------------------------------------+
+  |                     clean_desc |             suppliername | raw_price |
+  |     wizard sv gelpcr clean sys | thermo fisher scientific |    313.94 |
+  |-----------------------------------------------------------------------|
+  |        raw_qty        |        raw_spend        |        year         |
+  |              1        |           313.94        |        2010         |
+  +-----------------------------------------------------------------------+
+
+  +-----------------------------------------------------------------------+
+  |                     clean_desc |             suppliername | raw_price |
+  | gfx pcr dna gel band purif 100 | thermo fisher scientific |       164 |
+  |-----------------------------------------------------------------------|
+  |        raw_qty        |        raw_spend        |        year         |
+  |              3        |              492        |        2010         |
+  +-----------------------------------------------------------------------+
+
+  +-----------------------------------------------------------------------+
+  |                     clean_desc |             suppliername | raw_price |
+  |    gel/pcr fragment extraction |                      vwr |    104.65 |
+  |-----------------------------------------------------------------------|
+  |        raw_qty        |        raw_spend        |        year         |
+  |              4        |            418.6        |        2011         |
+  +-----------------------------------------------------------------------+
+
+  +-----------------------------------------------------------------------+
+  |                     clean_desc |             suppliername | raw_price |
+  |  promega gel/pcr cleanup rsltp | thermo fisher scientific |     89.68 |
+  |-----------------------------------------------------------------------|
+  |        raw_qty        |        raw_spend        |        year         |
+  |              1        |            89.68        |        2011         |
+  +-----------------------------------------------------------------------+
+----- top 5 priciest items 2018-2019 -----
+(98 observations deleted)
+
+  +-----------------------------------------------------------------+
+  |                           clean_desc |             suppliername |
+  |           nucleospin gel pcr cleanup | thermo fisher scientific |
+  |-----------------------------------------------------------------|
+  |    raw_price    |    raw_qty    |    raw_spend    |    year     |
+  |        466.8    |          1    |        466.8    |    2018     |
+  +-----------------------------------------------------------------+
+
+  +-----------------------------------------------------------------+
+  |                           clean_desc |             suppliername |
+  |           nucleospin gel pcr cleanup | thermo fisher scientific |
+  |-----------------------------------------------------------------|
+  |    raw_price    |    raw_qty    |    raw_spend    |    year     |
+  |        466.8    |          1    |        466.8    |    2018     |
+  +-----------------------------------------------------------------+
+
+  +-----------------------------------------------------------------+
+  |                           clean_desc |             suppliername |
+  |           nucleospin gel pcr cleanup | thermo fisher scientific |
+  |-----------------------------------------------------------------|
+  |    raw_price    |    raw_qty    |    raw_spend    |    year     |
+  |        466.8    |          1    |        466.8    |    2018     |
+  +-----------------------------------------------------------------+
+
+  +-----------------------------------------------------------------+
+  |                           clean_desc |             suppliername |
+  |           nucleospin gel pcr cleanup | thermo fisher scientific |
+  |-----------------------------------------------------------------|
+  |    raw_price    |    raw_qty    |    raw_spend    |    year     |
+  |        440.9    |          2    |        881.8    |    2019     |
+  +-----------------------------------------------------------------+
+
+  +-----------------------------------------------------------------+
+  |                           clean_desc |             suppliername |
+  | .250 nucleospin gel pcr clean-up kit |           takara bio usa |
+  |-----------------------------------------------------------------|
+  |    raw_price    |    raw_qty    |    raw_spend    |    year     |
+  |          389    |          1    |          389    |    2018     |
+  +-----------------------------------------------------------------+
+----- 5 random items from 2013 (base year) -----
+(106 observations deleted)
+(16 observations deleted)
+
+  +--------------------------------------------------------------------+
+  |                                                         clean_desc |
+  |                                         nucleospin gel pcr cleanup |
+  |--------------------------------------------------------------------|
+  |            raw_price             |             raw_qty             |
+  |               432.53             |                   1             |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                                         clean_desc |
+  |                                        nucleospin gel pcr clean-up |
+  |--------------------------------------------------------------------|
+  |            raw_price             |             raw_qty             |
+  |                   79             |                   1             |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                                         clean_desc |
+  |                                  .250 nucleospin gel pcr clean kit |
+  |--------------------------------------------------------------------|
+  |            raw_price             |             raw_qty             |
+  |               273.75             |                   2             |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                                         clean_desc |
+  |                                        gel/pcr fragment extraction |
+  |--------------------------------------------------------------------|
+  |            raw_price             |             raw_qty             |
+  |               107.79             |                   1             |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                                         clean_desc |
+  | spinsmart pcr purification gel extraction columns/collection tubes |
+  |--------------------------------------------------------------------|
+  |            raw_price             |             raw_qty             |
+  |                207.9             |                   2             |
+  +--------------------------------------------------------------------+
+
+
+===================================================
+CATEGORY: column-based pcr purification kits
+===================================================
+N items = 3795
+----- yearly aggregates -----
+
+  +--------------------------------------------------------+
+  | year     n   mean_p~e   med_pr~e    tot_qty   tot_sp~d |
+  |--------------------------------------------------------|
+  | 2010   226   463.5471        108   370.0503   196472.1 |
+  | 2011   249   444.1549        111      370.4   152932.5 |
+  | 2012   361   288.9552        102   852.8387   175756.4 |
+  | 2013   338   465.2899    120.875        512   208822.9 |
+  | 2014   361   348.6967      135.9        525   175079.1 |
+  | 2015   408   412.9355        126        648   226084.6 |
+  | 2016   408   448.9203    136.745    614.013   216407.8 |
+  | 2017   494   344.8771    118.525        796   207804.1 |
+  | 2018   465   335.2787     120.71        689   191360.2 |
+  | 2019   485   314.8411     115.32        744   184782.5 |
+  +--------------------------------------------------------+
+precision/recall/support (constant):
+
+  +-------------------------------+
+  | precis~n     recall   support |
+  |-------------------------------|
+  | .4305556   .6038961       154 |
+  +-------------------------------+
+----- top 5 suppliers by spend -----
+
+  +---------------------------------------------+
+  |             suppliername      n   raw_spend |
+  |---------------------------------------------|
+  | thermo fisher scientific    918    436171.9 |
+  |                   qiagen   1334    420233.1 |
+  |           bd biosciences     72    324514.4 |
+  |                      vwr    310    134783.5 |
+  |               affymetrix    112    106684.7 |
+  +---------------------------------------------+
+----- top 5 priciest items 2010-2011 -----
+(3,320 observations deleted)
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | 4376373r-real time pcr                                                    |
+  |---------------------------------------------------------------------------|
+  |             suppliername  | raw_price  |  raw_qty  |  raw_spend  |  year  |
+  |        life technologies  |      8000  |        1  |       8000  |  2011  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | eppendorf mastercycler pro pcr bund                                       |
+  |---------------------------------------------------------------------------|
+  |             suppliername  | raw_price  |  raw_qty  |  raw_spend  |  year  |
+  |                      vwr  |   7714.74  |        1  |    7714.74  |  2011  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | pcr machine eppendorf pro s-advantage mc bundle 96a -used research lab... |
+  |---------------------------------------------------------------------------|
+  |             suppliername  | raw_price  |  raw_qty  |  raw_spend  |  year  |
+  | thermo fisher scientific  |   5811.24  |        1  |    5811.24  |  2010  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | classroom pcr labstation                                                  |
+  |---------------------------------------------------------------------------|
+  |             suppliername  | raw_price  |  raw_qty  |  raw_spend  |  year  |
+  |                  edvotek  |      4999  |        1  |       4999  |  2011  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | classroom pcr labstationwith amplification alu vntr gmo                   |
+  |---------------------------------------------------------------------------|
+  |             suppliername  | raw_price  |  raw_qty  |  raw_spend  |  year  |
+  |                  edvotek  |      4999  |        1  |       4999  |  2010  |
+  +---------------------------------------------------------------------------+
+----- top 5 priciest items 2018-2019 -----
+(2,845 observations deleted)
+
+  +-------------------------------------------------------------------+
+  |                                                       clean_desc  |
+  |                                                pcr thermo cycler  |
+  |-------------------------------------------------------------------|
+  |             suppliername | raw_price | raw_qty | raw_spend | year |
+  | thermo fisher scientific |      8600 |       1 |      8600 | 2018 |
+  +-------------------------------------------------------------------+
+
+  +-------------------------------------------------------------------+
+  |                                                       clean_desc  |
+  |                                     blue mygo mini real-time pcr  |
+  |-------------------------------------------------------------------|
+  |             suppliername | raw_price | raw_qty | raw_spend | year |
+  | phenix research products |      8136 |       1 |      8136 | 2018 |
+  +-------------------------------------------------------------------+
+
+  +-------------------------------------------------------------------+
+  |                                                       clean_desc  |
+  |  thermal cycler mastercycler x50a aluminum used pcr applications  |
+  |-------------------------------------------------------------------|
+  |             suppliername | raw_price | raw_qty | raw_spend | year |
+  | thermo fisher scientific |   7896.62 |       1 |   7896.62 | 2019 |
+  +-------------------------------------------------------------------+
+
+  +-------------------------------------------------------------------+
+  |                                                       clean_desc  |
+  |                                   pcr machine mastercycler nexus  |
+  |-------------------------------------------------------------------|
+  |             suppliername | raw_price | raw_qty | raw_spend | year |
+  |                      vwr |   5257.78 |       1 |   5257.78 | 2018 |
+  +-------------------------------------------------------------------+
+
+  +-------------------------------------------------------------------+
+  |                                                       clean_desc  |
+  |                                             cxp real time pcr os  |
+  |-------------------------------------------------------------------|
+  |             suppliername | raw_price | raw_qty | raw_spend | year |
+  |     bio-rad laboratories |      5247 |       1 |      5247 | 2018 |
+  +-------------------------------------------------------------------+
+----- 5 random items from 2013 (base year) -----
+(3,457 observations deleted)
+(333 observations deleted)
+
+  +------------------------------------------------------+
+  |                     clean_desc   raw_price   raw_qty |
+  |------------------------------------------------------|
+  | exosap-it pcr product clean-up     3094.15         1 |
+  |                mgntc pcr clean      140.16         1 |
+  |  qiaquick pcr purification kit       71.28         1 |
+  |  qiaquick pcr purification kit        97.2         1 |
+  |  qiaquick pcr purification kit         498         1 |
+  +------------------------------------------------------+
+
+
+===================================================
+CATEGORY: ddpcr systems
+===================================================
+N items = 182
+----- yearly aggregates -----
+
+  +------------------------------------------------------+
+  | year    n   mean_p~e   med_pr~e   tot_qty   tot_sp~d |
+  |------------------------------------------------------|
+  | 2010    4   1286.235   1294.695         7    5891.04 |
+  | 2011    9   475.6555        453        10     4733.9 |
+  | 2012   20    329.546        255        25    8561.24 |
+  | 2013   12   286.3792     226.17        13    3766.55 |
+  | 2014   27   300.7859        255        33   10600.92 |
+  | 2015   15   382.8527        378        24    9024.34 |
+  | 2016   32   376.3216        307        34   12276.29 |
+  | 2017   15   509.9833     529.92        15    7649.75 |
+  | 2018   13   430.2892        357        14    5950.76 |
+  | 2019   35   398.2209        357        48   18554.41 |
+  +------------------------------------------------------+
+precision/recall/support (constant):
+
+  +-------------------------------+
+  | precis~n     recall   support |
+  |-------------------------------|
+  | .1071429   .4285714         7 |
+  +-------------------------------+
+----- top 5 suppliers by spend -----
+
+  +-------------------------------------------+
+  |             suppliername    n   raw_spend |
+  |-------------------------------------------|
+  | thermo fisher scientific   76    30758.99 |
+  |     bio-rad laboratories   46    24367.51 |
+  |        life technologies   27       11999 |
+  |      new england biolabs   11        6090 |
+  |       integrated dnatech    6      4012.7 |
+  +-------------------------------------------+
+----- top 5 priciest items 2010-2011 -----
+(169 observations deleted)
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | lens 72mm clear aperture 1000mm focal length rv 70 series fiberoptic pd.. |
+  |---------------------------------------------------------------------------|
+  |        suppliername  |  raw_price   |  raw_qty   |  raw_spend   |  year   |
+  |                 tsi  |       2400   |        1   |       2400   |  2010   |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | real-time pcr primers probes                                              |
+  |---------------------------------------------------------------------------|
+  |        suppliername  |  raw_price   |  raw_qty   |  raw_spend   |  year   |
+  |   life technologies  |    2154.39   |        1   |    2154.39   |  2010   |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | probes primers described attachment. product type prime time qpcr probe.  |
+  |---------------------------------------------------------------------------|
+  |        suppliername  |  raw_price   |  raw_qty   |  raw_spend   |  year   |
+  |  integrated dnatech  |       1188   |        1   |       1188   |  2011   |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | mgb real time probes                                                      |
+  |---------------------------------------------------------------------------|
+  |        suppliername  |  raw_price   |  raw_qty   |  raw_spend   |  year   |
+  |   life technologies  |      504.9   |        1   |      504.9   |  2011   |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | express qpcr supermix univ                                                |
+  |---------------------------------------------------------------------------|
+  |        suppliername  |  raw_price   |  raw_qty   |  raw_spend   |  year   |
+  |   life technologies  |        453   |        1   |        453   |  2011   |
+  +---------------------------------------------------------------------------+
+----- top 5 priciest items 2018-2019 -----
+(134 observations deleted)
+
+  +--------------------------------------------------------------------+
+  |                              clean_desc |             suppliername |
+  | probes 27 19 hudysv2 probe taqman tamra | thermo fisher scientific |
+  |--------------------------------------------------------------------|
+  |    raw_price     |    raw_qty     |    raw_spend     |    year     |
+  |          910     |          1     |          910     |    2019     |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                              clean_desc |             suppliername |
+  |  probes 12 19 atx002 probe taqman tamra | thermo fisher scientific |
+  |--------------------------------------------------------------------|
+  |    raw_price     |    raw_qty     |    raw_spend     |    year     |
+  |          910     |          1     |          910     |    2019     |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                              clean_desc |             suppliername |
+  |     probes 11 19 apb probe taqman tamra | thermo fisher scientific |
+  |--------------------------------------------------------------------|
+  |    raw_price     |    raw_qty     |    raw_spend     |    year     |
+  |          910     |          1     |          910     |    2019     |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                              clean_desc |             suppliername |
+  |     probes 20 19 apb probe taqman tamra | thermo fisher scientific |
+  |--------------------------------------------------------------------|
+  |    raw_price     |    raw_qty     |    raw_spend     |    year     |
+  |          910     |          1     |          910     |    2019     |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                              clean_desc |             suppliername |
+  |        probes 19 apb probe taqman tamra | thermo fisher scientific |
+  |--------------------------------------------------------------------|
+  |    raw_price     |    raw_qty     |    raw_spend     |    year     |
+  |          910     |          1     |          910     |    2019     |
+  +--------------------------------------------------------------------+
+----- 5 random items from 2013 (base year) -----
+(170 observations deleted)
+(7 observations deleted)
+
+  +----------------------------------------------------------------+
+  |                               clean_desc   raw_price   raw_qty |
+  |----------------------------------------------------------------|
+  | taqman primer probes slc2a10 (fam dye 25         155         1 |
+  | taqman primer probes slc2a2 (fam dye 250         155         1 |
+  | taqman primer probes slc2a9 (fam dye 250         155         1 |
+  |                           primers probes         230         1 |
+  |          express qpcr supermix universal         458         1 |
+  +----------------------------------------------------------------+
+
+
+===================================================
+CATEGORY: direct pcr lysis reagents
+===================================================
+N items = 94
+----- yearly aggregates -----
+
+  +------------------------------------------------------+
+  | year    n   mean_p~e   med_pr~e   tot_qty   tot_sp~d |
+  |------------------------------------------------------|
+  | 2010    2      150.2      150.2         2      300.4 |
+  | 2011    1       40.2       40.2         1       40.2 |
+  | 2012    5     189.91        216   5.13332   978.3471 |
+  | 2013   11   127.8945      102.7        12    1450.24 |
+  | 2014   11   173.4655        139        11    1908.12 |
+  | 2015   14     179.21      193.7        14    2508.94 |
+  | 2016   15   263.2953      193.7        70   19431.48 |
+  | 2017   12   203.0267    223.685        70    19438.2 |
+  | 2018    9   147.0444        149        13     1919.4 |
+  | 2019   14     133.04        149        28    6162.53 |
+  +------------------------------------------------------+
+precision/recall/support (constant):
+
+  +-------------------------------+
+  | precis~n     recall   support |
+  |-------------------------------|
+  |        1   .9615384        26 |
+  +-------------------------------+
+----- top 5 suppliers by spend -----
+
+  +-------------------------------------------+
+  |             suppliername    n   raw_spend |
+  |-------------------------------------------|
+  |                      vwr   11     34820.8 |
+  | thermo fisher scientific   39    11138.17 |
+  |           viagen biotech   26        4534 |
+  |           milliporesigma    4      1103.1 |
+  |                   qiagen    5    979.5971 |
+  +-------------------------------------------+
+----- top 5 priciest items 2010-2011 -----
+(91 observations deleted)
+
+  +------------------------------------------------------------------------+
+  |                             clean_desc |      suppliername | raw_price |
+  |     denat./lysis soln. 100ml (totally) | life technologies |     221.4 |
+  |------------------------------------------------------------------------|
+  |        raw_qty        |        raw_spend         |        year         |
+  |              1        |            221.4         |        2010         |
+  +------------------------------------------------------------------------+
+
+  +------------------------------------------------------------------------+
+  |                             clean_desc |      suppliername | raw_price |
+  | t-directpcr lysis reagent (mouse tail) |    viagen biotech |        79 |
+  |------------------------------------------------------------------------|
+  |        raw_qty        |        raw_spend         |        year         |
+  |              1        |               79         |        2010         |
+  +------------------------------------------------------------------------+
+
+  +------------------------------------------------------------------------+
+  |                             clean_desc |      suppliername | raw_price |
+  |             primer c-36 (4gallon pail) |         tandus us |      40.2 |
+  |------------------------------------------------------------------------|
+  |        raw_qty        |        raw_spend         |        year         |
+  |              1        |             40.2         |        2011         |
+  +------------------------------------------------------------------------+
+----- top 5 priciest items 2018-2019 -----
+(71 observations deleted)
+
+  +-----------------------------------------------------------------------+
+  |                     clean_desc |             suppliername | raw_price |
+  |      maxwell 16 mouse tail dna | thermo fisher scientific |    350.27 |
+  |-----------------------------------------------------------------------|
+  |        raw_qty        |        raw_spend        |        year         |
+  |             12        |          4203.24        |        2019         |
+  +-----------------------------------------------------------------------+
+
+  +-----------------------------------------------------------------------+
+  |                     clean_desc |             suppliername | raw_price |
+  | directpcr lysis reagent (tail) | thermo fisher scientific |    159.85 |
+  |-----------------------------------------------------------------------|
+  |        raw_qty        |        raw_spend        |        year         |
+  |              1        |           159.85        |        2018         |
+  +-----------------------------------------------------------------------+
+
+  +-----------------------------------------------------------------------+
+  |                     clean_desc |             suppliername | raw_price |
+  | directpcr lysis reagent (cell) | thermo fisher scientific |    159.85 |
+  |-----------------------------------------------------------------------|
+  |        raw_qty        |        raw_spend        |        year         |
+  |              1        |           159.85        |        2018         |
+  +-----------------------------------------------------------------------+
+
+  +-----------------------------------------------------------------------+
+  |                     clean_desc |             suppliername | raw_price |
+  | directpcr lysis reagent (tail) | thermo fisher scientific |    159.85 |
+  |-----------------------------------------------------------------------|
+  |        raw_qty        |        raw_spend        |        year         |
+  |              1        |           159.85        |        2018         |
+  +-----------------------------------------------------------------------+
+
+  +-----------------------------------------------------------------------+
+  |                     clean_desc |             suppliername | raw_price |
+  | directpcr lysis reagent (tail) | thermo fisher scientific |    159.85 |
+  |-----------------------------------------------------------------------|
+  |        raw_qty        |        raw_spend        |        year         |
+  |              1        |           159.85        |        2019         |
+  +-----------------------------------------------------------------------+
+----- 5 random items from 2013 (base year) -----
+(83 observations deleted)
+(6 observations deleted)
+
+  +--------------------------------------------------------------+
+  |                             clean_desc   raw_price   raw_qty |
+  |--------------------------------------------------------------|
+  |   gentra puregene mouse tail kit 100mg        43.4         2 |
+  |          dir pcr lysis rgnt(mouse tail       102.7         1 |
+  | viagen directpcr dna extraction system          79         1 |
+  |          dir pcr lysis rgnt(mouse tail       102.7         1 |
+  | viagen directpcr dna extraction system          79         1 |
+  +--------------------------------------------------------------+
+
+
+===================================================
+CATEGORY: dye-based qpcr systems
+===================================================
+N items = 4672
+----- yearly aggregates -----
+
+  +--------------------------------------------------------+
+  | year     n   mean_p~e   med_pr~e    tot_qty   tot_sp~d |
+  |--------------------------------------------------------|
+  | 2010   208   577.3998      540.1        297   158367.3 |
+  | 2011   220   550.9568      409.9        274   144021.6 |
+  | 2012   278   571.2108        434   346.1291     186340 |
+  | 2013   377   514.8945      354.6        492   235472.6 |
+  | 2014   361   574.9411      418.5     511.85   266788.7 |
+  | 2015   429   537.3979      385.2        559   278936.3 |
+  | 2016   527   513.1855     354.25   704.0668   331085.3 |
+  | 2017   769   525.1232     367.25        955   465542.8 |
+  | 2018   762   535.0364      372.6        958   470738.5 |
+  | 2019   741   513.7419        365        983   468092.6 |
+  +--------------------------------------------------------+
+precision/recall/support (constant):
+
+  +------------------------------+
+  | precis~n    recall   support |
+  |------------------------------|
+  | .8471455   .858209       536 |
+  +------------------------------+
+----- top 5 suppliers by spend -----
+
+  +---------------------------------------------+
+  |             suppliername      n   raw_spend |
+  |---------------------------------------------|
+  | thermo fisher scientific   1900     1177102 |
+  |     bio-rad laboratories   1452    925347.7 |
+  |                   qiagen    354    297604.9 |
+  |                      vwr    294    165313.7 |
+  |        life technologies    226    143292.4 |
+  +---------------------------------------------+
+----- top 5 priciest items 2010-2011 -----
+(4,244 observations deleted)
+
+  +--------------------------------------------------------------------------+
+  |                        clean_desc |             suppliername | raw_price |
+  |  ab4138b absolut blu qpcr rox mix | thermo fisher scientific |      2400 |
+  |--------------------------------------------------------------------------|
+  |        raw_qty         |        raw_spend         |         year         |
+  |              1         |             2400         |         2011         |
+  +--------------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------------+
+  |                        clean_desc |             suppliername | raw_price |
+  |             sybr green master mix |        life technologies |    2264.5 |
+  |--------------------------------------------------------------------------|
+  |        raw_qty         |        raw_spend         |         year         |
+  |              1         |           2264.5         |         2010         |
+  +--------------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------------+
+  |                        clean_desc |             suppliername | raw_price |
+  |    fast sybr reg green master mix |        life technologies |    2204.8 |
+  |--------------------------------------------------------------------------|
+  |        raw_qty         |        raw_spend         |         year         |
+  |              1         |           2204.8         |         2011         |
+  +--------------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------------+
+  |                        clean_desc |             suppliername | raw_price |
+  | fast sybr(r) green master mix ml) |        life technologies |      2067 |
+  |--------------------------------------------------------------------------|
+  |        raw_qty         |        raw_spend         |         year         |
+  |              1         |             2067         |         2011         |
+  +--------------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------------+
+  |                        clean_desc |             suppliername | raw_price |
+  | fast sybr(r) green master mix ml) |        life technologies |      2067 |
+  |--------------------------------------------------------------------------|
+  |        raw_qty         |        raw_spend         |         year         |
+  |              1         |             2067         |         2011         |
+  +--------------------------------------------------------------------------+
+----- top 5 priciest items 2018-2019 -----
+(3,169 observations deleted)
+
+  +-------------------------------------------------------------------------+
+  |                                   clean_desc |             suppliername |
+  |                   taqpath qpcr master mix cg | thermo fisher scientific |
+  |-------------------------------------------------------------------------|
+  |     raw_price     |     raw_qty     |     raw_spend     |     year      |
+  |       2409.75     |           1     |       2409.75     |     2019      |
+  +-------------------------------------------------------------------------+
+
+  +-------------------------------------------------------------------------+
+  |                                   clean_desc |             suppliername |
+  |                   fast sybr green master mix | thermo fisher scientific |
+  |-------------------------------------------------------------------------|
+  |     raw_price     |     raw_qty     |     raw_spend     |     year      |
+  |       2382.25     |           1     |       2382.25     |     2018      |
+  +-------------------------------------------------------------------------+
+
+  +-------------------------------------------------------------------------+
+  |                                   clean_desc |             suppliername |
+  |                perfecta sybr fastmx lrx 1250 |                      vwr |
+  |-------------------------------------------------------------------------|
+  |     raw_price     |     raw_qty     |     raw_spend     |     year      |
+  |          2365     |           1     |          2365     |     2019      |
+  +-------------------------------------------------------------------------+
+
+  +-------------------------------------------------------------------------+
+  |                                   clean_desc |             suppliername |
+  | ab1322b-absolute qpcr mix sybr green low rox | thermo fisher scientific |
+  |-------------------------------------------------------------------------|
+  |     raw_price     |     raw_qty     |     raw_spend     |     year      |
+  |          2340     |           1     |          2340     |     2019      |
+  +-------------------------------------------------------------------------+
+
+  +-------------------------------------------------------------------------+
+  |                                   clean_desc |             suppliername |
+  | ab1322b-absolute qpcr mix sybr green low rox | thermo fisher scientific |
+  |-------------------------------------------------------------------------|
+  |     raw_price     |     raw_qty     |     raw_spend     |     year      |
+  |          2215     |           1     |          2215     |     2018      |
+  +-------------------------------------------------------------------------+
+----- 5 random items from 2013 (base year) -----
+(4,295 observations deleted)
+(372 observations deleted)
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | sensi fast sybr no-rox kit                                                |
+  |---------------------------------------------------------------------------|
+  |              raw_price               |              raw_qty               |
+  |                    229               |                    1               |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | iq sybr green supermix                                                    |
+  |---------------------------------------------------------------------------|
+  |              raw_price               |              raw_qty               |
+  |                    175               |                    1               |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | 5ml ml) 2x qpcr mix contains dntps itaq dna polymerase mgcl sub /sub sy.. |
+  |---------------------------------------------------------------------------|
+  |              raw_price               |              raw_qty               |
+  |                    195               |                    1               |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | kit iq sybr grn lot                                                       |
+  |---------------------------------------------------------------------------|
+  |              raw_price               |              raw_qty               |
+  |                  561.6               |                    1               |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | sybr select master mix mini 1ml                                           |
+  |---------------------------------------------------------------------------|
+  |              raw_price               |              raw_qty               |
+  |                   72.5               |                    1               |
+  +---------------------------------------------------------------------------+
+
+
+===================================================
+CATEGORY: genome amplification kits
+===================================================
+N items = 90
+----- yearly aggregates -----
+
+  +------------------------------------------------------+
+  | year    n   mean_p~e   med_pr~e   tot_qty   tot_sp~d |
+  |------------------------------------------------------|
+  | 2010    3   562.6667        210         4       3038 |
+  | 2011    7   1666.173    2583.15         8   11768.21 |
+  | 2012    9   990.7433     177.84         9    8916.69 |
+  | 2013   13   465.5938     263.11        14    6237.72 |
+  | 2014   16   1524.718        831        28   52338.84 |
+  | 2015   10   1569.041        862        22   53933.45 |
+  | 2016    5    247.422     243.73         5    1237.11 |
+  | 2017   18   321.4439     263.05        18    5785.99 |
+  | 2018    5    351.404        423         8    3026.02 |
+  | 2019    4   217.5025    222.775         4     870.01 |
+  +------------------------------------------------------+
+precision/recall/support (constant):
+
+  +-------------------------------+
+  | precis~n     recall   support |
+  |-------------------------------|
+  | .7222222   .5652174        46 |
+  +-------------------------------+
+----- top 5 suppliers by spend -----
+
+  +-------------------------------------------+
+  |             suppliername    n   raw_spend |
+  |-------------------------------------------|
+  |        roche diagnostics   14    97928.68 |
+  | thermo fisher scientific   39    27521.48 |
+  |            ge healthcare   11     6286.38 |
+  |                   welgen    3        4800 |
+  |           milliporesigma    7     3207.24 |
+  +-------------------------------------------+
+----- top 5 priciest items 2010-2011 -----
+(80 observations deleted)
+
+  +------------------------------------------------------------------------+
+  |                                  clean_desc |             suppliername |
+  | templiphi -2000 reaction kit no. 45 003 001 | thermo fisher scientific |
+  |------------------------------------------------------------------------|
+  |     raw_price     |     raw_qty     |     raw_spend     |     year     |
+  |       2810.27     |           1     |       2810.27     |     2011     |
+  +------------------------------------------------------------------------+
+
+  +------------------------------------------------------------------------+
+  |                                  clean_desc |             suppliername |
+  |          templiphi 2000 reaction kit catlog | thermo fisher scientific |
+  |------------------------------------------------------------------------|
+  |     raw_price     |     raw_qty     |     raw_spend     |     year     |
+  |          2810     |           1     |          2810     |     2011     |
+  +------------------------------------------------------------------------+
+
+  +------------------------------------------------------------------------+
+  |                                  clean_desc |             suppliername |
+  |                 templiphi 2000 reaction kit | thermo fisher scientific |
+  |------------------------------------------------------------------------|
+  |     raw_price     |     raw_qty     |     raw_spend     |     year     |
+  |       2583.15     |           1     |       2583.15     |     2011     |
+  +------------------------------------------------------------------------+
+
+  +------------------------------------------------------------------------+
+  |                                  clean_desc |             suppliername |
+  |                 templiphi 2000 reaction kit | thermo fisher scientific |
+  |------------------------------------------------------------------------|
+  |     raw_price     |     raw_qty     |     raw_spend     |     year     |
+  |       2583.15     |           1     |       2583.15     |     2011     |
+  +------------------------------------------------------------------------+
+
+  +------------------------------------------------------------------------+
+  |                                  clean_desc |             suppliername |
+  |                  amplification purification |                   welgen |
+  |------------------------------------------------------------------------|
+  |     raw_price     |     raw_qty     |     raw_spend     |     year     |
+  |          1350     |           2     |          2700     |     2010     |
+  +------------------------------------------------------------------------+
+----- top 5 priciest items 2018-2019 -----
+(81 observations deleted)
+
+  +---------------------------------------------------------------------+
+  |                               clean_desc |             suppliername |
+  | illustra genomiphi dna amplification kit |            ge healthcare |
+  |---------------------------------------------------------------------|
+  |    raw_price     |    raw_qty     |    raw_spend     |     year     |
+  |          546     |          1     |          546     |     2018     |
+  +---------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------+
+  |                               clean_desc |             suppliername |
+  |            1x plus amplification diluent |              perkinelmer |
+  |---------------------------------------------------------------------|
+  |    raw_price     |    raw_qty     |    raw_spend     |     year     |
+  |          423     |          2     |          846     |     2018     |
+  +---------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------+
+  |                               clean_desc |             suppliername |
+  |            1x plus amplification diluent |              perkinelmer |
+  |---------------------------------------------------------------------|
+  |    raw_price     |    raw_qty     |    raw_spend     |     year     |
+  |          423     |          3     |         1269     |     2018     |
+  +---------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------+
+  |                               clean_desc |             suppliername |
+  |                  genomiphi dna kit 25rxn | thermo fisher scientific |
+  |---------------------------------------------------------------------|
+  |    raw_price     |    raw_qty     |    raw_spend     |     year     |
+  |       226.46     |          1     |       226.46     |     2019     |
+  +---------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------+
+  |                               clean_desc |             suppliername |
+  |                  genomiphi dna kit 25rxn | thermo fisher scientific |
+  |---------------------------------------------------------------------|
+  |    raw_price     |    raw_qty     |    raw_spend     |     year     |
+  |       226.46     |          1     |       226.46     |     2019     |
+  +---------------------------------------------------------------------+
+----- 5 random items from 2013 (base year) -----
+(77 observations deleted)
+(8 observations deleted)
+
+  +------------------------------------------------------------------+
+  |                                           clean_desc | raw_price |
+  |                              genomiphi dna kit 25rxn |       185 |
+  |------------------------------------------------------------------|
+  |                             raw_qty                              |
+  |                                   2                              |
+  +------------------------------------------------------------------+
+
+  +------------------------------------------------------------------+
+  |                                           clean_desc | raw_price |
+  |               seqplex enhanced dna amplification kit |       969 |
+  |------------------------------------------------------------------|
+  |                             raw_qty                              |
+  |                                   1                              |
+  +------------------------------------------------------------------+
+
+  +------------------------------------------------------------------+
+  |                                           clean_desc | raw_price |
+  |                       templiphi 100amplification kit |    263.11 |
+  |------------------------------------------------------------------|
+  |                             raw_qty                              |
+  |                                   1                              |
+  +------------------------------------------------------------------+
+
+  +------------------------------------------------------------------+
+  |                                           clean_desc | raw_price |
+  | yk001a single cell wga kit may also include shipping |    385.72 |
+  |------------------------------------------------------------------|
+  |                             raw_qty                              |
+  |                                   1                              |
+  +------------------------------------------------------------------+
+
+  +------------------------------------------------------------------+
+  |                                           clean_desc | raw_price |
+  |                              genomiphi dna kit 25rxn |    180.34 |
+  |------------------------------------------------------------------|
+  |                             raw_qty                              |
+  |                                   1                              |
+  +------------------------------------------------------------------+
+
+
+===================================================
+CATEGORY: high-fidelity hot start pcr systems
+===================================================
+N items = 284
+----- yearly aggregates -----
+
+  +------------------------------------------------------+
+  | year    n   mean_p~e   med_pr~e   tot_qty   tot_sp~d |
+  |------------------------------------------------------|
+  | 2010    7   396.8586        206        13    4096.14 |
+  | 2011    5     128.54       90.9        11     1889.2 |
+  | 2012   22   152.9541         90     27.03    3778.81 |
+  | 2013   37   312.3797        318        46   13671.07 |
+  | 2014   13   327.6177      254.7        15    4768.43 |
+  | 2015   25   281.7736     251.26        43   12540.14 |
+  | 2016   28   254.3296        240        43   11590.27 |
+  | 2017   37   226.0346        196        55   12491.46 |
+  | 2018   73    258.423      163.8       113   30562.48 |
+  | 2019   37   303.3676     168.92        63   19852.71 |
+  +------------------------------------------------------+
+precision/recall/support (constant):
+
+  +------------------------------+
+  | precis~n    recall   support |
+  |------------------------------|
+  | .7456141   .787037       108 |
+  +------------------------------+
+----- top 5 suppliers by spend -----
+
+  +--------------------------------------------+
+  |             suppliername     n   raw_spend |
+  |--------------------------------------------|
+  | thermo fisher scientific   180    71507.09 |
+  |           kapabiosystems    24    12064.38 |
+  |     agilent technologies    38       11450 |
+  |        life technologies    12     8362.28 |
+  |                      vwr     6     6509.22 |
+  +--------------------------------------------+
+----- top 5 priciest items 2010-2011 -----
+(272 observations deleted)
+
+  +------------------------------------------------------------------+
+  |                                 clean_desc |        suppliername |
+  |          bigdyeterm .1 cycleseq kit 100rxn |   life technologies |
+  |------------------------------------------------------------------|
+  |    raw_price    |    raw_qty    |    raw_spend     |    year     |
+  |        779.2    |          1    |        779.2     |    2010     |
+  +------------------------------------------------------------------+
+
+  +------------------------------------------------------------------+
+  |                                 clean_desc |        suppliername |
+  |          bigdyeterm .1 cycleseq kit 100rxn |   life technologies |
+  |------------------------------------------------------------------|
+  |    raw_price    |    raw_qty    |    raw_spend     |    year     |
+  |        779.2    |          1    |        779.2     |    2010     |
+  +------------------------------------------------------------------+
+
+  +------------------------------------------------------------------+
+  |                                 clean_desc |        suppliername |
+  |          bigdyeterm .1 cycleseq kit 100rxn |   life technologies |
+  |------------------------------------------------------------------|
+  |    raw_price    |    raw_qty    |    raw_spend     |    year     |
+  |        779.2    |          2    |       1558.4     |    2010     |
+  +------------------------------------------------------------------+
+
+  +------------------------------------------------------------------+
+  |                                 clean_desc |        suppliername |
+  | supply center acct platinum supermix hi fi |   life technologies |
+  |------------------------------------------------------------------|
+  |    raw_price    |    raw_qty    |    raw_spend     |    year     |
+  |        214.7    |          6    |       1288.2     |    2011     |
+  +------------------------------------------------------------------+
+
+  +------------------------------------------------------------------+
+  |                                 clean_desc |        suppliername |
+  |                                    phusion | new england biolabs |
+  |------------------------------------------------------------------|
+  |    raw_price    |    raw_qty    |    raw_spend     |    year     |
+  |          206    |          3    |          618     |    2010     |
+  +------------------------------------------------------------------+
+----- top 5 priciest items 2018-2019 -----
+(174 observations deleted)
+
+  +--------------------------------------------------------------------+
+  |                              clean_desc |             suppliername |
+  |          q5 hot st hi-fidel 2x mstr 500 | thermo fisher scientific |
+  |--------------------------------------------------------------------|
+  |    raw_price     |    raw_qty     |    raw_spend     |    year     |
+  |          812     |          1     |          812     |    2018     |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                              clean_desc |             suppliername |
+  |          hifi hotstart ready mix 100rxn | thermo fisher scientific |
+  |--------------------------------------------------------------------|
+  |    raw_price     |    raw_qty     |    raw_spend     |    year     |
+  |       696.83     |          1     |       696.83     |    2019     |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                              clean_desc |             suppliername |
+  | dna hifi hotstart readymix 500 rxn 25ul |                      vwr |
+  |--------------------------------------------------------------------|
+  |    raw_price     |    raw_qty     |    raw_spend     |    year     |
+  |       590.63     |          3     |      1771.89     |    2018     |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                              clean_desc |             suppliername |
+  |     hifi hotstart readymix 500 rxn 25ul |                      vwr |
+  |--------------------------------------------------------------------|
+  |    raw_price     |    raw_qty     |    raw_spend     |    year     |
+  |       533.21     |          4     |      2132.84     |    2018     |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                              clean_desc |             suppliername |
+  |     hifi hotstart readymix 500 rxn 25ul |                      vwr |
+  |--------------------------------------------------------------------|
+  |    raw_price     |    raw_qty     |    raw_spend     |    year     |
+  |       533.21     |          4     |      2132.84     |    2018     |
+  +--------------------------------------------------------------------+
+----- 5 random items from 2013 (base year) -----
+(247 observations deleted)
+(32 observations deleted)
+
+  +--------------------------------------------------------------------------+
+  |                                         clean_desc   raw_price   raw_qty |
+  |--------------------------------------------------------------------------|
+  |  pfuultra ii fusion hotstart dna polymerase 40 rxn        93.6         1 |
+  | pfuultra ii fusion hotstart dna polymerase 200 rxn       381.6         1 |
+  |                             accuprime pfx supermix         404         2 |
+  |                          phusion flash mstrmix 500      266.91         1 |
+  |  pfuultra ii fusion hotstart dna polymerase 40 rxn        91.8         1 |
+  +--------------------------------------------------------------------------+
+
+
+===================================================
+CATEGORY: high-fidelity pcr systems
+===================================================
+N items = 884
+----- yearly aggregates -----
+
+  +--------------------------------------------------------+
+  | year     n   mean_p~e   med_pr~e    tot_qty   tot_sp~d |
+  |--------------------------------------------------------|
+  | 2010    10    144.715     141.95         14     1713.9 |
+  | 2011     9   244.2589        166         14    3067.16 |
+  | 2012    35   274.6163      288.9   42.20068   11198.08 |
+  | 2013    60   247.3847     165.75         73   17398.78 |
+  | 2014    64   233.7142     165.75         78   18135.58 |
+  | 2015    78   233.5458      168.3         94   20687.73 |
+  | 2016    78   199.4554     148.75         98   17755.62 |
+  | 2017   168   235.9638        170        210   46152.75 |
+  | 2018   174   264.1531      173.4        229   55580.91 |
+  | 2019   208   235.3402    161.815        258    57308.5 |
+  +--------------------------------------------------------+
+precision/recall/support (constant):
+
+  +-------------------------------+
+  | precis~n     recall   support |
+  |-------------------------------|
+  | .4705882   .4819277        83 |
+  +-------------------------------+
+----- top 5 suppliers by spend -----
+
+  +--------------------------------------------+
+  |             suppliername     n   raw_spend |
+  |--------------------------------------------|
+  |      new england biolabs   658    180591.2 |
+  | thermo fisher scientific   114    37252.79 |
+  |                      vwr    42    11146.83 |
+  |     agilent technologies    25    8490.204 |
+  |     bio-rad laboratories    15     3812.55 |
+  +--------------------------------------------+
+----- top 5 priciest items 2010-2011 -----
+(865 observations deleted)
+
+  +-------------------------------------------------------------------+
+  |                                                      clean_desc   |
+  |   phusion high-fidelity pcr master mix hf buffer 500 (50ul vol)   |
+  |-------------------------------------------------------------------|
+  |             suppliername | raw_price | raw_qty | raw_spend | year |
+  |      new england biolabs |     567.8 |       1 |     567.8 | 2011 |
+  +-------------------------------------------------------------------+
+
+  +-------------------------------------------------------------------+
+  |                                                      clean_desc   |
+  |                     easy-a high-fidelity pcr master mix 100 rxn   |
+  |-------------------------------------------------------------------|
+  |             suppliername | raw_price | raw_qty | raw_spend | year |
+  |     agilent technologies |     322.2 |       1 |     322.2 | 2011 |
+  +-------------------------------------------------------------------+
+
+  +-------------------------------------------------------------------+
+  |                                                      clean_desc   |
+  |                                       phusion master mix f-548l   |
+  |-------------------------------------------------------------------|
+  |             suppliername | raw_price | raw_qty | raw_spend | year |
+  |      new england biolabs |       312 |       1 |       312 | 2010 |
+  +-------------------------------------------------------------------+
+
+  +-------------------------------------------------------------------+
+  |                                                      clean_desc   |
+  |                         f-548l phusion flash master mix 500rxns   |
+  |-------------------------------------------------------------------|
+  |             suppliername | raw_price | raw_qty | raw_spend | year |
+  | thermo fisher scientific |     305.6 |       1 |     305.6 | 2011 |
+  +-------------------------------------------------------------------+
+
+  +-------------------------------------------------------------------+
+  |                                                      clean_desc   |
+  |                     pfuultra ii hotstart pcr master mix 100 rxn   |
+  |-------------------------------------------------------------------|
+  |             suppliername | raw_price | raw_qty | raw_spend | year |
+  |     agilent technologies |     289.8 |       2 |     579.6 | 2011 |
+  +-------------------------------------------------------------------+
+----- top 5 priciest items 2018-2019 -----
+(502 observations deleted)
+
+  +-------------------------------------------------------------------+
+  |                                                       clean_desc  |
+  |                                        phusion hf master mix 500  |
+  |-------------------------------------------------------------------|
+  |             suppliername | raw_price | raw_qty | raw_spend | year |
+  | thermo fisher scientific |       748 |       1 |       748 | 2019 |
+  +-------------------------------------------------------------------+
+
+  +-------------------------------------------------------------------+
+  |                                                       clean_desc  |
+  |                              nc1645253-sparq hifi pcr master mix  |
+  |-------------------------------------------------------------------|
+  |             suppliername | raw_price | raw_qty | raw_spend | year |
+  | thermo fisher scientific |    737.71 |       1 |    737.71 | 2019 |
+  +-------------------------------------------------------------------+
+
+  +-------------------------------------------------------------------+
+  |                                                       clean_desc  |
+  |                   phusion high-fidelity pcr master mix hf buffer  |
+  |-------------------------------------------------------------------|
+  |             suppliername | raw_price | raw_qty | raw_spend | year |
+  | thermo fisher scientific |       736 |       1 |       736 | 2018 |
+  +-------------------------------------------------------------------+
+
+  +-------------------------------------------------------------------+
+  |                                                       clean_desc  |
+  |  phire plant direct pcr master mix phusion high fidelity dna pol  |
+  |-------------------------------------------------------------------|
+  |             suppliername | raw_price | raw_qty | raw_spend | year |
+  | thermo fisher scientific |       728 |       1 |       728 | 2019 |
+  +-------------------------------------------------------------------+
+
+  +-------------------------------------------------------------------+
+  |                                                       clean_desc  |
+  |                                   q5 high-fidelity 2x master mix  |
+  |-------------------------------------------------------------------|
+  |             suppliername | raw_price | raw_qty | raw_spend | year |
+  |                      vwr |    727.74 |       1 |    727.74 | 2019 |
+  +-------------------------------------------------------------------+
+----- 5 random items from 2013 (base year) -----
+(824 observations deleted)
+(55 observations deleted)
+
+  +---------------------------------------------------------------------------+
+  |                                                    clean_desc | raw_price |
+  | phusion high-fidelity pcr master mix hf buffer 500 (50ul vol) |       578 |
+  |---------------------------------------------------------------------------|
+  |                                  raw_qty                                  |
+  |                                        1                                  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                                                    clean_desc | raw_price |
+  |            failsafe pcr system premix choice (any one premix) |       120 |
+  |---------------------------------------------------------------------------|
+  |                                  raw_qty                                  |
+  |                                        1                                  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                                                    clean_desc | raw_price |
+  |                  q5 hot start high-fidelity 2x master mix 100 |    165.75 |
+  |---------------------------------------------------------------------------|
+  |                                  raw_qty                                  |
+  |                                        1                                  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                                                    clean_desc | raw_price |
+  |                  q5 hot start high-fidelity 2x master mix 100 |    165.75 |
+  |---------------------------------------------------------------------------|
+  |                                  raw_qty                                  |
+  |                                        1                                  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                                                    clean_desc | raw_price |
+  |                                 2x real-time pcr mix contains |     274.7 |
+  |---------------------------------------------------------------------------|
+  |                                  raw_qty                                  |
+  |                                        1                                  |
+  +---------------------------------------------------------------------------+
+
+
+===================================================
+CATEGORY: hot start pcr systems
+===================================================
+N items = 1248
+----- yearly aggregates -----
+
+  +--------------------------------------------------------+
+  | year     n   mean_p~e   med_pr~e    tot_qty   tot_sp~d |
+  |--------------------------------------------------------|
+  | 2010    51   319.8931        201         96   22560.97 |
+  | 2011    50    235.807     150.82       82.2   17688.25 |
+  | 2012   123    298.253      222.5        198   52254.79 |
+  | 2013   137   314.7661        160   249.1188   55415.91 |
+  | 2014   147   273.9196        174        232   51575.68 |
+  | 2015   126   224.4039     170.03        182   37331.41 |
+  | 2016   110   251.0051    167.075        196   39522.17 |
+  | 2017   158   233.9152        179        243   48614.62 |
+  | 2018   175   309.6038     190.44        330   73743.42 |
+  | 2019   171   348.7061     226.18        279   74515.26 |
+  +--------------------------------------------------------+
+precision/recall/support (constant):
+
+  +-------------------------------+
+  | precis~n     recall   support |
+  |-------------------------------|
+  | .8613861   .9206349       189 |
+  +-------------------------------+
+----- top 5 suppliers by spend -----
+
+  +--------------------------------------------+
+  |             suppliername     n   raw_spend |
+  |--------------------------------------------|
+  | thermo fisher scientific   647    221740.9 |
+  |           milliporesigma   294    143754.1 |
+  |        life technologies   173    68017.14 |
+  |     innovative solutions    17       12722 |
+  |      denville scientific    31     7504.24 |
+  +--------------------------------------------+
+----- top 5 priciest items 2010-2011 -----
+(1,147 observations deleted)
+
+  +-------------------------------------------------------------+
+  |                                                  clean_desc |
+  |                           redextract-n-amp pcr reaction mix |
+  |-------------------------------------------------------------|
+  |      suppliername | raw_price | raw_qty | raw_spend | year  |
+  |    milliporesigma |    1039.5 |       1 |    1039.5 | 2010  |
+  +-------------------------------------------------------------+
+
+  +-------------------------------------------------------------+
+  |                                                  clean_desc |
+  |                           redextract-n-amp pcr reaction mix |
+  |-------------------------------------------------------------|
+  |      suppliername | raw_price | raw_qty | raw_spend | year  |
+  |    milliporesigma |      1035 |       1 |      1035 | 2010  |
+  +-------------------------------------------------------------+
+
+  +-------------------------------------------------------------+
+  |                                                  clean_desc |
+  | amplitaq gold dna polymerase units buffer ii mgc12 solution |
+  |-------------------------------------------------------------|
+  |      suppliername | raw_price | raw_qty | raw_spend | year  |
+  | life technologies |       994 |       1 |       994 | 2010  |
+  +-------------------------------------------------------------+
+
+  +-------------------------------------------------------------+
+  |                                                  clean_desc |
+  | amplitaq gold dna polymerase units buffer ii mgc12 solution |
+  |-------------------------------------------------------------|
+  |      suppliername | raw_price | raw_qty | raw_spend | year  |
+  |            ambion |       994 |       1 |       994 | 2010  |
+  +-------------------------------------------------------------+
+
+  +-------------------------------------------------------------+
+  |                                                  clean_desc |
+  | amplitaq gold dna polymerase units buffer ii mgc12 solution |
+  |-------------------------------------------------------------|
+  |      suppliername | raw_price | raw_qty | raw_spend | year  |
+  | life technologies |       994 |       1 |       994 | 2010  |
+  +-------------------------------------------------------------+
+----- top 5 priciest items 2018-2019 -----
+(902 observations deleted)
+
+  +-------------------------------------------------------------------+
+  |                                               clean_desc          |
+  |                           extract-n-amp pcr reaction mix          |
+  |-------------------------------------------------------------------|
+  |             suppliername | raw_price | raw_qty | raw_spend | year |
+  |           milliporesigma |    1277.1 |       1 |    1277.1 | 2019 |
+  +-------------------------------------------------------------------+
+
+  +-------------------------------------------------------------------+
+  |                                               clean_desc          |
+  |                           extract-n-amp pcr reaction mix          |
+  |-------------------------------------------------------------------|
+  |             suppliername | raw_price | raw_qty | raw_spend | year |
+  |           milliporesigma |    1277.1 |       1 |    1277.1 | 2019 |
+  +-------------------------------------------------------------------+
+
+  +-------------------------------------------------------------------+
+  |                                               clean_desc          |
+  |                        redextract-n-amp pcr reaction mix          |
+  |-------------------------------------------------------------------|
+  |             suppliername | raw_price | raw_qty | raw_spend | year |
+  |           milliporesigma |      1270 |       1 |      1270 | 2019 |
+  +-------------------------------------------------------------------+
+
+  +-------------------------------------------------------------------+
+  |                                               clean_desc          |
+  |         r4775-12ml-redextract-n-amp(tm) pcr readymix(tm)          |
+  |-------------------------------------------------------------------|
+  |             suppliername | raw_price | raw_qty | raw_spend | year |
+  |           milliporesigma |      1270 |       1 |      1270 | 2019 |
+  +-------------------------------------------------------------------+
+
+  +-------------------------------------------------------------------+
+  |                                               clean_desc          |
+  |                             amplitaq gold 360 master mix          |
+  |-------------------------------------------------------------------|
+  |             suppliername | raw_price | raw_qty | raw_spend | year |
+  | thermo fisher scientific |   1261.59 |       1 |   1261.59 | 2019 |
+  +-------------------------------------------------------------------+
+----- 5 random items from 2013 (base year) -----
+(1,111 observations deleted)
+(132 observations deleted)
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | platinum taq dna polymerase                                               |
+  |---------------------------------------------------------------------------|
+  |              raw_price               |              raw_qty               |
+  |                  62.67               |                    3               |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | platinum taq dna polymerase (6                                            |
+  |---------------------------------------------------------------------------|
+  |              raw_price               |              raw_qty               |
+  |                 610.65               |                    1               |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | platinum taq dna polymerase high fidelity                                 |
+  |---------------------------------------------------------------------------|
+  |              raw_price               |              raw_qty               |
+  |                    160               |                    1               |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | dynabeads anti-e.coli o157 platinum multiplex pcr master mix amplitaq g.. |
+  |---------------------------------------------------------------------------|
+  |              raw_price               |              raw_qty               |
+  |                    602               |                    1               |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | amplitaq gold dna polymerase 1000 units buffer mgcl2 solution             |
+  |---------------------------------------------------------------------------|
+  |              raw_price               |              raw_qty               |
+  |                    720               |                    1               |
+  +---------------------------------------------------------------------------+
+
+
+===================================================
+CATEGORY: long template pcr systems
+===================================================
+N items = 240
+----- yearly aggregates -----
+
+  +-------------------------------------------------------+
+  | year    n   mean_p~e   med_pr~e    tot_qty   tot_sp~d |
+  |-------------------------------------------------------|
+  | 2010   34   292.6862     346.05         47   13831.08 |
+  | 2011   14   203.1064        136         14    2843.49 |
+  | 2012   33   284.5609     346.05   42.07005   12238.87 |
+  | 2013   24   232.7221    205.845         33    5864.28 |
+  | 2014   29   228.6503     326.03         37    8950.42 |
+  | 2015   30    217.639      205.5         43   10074.21 |
+  | 2016   21     202.07        196         24    4889.22 |
+  | 2017   25   196.0732      185.9         28    5474.58 |
+  | 2018   17     177.82      185.9         21    3474.94 |
+  | 2019   13   207.9354      192.4         17    3117.16 |
+  +-------------------------------------------------------+
+precision/recall/support (constant):
+
+  +-------------------------------+
+  | precis~n     recall   support |
+  |-------------------------------|
+  | .7142857   .8108108        37 |
+  +-------------------------------+
+----- top 5 suppliers by spend -----
+
+  +--------------------------------------------+
+  |             suppliername     n   raw_spend |
+  |--------------------------------------------|
+  | thermo fisher scientific   154    52332.94 |
+  |                   qiagen    40    6934.359 |
+  |             clontech lab    11      3169.5 |
+  |           takara bio usa    10      2129.9 |
+  |           milliporesigma     6     1358.23 |
+  +--------------------------------------------+
+----- top 5 priciest items 2010-2011 -----
+(192 observations deleted)
+
+  +----------------------------------------------------------------+
+  |                          clean_desc |             suppliername |
+  | nc9498611 taq man ez rt pcr core ki | thermo fisher scientific |
+  |----------------------------------------------------------------|
+  |    raw_price    |    raw_qty    |    raw_spend    |    year    |
+  |      1018.44    |          1    |      1018.44    |    2010    |
+  +----------------------------------------------------------------+
+
+  +----------------------------------------------------------------+
+  |                          clean_desc |             suppliername |
+  |            expand long template pcr |        roche diagnostics |
+  |----------------------------------------------------------------|
+  |    raw_price    |    raw_qty    |    raw_spend    |    year    |
+  |          480    |          1    |          480    |    2011    |
+  +----------------------------------------------------------------+
+
+  +----------------------------------------------------------------+
+  |                          clean_desc |             suppliername |
+  |                 pcr extender system |                   5prime |
+  |----------------------------------------------------------------|
+  |    raw_price    |    raw_qty    |    raw_spend    |    year    |
+  |          381    |          1    |          381    |    2011    |
+  +----------------------------------------------------------------+
+
+  +----------------------------------------------------------------+
+  |                          clean_desc |             suppliername |
+  |                 pcr extender system | thermo fisher scientific |
+  |----------------------------------------------------------------|
+  |    raw_price    |    raw_qty    |    raw_spend    |    year    |
+  |       346.05    |          1    |       346.05    |    2010    |
+  +----------------------------------------------------------------+
+
+  +----------------------------------------------------------------+
+  |                          clean_desc |             suppliername |
+  |                 pcr extender system | thermo fisher scientific |
+  |----------------------------------------------------------------|
+  |    raw_price    |    raw_qty    |    raw_spend    |    year    |
+  |       346.05    |          2    |        692.1    |    2010    |
+  +----------------------------------------------------------------+
+----- top 5 priciest items 2018-2019 -----
+(210 observations deleted)
+
+  +-----------------------------------------------------------------+
+  |                                clean_desc |        suppliername |
+  |                         longrange pcr kit |              qiagen |
+  |-----------------------------------------------------------------|
+  |    raw_price    |    raw_qty    |    raw_spend    |    year     |
+  |        559.3    |          1    |        559.3    |    2018     |
+  +-----------------------------------------------------------------+
+
+  +-----------------------------------------------------------------+
+  |                                clean_desc |        suppliername |
+  | expand long template pcr system use r- .1 |      milliporesigma |
+  |-----------------------------------------------------------------|
+  |    raw_price    |    raw_qty    |    raw_spend    |    year     |
+  |       417.59    |          1    |       417.59    |    2019     |
+  +-----------------------------------------------------------------+
+
+  +-----------------------------------------------------------------+
+  |                                clean_desc |        suppliername |
+  |    expand long template pcr system use .1 |      milliporesigma |
+  |-----------------------------------------------------------------|
+  |    raw_price    |    raw_qty    |    raw_spend    |    year     |
+  |       417.59    |          1    |       417.59    |    2019     |
+  +-----------------------------------------------------------------+
+
+  +-----------------------------------------------------------------+
+  |                                clean_desc |        suppliername |
+  |         longamp taq dna polymerase m0323l | new england biolabs |
+  |-----------------------------------------------------------------|
+  |    raw_price    |    raw_qty    |    raw_spend    |    year     |
+  |          328    |          1    |          328    |    2018     |
+  +-----------------------------------------------------------------+
+
+  +-----------------------------------------------------------------+
+  |                                clean_desc |        suppliername |
+  |                         longrange pcr kit |              qiagen |
+  |-----------------------------------------------------------------|
+  |    raw_price    |    raw_qty    |    raw_spend    |    year     |
+  |       219.75    |          1    |       219.75    |    2018     |
+  +-----------------------------------------------------------------+
+----- 5 random items from 2013 (base year) -----
+(216 observations deleted)
+(19 observations deleted)
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | r/rnasin ribo-inhibitor pcr extender system 500 upcr dntp flcn cultur s.. |
+  |---------------------------------------------------------------------------|
+  |              raw_price               |              raw_qty               |
+  |                 243.05               |                    1               |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | rapid-hyb buffer 500ml rq1 dnase pipet ser dsp /10ml pcr extender syste.. |
+  |---------------------------------------------------------------------------|
+  |              raw_price               |              raw_qty               |
+  |                 301.18               |                    1               |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | la taq supplement                                                         |
+  |---------------------------------------------------------------------------|
+  |              raw_price               |              raw_qty               |
+  |                 339.76               |                    1               |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | longamp taq pcr kit 100 rxn                                               |
+  |---------------------------------------------------------------------------|
+  |              raw_price               |              raw_qty               |
+  |                 159.31               |                    1               |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | plate well tc permount 100ml pcr extender system 500 upcr stopcock luer.. |
+  |---------------------------------------------------------------------------|
+  |              raw_price               |              raw_qty               |
+  |                  71.49               |                    1               |
+  +---------------------------------------------------------------------------+
+
+
+===================================================
+CATEGORY: pcr systems
+===================================================
+N items = 8816
+----- yearly aggregates -----
+
+  +---------------------------------------------------------+
+  | year      n   mean_p~e   med_pr~e    tot_qty   tot_sp~d |
+  |---------------------------------------------------------|
+  | 2010    636   673.5064    344.185        984   611578.7 |
+  | 2011    513   583.2953     329.94      908.4     489052 |
+  | 2012    889   512.2063     344.06   1357.914   678056.5 |
+  | 2013    977   525.5212     318.16       1466   710405.8 |
+  | 2014    949   510.0971     334.51   1411.002   709990.5 |
+  | 2015    871   569.7343     321.62   1174.272   621733.7 |
+  | 2016    911   572.5619     267.76   1283.681   635650.2 |
+  | 2017   1112   496.3926        275       1564     673130 |
+  | 2018    993   499.6338     262.53       1358   582664.3 |
+  | 2019    965   458.6784      239.2       1308   537052.3 |
+  +---------------------------------------------------------+
+precision/recall/support (constant):
+
+  +------------------------------+
+  | precis~n    recall   support |
+  |------------------------------|
+  | .4332756   .877193       285 |
+  +------------------------------+
+----- top 5 suppliers by spend -----
+
+  +---------------------------------------------+
+  |             suppliername      n   raw_spend |
+  |---------------------------------------------|
+  | thermo fisher scientific   3599     2291463 |
+  |                   qiagen   1325     1047358 |
+  |        life technologies   1035     1042067 |
+  |           bd biosciences    111    555796.6 |
+  |     bio-rad laboratories    504    392920.6 |
+  +---------------------------------------------+
+----- top 5 priciest items 2010-2011 -----
+(7,667 observations deleted)
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | dual geneamp pcr system 9700                                              |
+  |---------------------------------------------------------------------------|
+  |       suppliername   |  raw_price   |  raw_qty   |  raw_spend   |  year   |
+  |  life technologies   |     8573.5   |        1   |     8573.5   |  2010   |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | quantifast syber green rt-pcr kit (400rxs)                                |
+  |---------------------------------------------------------------------------|
+  |       suppliername   |  raw_price   |  raw_qty   |  raw_spend   |  year   |
+  |             qiagen   |       7810   |        1   |       7810   |  2010   |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | gold geneamp pcr system 9700                                              |
+  |---------------------------------------------------------------------------|
+  |       suppliername   |  raw_price   |  raw_qty   |  raw_spend   |  year   |
+  |  life technologies   |     7079.4   |        1   |     7079.4   |  2010   |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | silver well geneamp pcr system 9700                                       |
+  |---------------------------------------------------------------------------|
+  |       suppliername   |  raw_price   |  raw_qty   |  raw_spend   |  year   |
+  |  life technologies   |     6285.6   |        1   |     6285.6   |  2011   |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | geneamp pcr system 9700 base module including unit (n8050200)- power co.. |
+  |---------------------------------------------------------------------------|
+  |       suppliername   |  raw_price   |  raw_qty   |  raw_spend   |  year   |
+  |  life technologies   |       5310   |        1   |       5310   |  2010   |
+  +---------------------------------------------------------------------------+
+----- top 5 priciest items 2018-2019 -----
+(6,858 observations deleted)
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | asset nucleic acid pcr system sn model viia7 maint 7/1/ 6/30/19           |
+  |---------------------------------------------------------------------------|
+  |             suppliername  | raw_price  |  raw_qty  |  raw_spend  |  year  |
+  | thermo fisher scientific  |    9438.4  |        1  |     9438.4  |  2018  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | proflex dual 96well pcr system                                            |
+  |---------------------------------------------------------------------------|
+  |             suppliername  | raw_price  |  raw_qty  |  raw_spend  |  year  |
+  | thermo fisher scientific  |    9132.5  |        1  |     9132.5  |  2018  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | proflex dual 384w pcr thermo-cycler system                                |
+  |---------------------------------------------------------------------------|
+  |             suppliername  | raw_price  |  raw_qty  |  raw_spend  |  year  |
+  | thermo fisher scientific  |      8600  |        1  |       8600  |  2018  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | proflex -well pcr system                                                  |
+  |---------------------------------------------------------------------------|
+  |             suppliername  | raw_price  |  raw_qty  |  raw_spend  |  year  |
+  | thermo fisher scientific  |      6995  |        1  |       6995  |  2019  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | proflex 3/ well pcr system thermal cycler independently controlled bloc.. |
+  |---------------------------------------------------------------------------|
+  |             suppliername  | raw_price  |  raw_qty  |  raw_spend  |  year  |
+  | thermo fisher scientific  |    6817.5  |        1  |     6817.5  |  2019  |
+  +---------------------------------------------------------------------------+
+----- 5 random items from 2013 (base year) -----
+(7,839 observations deleted)
+(972 observations deleted)
+
+  +--------------------------------------------------------------------+
+  |                                   clean_desc   raw_price   raw_qty |
+  |--------------------------------------------------------------------|
+  |               verso rt-pcr 1step hotstrt kit      151.28         1 |
+  |                       gotaq green master mix       39.38         3 |
+  |                   phire plant direct pcr kit       224.4         1 |
+  |                       pcr clean-up 250 preps      355.67         1 |
+  | superscript iii platinumone-step qrt-pcr kit        1672         1 |
+  +--------------------------------------------------------------------+
+
+
+===================================================
+CATEGORY: pcr tube strips
+===================================================
+N items = 4069
+----- yearly aggregates -----
+
+  +--------------------------------------------------------+
+  | year     n   mean_p~e   med_pr~e    tot_qty   tot_sp~d |
+  |--------------------------------------------------------|
+  | 2010   226    94.4054      65.95        512   38689.91 |
+  | 2011   205   88.94956         75        450   35697.78 |
+  | 2012   301   90.59146      72.93   678.2753   51935.34 |
+  | 2013   309    91.0345      73.86        663   50143.45 |
+  | 2014   329   93.79356      75.21   691.0833   55909.32 |
+  | 2015   391   108.0796      74.85        769   67918.34 |
+  | 2016   432   106.4979     77.575        956   81187.33 |
+  | 2017   582   101.1978      77.95       1171   99392.15 |
+  | 2018   614   102.8742      79.57       1231   105690.1 |
+  | 2019   680   108.7146      79.45       1410   126575.4 |
+  +--------------------------------------------------------+
+precision/recall/support (constant):
+
+  +-------------------------------+
+  | precis~n     recall   support |
+  |-------------------------------|
+  | .8995122   .7070552      1304 |
+  +-------------------------------+
+----- top 5 suppliers by spend -----
+
+  +---------------------------------------------+
+  |             suppliername      n   raw_spend |
+  |---------------------------------------------|
+  | thermo fisher scientific   1282    222460.9 |
+  |                      vwr    846    158652.9 |
+  |           usa scientific    632    117874.2 |
+  |     bio-rad laboratories    356    33108.22 |
+  |       geneese scientific    115    24758.15 |
+  +---------------------------------------------+
+----- top 5 priciest items 2010-2011 -----
+(3,638 observations deleted)
+
+  +-------------------------------------------------------------------------+
+  |             clean_desc |             suppliername | raw_price | raw_qty |
+  |  tube pcr strp 12wl nt |                      vwr |    728.83 |       1 |
+  |-------------------------------------------------------------------------|
+  |              raw_spend               |               year               |
+  |                 728.83               |               2011               |
+  +-------------------------------------------------------------------------+
+
+  +-------------------------------------------------------------------------+
+  |             clean_desc |             suppliername | raw_price | raw_qty |
+  |    tube pcr 12strp cap |                      vwr |    626.84 |       1 |
+  |-------------------------------------------------------------------------|
+  |              raw_spend               |               year               |
+  |                 626.84               |               2011               |
+  +-------------------------------------------------------------------------+
+
+  +-------------------------------------------------------------------------+
+  |             clean_desc |             suppliername | raw_price | raw_qty |
+  |    tube pcr 12strp cap |                      vwr |    626.84 |       1 |
+  |-------------------------------------------------------------------------|
+  |              raw_spend               |               year               |
+  |                 626.84               |               2011               |
+  +-------------------------------------------------------------------------+
+
+  +-------------------------------------------------------------------------+
+  |             clean_desc |             suppliername | raw_price | raw_qty |
+  |        pcr tube strips |           usa scientific |       600 |       1 |
+  |-------------------------------------------------------------------------|
+  |              raw_spend               |               year               |
+  |                    600               |               2010               |
+  +-------------------------------------------------------------------------+
+
+  +-------------------------------------------------------------------------+
+  |             clean_desc |             suppliername | raw_price | raw_qty |
+  | tbe,pcr,.2ml,fltcp,clr | thermo fisher scientific |     578.8 |       1 |
+  |-------------------------------------------------------------------------|
+  |              raw_spend               |               year               |
+  |                  578.8               |               2010               |
+  +-------------------------------------------------------------------------+
+----- top 5 priciest items 2018-2019 -----
+(2,775 observations deleted)
+
+  +---------------------------------------------------------------------------+
+  |                             clean_desc |         suppliername | raw_price |
+  |           6q8030785680- tube pcr 8strp |                  vwr |       765 |
+  |---------------------------------------------------------------------------|
+  |        raw_qty         |         raw_spend         |         year         |
+  |              1         |               765         |         2018         |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                             clean_desc |         suppliername | raw_price |
+  |                    strip pcr lp rt nat |                  vwr |    752.53 |
+  |---------------------------------------------------------------------------|
+  |        raw_qty         |         raw_spend         |         year         |
+  |              1         |            752.53         |         2019         |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                             clean_desc |         suppliername | raw_price |
+  |                     tube pcr 8strp cap |                  vwr |    692.75 |
+  |---------------------------------------------------------------------------|
+  |        raw_qty         |         raw_spend         |         year         |
+  |              1         |            692.75         |         2018         |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                             clean_desc |         suppliername | raw_price |
+  |                     tube pcr 8strp cap |                  vwr |    692.75 |
+  |---------------------------------------------------------------------------|
+  |        raw_qty         |         raw_spend         |         year         |
+  |              1         |            692.75         |         2018         |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                             clean_desc |         suppliername | raw_price |
+  | mx3000p/mx3005p strip tubes 120 strips | agilent technologies |    679.72 |
+  |---------------------------------------------------------------------------|
+  |        raw_qty         |         raw_spend         |         year         |
+  |              1         |            679.72         |         2019         |
+  +---------------------------------------------------------------------------+
+----- 5 random items from 2013 (base year) -----
+(3,760 observations deleted)
+(304 observations deleted)
+
+  +--------------------------------------------------------------------+
+  |                                   clean_desc   raw_price   raw_qty |
+  |--------------------------------------------------------------------|
+  | 0.2ml strip pcr tubes separate caps included       74.85         1 |
+  |           tcs0803edu-optical flat cap strips          36         1 |
+  |                     cap strip strl 120strips       26.04         8 |
+  |             tube strips tubes 0.2ml dome cap          79         4 |
+  |                      optical flat cap strips          36         1 |
+  +--------------------------------------------------------------------+
+
+
+===================================================
+CATEGORY: pcr tubes
+===================================================
+N items = 4443
+----- yearly aggregates -----
+
+  +--------------------------------------------------------+
+  | year     n   mean_p~e   med_pr~e    tot_qty   tot_sp~d |
+  |--------------------------------------------------------|
+  | 2010   237   68.80371      54.55        415   25268.48 |
+  | 2011   253   67.77721      48.06   467.0001   27594.15 |
+  | 2012   312   66.75891       48.5   515.2302   31673.93 |
+  | 2013   402   71.44656      45.85        645   40986.48 |
+  | 2014   465   69.13325      50.39        742    47405.6 |
+  | 2015   458    66.8476      53.59        745   46160.35 |
+  | 2016   453   68.12066      54.13        739   45022.03 |
+  | 2017   611    75.8599      61.44        949   65072.37 |
+  | 2018   602   77.78336     63.985        982   69269.19 |
+  | 2019   650   73.42177     61.005       1034   69489.69 |
+  +--------------------------------------------------------+
+precision/recall/support (constant):
+
+  +------------------------------+
+  | precis~n    recall   support |
+  |------------------------------|
+  | .6192715   .869637       606 |
+  +------------------------------+
+----- top 5 suppliers by spend -----
+
+  +---------------------------------------------+
+  |             suppliername      n   raw_spend |
+  |---------------------------------------------|
+  | thermo fisher scientific   2705    291123.2 |
+  |                      vwr    928    85757.35 |
+  |           usa scientific    318    41546.92 |
+  |                   qiagen     41     6206.02 |
+  |     bio-rad laboratories     77     5561.65 |
+  +---------------------------------------------+
+----- top 5 priciest items 2010-2011 -----
+(3,953 observations deleted)
+
+  +--------------------------------------------------------------------------+
+  |                                    clean_desc |             suppliername |
+  |       e0030124260 tubes pcr 0.2ml bulk tubes, | thermo fisher scientific |
+  |--------------------------------------------------------------------------|
+  |     raw_price     |     raw_qty     |     raw_spend      |     year      |
+  |        349.05     |           1     |        349.05      |     2011      |
+  +--------------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------------+
+  |                                    clean_desc |             suppliername |
+  |                             tube pcr 12str na |                      vwr |
+  |--------------------------------------------------------------------------|
+  |     raw_price     |     raw_qty     |     raw_spend      |     year      |
+  |         334.1     |           1     |         334.1      |     2011      |
+  +--------------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------------+
+  |                                    clean_desc |             suppliername |
+  |                    med gloves 0.2ml pcr tubes | phenix research products |
+  |--------------------------------------------------------------------------|
+  |     raw_price     |     raw_qty     |     raw_spend      |     year      |
+  |         330.9     |           1     |         330.9      |     2010      |
+  +--------------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------------+
+  |                                    clean_desc |             suppliername |
+  | serological pipets 10ml 0.2ml pcr tube axygen |                      vwr |
+  |--------------------------------------------------------------------------|
+  |     raw_price     |     raw_qty     |     raw_spend      |     year      |
+  |         324.7     |           1     |         324.7      |     2010      |
+  +--------------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------------+
+  |                                    clean_desc |             suppliername |
+  |                               pcr tubes 0.5ml |                eppendorf |
+  |--------------------------------------------------------------------------|
+  |     raw_price     |     raw_qty     |     raw_spend      |     year      |
+  |           320     |           1     |           320      |     2010      |
+  +--------------------------------------------------------------------------+
+----- top 5 priciest items 2018-2019 -----
+(3,191 observations deleted)
+
+  +-------------------------------------------------------------------------+
+  |                         clean_desc | suppliername | raw_price | raw_qty |
+  |       tube pcr 2ml fltcp clr 10pks |          vwr |     360.2 |       1 |
+  |-------------------------------------------------------------------------|
+  |              raw_spend               |               year               |
+  |                  360.2               |               2019               |
+  +-------------------------------------------------------------------------+
+
+  +-------------------------------------------------------------------------+
+  |                         clean_desc | suppliername | raw_price | raw_qty |
+  |               tube pcr fltcp 0.2ml |          vwr |    351.14 |       1 |
+  |-------------------------------------------------------------------------|
+  |              raw_spend               |               year               |
+  |                 351.14               |               2019               |
+  +-------------------------------------------------------------------------+
+
+  +-------------------------------------------------------------------------+
+  |                         clean_desc | suppliername | raw_price | raw_qty |
+  | 0.2ml pcr individual tubes-natural |          vwr |     344.2 |       1 |
+  |-------------------------------------------------------------------------|
+  |              raw_spend               |               year               |
+  |                  344.2               |               2018               |
+  +-------------------------------------------------------------------------+
+
+  +-------------------------------------------------------------------------+
+  |                         clean_desc | suppliername | raw_price | raw_qty |
+  |             tube pcr 2ml fltcp clr |          vwr |     343.8 |       1 |
+  |-------------------------------------------------------------------------|
+  |              raw_spend               |               year               |
+  |                  343.8               |               2018               |
+  +-------------------------------------------------------------------------+
+
+  +-------------------------------------------------------------------------+
+  |                         clean_desc | suppliername | raw_price | raw_qty |
+  |                tube pcr fltcp .2ml |          vwr |    332.09 |       1 |
+  |-------------------------------------------------------------------------|
+  |              raw_spend               |               year               |
+  |                 332.09               |               2018               |
+  +-------------------------------------------------------------------------+
+----- 5 random items from 2013 (base year) -----
+(4,041 observations deleted)
+(397 observations deleted)
+
+  +---------------------------------------------------+
+  |                  clean_desc   raw_price   raw_qty |
+  |---------------------------------------------------|
+  |         tube pcr fltcp .2ml       27.88         2 |
+  |   0.2ml pcr tubes flat caps       35.75         2 |
+  | tubes 5mlpro.lobpcrclean100        45.9         4 |
+  |         tube pcr snpcp .2ml       21.88         1 |
+  |        tubes pcr 0.2ml bulk      130.97         1 |
+  +---------------------------------------------------+
+
+
+===================================================
+CATEGORY: pre amplification kits
+===================================================
+N items = 98
+----- yearly aggregates -----
+
+  +------------------------------------------------------+
+  | year    n   mean_p~e   med_pr~e   tot_qty   tot_sp~d |
+  |------------------------------------------------------|
+  | 2010    6   1544.267      736.3         8     9563.6 |
+  | 2011    5       2129       2720         6      13365 |
+  | 2012    9   1190.204     820.62        11   14089.84 |
+  | 2013   11   1012.565        856        16   17470.81 |
+  | 2014   14     864.54      573.3        14   12103.56 |
+  | 2015   12   756.9625      836.2        13    9535.55 |
+  | 2016   11   683.8091        904        13     9329.9 |
+  | 2017   12   925.4092     705.52        17   14531.71 |
+  | 2018    7   861.5243        970         7    6030.67 |
+  | 2019   11      589.9        600        13     7905.1 |
+  +------------------------------------------------------+
+precision/recall/support (constant):
+
+  +-------------------------------+
+  | precis~n     recall   support |
+  |-------------------------------|
+  |    .9375   .8823529        34 |
+  +-------------------------------+
+----- top 5 suppliers by spend -----
+
+  +-------------------------------------------+
+  |             suppliername    n   raw_spend |
+  |-------------------------------------------|
+  | thermo fisher scientific   58    54898.64 |
+  |        life technologies   28    53747.89 |
+  |                   qiagen    5     4267.41 |
+  |     bio-rad laboratories    7      1011.8 |
+  +-------------------------------------------+
+----- top 5 priciest items 2010-2011 -----
+(87 observations deleted)
+
+  +---------------------------------------------------------------------------+
+  |                      clean_desc |      suppliername | raw_price | raw_qty |
+  |     geneamp 2720 thermal cycler | life technologies |      4530 |       1 |
+  |---------------------------------------------------------------------------|
+  |               raw_spend               |               year                |
+  |                    4530               |               2010                |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                      clean_desc |      suppliername | raw_price | raw_qty |
+  |     geneamp 2720 thermal cycler | life technologies |      3290 |       1 |
+  |---------------------------------------------------------------------------|
+  |               raw_spend               |               year                |
+  |                    3290               |               2011                |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                      clean_desc |      suppliername | raw_price | raw_qty |
+  |      geneamp 272 thermal cycler | life technologies |      2995 |       1 |
+  |---------------------------------------------------------------------------|
+  |               raw_spend               |               year                |
+  |                    2995               |               2011                |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                      clean_desc |      suppliername | raw_price | raw_qty |
+  |      geneamp 2720 thermo cycler | life technologies |      2965 |       1 |
+  |---------------------------------------------------------------------------|
+  |               raw_spend               |               year                |
+  |                    2965               |               2010                |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                      clean_desc |      suppliername | raw_price | raw_qty |
+  | geneamp 2720 thermal cycler no. | life technologies |      2720 |       2 |
+  |---------------------------------------------------------------------------|
+  |               raw_spend               |               year                |
+  |                    5440               |               2011                |
+  +---------------------------------------------------------------------------+
+----- top 5 priciest items 2018-2019 -----
+(80 observations deleted)
+
+  +---------------------------------------------------------------------+
+  |                   clean_desc |             suppliername | raw_price |
+  | taqman preamp master mix kit | thermo fisher scientific |   1374.67 |
+  |---------------------------------------------------------------------|
+  |       raw_qty        |        raw_spend        |        year        |
+  |             1        |          1374.67        |        2018        |
+  +---------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------+
+  |                   clean_desc |             suppliername | raw_price |
+  | taqman preamp master mix qrc | thermo fisher scientific |      1000 |
+  |---------------------------------------------------------------------|
+  |       raw_qty        |        raw_spend        |        year        |
+  |             1        |             1000        |        2019        |
+  +---------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------+
+  |                   clean_desc |             suppliername | raw_price |
+  |     taqman preamp master mix | thermo fisher scientific |       970 |
+  |---------------------------------------------------------------------|
+  |       raw_qty        |        raw_spend        |        year        |
+  |             1        |              970        |        2018        |
+  +---------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------+
+  |                   clean_desc |             suppliername | raw_price |
+  |     taqman preamp master mix | thermo fisher scientific |       970 |
+  |---------------------------------------------------------------------|
+  |       raw_qty        |        raw_spend        |        year        |
+  |             1        |              970        |        2018        |
+  +---------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------+
+  |                   clean_desc |             suppliername | raw_price |
+  |     taqman preamp master mix | thermo fisher scientific |       970 |
+  |---------------------------------------------------------------------|
+  |       raw_qty        |        raw_spend        |        year        |
+  |             1        |              970        |        2018        |
+  +---------------------------------------------------------------------+
+----- 5 random items from 2013 (base year) -----
+(87 observations deleted)
+(6 observations deleted)
+
+  +------------------------------------------------------------------+
+  |                                 clean_desc   raw_price   raw_qty |
+  |------------------------------------------------------------------|
+  |                   taqman preamp master mix       684.8         1 |
+  |                   taqman preamp master mix       684.8         1 |
+  |                     geneamp thermal cycler     1994.97         1 |
+  | taqman fast advanced master mix ml) preamp      600.32         1 |
+  |                   taqman preamp master mix         856         1 |
+  +------------------------------------------------------------------+
+
+
+===================================================
+CATEGORY: pre-designed qpcr assays
+===================================================
+N items = 3371
+----- yearly aggregates -----
+
+  +-------------------------------------------------------+
+  | year     n   mean_p~e   med_pr~e   tot_qty   tot_sp~d |
+  |-------------------------------------------------------|
+  | 2010   119   165.4866      139.5       127   20679.06 |
+  | 2011   136   204.2454     150.35       137   27916.87 |
+  | 2012   190   174.1477        155       191   33338.07 |
+  | 2013   478   149.3793      143.1       479   71485.97 |
+  | 2014   383    133.331      143.1       383   51065.79 |
+  | 2015   262   123.7452      130.4       263   32541.24 |
+  | 2016   376   167.5752     144.61       387   63925.75 |
+  | 2017   523   158.8607     143.43       541   84599.02 |
+  | 2018   401   155.0775     150.51       420   63960.64 |
+  | 2019   503   150.5162      136.5       505   75998.03 |
+  +-------------------------------------------------------+
+precision/recall/support (constant):
+
+  +-------------------------------+
+  | precis~n     recall   support |
+  |-------------------------------|
+  | .9717084   .8030576      1112 |
+  +-------------------------------+
+----- top 5 suppliers by spend -----
+
+  +---------------------------------------------+
+  |             suppliername      n   raw_spend |
+  |---------------------------------------------|
+  | thermo fisher scientific   2240    351859.4 |
+  |        life technologies    837    139176.7 |
+  |       integrated dnatech    199       29645 |
+  |          realtimeprimers     46      1696.6 |
+  |             reid mirabel      8     1416.12 |
+  +---------------------------------------------+
+----- top 5 priciest items 2010-2011 -----
+(3,116 observations deleted)
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | igfbp-3 taqman gene expression assay(l 2900 reaction kit)                 |
+  |---------------------------------------------------------------------------|
+  |       suppliername   |  raw_price   |  raw_qty   |  raw_spend   |  year   |
+  |  life technologies   |      735.3   |        1   |      735.3   |  2011   |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | igf-1 taqman gene expression assay(l 2900 reaction kit)                   |
+  |---------------------------------------------------------------------------|
+  |       suppliername   |  raw_price   |  raw_qty   |  raw_spend   |  year   |
+  |  life technologies   |      735.3   |        1   |      735.3   |  2011   |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | vitamin receptor taqman gene expression assay(l 2900 reaction kit)        |
+  |---------------------------------------------------------------------------|
+  |       suppliername   |  raw_price   |  raw_qty   |  raw_spend   |  year   |
+  |  life technologies   |      735.3   |        1   |      735.3   |  2011   |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | vitamin binding protein (group-specific component) taqman gene expressi.. |
+  |---------------------------------------------------------------------------|
+  |       suppliername   |  raw_price   |  raw_qty   |  raw_spend   |  year   |
+  |  life technologies   |      735.3   |        1   |      735.3   |  2011   |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | pax7 taqman gene expression assay(l 2900 reaction kit)                    |
+  |---------------------------------------------------------------------------|
+  |       suppliername   |  raw_price   |  raw_qty   |  raw_spend   |  year   |
+  |  life technologies   |      735.3   |        1   |      735.3   |  2011   |
+  +---------------------------------------------------------------------------+
+----- top 5 priciest items 2018-2019 -----
+(2,467 observations deleted)
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | assay id rn01409804 m1 gene symbol rn00821429 g1                          |
+  |---------------------------------------------------------------------------|
+  |             suppliername  | raw_price  |  raw_qty  |  raw_spend  |  year  |
+  | thermo fisher scientific  |       595  |        1  |        595  |  2019  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | multiple primetime std qpcr assay see details                             |
+  |---------------------------------------------------------------------------|
+  |             suppliername  | raw_price  |  raw_qty  |  raw_spend  |  year  |
+  |       integrated dnatech  |       520  |        1  |        520  |  2019  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | gene expression assay single tube taqman snp applied biosystems human 5.. |
+  |---------------------------------------------------------------------------|
+  |             suppliername  | raw_price  |  raw_qty  |  raw_spend  |  year  |
+  | thermo fisher scientific  |       492  |        1  |        492  |  2018  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | assay id mm99999915 g1 taqman genexprsnassay mvic                         |
+  |---------------------------------------------------------------------------|
+  |             suppliername  | raw_price  |  raw_qty  |  raw_spend  |  year  |
+  | thermo fisher scientific  |    490.59  |        1  |     490.59  |  2019  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | taqman gene expression assay                                              |
+  |---------------------------------------------------------------------------|
+  |             suppliername  | raw_price  |  raw_qty  |  raw_spend  |  year  |
+  | thermo fisher scientific  |    482.45  |        1  |     482.45  |  2019  |
+  +---------------------------------------------------------------------------+
+----- 5 random items from 2013 (base year) -----
+(2,893 observations deleted)
+(473 observations deleted)
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | assay id hs00189551 m1 taqman gene express                                |
+  |---------------------------------------------------------------------------|
+  |              raw_price               |              raw_qty               |
+  |                  143.1               |                    1               |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | assay id 15943158 10 taqman snp genotyping human sm scale 188ul 40x       |
+  |---------------------------------------------------------------------------|
+  |              raw_price               |              raw_qty               |
+  |                 305.28               |                    1               |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | assay id mr00733719 cn taqman copy number sm scale 360ul 20x              |
+  |---------------------------------------------------------------------------|
+  |              raw_price               |              raw_qty               |
+  |                    255               |                    1               |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | assay id hs01931464 s1 taqman gene express                                |
+  |---------------------------------------------------------------------------|
+  |              raw_price               |              raw_qty               |
+  |                  143.1               |                    1               |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | assay id mm01135937 g1 taqman gene expression xs dye label concentratio.. |
+  |---------------------------------------------------------------------------|
+  |              raw_price               |              raw_qty               |
+  |                     79               |                    1               |
+  +---------------------------------------------------------------------------+
+
+
+===================================================
+CATEGORY: probe-based qpcr systems
+===================================================
+N items = 1781
+----- yearly aggregates -----
+
+  +--------------------------------------------------------+
+  | year     n   mean_p~e   med_pr~e    tot_qty   tot_sp~d |
+  |--------------------------------------------------------|
+  | 2010    75   694.0948     371.34         88   58019.16 |
+  | 2011    74   519.1949     377.25         84   41458.82 |
+  | 2012   127   594.8336        376   142.0098   79501.26 |
+  | 2013    96   611.6724        404        117   64575.76 |
+  | 2014   122   609.7531      421.5        148   84376.42 |
+  | 2015   152   480.9359    379.425        200   92163.86 |
+  | 2016   222   539.2833     426.95   310.1059   147626.9 |
+  | 2017   312   521.8167    404.065      436.5   197828.9 |
+  | 2018   277   456.4986        400        388     155295 |
+  | 2019   324    560.277     388.33        428   209202.3 |
+  +--------------------------------------------------------+
+precision/recall/support (constant):
+
+  +-------------------------------+
+  | precis~n     recall   support |
+  |-------------------------------|
+  |  .816092   .4329268       164 |
+  +-------------------------------+
+----- top 5 suppliers by spend -----
+
+  +---------------------------------------------+
+  |             suppliername      n   raw_spend |
+  |---------------------------------------------|
+  | thermo fisher scientific   1145    728217.4 |
+  |        life technologies    260    202856.8 |
+  |                   qiagen    131    104475.7 |
+  |       diasorin molecular     35    23599.99 |
+  |  texas agrilife research     34    11090.11 |
+  +---------------------------------------------+
+----- top 5 priciest items 2010-2011 -----
+(1,632 observations deleted)
+
+  +-------------------------------------------------------------------+
+  |                                    clean_desc |      suppliername |
+  |                                    master mix | life technologies |
+  |-------------------------------------------------------------------|
+  |    raw_price    |    raw_qty     |    raw_spend     |    year     |
+  |      3039.65    |          1     |      3039.65     |    2010     |
+  +-------------------------------------------------------------------+
+
+  +-------------------------------------------------------------------+
+  |                                    clean_desc |      suppliername |
+  |                           master mix aflp kit | life technologies |
+  |-------------------------------------------------------------------|
+  |    raw_price    |    raw_qty     |    raw_spend     |    year     |
+  |      2672.27    |          1     |      2672.27     |    2011     |
+  +-------------------------------------------------------------------+
+
+  +-------------------------------------------------------------------+
+  |                                    clean_desc |      suppliername |
+  |                           master mix dna free | life technologies |
+  |-------------------------------------------------------------------|
+  |    raw_price    |    raw_qty     |    raw_spend     |    year     |
+  |      2633.84    |          1     |      2633.84     |    2010     |
+  +-------------------------------------------------------------------+
+
+  +-------------------------------------------------------------------+
+  |                                    clean_desc |      suppliername |
+  |                                    master mix | life technologies |
+  |-------------------------------------------------------------------|
+  |    raw_price    |    raw_qty     |    raw_spend     |    year     |
+  |         2587    |          1     |         2587     |    2010     |
+  +-------------------------------------------------------------------+
+
+  +-------------------------------------------------------------------+
+  |                                    clean_desc |      suppliername |
+  | taqman(r) gene expression master mix bulk ml) | life technologies |
+  |-------------------------------------------------------------------|
+  |    raw_price    |    raw_qty     |    raw_spend     |    year     |
+  |       2533.5    |          1     |       2533.5     |    2010     |
+  +-------------------------------------------------------------------+
+----- top 5 priciest items 2018-2019 -----
+(1,180 observations deleted)
+
+  +--------------------------------------------------------------------------+
+  |                        clean_desc |             suppliername | raw_price |
+  | taqman gene expression master mix | thermo fisher scientific |    3225.6 |
+  |--------------------------------------------------------------------------|
+  |        raw_qty         |        raw_spend         |         year         |
+  |              1         |           3225.6         |         2019         |
+  +--------------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------------+
+  |                        clean_desc |             suppliername | raw_price |
+  |   taqman fast advanced master mix | thermo fisher scientific |   2824.25 |
+  |--------------------------------------------------------------------------|
+  |        raw_qty         |        raw_spend         |         year         |
+  |              1         |          2824.25         |         2019         |
+  +--------------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------------+
+  |                        clean_desc |             suppliername | raw_price |
+  |          taqman fast advance mmix | thermo fisher scientific |   2824.25 |
+  |--------------------------------------------------------------------------|
+  |        raw_qty         |        raw_spend         |         year         |
+  |              1         |          2824.25         |         2019         |
+  +--------------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------------+
+  |                        clean_desc |             suppliername | raw_price |
+  |   taqman fast advanced master mix | thermo fisher scientific |   2824.25 |
+  |--------------------------------------------------------------------------|
+  |        raw_qty         |        raw_spend         |         year         |
+  |              1         |          2824.25         |         2018         |
+  +--------------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------------+
+  |                        clean_desc |             suppliername | raw_price |
+  |   taqman fast advanced master mix | thermo fisher scientific |   2824.25 |
+  |--------------------------------------------------------------------------|
+  |        raw_qty         |        raw_spend         |         year         |
+  |              1         |          2824.25         |         2019         |
+  +--------------------------------------------------------------------------+
+----- 5 random items from 2013 (base year) -----
+(1,685 observations deleted)
+(91 observations deleted)
+
+  +--------------------------------------------------------------------+
+  |                                             clean_desc | raw_price |
+  |                  taqman fast virus step master mix ml) |       314 |
+  |--------------------------------------------------------------------|
+  |                              raw_qty                               |
+  |                                    1                               |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                             clean_desc | raw_price |
+  | taqman fast universal pcr master mix (2x) amperase ung |       524 |
+  |--------------------------------------------------------------------|
+  |                              raw_qty                               |
+  |                                    1                               |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                             clean_desc | raw_price |
+  |                 taqman universal master mix ii ung ml) |       404 |
+  |--------------------------------------------------------------------|
+  |                              raw_qty                               |
+  |                                    2                               |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                             clean_desc | raw_price |
+  |                 taqman universal master mix ii ung ml) |       404 |
+  |--------------------------------------------------------------------|
+  |                              raw_qty                               |
+  |                                    1                               |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                             clean_desc | raw_price |
+  |                    taqman fast advanced master mix ml) |    1734.3 |
+  |--------------------------------------------------------------------|
+  |                              raw_qty                               |
+  |                                    1                               |
+  +--------------------------------------------------------------------+
+
+
+===================================================
+CATEGORY: probe-based rt-qpcr systems
+===================================================
+N items = 81
+----- yearly aggregates -----
+
+  +------------------------------------------------------+
+  | year    n   mean_p~e   med_pr~e   tot_qty   tot_sp~d |
+  |------------------------------------------------------|
+  | 2010   12   1331.518    265.455        12   15978.22 |
+  | 2011    2       1219       1219         2       2438 |
+  | 2012    9   649.5555        580        18      12897 |
+  | 2013    1        970        970         1        970 |
+  | 2014    1        567        567         2       1134 |
+  | 2015    2   1069.775   1069.775         2    2139.55 |
+  | 2016    6   716.3083        504         8    7929.85 |
+  | 2017   19   782.0211     451.26        34   29339.76 |
+  | 2018   19   1045.362     460.58        39   37441.31 |
+  | 2019   10    755.193    543.495        15    8763.45 |
+  +------------------------------------------------------+
+precision/recall/support (constant):
+
+  +-------------------------------+
+  | precis~n     recall   support |
+  |-------------------------------|
+  | .4285714   .3947369        38 |
+  +-------------------------------+
+----- top 5 suppliers by spend -----
+
+  +-------------------------------------------+
+  |             suppliername    n   raw_spend |
+  |-------------------------------------------|
+  | thermo fisher scientific   49    79909.07 |
+  |        life technologies   14     23058.3 |
+  |                   qiagen    8        8311 |
+  |     agilent technologies    6     5325.71 |
+  |                  quartzy    1      1090.9 |
+  +-------------------------------------------+
+----- top 5 priciest items 2010-2011 -----
+(67 observations deleted)
+
+  +------------------------------------------------------------+
+  |                                                clean_desc  |
+  |              am1729m taqman gene expression cells ct kit,  |
+  |------------------------------------------------------------|
+  |      suppliername | raw_price | raw_qty | raw_spend | year |
+  | life technologies |      4060 |       1 |      4060 | 2010 |
+  +------------------------------------------------------------+
+
+  +------------------------------------------------------------+
+  |                                                clean_desc  |
+  |  am1729 taqman gene expression cells ct kit 400 reactions  |
+  |------------------------------------------------------------|
+  |      suppliername | raw_price | raw_qty | raw_spend | year |
+  | life technologies |      3654 |       1 |      3654 | 2010 |
+  +------------------------------------------------------------+
+
+  +------------------------------------------------------------+
+  |                                                clean_desc  |
+  |                  am1729fg taqman ge cells-to-ct (400 rxn)  |
+  |------------------------------------------------------------|
+  |      suppliername | raw_price | raw_qty | raw_spend | year |
+  | life technologies |   3548.44 |       1 |   3548.44 | 2010 |
+  +------------------------------------------------------------+
+
+  +------------------------------------------------------------+
+  |                                                clean_desc  |
+  |                  am1729fg taqman ge cells-to-ct (400 rxn)  |
+  |------------------------------------------------------------|
+  |      suppliername | raw_price | raw_qty | raw_spend | year |
+  | life technologies |   3548.44 |       1 |   3548.44 | 2010 |
+  +------------------------------------------------------------+
+
+  +------------------------------------------------------------+
+  |                                                clean_desc  |
+  |                   agpath-id one-step rt-pcr reagents 1000  |
+  |------------------------------------------------------------|
+  |      suppliername | raw_price | raw_qty | raw_spend | year |
+  | life technologies |      1270 |       1 |      1270 | 2011 |
+  +------------------------------------------------------------+
+----- top 5 priciest items 2018-2019 -----
+(52 observations deleted)
+
+  +--------------------------------------------------------------------+
+  |                  clean_desc |             suppliername | raw_price |
+  | express 1step ssii qpcr uni | thermo fisher scientific |   2914.45 |
+  |--------------------------------------------------------------------|
+  |       raw_qty        |       raw_spend        |        year        |
+  |             1        |         2914.45        |        2018        |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                  clean_desc |             suppliername | raw_price |
+  |      ssiii step qrt-pcr 500 | thermo fisher scientific |   1941.66 |
+  |--------------------------------------------------------------------|
+  |       raw_qty        |       raw_spend        |        year        |
+  |             1        |         1941.66        |        2018        |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                  clean_desc |             suppliername | raw_price |
+  |      ssiii step qrt-pcr 500 | thermo fisher scientific |   1941.66 |
+  |--------------------------------------------------------------------|
+  |       raw_qty        |       raw_spend        |        year        |
+  |             1        |         1941.66        |        2018        |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                  clean_desc |             suppliername | raw_price |
+  |      ssiii step qrt-pcr 500 | thermo fisher scientific |   1941.66 |
+  |--------------------------------------------------------------------|
+  |       raw_qty        |       raw_spend        |        year        |
+  |             1        |         1941.66        |        2018        |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                  clean_desc |             suppliername | raw_price |
+  |      ssiii step qrt-pcr 500 | thermo fisher scientific |   1941.66 |
+  |--------------------------------------------------------------------|
+  |       raw_qty        |       raw_spend        |        year        |
+  |             2        |         3883.32        |        2018        |
+  +--------------------------------------------------------------------+
+----- 5 random items from 2013 (base year) -----
+(80 observations deleted)
+
+  +-----------------------------------------------------------------------+
+  |                                      clean_desc   raw_price   raw_qty |
+  |-----------------------------------------------------------------------|
+  | taqman ez rt-pcr core reagents without controls         970         1 |
+  +-----------------------------------------------------------------------+
+
+
+===================================================
+CATEGORY: qpcr reaction dyes
+===================================================
+N items = 138
+----- yearly aggregates -----
+
+  +------------------------------------------------------+
+  | year    n   mean_p~e   med_pr~e   tot_qty   tot_sp~d |
+  |------------------------------------------------------|
+  | 2010   11   204.7055     151.05        14    2332.76 |
+  | 2011    6      404.3         34        10     2565.6 |
+  | 2012   14   359.0107      70.11        27    5979.15 |
+  | 2013    6   89.73833      49.83        14     796.43 |
+  | 2014    5     66.158         33         6     363.79 |
+  | 2015   26   428.7246     125.53        36   12465.25 |
+  | 2016   22   655.5073        713        35   21845.41 |
+  | 2017   28   533.2925   610.6851        42   20186.54 |
+  | 2018   11     485.42     626.18        21    5637.52 |
+  | 2019    9   345.6356     224.36        11    3516.17 |
+  +------------------------------------------------------+
+precision/recall/support (constant):
+
+  +-----------------------------+
+  | precis~n   recall   support |
+  |-----------------------------|
+  |  .244898        1        12 |
+  +-----------------------------+
+----- top 5 suppliers by spend -----
+
+  +-------------------------------------------+
+  |             suppliername    n   raw_spend |
+  |-------------------------------------------|
+  |                      vwr   39    39075.86 |
+  |             lgc genomics    9    10913.06 |
+  | thermo fisher scientific   26     9468.71 |
+  |           milliporesigma   20      8032.4 |
+  |        life technologies   13     3034.64 |
+  +-------------------------------------------+
+----- top 5 priciest items 2010-2011 -----
+(121 observations deleted)
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | 6q0375284perfecta qpcr fastmx rox 5000                                    |
+  |---------------------------------------------------------------------------|
+  |       suppliername   |  raw_price   |  raw_qty   |  raw_spend   |  year   |
+  |                vwr   |       2252   |        1   |       2252   |  2011   |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | catalogue perfecta qpcr fastmix rox lab                                   |
+  |---------------------------------------------------------------------------|
+  |       suppliername   |  raw_price   |  raw_qty   |  raw_spend   |  year   |
+  |                vwr   |      812.7   |        1   |      812.7   |  2010   |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | eukaryotic 18s rrna endogenous control (fam(tm) dye/mgb probe non-prime.. |
+  |---------------------------------------------------------------------------|
+  |       suppliername   |  raw_price   |  raw_qty   |  raw_spend   |  year   |
+  |  life technologies   |      509.2   |        1   |      509.2   |  2010   |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | plat qpcr sudg rox supermix                                               |
+  |---------------------------------------------------------------------------|
+  |       suppliername   |  raw_price   |  raw_qty   |  raw_spend   |  year   |
+  |  life technologies   |     209.88   |        1   |     209.88   |  2010   |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  | clean_desc                                                                |
+  | plat qpcr sudg rox                                                        |
+  |---------------------------------------------------------------------------|
+  |       suppliername   |  raw_price   |  raw_qty   |  raw_spend   |  year   |
+  |  life technologies   |     209.88   |        1   |     209.88   |  2010   |
+  +---------------------------------------------------------------------------+
+----- top 5 priciest items 2018-2019 -----
+(118 observations deleted)
+
+  +-------------------------------------------------------------------+
+  |                                                     clean_desc    |
+  |    us kasp .0 2x mastermix 96/ low rox- reactions 25ml usa/au.    |
+  |-------------------------------------------------------------------|
+  |             suppliername | raw_price | raw_qty | raw_spend | year |
+  |             lgc genomics |   1382.54 |       1 |   1382.54 | 2018 |
+  +-------------------------------------------------------------------+
+
+  +-------------------------------------------------------------------+
+  |                                                     clean_desc    |
+  |                                  radiant green hi rox qpcr kit    |
+  |-------------------------------------------------------------------|
+  |             suppliername | raw_price | raw_qty | raw_spend | year |
+  |        alkali scientific |    799.95 |       1 |    799.95 | 2019 |
+  +-------------------------------------------------------------------+
+
+  +-------------------------------------------------------------------+
+  |                                                     clean_desc    |
+  |                                        rox factor ix assay kit    |
+  |-------------------------------------------------------------------|
+  |             suppliername | raw_price | raw_qty | raw_spend | year |
+  | thermo fisher scientific |    626.18 |       1 |    626.18 | 2018 |
+  +-------------------------------------------------------------------+
+
+  +-------------------------------------------------------------------+
+  |                                                     clean_desc    |
+  |                                        rox factor ix assay kit    |
+  |-------------------------------------------------------------------|
+  |             suppliername | raw_price | raw_qty | raw_spend | year |
+  | thermo fisher scientific |    626.18 |       1 |    626.18 | 2018 |
+  +-------------------------------------------------------------------+
+
+  +-------------------------------------------------------------------+
+  |                                                     clean_desc    |
+  |                                        rox factor ix assay kit    |
+  |-------------------------------------------------------------------|
+  |             suppliername | raw_price | raw_qty | raw_spend | year |
+  | thermo fisher scientific |    626.18 |       1 |    626.18 | 2018 |
+  +-------------------------------------------------------------------+
+----- 5 random items from 2013 (base year) -----
+(132 observations deleted)
+(1 observation deleted)
+
+  +------------------------------------------------------------+
+  |                           clean_desc   raw_price   raw_qty |
+  |------------------------------------------------------------|
+  |                      rox passive dye       32.25         2 |
+  |                      rox passive dye       32.25         8 |
+  | coomassie brilliant blue g25 dye 10g          34         1 |
+  |                      rox solution 50       65.66         1 |
+  |       perfecta qpcr fastmix ii l-rox      194.77         1 |
+  +------------------------------------------------------------+
+
+
+===================================================
+CATEGORY: tissue pcr systems
+===================================================
+N items = 510
+----- yearly aggregates -----
+
+  +------------------------------------------------------+
+  | year    n   mean_p~e   med_pr~e   tot_qty   tot_sp~d |
+  |------------------------------------------------------|
+  | 2010   42   184.8348     126.34        66    9739.04 |
+  | 2011   41    266.851        128        69   14425.62 |
+  | 2012   33    201.703        105        52    8599.56 |
+  | 2013   38   332.1497    144.355       111   24514.85 |
+  | 2014   43   356.9184        288        61   19198.83 |
+  | 2015   41   332.5105     181.24        73   16603.66 |
+  | 2016   80   393.9204     172.21       112   37784.93 |
+  | 2017   82   490.0522     263.73       109   46232.64 |
+  | 2018   54    494.745    427.965        68   31952.97 |
+  | 2019   56   258.8112     159.13        79   18952.71 |
+  +------------------------------------------------------+
+precision/recall/support (constant):
+
+  +-----------------------------+
+  | precis~n   recall   support |
+  |-----------------------------|
+  |      .45      .54       100 |
+  +-----------------------------+
+----- top 5 suppliers by spend -----
+
+  +--------------------------------------------+
+  |             suppliername     n   raw_spend |
+  |--------------------------------------------|
+  | thermo fisher scientific   177    80931.86 |
+  |                      vwr   141    58635.17 |
+  |           milliporesigma    33    17806.66 |
+  |                   qiagen    25     11950.7 |
+  |  ingenious targeting lab     2       11500 |
+  +--------------------------------------------+
+----- top 5 priciest items 2010-2011 -----
+(427 observations deleted)
+
+  +-------------------------------------------------------------------+
+  |                             clean_desc |             suppliername |
+  |          tissue culture rollr drum tc7 | thermo fisher scientific |
+  |-------------------------------------------------------------------|
+  |    raw_price    |    raw_qty     |    raw_spend     |    year     |
+  |      1887.88    |          1     |      1887.88     |    2011     |
+  +-------------------------------------------------------------------+
+
+  +-------------------------------------------------------------------+
+  |                             clean_desc |             suppliername |
+  | 1753 amino allyl message amp(tm)iiarna |        life technologies |
+  |-------------------------------------------------------------------|
+  |    raw_price    |    raw_qty     |    raw_spend     |    year     |
+  |       1196.3    |          1     |       1196.3     |    2010     |
+  +-------------------------------------------------------------------+
+
+  +-------------------------------------------------------------------+
+  |                             clean_desc |             suppliername |
+  |                 archivepure dna tissue | thermo fisher scientific |
+  |-------------------------------------------------------------------|
+  |    raw_price    |    raw_qty     |    raw_spend     |    year     |
+  |       913.54    |          1     |       913.54     |    2011     |
+  +-------------------------------------------------------------------+
+
+  +-------------------------------------------------------------------+
+  |                             clean_desc |             suppliername |
+  |                puregene tissue kit 33g |                   qiagen |
+  |-------------------------------------------------------------------|
+  |    raw_price    |    raw_qty     |    raw_spend     |    year     |
+  |       899.14    |          1     |       899.14     |    2011     |
+  +-------------------------------------------------------------------+
+
+  +-------------------------------------------------------------------+
+  |                             clean_desc |             suppliername |
+  |                tissue culture supplies |                      vwr |
+  |-------------------------------------------------------------------|
+  |    raw_price    |    raw_qty     |    raw_spend     |    year     |
+  |       726.19    |          1     |       726.19     |    2011     |
+  +-------------------------------------------------------------------+
+----- top 5 priciest items 2018-2019 -----
+(400 observations deleted)
+
+  +-------------------------------------------------------------------------+
+  |                                             clean_desc |   suppliername |
+  |         c-pace em tissue culture interface shv100quote |       ionoptix |
+  |-------------------------------------------------------------------------|
+  |     raw_price     |     raw_qty     |     raw_spend     |     year      |
+  |          7180     |           1     |          7180     |     2018      |
+  +-------------------------------------------------------------------------+
+
+  +-------------------------------------------------------------------------+
+  |                                             clean_desc |   suppliername |
+  |                                redextract-n-amp tissue | milliporesigma |
+  |-------------------------------------------------------------------------|
+  |     raw_price     |     raw_qty     |     raw_spend     |     year      |
+  |       2098.97     |           1     |       2098.97     |     2019      |
+  +-------------------------------------------------------------------------+
+
+  +-------------------------------------------------------------------------+
+  |                                             clean_desc |   suppliername |
+  | inverted tissue culture trinocular microscope 40x-800x |         amazon |
+  |-------------------------------------------------------------------------|
+  |     raw_price     |     raw_qty     |     raw_spend     |     year      |
+  |       1023.99     |           2     |       2047.98     |     2018      |
+  +-------------------------------------------------------------------------+
+
+  +-------------------------------------------------------------------------+
+  |                                             clean_desc |   suppliername |
+  |                             (r) tissue-culture treated | milliporesigma |
+  |-------------------------------------------------------------------------|
+  |     raw_price     |     raw_qty     |     raw_spend     |     year      |
+  |        684.41     |           1     |        684.41     |     2018      |
+  +-------------------------------------------------------------------------+
+
+  +-------------------------------------------------------------------------+
+  |                                             clean_desc |   suppliername |
+  |                          maxwell 16 tissue dna 48preps |            vwr |
+  |-------------------------------------------------------------------------|
+  |     raw_price     |     raw_qty     |     raw_spend     |     year      |
+  |         673.7     |           1     |         673.7     |     2018      |
+  +-------------------------------------------------------------------------+
+----- 5 random items from 2013 (base year) -----
+(472 observations deleted)
+(33 observations deleted)
+
+  +-----------------------------------------------------------------+
+  |                                clean_desc   raw_price   raw_qty |
+  |-----------------------------------------------------------------|
+  |          maxwell 16 tissue dna pur 48prep      230.82        30 |
+  |              tissue culture treated falco        69.6         5 |
+  |               kit bigdye direct cycle seq         359         1 |
+  | cj-f-cdv-1ml cdv fitc direct fa conjugate        18.6         1 |
+  |           redextract-n-amp tissue pcr kit        2085         1 |
+  +-----------------------------------------------------------------+
+
+. 
+end of do-file

@@ -81,6 +81,9 @@ hierarchical_veto_rules:
     - glycine
     - gly
 required_keywords:
+  rpmi:
+    any_of:
+    - rpmi
   nucleic acid modifying enzymes - t4 polynucleotide kinase:
     any_of:
     - t4
@@ -114,6 +117,12 @@ required_keywords:
     any_of:
     - dmf
     - '*formamide*'
+    none_of:
+    - '*hypochlorite*'
+    - '*alcohol*'
+    - '*hexanes*'
+    - '*sulfure*'
+    - '*acetamide*'
   reverse transcriptase:
     any_of:
     - '*transcriptase*'
@@ -222,6 +231,15 @@ required_keywords:
     - oxy*
     - metha*
     - amino*
+    - allyl
+    - '*propyl*'
+    - '*butyl*'
+    - '*butanol*'
+    - amyl
+    - cetyl
+    - lauryl
+    - stearyl
+    - vinyl
   dmf:
     none_of:
     - hexane
@@ -525,6 +543,7 @@ keyword_groups:
   - '*tb*'
   - '*tbe*'
   - '*tub*'
+  - '*grdtb*'
   ECOLI_TERMS:
   - '*ecoli*'
   - 'e. coli'
@@ -979,6 +998,10 @@ market_rules:
   all_of:
   - sirna
   - configurationid
+- name: synthetic sirna
+  all_of:
+  - sirna
+  - control 
 # shRNA (short hairpin RNA) — distinct from generic synthetic-rna-oligo.
 # Placed before the rna-oligo rule so shRNA descriptions (e.g.
 # MISSION shRNA, pLKO shRNA) aren't claimed by the broader `*oligo* + rna`
@@ -988,6 +1011,41 @@ market_rules:
   - '*shrna*'
   - '*sh-rna*'
   - '*short hairpin*'
+  none_of:
+  - '*type dna oligos*'
+  regex_none_of:
+  # DNA oligo ordering metadata — when "shrna" appears in a synthetic DNA
+  # oligo name (e.g., cloning insert templates), these fields are present.
+  - '(?i)\bsequence\b'
+  - '(?i)\bnmole?\b'
+  - '(?i)\bpurification\b'
+  - '(?i)\bdesalt\w*'
+  - '(?i)\bbases?\b'
+# shRNA-named DNA oligo cloning inserts — descriptions containing "shrna"
+# plus oligo-order metadata (sequence / nmol / bases) are DNA templates for
+# cloning shRNA, NOT actual synthetic shRNA.  Placed immediately after the
+# shRNA rule so these items get routed to DNA oligos before the restriction
+# enzyme fallback fires on any cloning-site overhangs they carry.
+# Two rules: one for "shrna", one for "sh-rna" — using all_of so the shRNA
+# keyword AND the metadata signal are BOTH required (not OR'd).
+- name: synthetic dna oligonucleotide - desalted
+  all_of:
+  - '*shrna*'
+  regex_any_of:
+  - '(?i)\bsequence\b'
+  - '(?i)\bnmole?\b'
+  - '(?i)\bpurification\b'
+  - '(?i)\bdesalt\w*'
+  - '(?i)\bbases?\b'
+- name: synthetic dna oligonucleotide - desalted
+  all_of:
+  - '*sh-rna*'
+  regex_any_of:
+  - '(?i)\bsequence\b'
+  - '(?i)\bnmole?\b'
+  - '(?i)\bpurification\b'
+  - '(?i)\bdesalt\w*'
+  - '(?i)\bbases?\b'
 # DNA oligo: modified (5'/3' fluorophore, quencher, chemical modification)
 - name: synthetic dna oligonucleotide - modified
   all_of:
@@ -1024,6 +1082,7 @@ market_rules:
   - '*shrna*'
   - '*sh-rna*'
   - '*short hairpin*'
+  - '*type dna oligos*'
 # EBS (Exon Binding Site) / IBS (Intron Binding Site) primer labels.
 # These are the RNA-RNA base-pairing regions of group II introns — a
 # primer bearing an EBS<N> / IBS<N> tag is a synthetic RNA oligo designed
@@ -1033,11 +1092,37 @@ market_rules:
 # and other 3-letter acronyms.
 - name: synthetic rna oligonucleotide
   regex_any_of:
-  # Numbered labels: EBS1, EBS2a, IBS1, IBS3b
-  - '(?i)\b(?:EBS|IBS)\d+[a-z]?\b'
-  # Paired EBS/IBS in a single token — unambiguous group II intron signal
-  # even without a number (e.g., "EBS-IBS primer pair").
+  # Paired EBS/IBS in a single token — requires both markers, which is
+  # unambiguous group II intron RNA signal. The numbered form EBS1/IBS2 is
+  # intentionally excluded: TargeTron DNA primers routinely carry those
+  # labels, so numbered-only EBS/IBS is not a reliable RNA discriminator.
   - '(?i)\b(?:EBS[-_/\s]+IBS|IBS[-_/\s]+EBS)\b'
+# RNA oligo explicit signals — "rna duplex" and "rna oligo" without "oligo"
+# keyword would miss the all_of:[*oligo*, rna] rule above.  These catch
+# stand-alone "100 nmole rna duplex" / "rna oligo 25mer" style descriptions.
+- name: synthetic rna oligonucleotide
+  all_of:
+  - rna
+  - duplex
+  none_of:
+  - '*sirna*'
+  - '*shrna*'
+  - '*dsrna*'
+  - '*double stranded*'
+  - '*double-stranded*'
+- name: synthetic rna oligonucleotide
+  all_of:
+  - '*rna oligo*'
+  none_of:
+  - '*shrna*'
+  - '*sirna*'
+# Numbered EBS/IBS labels (EBS1, EBS2, EBS1d, IBS2 etc.) are TargeTron
+# retargeting DNA primers — NOT synthetic RNA oligos.  Route them to
+# synthetic dna oligonucleotide - desalted before the enzyme fallback fires,
+# which would mislabel "spea-ebs1d" as a restriction enzyme (SpeI match).
+- name: synthetic dna oligonucleotide - desalted
+  regex_any_of:
+  - '(?i)\b(?:EBS|IBS)\d+[a-z]?\b'
 # Structural-name primer rule: catches oligos whose descriptions don't
 # include the word "oligo" but carry tell-tale primer markers —
 # _F / _R / _fwd / _rev / _forward / _reverse suffixes, forward/reverse
@@ -1131,6 +1216,68 @@ market_rules:
   - '*custom cloning:*'
   - '*mutagenesis:*'
   - '*target insert name:*'
+# Syringes with abbreviated descriptions — "luer-lok syr", "syrg nd" etc.
+# Must come before the cloning-site oligo rule (Rule 19) which has a
+# combined (?i) that makes [FR][_-][A-Z] case-insensitive, so "luer-lok"
+# matches the [a-zA-Z][FR][_-][A-Z] pattern due to "r-l".
+- name: syringes
+  any_of:
+  - '*luer-lok syr*'
+  - '*luer lok syr*'
+  - '*luer syr*'
+  - '*lr-lk syr*'
+  - '*luer lock syr*'
+  - '*luer-lock syr*'
+  - '*luer-lok*'
+  - '*luerlok*'
+- name: syringes
+  all_of:
+  - '*syringe*'
+  none_of:
+  - '*filter*'
+  - '*tip*'
+  - '*pump*'
+  - '*driver*'
+  - '*plunger*'
+  - '*needle free*'
+  - '*needlefree*'
+- name: syringes
+  any_of:
+  - '*syrg nd*'
+  - '*syrg w/nd*'
+  - '* syrg *'
+# Oligos where the primer name embeds a restriction site as a cloning tag.
+# The main desalted rule below catches fwd/rev/forward/reverse but misses
+# single-letter F/R tokens (mid-string or end) and the 3-letter "_For" suffix.
+# case_sensitive: true routes matching to the raw description.
+#
+# Original rule: requires word-bounded enzyme in all_of, but fails when:
+#   (a) the enzyme is all-uppercase ("XHOI" ≠ "XhoI" case-sensitively)
+#   (b) the enzyme is not in $RESTRICTION_ENZYME (e.g. standalone SbfI)
+#   (c) the F/R is stripped from clean_desc by the preprocessor
+# New rule below uses a case-insensitive enzyme-stem regex in regex_any_of
+# to catch all three failure modes.
+- name: synthetic dna oligonucleotide - desalted
+  case_sensitive: true
+  regex_any_of:
+  # Enzyme stem (case-insensitive) followed by space/sep + F or R + end.
+  # Catches "Sort SbfI R", "idsD sphI F", "CHIF 891 STOP XHOI R", etc.
+  # The (?i) makes the enzyme-stem pattern and [FR] both case-insensitive.
+  - '(?i)\b(?:bamh|ecor?v?|hind|xho|xba|xma|sal|sph|sac|kpn|not|nhe|cla|bgl|pst|pvu|spe|nco|nde|pac|pci|pme|sbf|mfe|mlu|stu|sma|sca|nar|dra|mbo|blp|bgl|avr|bsr|bss|bss|bsm|bst|bsu|bcu|bfa|bse|age|ale|alu|ase|ava|afl|acl|mfe|pml|nsi|msl|xcm|bstx|pflm|bcc|bse|fau|tsp|msp|hpa|scr|styd|bsaj|bsl|btg|nci|mnl|bbv|bpu|bsu|eco|dpn|msp|hae|hinf|csp|sau3a)\w*i\b.*[\s._\-][FR]\d*\s*$'
+  # F at very start of identifier before underscore/hyphen: "F_extension_XmaI"
+  - '^[FR][_\-]'
+  # F or R embedded in compound identifier before underscore/hyphen to uppercase:
+  # "genomicF_KpnI", "fliCF-PmeI" (any letter + F/R + sep + uppercase = cloning site)
+  - '[a-zA-Z][FR][_\-][A-Z]'
+- name: synthetic dna oligonucleotide - desalted
+  case_sensitive: true
+  all_of:
+  - $RESTRICTION_ENZYME
+  regex_any_of:
+  - '(?i)(?:^|[\s._\-])[FR]\d{0,2}\s*$'
+  - '(?i)^[FR]\d{0,2}[\s._\-]'
+  - '(?i)[\s._\-][FR]\d{0,2}[\s._\-]\w'
+  - '(?i)[._\-][Ff]or\d*\s*$'
 # Enzyme-name + oligo-marker rule.  Verified 0/1047 true restriction-enzyme
 # items in UMich contain tokens like fwd/sense/adaptor/sequence/promoter/
 # chip/gene — real enzyme orders are bone-simple (enzyme + maybe fastdigest
@@ -1173,6 +1320,14 @@ market_rules:
   - '(?i)\bdesalt\w*'
   - '(?i)\bpurification\b'
   - '(?i)\bsynthesis\b'
+  # Primer-direction short words: "up" / "dn" (upstream/downstream) and
+  # "left" / "right" are never in real enzyme descriptions.
+  - '(?i)\b(?:up|dn)\b'
+  - '(?i)\b(?:left|right)\b'
+  # Gene / context abbreviations that appear in primer names with cloning sites
+  # but never in genuine enzyme product orders.
+  - '(?i)\bctx\b'
+  - '(?i)(?:^|[\s_\-])myc(?:[\s_\-]|\d|$)'
 - name: restriction enzymes
   case_sensitive: true
   any_of:
@@ -1263,6 +1418,15 @@ market_rules:
   - '(?i)\bcas9\b'
   - '(?i)\bcre\b'
   - '(?i)\blox[pn]\b'
+  # Primer direction / location words (real enzyme descriptions never carry these)
+  - '(?i)\b(?:up|dn)\b'
+  - '(?i)\b(?:left|right)\b'
+  - '(?i)\b(?:site|insert|backbone|coding|amplification|amplify)\b'
+  # Short gene/protein context abbreviations commonly paired with restriction sites
+  # in primer descriptions but never in actual enzyme orders
+  - '(?i)\b(?:ctx|ext|exon|loop|stem|codon|promoter|enhancer|intron|exon)\b'
+  # Standalone myc gene (not myc-tag which is already covered above)
+  - '(?i)(?:^|[\s_\-])myc(?:[\s_\-]|\d|$)'
 - name : recombinant human protein
   all_of:
   - gdnf
@@ -1279,6 +1443,10 @@ market_rules:
   all_of:
   - rec
   - hu 
+- name : recombinant human protein
+  all_of:
+  - rec
+  - hum
 - name : recombinant human protein
   all_of:
   - recombinant
@@ -1685,6 +1853,30 @@ market_rules:
   - '*goat*'
   - '*chicken*'
   - '*cd*'
+# Biotin-conjugated primary antibodies targeting CD/surface markers.
+# Mirrors the alexa-fluor + anti-mouse/anti-human rules above.
+- name: monoclonal primary antibody
+  all_of:
+  - '*biotin*'
+  - '*anti-*'
+  any_of:
+  - '*cd*'
+  - '*ly-*'
+  - '*ly6*'
+  - '*ter-*'
+  - '*nk*'
+  - '*gl7*'
+  - '*f4/80*'
+  none_of:
+  - '*igg*'
+  - '*igm*'
+  - '*secondary*'
+  - '*whole*'
+  - '*h+l*'
+  - '*hrp*'
+  - '*donkey*'
+  - '*goat*'
+  - '*chicken*'
 - name: monoclonal primary antibody
   all_of:
   - '*anti-m*'
@@ -1800,6 +1992,16 @@ market_rules:
   all_of:
   - '*clone*'
   - '*antibod*'
+- name: monoclonal primary antibody
+  all_of:
+  - '*clone*'
+  - '*anti-*'
+  none_of:
+  - '*secondary*'
+  - '*igg*'
+  - '*bac*'
+  - '*shrna*'
+  - '*sirna*'
 - name: monoclonal primary antibody
   all_of:
   - '*rabbit mab*'
@@ -1953,6 +2155,41 @@ market_rules:
   none_of:
   - '*secondary*'
   - '*monoclonal*'
+# Santa Cruz Biotechnology catalog numbers (sc-NNNN in raw description).
+# ~65% of sc-NNNN items are primary antibodies; siRNA/shRNA/protein-resins/
+# isotype controls are excluded by their own description tokens.
+# case_sensitive: true routes matching to the raw description.
+- name: monoclonal primary antibody
+  case_sensitive: true
+  regex_any_of:
+  - '(?i)\bsc-\d{4,}'
+  none_of:
+  - '*sirna*'
+  - '*shrna*'
+  - '*protein a*'
+  - '*protein g*'
+  - '*agarose*'
+  - '*secondary*'
+  - '*normal mouse*'
+  - '*normal rabbit*'
+  - '*normal goat*'
+  - '*igg*'
+# Standalone 'ab' token is a strong antibody signal when not in an oligo,
+# serum, or secondary-antibody context.  Word-boundary prevents matching
+# inside cry1ab, abcam, lab, etc.
+- name: monoclonal primary antibody
+  regex_any_of:
+  - '\bab\b'
+  none_of:
+  - '*secondary*'
+  - '*igg*'
+  - '*hrp*'
+  - '*irdye*'
+  - '*alexa fluor*'
+  - '*oligo*'
+  - '*serum*'
+  - '*normal*'
+  - '*whole*'
 - name: rnase inhibitors
   all_of:
   - recombinant
@@ -1995,12 +2232,15 @@ market_rules:
   - $ASSAY_OR_KIT
 - name: high-fidelity dna polymerase
   all_of:
-  - phusion 
+  - phusion
   - dna
   - '*poly*'
   - $HIGH_FIDELITY
   none_of:
   - $ASSAY_OR_KIT
+  - $HOT_START
+  - '*hot-start*'
+  - '*hotstart*'
 - name: high-fidelity dna polymerase
   all_of:
   - ventsupreg
@@ -2010,6 +2250,11 @@ market_rules:
   - $HIGH_FIDELITY
   - '*taq*'
   - '*polymerase*'
+  none_of:
+  - $HOT_START
+  - '*hot-start*'
+  - '*hotstart*'
+  - '*platinum*'
 - name: hot start taq polymerase
   all_of:
   - $HOT_START
@@ -2090,6 +2335,87 @@ market_rules:
   any_of:
   - pcr
   - polymerase 
+- name: high-fidelity hot start pcr systems
+  all_of:
+  - accuprime 
+  - pfx 
+  - supermix 
+  none_of:
+  - qpcr
+- name: high-fidelity hot start pcr systems
+  all_of:
+  - fusion 
+  - $HOT_START 
+  - '*rxn*'
+  - pfuultra
+  none_of:
+  - qpcr
+- name: high-fidelity hot start pcr systems
+  all_of:
+  - kod 
+  - $HOT_START 
+  - '*master*'
+  - '*mix*' 
+  none_of:
+  - qpcr
+- name: high-fidelity hot start pcr systems
+  all_of:
+  - kapa 
+  - $HOT_START 
+  - $HIGH_FIDELITY 
+  - dntps 
+  none_of:
+  - qpcr
+- name: high-fidelity hot start pcr systems
+  all_of:
+  - $HOT_START 
+  - '*phusion*'
+  - '*mix*' 
+  none_of:
+  - qpcr
+- name: high-fidelity hot start pcr systems
+  all_of:
+  - '*phusion*'
+  - flash 
+  - mstrmix
+  none_of:
+  - qpcr
+- name: hot start pcr systems
+  all_of:
+  - $HOT_START 
+  - gotaq 
+  none_of:
+  - qpcr
+- name: hot start pcr systems
+  all_of:
+  - $HOT_START 
+  - 2g
+  - fast
+  - pcr
+  - kit 
+  none_of:
+  - qpcr
+- name: hot start pcr systems
+  all_of:
+  - hotmastermix 
+  - '*prime*'
+  none_of:
+  - qpcr
+- name: hot start pcr systems
+  all_of:
+  - kapa2g
+  - fast
+  - $HOT_START 
+  - genotyping
+  - pcr 
+  none_of:
+  - qpcr
+- name: hot start pcr systems
+  all_of:
+  - red taq
+  - '*4spb10*' 
+  none_of:
+  - qpcr
 - name: hot start pcr systems
   all_of:
   - sapphireamp
@@ -2262,14 +2588,46 @@ market_rules:
 - name: dye-based qpcr systems
   all_of:
   - qpcr
-  - master
+  - '*master*'
 - name: dye-based qpcr systems
   all_of:
   - qpcr
   - mix
 - name: dye-based qpcr systems
   all_of:
+  - qpcr
+  - '*mm' 
+- name: dye-based qpcr systems
+  all_of:
   - powerupsybrgreen
+- name: dye-based qpcr systems
+  all_of:
+  - '*power up sybr green pcr master mix*'
+- name: dye-based qpcr systems
+  all_of:
+  - sybr green pcr master mix
+- name: dye-based qpcr systems
+  all_of:
+  - sybr fast one-step qrt-pcr 
+- name: dye-based qpcr systems
+  all_of:
+  - hi-rox qpcr kit 
+- name: dye-based qpcr systems
+  all_of:
+  - lo-rox qpcr kit 
+- name: dye-based qpcr systems
+  all_of:
+  - qpcrbio sygreen mix hi-rox 
+- name: dye-based qpcr systems
+  all_of:
+  - qpcrbio sygreen mix lo-rox 
+- name: dye-based qpcr systems
+  all_of:
+  - kapa sybr fast one-step
+- name: dye-based qpcr systems
+  all_of:
+  - '*sybr green master hot start reaction mix*' 
+  - '*lightcycler*' 
 - name: dye-based qpcr systems
   all_of:
   - fg
@@ -2292,6 +2650,15 @@ market_rules:
   - taqman
   - gt
   - master
+- name: custom-designed qpcr assays
+  all_of:
+  - '*custom*'
+  any_of:
+  - '*taqman*'
+  - '*qpcr*assay*'
+- name: pre-designed qpcr assays
+  any_of:
+  - '*vhps*'
 - name: first-strand cdna synthesis systems
   all_of:
   - first-strand
@@ -2387,6 +2754,14 @@ market_rules:
   - '*sirna*'
   - '*shrna*'
   - '*rnai*'
+  - '*rnaimax*'
+  - '*dharmafect*'
+  - '*electropor*'
+  - '*nucleofect*'
+  - '*nucleofactor*'
+  - '*neon system*'
+  - '*transfection-ready*'
+  - '*orf clone*'
 - name: in situ hybridization reagents
   any_of:
   - '*rnascope*'
@@ -2661,6 +3036,41 @@ market_rules:
   - acridine orange
   - methyl green
   - fast green fcf
+  - fast green
+  - hemotox hg-free
+  - hematox hg-free
+  - hematox
+  - picrosiruis red
+  - picrosirius red
+  - diamidino- phenyli
+  - bisbenzimide
+  - bis-benzimide
+  - bluing reagent
+  - blueing
+  - pararosaniline
+  - orange g
+  - azure a
+  - biebrich scarlet
+  - ehrlich
+  - giemsa
+  - wright stain
+  - wright-giemsa
+  - nile red
+  - nigrosin
+  - lugol
+  - congo red
+  - sudan black
+  - basic fuchsin
+  - acid fuchsin
+  - periodic acid
+  - alizarin
+  - biocytin
+  - pyronin
+  - hema 3
+  - monoflow
+  - redox dye
+  - diff quik
+  - camco stain
 - name: histology & cell stains
   any_of:
   - '*masson trichrome*'
@@ -2688,10 +3098,54 @@ market_rules:
   - '*hematoxylin*gill*'
   - '*hematoxylin qs*'
   - '*hematoxylin*delafield*'
+  - '*hematoxylin*weigert*'
+  - '*weigert*hematoxylin*'
+  - '*trichrome stain*'
+  - '*h&e*kit*'
+  - '*h&e*stain*'
+  - '*he staining kit*'
+  - '*wright*giemsa*'
+  - '*wright*stain*'
+  - '*giemsa*stain*'
+  - '*karyomax*'
+  - '*diff*quik*'
+  - '*oil red o*'
+  - '*lipid*stain*kit*'
+  - '*saffron*'
+  - '*alcian*pas*'
   none_of:
   - '*antibod*'
   - '*gel*'
   - '*western*'
+# Brand-name and product-specific cell/histology stains not covered by
+# plain-text or chemical-name rules above.
+- name: histology & cell stains
+  any_of:
+  - '*amylo*glo*'
+  - '*amyloid*stain*'
+  - '*nucspot*'
+  - '*celltracker*'
+  - '*fluoro*jade*'
+  - '*fluorojade*'
+  - '*mitospy*'
+  - '*cellbrite*'
+  - '*membrite*'
+  - '*galactosidase*stain*'
+  - '*neurotrace*'
+  - '*fluoromyelin*'
+  - '*fluoro*myelin*'
+  - '*calcofluor white*'
+  - '*reticulin stain*'
+  - '*golgi*stain*'
+  - '*rapid golgi*'
+  - '*easydip*'
+  - '*easy dip*stain*'
+  - '*histogene*stain*'
+  - '*vector red*stain*'
+  - '*reddot*'
+  - '*fxcycle*'
+  - '*redox dye*'
+  - '*syto*'
 - name: histology & cell stains
   all_of:
   - '*diamidino*'
@@ -2842,19 +3296,108 @@ market_rules:
 - name: dntps
   all_of:
   - datp
-  none_of: *DNTP_NONE_OF
+  # Individual 100mM single-nucleotide solutions are "nucleotides", not dNTP mixes.
+  none_of:
+  - supermix
+  - cdna
+  - kit
+  - '*radioactive*'
+  - '*32p*'
+  - '*p32*'
+  - '*p-32*'
+  - '*p 32*'
+  - '*alpha-*'
+  - '*alpha *'
+  - '*[32-p]*'
+  - '*[32p]*'
+  - '*35s*'
+  - '*35-s*'
+  - '*33p*'
+  - '*3h*'
+  - '*biotin-*'
+  - '*fluor-*'
+  - '*cy3-*'
+  - '*cy5-*'
+  - '*100mm*'
+  - '*100 mm*'
 - name: dntps
   all_of:
   - dttp
-  none_of: *DNTP_NONE_OF
+  none_of:
+  - supermix
+  - cdna
+  - kit
+  - '*radioactive*'
+  - '*32p*'
+  - '*p32*'
+  - '*p-32*'
+  - '*p 32*'
+  - '*alpha-*'
+  - '*alpha *'
+  - '*[32-p]*'
+  - '*[32p]*'
+  - '*35s*'
+  - '*35-s*'
+  - '*33p*'
+  - '*3h*'
+  - '*biotin-*'
+  - '*fluor-*'
+  - '*cy3-*'
+  - '*cy5-*'
+  - '*100mm*'
+  - '*100 mm*'
 - name: dntps
   all_of:
   - dgtp
-  none_of: *DNTP_NONE_OF
+  none_of:
+  - supermix
+  - cdna
+  - kit
+  - '*radioactive*'
+  - '*32p*'
+  - '*p32*'
+  - '*p-32*'
+  - '*p 32*'
+  - '*alpha-*'
+  - '*alpha *'
+  - '*[32-p]*'
+  - '*[32p]*'
+  - '*35s*'
+  - '*35-s*'
+  - '*33p*'
+  - '*3h*'
+  - '*biotin-*'
+  - '*fluor-*'
+  - '*cy3-*'
+  - '*cy5-*'
+  - '*100mm*'
+  - '*100 mm*'
 - name: dntps
   all_of:
   - dctp
-  none_of: *DNTP_NONE_OF
+  none_of:
+  - supermix
+  - cdna
+  - kit
+  - '*radioactive*'
+  - '*32p*'
+  - '*p32*'
+  - '*p-32*'
+  - '*p 32*'
+  - '*alpha-*'
+  - '*alpha *'
+  - '*[32-p]*'
+  - '*[32p]*'
+  - '*35s*'
+  - '*35-s*'
+  - '*33p*'
+  - '*3h*'
+  - '*biotin-*'
+  - '*fluor-*'
+  - '*cy3-*'
+  - '*cy5-*'
+  - '*100mm*'
+  - '*100 mm*'
 - name: gel loading dye
   all_of:
   - gel
@@ -3371,6 +3914,9 @@ market_rules:
   - bsa
   none_of:
   - $BUFFER
+  - '*antibod*'
+  regex_none_of:
+  - '\bab\b'
 - name: bovine serum albumin
   all_of:
   - bovine
@@ -3451,6 +3997,10 @@ market_rules:
   all_of:
   - extraction
   - $BUFFER
+  none_of:
+  - '*gel*'
+  - '*2d*'
+  - '*protein trial*'
 - name: cell lysis buffers
   all_of:
   - xtractor
@@ -3463,6 +4013,12 @@ market_rules:
   all_of:
   - lysis
   - $BUFFER
+  none_of:
+  - '*reporter*'
+  - '*renilla*'
+  - '*luciferase*'
+  - '*repair*'
+  - '*dissociation*'
 - name: hepes buffer
   all_of:
   - hepes
@@ -3472,19 +4028,44 @@ market_rules:
   all_of:
   - hepes
   - $BUFFER
+- name: dulbecco's phosphate-buffered saline (dpbs) buffer
+  all_of:
+  - '*dulbecco*'
+  - pbs
+  - $BUFFER
+- name: dulbecco's phosphate-buffered saline (dpbs) buffer
+  all_of:
+  - '*dulbecco*'
+  - '*phos*' 
+  - '*saline*' 
+  - $BUFFER
+- name: dulbecco's phosphate-buffered saline (dpbs) buffer
+  all_of:
+  - '*dpbs*'
+  - $BUFFER
+- name: dulbecco's phosphate-buffered saline (dpbs) buffer
+  all_of:
+  - '*d-pbs*'
+  - $BUFFER
 - name: phosphate-buffered saline (pbs) buffer
   all_of:
   - pbs
   - $BUFFER
   none_of:
   - '*dulbecco*'
+  - '*block*'
+  - '*d-pbs*'
+  - '*plasmid*'
+  - '*oligo*'
 - name: phosphate-buffered saline (pbs) buffer
   all_of:
   - '*phos*'
-  - '*buf*' 
-  - '*sal*' 
+  - '*buf*'
+  - '*sal*'
   none_of:
   - '*dulbecco*'
+  - '*block*'
+  - '*d-pbs*'
 - name: phosphate-buffered saline (pbs) buffer
   all_of:
   - fta hemaglutn
@@ -3516,12 +4097,23 @@ market_rules:
   - sds
   none_of:
   - $BUFFER
+  - '*page*'
+  - '*standard*'
+  - '*prestain*'
+  - '*pre-stain*'
+  - '*ladder*'
+  - '*marker*'
+  - '*lithium*'
 - name: cell lysis detergents - sds (sodium dodecyl sulfate)
   all_of:
   - sodium dodecyl sulfate
+  none_of:
+  - '*lithium*'
 - name: cell lysis detergents - sds (sodium dodecyl sulfate)
   all_of:
   - dodecyl sulfate
+  none_of:
+  - '*lithium*'
 - name: cell lysis detergents - commercial protein extraction reagents
   all_of:
   - b-per bacterial protein
@@ -3725,6 +4317,8 @@ market_rules:
   - '*spin column*'
   - '*slurry*'
   - '*bulk*'
+  - '*nucleofect*'
+  - '*nucleofactor*'
 - name: spin desalting columns
   any_of:
   - '*zeba*desalt*'
@@ -4634,6 +5228,14 @@ market_rules:
   - trypsin
   - bovine
   - pancreas
+  none_of:
+  - '*tpck*'
+  - '*mass spec*'
+  - '*sequencing*'
+  - '*seq grade*'
+  - '*agarose*'
+  - '*gold*'
+  - '*affinity*'
 - name: cell culture dissociation reagents
   all_of:
   - edta
@@ -4641,11 +5243,20 @@ market_rules:
 - name: cell culture dissociation reagents
   all_of:
   - trypsin
-- name: cell culture dissociation reagents
-  all_of:
-  - collagenase
-  - type
-  - iv
+  none_of:
+  - '*tpck*'
+  - '*mass spec*'
+  - '*sequencing*'
+  - '*seq grade*'
+  - '*agarose*'
+  - '*gold*'
+  - '*affinity*'
+  - '*bovine pancreas*'
+  - '*type i*'
+  - '*type ii*'
+  - '*type iii*'
+# collagenase type iv is labeled "collagenase" (not cell culture dissociation)
+# in umich ground truth — removed the broad collagenase type iv rule to avoid FPs
 - name: cell culture dissociation reagents
   all_of:
   - versene
@@ -4685,12 +5296,14 @@ market_rules:
   - alch
 # `2-propanol` / `2 propanol` is the IUPAC synonym for isopropanol.  Naming
 # alone is deterministic — no ambiguity with other chemicals.
+# case_sensitive: true routes to raw product_desc so the "2-" prefix is not
+# stripped by the clean_desc preprocessor (which strips standalone numbers).
 - name: isopropanol
-  any_of:
-  - '*2-propanol*'
-  - '*2 propanol*'
-  - '*2propanol*'
-  - '*propan-2-ol*'
+  case_sensitive: true
+  regex_any_of:
+  - '(?i)\b2[\s\-]?propanol\b'
+  - '(?i)\bpropan[\s\-]?2[\s\-]?ol\b'
+  - '(?i)\b2[\s\-]?prpnl\b'
 - name: glycerol
   any_of:
   - '*glycerol*'
@@ -5052,6 +5665,10 @@ market_rules:
   - '*cell culture*'
   - '*cm2*'
   - tc
+  none_of:
+  - '*erlenmeyer*'
+  - '*erlnmyr*'
+  - '*erlen*'
 # ----------------------------------------------------------------------------
 # TBE buffer / TBE gels / tubing — pre-empt the $TUBE alias.  $TUBE expands
 # to '*tube*|*tb*|*tbe*|*tub*', and the bare '*tbe*' / '*tub*' tokens leak
@@ -5085,6 +5702,175 @@ market_rules:
   - '*criterion*tbe*'
   - '*tbe precast*'
   - '*tbe pre-cast*'
+# ----------------------------------------------------------------------------
+# 'TBE' / 'TB' as a "tube" abbreviation (NOT TBE buffer/gel).  Supplier
+# descriptions like "15M TBE PP/FLT/ST/GRD RK500CS" or "5ML TBE PS\STR" use
+# TBE = tube; co-occurring tokens are form-factor abbreviations (PP/PS =
+# polypropylene/polystyrene, FLT = flat, ST/STR = sterile, GRD = graduated,
+# RK = rack pack).  Placed BEFORE the Non-Lab tubing rule and the size-based
+# microcentrifuge / centrifuge-conical rules so the abbreviated forms route
+# correctly instead of falling through to Non-Lab or being shoved into
+# nearest-cosine categories ("pre-cast tbe gels", "tissue clearing
+# solution", "rnase") by the Expert Model.
+- name: centrifuge tubes
+  any_of:
+  - '*tbe pp*'
+  - '*tbe ps*'
+  - '*tbe flt*'
+  - '*tbe grd*'
+  - '*tbe str*'   # 'TBE STR' (sterile) -- space variant; pattern compiles to tbe[\s-]?str so it also catches 'tbe-str'
+  - '*tbe rk*'
+  - '*mltbe str*'  # '14MLTBE STR', 'fb14mltbe str' -- 14 mL conical tube
+  none_of:
+  - '*gel*'
+  - '*precast*'
+  - '*pre-cast*'
+  - '*buffer*'
+  - '*tubing*'
+  - '*dilu*'
+  - '*tygon*'
+  - '*ladder*'
+  - '*snap*'
+  - '*snp*'
+  - '*mcrtbe*'
+  - '*mcrtub*'
+  - '*test*'
+  - '*sc mcr*'
+  - '*cult*'
+# 'TB' (standalone token) + conical-size + form-factor descriptor.  Catches
+# "TB 15ML CLR PP FLAT CAP", "TB 15ML CLR PP FLT BULK", "TUBE CONIC 15ML
+# W/RACK"-style strings that lack the literal word "tube" / "conical" in a
+# form the size-based rule below can latch onto.
+- name: centrifuge tubes
+  all_of:
+  - tb
+  any_of:
+  - '*15ml*'
+  - '*15 ml*'
+  - '*50ml*'
+  - '*50 ml*'
+  - '*30ml*'
+  - '*30 ml*'
+  none_of:
+  - '*tbe gel*'
+  - '*precast*'
+  - '*pre-cast*'
+  - '*buffer*'
+  - '*tubing*'
+  - '*tygon*'
+  - '*pcr*'
+  - '*test*'
+  - '*filter*'
+  - '*fltr*'
+  - '*microfg*'
+  - '*microfuge*'
+  - '*ladder*'
+  - '*cult*'    # cell culture tubes (CULT TB 15ML BORO) -- different category
+  - '*snap*'    # snap-cap tubes belong to test tubes
+# 'TB' / 'TUB' (standalone) + microcentrifuge-size + form-factor descriptor:
+# "2.OML CONCL TB STR CP", "HLT 0.6ML TB NS", "HLT 2ML TUB GRD NSTCLR",
+# "HLT 2.0ML TUB NS SCRWCP".  Targets the small-volume microcentrifuge form
+# only -- explicitly excludes 15/30/50 mL conical sizes (handled above).
+- name: microcentrifuge tubes
+  any_of:
+  - '*tb str*'
+  - '*tb ns*'
+  - '*tb-ns*'
+  - '*tub grd*'
+  - '*tub-grd*'
+  - '*tub ns*'
+  - '*tub-ns*'
+  - '*tub scrwcp*'
+  - '*tub-scrwcp*'
+  - '*concl tb*'
+  - '*conical tb*'
+  none_of:
+  - '*15ml*'
+  - '*15 ml*'
+  - '*50ml*'
+  - '*50 ml*'
+  - '*30ml*'
+  - '*30 ml*'
+  - '*tbe gel*'
+  - '*precast*'
+  - '*pre-cast*'
+  - '*buffer*'
+  - '*tubing*'
+  - '*tygon*'
+  - '*pcr*'
+  - '*strip*'  # 'tb strip cap' is a PCR strip cap, not a microcentrifuge tube
+  - '*easystrip*'
+# Microcentrifuge tube spelling variants in supplier descriptions that the
+# size-based / `micro+$TUBE` rules miss because the word "micro" doesn't
+# appear: MCROTBES (microtubes), MCROFG / MICROFG (microfuge), MICTUBE,
+# SCMTUBE (screw-cap microtube), GRDTB (graduated tube).
+- name: microcentrifuge tubes
+  any_of:
+  - '*mcrotbe*'
+  - '*mcrofg*'
+  - '*microfg*'
+  - '*mictube*'
+  - '*mctube*'
+  - '*scmtube*'
+  - '*grdtb*'
+  - '*microtb*'
+  - '*mcrtub*'
+  none_of:
+  - '*rack*'
+  - '*rcks*'
+  - '*box*'
+  - '*holder*'
+# Bare 'mct' token (microcentrifuge tube) -- 97% of standalone "mct"
+# descriptions in UMich supplier data are microcentrifuge tubes.  Catches
+# "1.5ml nature mct", "mct n/s 0.6ml bl", "mct n/s 1.5ml yw 500/pkmct" that
+# the existing `mct + $TUBE` rule misses when the description has no
+# tube/tb/tbe token.
+- name: microcentrifuge tubes
+  all_of:
+  - mct
+  none_of:
+  - '*rack*'
+  - '*rcks*'
+  - '*box*'
+  - '*holder*'
+  - '*stand*'
+  - '*tip*'
+  - '*grinder*'
+  - '*bag*'
+  - '*200ul*'
+  - '*100ul*'
+  - '*1000ul*'
+  - '*10ul*'
+# Conical centrifuge tubes packaged with their own rack: "TUBE CONIC 50ML
+# W/RACK 500/CS", "TUBE CONICAL PP15ML RACK CS500".  The size-based conical
+# rule below excludes '*rack*' to avoid catching standalone tube racks; this
+# rule re-admits the bundled-rack format using the strong "conic" signal.
+- name: centrifuge tubes
+  all_of:
+  - '*tube*'
+  - '*conic*'
+  any_of:
+  - '*15ml*'
+  - '*15 ml*'
+  - '*50ml*'
+  - '*50 ml*'
+  - '*30ml*'
+  - '*30 ml*'
+  - '*pp15ml*'
+  - '*pp50ml*'
+  none_of:
+  - '*microcent*'
+  - '*microfuge*'
+  - '*microfg*'
+  - '*configurationid*'
+  - '*oligo*'
+  - '*sequence*'
+  - '*pcr*'
+  - '*adapter*'
+  - '*adaptor*'
+  - '*storag*'
+  - '*closur*'
+  - '*insert*'
 - name: Non-Lab
   any_of:
   - '*tubing*'
@@ -5111,29 +5897,71 @@ market_rules:
   all_of:
   - mct
   - nat
+  none_of:
+  - '*storag*'
+  - '*closur*'
+  - '*insert*'
+  - '*rack*'
+  - '*rck*'
 - name: microcentrifuge tubes
   all_of:
   - mct
   - $TUBE
+  none_of:
+  - '*storag*'
+  - '*closur*'
+  - '*insert*'
+  - '*rack*'
+  - '*rck*'
 - name: microcentrifuge tubes
   all_of:
   - microtube
+  none_of:
+  - '*storag*'
+  - '*closur*'
+  - '*insert*'
+  - '*rack*'
+  - '*rck*'
 - name: microcentrifuge tubes
   all_of:
   - micro
   - $TUBE
+  none_of:
+  - '*storag*'
+  - '*closur*'
+  - '*insert*'
+  - '*rack*'
+  - '*rck*'
 - name: microcentrifuge tubes
   all_of:
   - microcent
   - $TUBE
+  none_of:
+  - '*storag*'
+  - '*closur*'
+  - '*insert*'
+  - '*rack*'
+  - '*rck*'
 - name: microcentrifuge tubes
   all_of:
   - microcentrifuge
   - $TUBE
+  none_of:
+  - '*storag*'
+  - '*closur*'
+  - '*insert*'
+  - '*rack*'
+  - '*rck*'
 - name: microcentrifuge tubes
   all_of:
   - '*microfuge*'
   - $TUBE
+  none_of:
+  - '*storag*'
+  - '*closur*'
+  - '*insert*'
+  - '*rack*'
+  - '*rck*'
 - name: microcentrifuge tubes
   any_of:
   - '*microtube*'
@@ -5141,15 +5969,23 @@ market_rules:
   - micro cent tube
   none_of:
   - '*rack*'
+  - '*rck*'
   - '*centrifuge tube*'
+  - '*storag*'
+  - '*closur*'
+  - '*insert*'
 - name: microcentrifuge tubes
   all_of:
   - '*eppendorf*'
   - $TUBE
   none_of:
   - '*rack*'
+  - '*rck*'
   - '*pcr*'
   - '*configurationid*'
+  - '*storag*'
+  - '*closur*'
+  - '*insert*'
 # Brand-specific microcentrifuge tube variants whose canonical names don't
 # contain `micro`/`eppendorf`/`mct` — matched on the brand token alone.
 - name: microcentrifuge tubes
@@ -5160,7 +5996,11 @@ market_rules:
   - '*super spin*'
   none_of:
   - '*rack*'
+  - '*rck*'
   - '*pcr*'
+  - '*storag*'
+  - '*closur*'
+  - '*insert*'
 # Size-based microcentrifuge rule.  Standard micro tube volumes are 0.5 / 1.5
 # / 2.0 mL — these are unambiguously microcentrifuge regardless of whether
 # the description says "micro" or "conical screw cap".  Placed BEFORE the
@@ -5208,6 +6048,10 @@ market_rules:
   - '*15ml*'
   - '*50 ml*'
   - '*50ml*'
+  - '*storag*'
+  - '*closur*'
+  - '*insert*'
+  - '*rck*'
 - name: pcr tube strips
   all_of:
   - '*pcr*'
@@ -5215,15 +6059,23 @@ market_rules:
   - '*strip*'
   none_of:
   - '*rack*'
+  - '*rck*'
   - '*configurationid*'
+  - '*storag*'
+  - '*closur*'
+  - '*insert*'
 - name: pcr tube strips
   all_of:
   - '*pcr*'
   - '*strp*'
   none_of:
   - '*rack*'
+  - '*rck*'
   - '*tip*'
   - '*configurationid*'
+  - '*storag*'
+  - '*closur*'
+  - '*insert*'
 - name: pcr tubes
   all_of:
   - '*pcr*'
@@ -5232,11 +6084,15 @@ market_rules:
   - '*caps for*'
   - '*strip*'
   - '*rack*'
+  - '*rck*'
   - '*tip*'
   - '*configurationid*'
   - '*oligo*'
   - '*sequence*'
   - '*cap*'
+  - '*storag*'
+  - '*closur*'
+  - '*insert*'
 - name: sample vials
   all_of:
   - '*vial*'
@@ -5251,7 +6107,12 @@ market_rules:
   none_of:
   - '*scintillation*'
   - '*scntl*'
-- name: centrifuge conical tubes
+  - '*storag*'
+  - '*closur*'
+  - '*insert*'
+  - '*rack*'
+  - '*rck*'
+- name: centrifuge tubes
   all_of:
   - '*conical*'
   - '*tube*'
@@ -5261,17 +6122,28 @@ market_rules:
   - '*configurationid*'
   - '*oligo*'
   - '*sequence*'
-- name: centrifuge conical tubes
+  - '*storag*'
+  - '*closur*'
+  - '*insert*'
+  - '*rack*'
+  - '*rck*'
+- name: centrifuge tubes
   any_of:
   - '*50mltbe*'
   - '*15mltbe*'
+  none_of:
+  - '*storag*'
+  - '*closur*'
+  - '*insert*'
+  - '*rack*'
+  - '*rck*'
 # Size-based conical rule.  15 / 50 mL tubes are unambiguously conical
 # centrifuge tubes — catches "VWR TUBE PP ST GRD 50ML" style descriptions
 # that don't contain the literal word "conical" and would otherwise fall
 # through to Non-Lab.  Placed AFTER the size-based microcentrifuge rule so
 # combined sizes ("rack for 1.5 / 15 / 50 mL tubes") are blocked by *rack*
 # first.  Uses literal '*tube*' (see microcentrifuge note above).
-- name: centrifuge conical tubes
+- name: centrifuge tubes
   all_of:
   - '*tube*'
   any_of:
@@ -5346,6 +6218,10 @@ market_rules:
   - '*test tube*'
   - '*culture tube*'
   - '*cryo*'
+  - '*storag*'
+  - '*closur*'
+  - '*insert*'
+  - '*rck*'
 - name: syringes
   all_of:
   - '*syr*'
@@ -5501,6 +6377,10 @@ market_rules:
   - '*freez*'
 - name: cryogenic and freezer boxes
   all_of:
+  - cryovial 
+  - holder
+- name: cryogenic and freezer boxes
+  all_of:
   - container
   - '*frz*'
 - name: cryogenic and freezer boxes
@@ -5520,6 +6400,31 @@ market_rules:
   - cryostore
 - name: cryogenic and freezer boxes
   all_of:
+  - cryobox 
+- name: cryogenic and freezer boxes
+  all_of:
+  - '*cryo*'
+  any_of:
+  - '*box*'
+  - '*bx*'
+  - '*container*'
+  - '*rck*'
+  - '*rack*'
+- name: cryogenic and freezer boxes
+  all_of:
+  - '*cryule*'
+  any_of:
+  - '*box*'
+  - '*bx*'
+  - '*container*'
+  - '*rck*'
+  - '*rack*'
+- name: cryogenic and freezer boxes
+  all_of:
+  - '*cryo*'
+  - rack 
+- name: cryogenic and freezer boxes
+  all_of:
   - '*cryovial*'
   - '*storag*'
 - name: cryogenic and freezer boxes
@@ -5530,6 +6435,12 @@ market_rules:
   all_of:
   - '*cryo*'
   - '*vial*'
+  none_of:
+  - '*closur*'
+  - '*insert*'
+  - '*storag*'
+  - '*rack*'
+  - '*rck*'
 - name: dialysis casettes
   all_of:
   - '*slide*'
@@ -5739,6 +6650,11 @@ market_rules:
   all_of:
   - '*tip*'
   - gel load
+- name: gel loading pipette tips
+  all_of:
+  - '*ul*'
+  - '*gel*'
+  - '*load*'
 - name: gel loading pipette tips
   all_of:
   - '*tip*'
@@ -6200,6 +7116,8 @@ market_rules:
   all_of:
   - vial
   - scint
+  none_of:
+  - '*closur*'
 - name: pcr tube strips
   all_of:
   - '*pcr*'
@@ -6238,7 +7156,7 @@ market_rules:
   all_of:
   - $TUBE
   - '*mct*'
-- name: centrifuge conical tubes
+- name: centrifuge tubes
   all_of:
   - $TUBE
   - '*cent*'
@@ -6247,11 +7165,11 @@ market_rules:
   - '*oligo*'
   - '*sequence*'
   - '*concentration*'
-- name: centrifuge conical tubes
+- name: centrifuge tubes
   all_of:
   - $TUBE
   - '*cfg*'
-- name: centrifuge conical tubes
+- name: centrifuge tubes
   all_of:
   - $TUBE
   - '*cnt*'
@@ -6259,7 +7177,7 @@ market_rules:
   - '*configurationid*'
   - '*oligo*'
   - '*sequence*'
-- name: centrifuge conical tubes
+- name: centrifuge tubes
   all_of:
   - $TUBE
   - '*conic*'
@@ -6267,16 +7185,16 @@ market_rules:
   - '*configurationid*'
   - '*oligo*'
   - '*sequence*'
-- name: centrifuge conical tubes
+- name: centrifuge tubes
   all_of:
   - cap
   - cb
   - ct
-- name: centrifuge conical tubes
+- name: centrifuge tubes
   all_of:
   - $TUBE
   - flatpp
-- name: centrifuge conical tubes
+- name: centrifuge tubes
   all_of:
   - $TUBE
   - conical
@@ -6485,6 +7403,8 @@ market_rules:
   all_of:
   - alcohol
   - proof
+  none_of:
+  - '*allyl*'
 - name: ethanol
   all_of:
   - ethylalco
@@ -6510,6 +7430,18 @@ market_rules:
   all_of:
   - alcohol
   - reagent
+  none_of:
+  - allyl
+  - '*propyl*'
+  - '*butyl*'
+  - '*butanol*'
+  - amyl
+  - cetyl
+  - lauryl
+  - stearyl
+  - vinyl
+  - '*benz*'
+  - '*methyl*'
 # Erlenmeyer flasks: any form of "erlen" + a flask token (erlen / erlenmeyer
 # / erl ...), provided no clamp / stand / holder in the description (those
 # are flask accessories, not flasks).
@@ -6640,16 +7572,16 @@ market_rules:
   - paper towels
   - kimwps
   - bleach towels
-- name: uncoated sandwich colorimetric elisa kits
+- name: elisa kits
   any_of:
   - '*duoset*'
   - '*duo set*'
   none_of:
   - '*ancillary*'
-- name: pre-coated sandwich colorimetric elisa kits
+- name: elisa kits
   any_of:
   - '*quantikine*'
-- name: pre-coated sandwich colorimetric elisa kits
+- name: elisa kits
   all_of:
   - '*elisa*'
   - '*kit*'
@@ -6659,11 +7591,10 @@ market_rules:
   - '*buffer*'
   - '*starter*'
   - '*accessory*'
-  - '*duoset*'
-- name: uncoated sandwich colorimetric elisa kits
+- name: elisa kits
   all_of:
   - '*elisa max*'
-- name: pre-coated sandwich colorimetric elisa kits
+- name: elisa kits
   any_of:
   - '*eia kit*'
   none_of:
@@ -6796,7 +7727,8 @@ market_rules:
   - '*antibod*'
 - name: recombinant mouse protein
   all_of:
-  - '*recombinant mouse*'
+  - '*recom*'
+  - '*mouse*'
   none_of:
   - '*antibod*'
   - '*albumin*'
@@ -7147,6 +8079,9 @@ market_rules:
   - '*well*'
   - '*shipping*'
   - '*freight*'
+  - '*closur*'
+  - '*caps*'
+  - '*storag*'
 - name: filtering funnels
   any_of:
   - '*filtering funnel*'
@@ -7642,6 +8577,8 @@ market_rules:
   - '*ribonuclease chromatograph*'
   - '*rnase (e*'
   - '*rnase e.coli*'
+  - '*rnase*'
+  - '*ribonuclease*'
   none_of:
   - '*inhibitor*'
   - '*rnasin*'
@@ -7651,18 +8588,28 @@ market_rules:
   - '*antiserum*'
   - '*free*'
   - '*fre*'
+  - '* fr *'
+  - '*rnase fr*'
   - '*decontamin*'
+  - '*decontam*'
   - '*away*'
   - '*zap*'
+  - '*remov*'
+  - '*elimin*'
+  - '*spray*'
   - '*dnase*'
   - '*deoxyribonuclease*'
   - '*deoxyrib*'
+  - '*displace*'
   - '*tube*'
   - '*tip*'
   - '*plate*'
   - '*bottle*'
   - '*oligo*'
   - '*primer*'
+  - '*water*'
+  - '*pestle*'
+  - '*pestl*'
 - name: dnase/rnase-free & molecular-biology-grade water
   any_of:
   - '*nuclease-free water*'
@@ -7719,6 +8666,7 @@ market_rules:
   - '*enzyme only*'
   - '*h minus*'
   - '*qpcr*'
+  - '*clone*'
 - name: probe-based qpcr systems
   any_of:
   - '*ssoadvanced universal probe*'
@@ -7757,6 +8705,10 @@ market_rules:
   - '*ssoadvanced*sybr*'
   - '*quantitect sybr*'
   - '*absolute qpcr sybr*'
+  - '*radient green hi-rix qpcr*'
+  - '*radient green lorox qpcr*'
+  - '*radient green flourescein qpcr*'
+  - '*qpcrbio sygreen*'
   none_of:
   - '*primer*'
   - '*oligo*'
@@ -7873,6 +8825,15 @@ market_rules:
   - '*dnafectin*'
   - '*yeastmaker*'
   - '*polyethyleneimine*'
+  none_of:
+  - '*sirna*'
+  - '*shrna*'
+  - '*rnai*'
+  - '*rnaimax*'
+  - '*dharmafect*'
+  - '*electropor*'
+  - '*nucleofect*'
+  - '*nucleofactor*'
 
 # Specialty cell culture media — plant (Murashige & Skoog), adipocyte
 # differentiation, Williams' Medium E, EpiLife, SILAC DMEM variants.
@@ -7955,6 +8916,22 @@ market_rules:
 - name: restriction enzymes
   regex_any_of:
   - '(?i)\b(?:mse|dde|sfi|ssp|bspe|bsph|srf|mfe|mme|blp|aar|bamh|bbs|bcu|bsa|bsb|bsm|bsmb|bst|bsu|cla|dpn|eag|eco[rt]?|eco53|hae|hind|kpn|nco|nde|nhe|not|pac|pci|pst|pvu|rsr|sal|sbf|sma|sph|stu|swa|xba|xho|xma|sau3a|alu|sac|nar|spe|scai?|sge|agei?|hinf|msc|mly|mnl|mva|nae|nru|pfoi?|plei?|psi|pshai?|ssti?|taqi?|tli?|tsp|ava|banii?|bmgbi|btgi|dra|drdi|fsei?|fspe|hgai?|mboii?|mfei?|mjai?|mlui?|mslii?|pci|pvu|sal|spli?|taii?|bgl|sap|ahd|sfo|bpi|psp|cfr|aor|mph|lgu|pme)\s*i+\s*(?:\d|$|\b|u\b|units)'
+  regex_none_of:
+  # Oligo / primer context — real enzyme orders are bone-simple (enzyme + maybe
+  # hf / units / fastdigest).  Any of the tokens below co-occurring with an
+  # enzyme stem name means the row is a primer with a cloning site, not an enzyme.
+  - '(?i)\b(?:fwd|forward|rev|reverse)\b'
+  - '(?i)\b(?:primer|oligo)\w*'
+  - '(?i)\b(?:up|dn)\b'
+  - '(?i)\b(?:left|right)\b'
+  - '(?i)\b(?:site|insert|coding|amplif)\w*'
+  - '(?i)\b(?:ctx|ext)\b'
+  - '(?i)(?:^|[\s_\-])myc(?:[\s_\-]|\d|$)'
+  - '(?i)\b(?:gene|dna|sequence|fragment|vector|plasmid|construct)\b'
+  - '(?i)\b(?:helix|loop|stem)\b'
+  # Descriptions with 2 or more enzyme-stem tokens are almost certainly
+  # multi-site primers, not enzyme products.
+  - '(?i)(?:\b(?:bamh|ecor?v?|hind|xho|xba|xma|sal|sph|sac|kpn|not|nhe|cla|bgl|pst|pvu|spe|nco|nde|sbf|mfe)\w*i\b.*){2}'
 
 # Purified proteins — native proteins sourced from specific organisms / tissues
 # (collagen from calf skin, myosin from rabbit muscle, keyhole limpet
@@ -8077,6 +9054,8 @@ market_rules:
   - '*lsc*'
   - '*gal*'
   - '*gl*'
+  - '*storag*'
+  - '*closur*'
 
 # Scintillation cocktail — Ecolite, CytoScint, RNA Bee-style LSC fluids.
 # Typically sold by the gallon/liter (GAL, GL, L).
@@ -8147,6 +9126,8 @@ market_rules:
   - '*membrane*'
   - '*holder*'
   - '*cassette*'
+  - '*storag*'
+  - '*closur*'
 
 # Syringes — BD / luer-lok / luer-slip disposable syringes with CC or ML
 # units.  The "SYR" token alone is too common; pair it with luer or a volume
@@ -8154,6 +9135,7 @@ market_rules:
 - name: syringes
   any_of:
   - '*luer-lok*syr*'
+  - '*norm-ject*'
   - '*luer lok*syr*'
   - '*luer lock*syr*'
   - '*luer slip*syr*'
@@ -8163,6 +9145,8 @@ market_rules:
   - '*syrg*luer*'
   - '*tb syr*'
   - '*tuberculin*syringe*'
+  - '*lr-lk*'
+  - '*luer-lok*'
   regex_any_of:
   - '(?i)\b\d+\s*(?:cc|ml)\s*syr\b'
   - '(?i)\bsyr\s*\d+\s*(?:cc|ml)\b'
@@ -8508,7 +9492,8 @@ market_rules:
   - '*transformation*'
 
 # 2-Mercaptoethanol / β-ME — reducing agent, same bucket as DTT/TCEP family.
-- name: reducing agents - bme
+# UMich labels all reducing agents (including BME) under "reducing agents - dtt".
+- name: reducing agents - dtt
   any_of:
   - '*2-mercaptoethanol*'
   - '*2 mercaptoethanol*'
@@ -8560,4 +9545,685 @@ market_rules:
   - '*platinum ii taq*'
   - '*platinum superfi*'
   - '*platinum hot start*'
+
+# Drosophila / fly diet and vial-tray supplies.
+- name: Non-Lab
+  any_of:
+  - '*fly food*'
+  - '*drosophila*food*'
+  - '*nutri-fly*'
+- name: Non-Lab
+  all_of:
+  - '*tray*'
+  - '*vial*'
+  any_of:
+  - '*drosophila*'
+  - '*fly*'
+  none_of:
+  - '*food*'
+  - '*plate*'
+  - '*96*'
+
+# ---------------------------------------------------------------------------
+# Precision-rescue batch 6 — override Expert Model false positives identified
+# from umich_supplier validation (April 2026).
+# ---------------------------------------------------------------------------
+
+# Buffer dams — instrument accessories for gel electrophoresis systems (XCell,
+# Mini-Cell). Expert model sees "cell buffer" and predicts "cell lysis buffers".
+- name: instrument part - buffer dams
+  any_of:
+  - '*buffer dam*'
+  - '*buffer dams*'
+
+# HistoPrep is a tissue-clearing / defatting compound (alcoholic, but non-lab
+# consumable sold as first-aid / cleaning supply).  Expert model sees "alcohol"
+# and predicts "ethanol" — override to Non-Lab.
+- name: Non-Lab
+  any_of:
+  - '*histoprep*'
+
+# Drosophila vial plugs/flugs — expert model predicts "vials" because the
+# word "vial" appears.  These are drosophila cage accessories.
+- name: animal - drosophila supplies
+  any_of:
+  - '*vial flug*'
+  - '*vial plug*'
+  - '*wide vial flug*'
+  - '*wide vial plug*'
+  - '*flugs*'
+
+# Hydrion — brand of pH indicator / pH paper strips.  Expert model sees
+# "hydri" and predicts "sodium hydride".
+- name: ph paper and other test strips
+  any_of:
+  - '*hydrion*'
+
+# Isotope-labeled ammonium chloride (15N) — research tracer, not the
+# cell-biology "ammonium chloride" reagent.  Override to irrelevant chemicals.
+- name: irrelevant chemicals - inorganic salts
+  all_of:
+  - '*ammonium*'
+  - '*chloride*'
+  any_of:
+  - '*15n*'
+  - '*(15n*'
+  - '*nlm-*'
+
+# William's Medium E and MCDB 131 containing glutamine — specialty media,
+# not l-glutamine supplement.  Expert model predicts l-glutamine because
+# "glutamine" appears.
+- name: specialty cell culture media
+  any_of:
+  - '*william*medium*'
+  - '*williams*medium*'
+  - '*mcdb 131*'
+  none_of:
+  - '*supplement*'
+  - '*l-glutamine only*'
+
+# Luciferase protein alone (without "assay", "kit", or "reporter" context)
+# — expert model predicts "bioluminescence assay kit".  The enzyme itself is
+# a purified protein / purified enzyme.  Quantilum is Promega's brand for
+# recombinant luciferase but umich labels it as bioluminescence — exclude.
+- name: purified proteins
+  all_of:
+  - luciferase
+  none_of:
+  - '*assay*'
+  - '*kit*'
+  - '*reporter*'
+  - '*promoter*'
+  - '*antibod*'
+  - '*glo*'
+  - '*dual*'
+  - '*bright*'
+  - '*steady*'
+  - '*quantilum*'
+  - '*qaantilum*'
+  - '*recombinant luciferase*'
+
+# Formamide (deionized / ultrapure) — amide solvent, NOT DMF
+# (N,N-dimethylformamide).  Expert model conflates them.
+- name: irrelevant chemicals - solvents
+  all_of:
+  - formamide
+  none_of:
+  - '*dimethyl*'
+  - '*n,n-*'
+  - '*dmf*'
+
+# =============================================================================
+# RECALL IMPROVEMENT RULES (batch added 2026-04-29)
+# =============================================================================
+
+# --- RNA stabilization reagent ---
+# RNAlater / RNAProtect / RNA/DNA Shield are routinely labeled non-lab or
+# mis-routed to RNA purification kits by the expert model.
+- name: rna stabilization reagent
+  any_of:
+  - '*rnalater*'
+  - '*rna later*'
+  - '*rna-later*'
+  - '*rnalater-ice*'
+  - '*rnaprotect*'
+  - '*rna protect*'
+  - '*rna/dna shield*'
+  - '*dna/rna shield*'
+
+# --- Cell culture nutritional supplements - l-glutamine ---
+# GlutaMAX (L-alanyl-L-glutamine dipeptide) is the standard L-glutamine
+# substitute; expert model routes it to the B27 supplement category.
+- name: cell culture nutritional supplements - l-glutamine
+  any_of:
+  - '*glutamax*'
+  - '*gluta max*'
+
+# --- Collagenase ---
+# Re-add collagenase type IV catch (removed in precision session for
+# cell-culture-dissociation precision).  Place before dissociation rule.
+- name: collagenase
+  all_of:
+  - collagenase
+  any_of:
+  - '*type iv*'
+  - '*type 4*'
+  - '*type-iv*'
+  - '*type-4*'
+- name: collagenase
+  any_of:
+  - '*collagenase/dispase*'
+  - '*collagenase dispase*'
+- name: collagenase
+  any_of:
+  - '*liberase*'
+
+# --- Bioluminescence assay kit ---
+# ATPlite, luciferin substrates, beta-gal luminescence assays, chrono-lume
+# and similar are mis-routed to enzymatic assay kits, scintillation cocktail,
+# crosslinking reagents, or Non-Lab.
+# Fix purified-proteins regression: quantilum/recombinant luciferase IS the
+# enzyme standard, not a bioluminescence assay per se, so keep it in
+# purified proteins. All others go to bioluminescence.
+- name: bioluminescence assay kit
+  any_of:
+  - '*atplite*'
+  - '*atp-lite*'
+- name: bioluminescence assay kit
+  any_of:
+  - '*luciferin*'
+  none_of:
+  - '*quantilum*'
+  - '*recombinant luciferase*'
+  - '*antibod*'
+- name: bioluminescence assay kit
+  any_of:
+  - '*chrono-lume*'
+  - '*chronolume*'
+  - '*bactiter*'
+  - '*bactit-glo*'
+  - '*galacto-star*'
+  - '*galactostar*'
+  - '*luminescent cell viability*'
+  - '*vivolume luciferin*'
+- name: bioluminescence assay kit
+  any_of:
+  - '*vivoglo luciferin*'
+  - '*in vivo luciferin*'
+  - '*beta-glo*'
+  - '*beta glo*'
+  - '*caspase-glo*'
+
+# --- Ethanol ---
+# "molecular biology ethanol" is a subcategory our expert model uses;
+# umich ground truth just calls it "ethanol".  Add redirect rule.
+# Also fix histoprep alcohol regression from precision session.
+- name: ethanol
+  any_of:
+  - '*molecular biology ethanol*'
+  - '*molecular biology ethano*'
+  - '*ethanol denat*'
+  - '*denatured ethanol*'
+  - '*ethanol 190 proof*'
+  - '*ethanol 200 proof*'
+  - '*histoprep alcohol*'
+
+# --- Desalting columns ---
+# NAP columns (Sephadex G-25 gravity), Econo-Pac DG, Nick columns, PD-10
+# variants and spin desalting columns are labeled "gravity flow desalting
+# columns" or "Non-Lab" by old model; umich uses "desalting columns" broadly.
+- name: desalting columns
+  any_of:
+  - '*nap-10*'
+  - '*nap-5*'
+  - '*nap-25*'
+  - '*nap 10*'
+  - '*nap 5*'
+  - '*nap 25*'
+  - '*nap10*'
+  - '*nap5*'
+- name: desalting columns
+  all_of:
+  - '*econo-pac*'
+  any_of:
+  - '*dg*'
+  - '*desalt*'
+- name: desalting columns
+  any_of:
+  - '*nick column*'
+  - '*nick-column*'
+  - '*nick col*'
+- name: desalting columns
+  any_of:
+  - '*pd miditrap*'
+  - '*pd-miditrap*'
+  - '*miditrap g*'
+
+# --- First-strand cDNA synthesis systems ---
+# "transcriptor first strand" and "superscript first-strand" are mis-routed
+# to "pcr systems" by expert model.  Note: many first-strand systems are
+# explicitly designed for RT-PCR / qRT-PCR, so we do NOT exclude *pcr*.
+- name: first-strand cdna synthesis systems
+  all_of:
+  - '*first*strand*'
+  any_of:
+  - '*cdna*'
+  - '*synthesis*'
+  - '*synthesis system*'
+  - '*super mix*'
+  - '*supermix*'
+  none_of:
+  - '*qpcr master mix*'
+  - '*sybr*'
+  - '*taqman master*'
+- name: first-strand cdna synthesis systems
+  any_of:
+  - '*superscript first*strand*'
+  - '*superscript iii first*strand*'
+  - '*superscript ii first*strand*'
+  - '*superscript iv first*strand*'
+  - '*transcriptor first*strand*'
+  - '*first-strand synthesis system*'
+  - '*first strand synthesis system*'
+  - '*first strand cdna synthesis*'
+  - '*first-strand cdna synthesis*'
+  - '*1st strand*synthesis*'
+  - '*1st-strand*synthesis*'
+  - '*ssiii first*strand*'
+  - '*1st strand system*'
+- name: first-strand cdna synthesis systems
+  any_of:
+  - '*superscript vilo*'
+  - '*vilo master mix*'
+  - '*vilo mix*'
+  - '*vilo cdna*'
+  - '*high capacity cdna*'
+  - '*high-capacity cdna*'
+  - '*revertaid*'
+  - '*generacer superscrpt*'
+  - '*generacer superscript*'
+
+# --- Bioluminescence assay kit ---
+# Update: quantilum/recombinant luciferase IS labeled as biolum kit in umich
+# ground truth. Also add betafluor, toxilight, firefly+renilla bundles.
+- name: bioluminescence assay kit
+  any_of:
+  - '*betafluor*beta*gal*'
+  - '*betafluor b-gal*'
+  - '*betafluor b gal*'
+  - '*toxilight*'
+  - '*tox lite*'
+  - '*great escape seap*'
+  - '*greatescape seap*'
+  - '*seap kit*'
+  - '*quantilum*recombinant luciferase*'
+  - '*quantilum recombinant*'
+  - '*qaantilum*'
+- name: bioluminescence assay kit
+  all_of:
+  - '*firefly*'
+  - '*renilla*'
+  any_of:
+  - '*assay*'
+  - '*kit*'
+  - '*reporter*'
+
+# --- Synthetic RNA oligonucleotide ---
+# miRNA / 3'StarFire-modified / RNA mimic oligos are mis-routed to DNA oligo.
+- name: synthetic rna oligonucleotide
+  any_of:
+  - '*mirna*starfire*'
+  - '*starfire*mirna*'
+  - '*starfire*rtm*'
+  - '*starfirertm*'
+  - '*3starfire*'
+  - '*5starfire*'
+  - '*3'' starfire*'
+  - '*5'' starfire*'
+- name: synthetic rna oligonucleotide
+  all_of:
+  - '*mirna*'
+  any_of:
+  - '*sequence*'
+  - '*kit*'
+  - '*purification*'
+  none_of:
+  - '*mirna mimic*'
+  - '*mirnatarget*'
+  - '*antibod*'
+  - '*assay*'
+
+# --- Column-based DNA plasmid maxiprep (more patterns) ---
+# ZymoPURE II maxi/gigaprep, PureLink HiPure, "cm- maxi prep" etc.
+- name: column-based dna plasmid maxiprep
+  any_of:
+  - '*zymopure*plasmid*kit*'
+  - '*zymopure ii plasmid*'
+  - '*zymopure plasmid maxi*'
+  - '*purelink hipure*plasmid*maxi*'
+  - '*purelink hi*pure*maxi*'
+  - '*purelink hi pure maxi*'
+  - '*hipure plasmid*maxi*'
+  - '*hipure*precipitator*'
+  - '*purelink hipure filter maxi*'
+- name: column-based dna plasmid maxiprep
+  any_of:
+  - '*d4203*'
+  - '*d4204*'
+  - '*cm- 10 maxi*'
+  - '*cm-10 maxi*'
+- name: column-based dna plasmid maxiprep
+  all_of:
+  - '*maxi*prep*'
+  none_of:
+  - '*bac*'
+  - '*service*'
+  - '*dialy*'
+  - '*column-based dna plasmid gigaprep*'
+  - '*gigaprep*'
+
+# --- Cell lysis buffers (more Qiagen / fix-lysis patterns) ---
+# Buffer RLT (Qiagen RNeasy), Cytofix, Lyse/Fix.
+- name: cell lysis buffers
+  any_of:
+  - '*buffer rlt*'
+  - '*buffer atl*'
+  - '*buffer k313*'
+  - '*lyse/fix*'
+  - '*lyse fix*'
+  - '*cytofix buf*'
+  - '*cytofix buffer*'
+  none_of:
+  - '*wash*'
+  - '*elution*'
+  - '*reagent*'
+
+# --- Syringes ---
+# "luer-lok syr", "syringe 60ml", "syrg nd" etc. are caught by DNA oligo
+# rules in old model; add early-firing syringe rules.
+- name: syringes
+  any_of:
+  - '*luer-lok syr*'
+  - '*luer lok syr*'
+  - '*luer syr*'
+  - '*lr-lk syr*'
+  - '*luer lock syr*'
+  - '*luer-lock syr*'
+- name: syringes
+  all_of:
+  - '*syringe*'
+  none_of:
+  - '*filter*'
+  - '*tip*'
+  - '*pump*'
+  - '*driver*'
+  - '*plunger*'
+  - '*needle free*'
+  - '*needlefree*'
+- name: syringes
+  any_of:
+  - '*syrg nd*'
+  - '*syrg w/nd*'
+
+# --- Erlenmeyer flasks ---
+# Pyrex-branded flasks, baffled/DeLong flasks, and colored-scale flasks are
+# mis-routed to "other flasks" or "cell culture flasks" by old model.
+- name: erlenmeyer flasks
+  any_of:
+  - '*erlenmeyer*'
+  - '*erlnmyr*'
+- name: erlenmeyer flasks
+  all_of:
+  - $FLASK
+  any_of:
+  - '*pyrx*'
+  - '*pyrex*'
+  none_of:
+  - '*filter*'
+  - '*vacuum*'
+  - '*reservoir*'
+  - '*cell culture*'
+  - '*tissue culture*'
+- name: erlenmeyer flasks
+  all_of:
+  - $FLASK
+  any_of:
+  - '*baffled*'
+  - '*baffle*'
+  - '*delong*'
+  - '*de long*'
+  - '*fernbach*'
+  none_of:
+  - '*cell culture*'
+- name: erlenmeyer flasks
+  all_of:
+  - $FLASK
+  any_of:
+  - '*yellow scale*'
+  - '*blue scale*'
+  - '*green scale*'
+  - '*red scale*'
+  - '*nar mouth*'
+  - '*narrow mouth*'
+
+# --- Size-exclusion resins ---
+# Prep-scale Superdex/Superose columns (e.g. Superdex 200 prep 150mL) are
+# labeled "size-exclusion chromatography columns" by old model; umich calls
+# them "size-exclusion resins".
+- name: size-exclusion resins
+  any_of:
+  - '*superdex*'
+  - '*superose*'
+  none_of:
+  - '*column pack*'
+  - '*tricorn*'
+  - '*hiload*'
+  - '*hi load*'
+
+# --- Column-based DNA plasmid maxiprep ---
+# NucleoBond Xtra Maxi, spinsmart maxi, "maxi prep" + dna, etc.
+- name: column-based dna plasmid maxiprep
+  any_of:
+  - '*nucleobond xtra maxi*'
+  - '*nucleobond maxi*'
+  - '*nucleo bond xtra maxi*'
+  - '*spinsmart hs maxi*'
+  - '*spinsmart maxi*'
+  - '*genelute endotoxin free maxi*'
+- name: column-based dna plasmid maxiprep
+  all_of:
+  - '*maxiprep*'
+  none_of:
+  - '*bac*'
+  - '*service*'
+- name: column-based dna plasmid maxiprep
+  all_of:
+  - '*maxi prep*'
+  any_of:
+  - '*plasmid*'
+  - '*dna*'
+  - '*endotoxin*'
+  none_of:
+  - '*bac*'
+  - '*service*'
+
+# --- Column-based gel DNA extraction kits ---
+# Zymoclean / Zymaclean gel recovery, Gene Clean, and related gel purification
+# kits are mis-routed to DNA purification kits or gel RNA kits.
+- name: column-based gel dna extraction kits
+  any_of:
+  - '*zymoclean*'
+  - '*zymaclean*'
+  - '*zymo gel*'
+  none_of:
+  - '*rna*'
+- name: column-based gel dna extraction kits
+  any_of:
+  - '*gene clean*'
+  - '*geneclean*'
+  none_of:
+  - '*rna*'
+- name: column-based gel dna extraction kits
+  all_of:
+  - '*gel*'
+  any_of:
+  - '*gel extraction kit*'
+  - '*gel purification kit*'
+  - '*gel recovery kit*'
+  - '*gel dna*'
+  none_of:
+  - '*rna*'
+  - '*pcr*'
+
+# --- Nucleic acid modifying enzymes - t4 dna ligase ---
+# "T4 DNA lig-20 000 U" etc. are caught by "t4 dna ligase buffer" rule;
+# need explicit t4 ligase enzyme rule.
+- name: nucleic acid modifying enzymes - t4 dna ligase
+  all_of:
+  - t4
+  - dna
+  - lig
+  none_of:
+  - '*buffer*'
+  - '*atp*'
+  - '*peg*'
+  - '*10x*'
+  - '*supplement*'
+  - '*taq*'
+  - '*t7*'
+  - '*crc*'
+
+# --- pH paper and other test strips ---
+# Gas indicator strips, chemical test strips, hydrogen sulfide / peroxide /
+# ammonia test strips are labeled Non-Lab by old model.
+- name: ph paper and other test strips
+  any_of:
+  - '*test strip*'
+  - '*test sticks*'
+  - '*indicator strip*'
+  - '*indicator strips*'
+  none_of:
+  - '*glucose*'
+  - '*blood*'
+  - '*urine*'
+  - '*urinalysis*'
+  - '*pcr*'
+  - '*strip cap*'
+  - '*strip tube*'
+- name: ph paper and other test strips
+  any_of:
+  - '*eo gas indicator*'
+  - '*hydrogen sulfide test*'
+  - '*ammonia test strip*'
+  - '*peroxide test strip*'
+  - '*quantofix*'
+  - '*ph test strip*'
+  - '*12ph test strip*'
+
+# --- Reducing agents - dtt ---
+# UMich uses "reducing agents - dtt" for ALL reducing agents including BME.
+# Add mercaptoethanol and cleland's reagent to this category.
+- name: reducing agents - dtt
+  any_of:
+  - '*mercaptoethanol*'
+  - '*beta-mercaptoethanol*'
+  - '*β-mercaptoethanol*'
+  - '*bme*'
+  none_of:
+  - '*antibod*'
+  - '*elisa*'
+  - '*kit*'
+  - '*reaction*'
+- name: reducing agents - dtt
+  any_of:
+  - '*cleland*'
+  - '*cleland reagent*'
+  - '*(+/-)-trans-1*bis*mercapto*'
+
+# --- Cell lysis buffers ---
+# Buffer AL (Qiagen chaotropic lysis buffer), cytoperm (permeabilization),
+# nuclei lysis solution are mis-routed to nuclease-free buffer kit.
+- name: cell lysis buffers
+  any_of:
+  - '*buffer al *'
+  - '*buffer al-*'
+  - '*buffer al *'
+  none_of:
+  - '*blocking*'
+  - '*wash*'
+  - '*elution*'
+  - '*equilibration*'
+- name: cell lysis buffers
+  any_of:
+  - '*nuclei lysis*'
+  - '*nuclear lysis*'
+- name: cell lysis buffers
+  all_of:
+  - '*cytoperm*'
+  any_of:
+  - '*buf*'
+  - '*buffer*'
+  - '*sol*'
+  none_of:
+  - '*wash*'
+  - '*block*'
+
+# --- Spray bottles ---
+# RNase Away in spray bottle format is labeled "spray bottles" in umich;
+# generic trigger sprayers are also spray bottles.
+- name: spray bottles
+  all_of:
+  - '*rnase away*'
+  - '*spray*'
+- name: spray bottles
+  any_of:
+  - '*trigger sprayer*'
+  - '*sprayer trigger*'
+  - '*trigger spray*'
+
+# --- Potassium carbonate ---
+# "pot carbonate anhy" = potassium carbonate anhydrous.
+- name: potassium carbonate
+  any_of:
+  - '*pot carbonate*'
+  - '*potassium carbonate*'
+
+# --- Synthetic siRNA ---
+# Stealth RNAi (Invitrogen), ON-TARGETplus, and Santa Cruz "sc-XXXXX siRNA"
+# products are mis-routed to gene-specific RNAi, primary antibodies, or Non-Lab.
+- name: synthetic sirna
+  any_of:
+  - '*stealth rnai*'
+  - '*stealth rna*'
+  - '*on-targetplus*'
+  - '*ontargetplus*'
+  - '*on targetplus*'
+  none_of:
+  - '*lentiviral*'
+  - '*adenoviral*'
+  - '*vector*'
+- name: synthetic sirna
+  any_of:
+  - '*siglo*'
+  - '*siglone*'
+  - '*silencer select*'
+  - '*dicer substrate*'
+  none_of:
+  - '*transfect*'
+  - '*reagent*'
+- name: synthetic sirna
+  all_of:
+  - '*sirna*'
+  any_of:
+  - '*sc-*'
+  none_of:
+  - '*antibod*'
+  - '*transfect*'
+  - '*reagent*'
+  - '*lentiviral*'
+
+# --- Viability stains ---
+# SYTOX green in DMSO and 7-AAD (aminoactinomycin) are mis-routed.
+- name: viability stains
+  any_of:
+  - '*sytox*'
+  - '*sytox green*'
+  - '*7-aad*'
+  - '*7 aad*'
+  - '*aminoactinomycin*'
+  - '*cellvue*'
+  none_of:
+  - '*kit*'
+  - '*assay kit*'
+
+# --- Cell lysis buffers: additional patterns ---
+- name: cell lysis buffers
+  any_of:
+  - '*laemmli lysis*'
+  - '*m-per*'
+  - '*mper*'
+  - '*t-per*'
+  - '*tper*'
+  - '*ripa buffer*'
+  - '*ripa lysis*'
 

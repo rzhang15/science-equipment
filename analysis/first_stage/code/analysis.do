@@ -7,22 +7,14 @@ preliminaries
 version 17
 
 program main   
-   raw_plots
+   *raw_plots
    did
    event_study
-   uni_fes
+   *uni_fes
 end
 
 program raw_plots
     use ../external/samp/full_category_yr_tfidf, clear
-    *drop if category == "bovine growth serum"
-    /*egen uni_mkt = group(uni_id mkt)
-    bys uni_mkt: egen avg_raw_qty = mean(log_raw_qty)
-    bys uni_mkt: egen avg_raw_spend = mean(log_raw_spend)
-    bys uni_mkt: egen avg_raw_price = mean(log_raw_price)
-    gen r_raw_qty = log_raw_qty - avg_raw_qty
-    gen r_raw_spend = log_raw_spend - avg_raw_spend
-    gen r_raw_price = log_raw_price - avg_raw_price*/
     gen tot_qty = raw_qty
     gen tot_spend = raw_spend
     replace treated = 2 if keep == 0 & treated == 1
@@ -64,7 +56,7 @@ program raw_plots
         qui replace othr_ctrl_`var' = othr_ctrl_`var' - r(mean)
         qui tw connected trt_`var' year , lcolor(lavender) mcolor(lavender) || connected ctrl_`var' year , lcolor(dkorange) mcolor(dkorange) ///
           || connected othr_trt_`var' year, lcolor(lavender%40) mcolor(lavender%20) lpattern(dash) || ///
-          connected othr_ctrl_`var' year, lcolor(dkorange%40) mcolor(dkorange%20) lpattern(dash) legend(on label(1 "Treated") label(2 "Control") label(3 "Bad ML Treated") label(4 "Bad ML Control") ring(1) pos(6) rows(1) size(vsmall)) ytitle("`yname'", size(small)) yline(0, lcolor(gs10) lpattern(solid)) ylabel(#6, labsize(small)) xlabel(2010(1)2019, labsize(small)) xtitle("Year", size(small)) tline(2013.5, lpattern(shortdash) lcolor(gs4%80)) 
+          connected othr_ctrl_`var' year, lcolor(dkorange%40) mcolor(dkorange%20) lpattern(dash) legend(on label(1 "Treated") label(2 "Control") label(3 "Bad ML Treated") label(4 "Bad ML Control") ring(1) pos(6) rows(1) size(small)) ytitle("`yname'", size(small)) yline(0, lcolor(gs10) lpattern(solid)) ylabel(#6, labsize(small)) xlabel(2010(1)2019, labsize(small)) xtitle("Year", size(small)) tline(2013.5, lpattern(shortdash) lcolor(gs4%80)) 
         qui graph export "../output/figures/raw/`var'_trends_pooled.pdf", replace
     }
     use ../external/merged/matched_mkts, clear
@@ -117,7 +109,7 @@ program raw_plots
             qui replace trt_`var' = trt_`var' - r(mean)
             qui sum ctrl_`var' if year == 2013 
             qui replace ctrl_`var' = ctrl_`var' - r(mean)
-            qui tw connected trt_`var' year , lcolor(lavender) mcolor(lavender) || connected ctrl_`var' year , lcolor(dkorange%40) mcolor(dkorange%40) legend(on label(1 "Treated: `name'") label(2 "Control: `match_name'") ring(1) pos(6) rows(1) size(vsmall)) ytitle("`yname'", size(small)) yline(0, lcolor(gs10) lpattern(solid)) ylabel(#6, labsize(small)) xlabel(2010(1)2019, labsize(small)) xtitle("Year", size(small)) tline(2013.5, lpattern(shortdash) lcolor(gs4%80)) title("Simulated HHI: `sim_hhi'; Delta HHI: `del_hhi'", size(small))
+            qui tw connected trt_`var' year , lcolor(lavender) mcolor(lavender) || connected ctrl_`var' year , lcolor(dkorange%40) mcolor(dkorange%40) legend(on label(1 "Treated: `name'") label(2 "Control: `match_name'") ring(1) pos(6) rows(1) size(small)) ytitle("`yname'", size(small)) yline(0, lcolor(gs10) lpattern(solid)) ylabel(#6, labsize(small)) xlabel(2010(1)2019, labsize(small)) xtitle("Year", size(small)) tline(2013.5, lpattern(shortdash) lcolor(gs4%80)) title("Simulated HHI: `sim_hhi'; Delta HHI: `del_hhi'", size(small))
             qui graph export "../output/figures/raw/`var'_trends_category`c'.pdf", replace
         }
         restore
@@ -187,7 +179,7 @@ program did
         local name = strproper(`name')
         foreach var in log_raw_price {
             di "`name'"
-            reghdfe `var' posttreat [aw = spend_2013], cluster(mkt) absorb(year uni_id mkt) 
+            reghdfe `var' posttreat [aw=spend_2013], cluster(mkt) absorb(year uni_id mkt) 
         }
         mat coef = nullmat(coef) \ ( _b[posttreat], _se[posttreat])
         restore
@@ -210,26 +202,39 @@ program did
     gen ub = b + 1.96*se
     hashsort b
     save ../output/did_coefs, replace
+    sum b, d
+    local N    = r(N)
+    local mean : di %6.3f r(mean)
+    local sd   : di %6.3f r(sd)
+    tw kdensity b, color(lavender) ///
+        xtitle("DiD Coefficient", size(small)) ///
+        ytitle("Density", size(small)) ///
+        xlab(, labsize(small)) ylab(, labsize(small)) ///
+        xline(0, lcolor(gs6) lpattern(dash)) ///
+        legend(on order(- "N = `N'" "mean = `mean'" "sd = `sd'") ///
+               pos(1) ring(0) region(fcolor(none)))
+    graph export ../output/figures/did_coefs_kdens.pdf, replace
     gen rank = _n
     labmask rank, values(category)
     count
     local n = r(N)
-    tw rcap ub lb rank, msize(vsmall) || scatter b rank, msize(tiny) mcolor(lavender) yline(0) ylab(-1(0.2)1, labsize(vsmall)) ysc(titlegap(-6) outergap(0)) ytitle("DiD Estimate + 95% CI", size(small)) xlab(1(1)`n', angle(45) labsize(vsmall) valuelabel) graphregion(margin(b+35 l+5)) xtitle("") legend(off)
+    tw rcap ub lb rank, msize(vsmall) || scatter b rank, msize(tiny) mcolor(lavender) yline(0) ylab(-1(0.2)1, labsize(small)) ysc(titlegap(-6) outergap(0)) ytitle("DiD Estimate + 95% CI", size(small)) xlab(1(1)`n', angle(45) labsize(small) valuelabel) graphregion(margin(b+35 l+5)) xtitle("") legend(off)
     graph export ../output/figures/coef_rank.pdf, replace
     hashsort spend_2013 
     gen rank_spend = _n
     labmask rank_spend, values(category)
     count
     local n = r(N)
-    tw rcap ub lb rank_spend, msize(vsmall) || scatter b rank_spend, msize(tiny) mcolor(lavender) yline(0) ylab(-1(0.2)1, labsize(vsmall)) ysc(titlegap(-6) outergap(0)) ytitle("DiD Estimate + 95% CI", size(small)) xlab(1(1)`n', angle(45) labsize(vsmall) valuelabel) graphregion(margin(b+35 l+5)) xtitle("") legend(off)
+    tw rcap ub lb rank_spend, msize(vsmall) || scatter b rank_spend, msize(tiny) mcolor(lavender) yline(0) ylab(-1(0.2)1, labsize(small)) ysc(titlegap(-6) outergap(0)) ytitle("DiD Estimate + 95% CI", size(small)) xlab(1(1)`n', angle(45) labsize(small) valuelabel) graphregion(margin(b+35 l+5)) xtitle("") legend(off)
     graph export ../output/figures/coef_spend_rank.pdf, replace
     corr b delta_hhi [aw=spend_2013]
     local corr : di %4.3f r(rho) 
-    binscatter2 b delta_hhi [aw = spend_2013], legend(on order(- "corr: `corr'") ring(0) pos(1))
+    binscatter2 b delta_hhi [aw = spend_2013], legend(on order(- "corr: `corr'") ring(0) pos(1)) xtitle("Delta HHI") ytitle("Estimated Coefficient")
+
     graph export ../output/figures/delta_hhi_corr.pdf, replace
     corr b simulated_hhi [aw=spend_2013]
     local corr : di %4.3f r(rho) 
-    binscatter2 b simulated_hhi [aw = spend_2013], legend(on order(- "corr: `corr'") ring(0) pos(1))
+    binscatter2 b simulated_hhi [aw = spend_2013], legend(on order(- "corr: `corr'") ring(0) pos(1)) xtitle("Simulated HHI") ytitle("Estimated Coefficient")
     graph export ../output/figures/sim_hhi_corr.pdf, replace
 end
 
@@ -631,7 +636,7 @@ program uni_fes
 end
 
 program manual_event_study
-    syntax, lag(int) lead(int) yvar(str) ymin(real) ymax(real) ygap(real) trt_mean(real) ctrl_mean(real) name(str) fes(str) wt_var(str) cluster_var(str) [balance(real 0) file_suf(str) title(str)]
+    syntax, lag(int) lead(int) yvar(str) ymin(real) ymax(real) ygap(real) trt_mean(real) ctrl_mean(real) name(str) fes(str) wt_var(str) cluster_var(str) [unwt(real 0)balance(real 0) file_suf(str) title(str)]
     cap drop lag* lead* year_fes*
     local suf ""
     if `balance' == 1 local suf "bal_" 
@@ -673,7 +678,12 @@ program manual_event_study
     }
     preserve
     mat drop _all 
-    reghdfe `yvar' `leads' `lags' lead1 `years' year_fes2013  [aw = `wt_var'], absorb(`fes') vce(cluster `cluster_var')
+    if `unwt' == 1 {
+        reghdfe `yvar' `leads' `lags' lead1 `years' year_fes2013 , absorb(`fes') vce(cluster `cluster_var')
+    }
+    if `unwt' == 0{
+        reghdfe `yvar' `leads' `lags' lead1 `years' year_fes2013  [aw = `wt_var'], absorb(`fes') vce(cluster `cluster_var')
+    }
     foreach var in `leads' `lags' lead1 {
         mat row = _b[`var'], _se[`var']
         if "`var'" == "lead1" {
@@ -723,7 +733,8 @@ program manual_event_study
     gen year_fes_ub = year_fes + 1.96*year_fes_se
     gen year_fes_lb = year_fes - 1.96*year_fes_se
     gen trt_coef_ub = trt_coef + 1.96*trt_coef_se
-    gen trt_coef_lb = trt_coef - 1.96*trt_coef_se
+    gen trt_coef_lb = trt_coef - 1.96*trt_coef_se 
+    gen rel_year_fes = rel + 0.1
     
     hashsort rel
     sum ub , d
@@ -745,20 +756,20 @@ program manual_event_study
         tw rcap ub lb rel if rel != -1 & inrange(rel, `lead', `lag') , lcolor(ebblue%70) msize(vsmall) || ///
         scatter b rel if inrange(rel, `lead', `lag') , mcolor(ebblue) || ///
         scatteri `ymax' -0.25 `ymax' 0.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
-        xlab(`lead'(1)`lag', labsize(vsmall)) xtitle("Relative Year", size(small)) ///
-        ytitle("`name'", size(small)) ylab(`ymin'(`ygap')`ymax', labsize(vsmall)) yline(0, lcolor(gs10) lpattern(solid)) ///
-        legend(on order(- "Treatment Level Avg. in t = -1: `trt_mean'" "Control Level Avg. in t = -1: `ctrl_mean'") pos(6) rows(2)) ///
+        xlab(`lead'(1)`lag', labsize(small)) xtitle("Relative Year", size(small)) ///
+        ytitle("`name'", size(small)) ylab(`ymin'(`ygap')`ymax', labsize(small)) yline(0, lcolor(gs10) lpattern(solid)) ///
+        legend(on order(- "Treatment Level Avg. in t = -1: `trt_mean'" "Control Level Avg. in t = -1: `ctrl_mean'") pos(7) rows(2) bmargin(zero)) ///
         title(`title', size(small)) plotregion(margin(sides))
         graph export "../output/figures/es/`suf'es_`yvar'_`file_suf'.pdf", replace
         
         tw rcap trt_coef_ub trt_coef_lb rel if rel != -1 & inrange(rel, `lead', `lag') , lcolor(ebblue%70) msize(vsmall) || ///
-        rcap year_fes_ub year_fes_lb rel if rel != -1 & inrange(rel, `lead', `lag') , lcolor(dkorange%70) lpattern(dash) msize(vsmall) || ///
+        rcap year_fes_ub year_fes_lb rel_year_fes if rel != -1 & inrange(rel, `lead', `lag') , lcolor(dkorange%70) lpattern(dash) msize(vsmall) || ///
         scatter trt_coef rel if inrange(rel, `lead', `lag') , mcolor(ebblue) || ///
-        scatter year_fes rel if inrange(rel, `lead', `lag') , mcolor(dkorange) msymbol(diamond) || ///
+        scatter year_fes rel_year_fes if inrange(rel, `lead', `lag') , mcolor(dkorange) msymbol(diamond) || ///
         scatteri `ymax' -0.25 `ymax' 0.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
-        xlab(`lead'(1)`lag', labsize(vsmall)) xtitle("Relative Year", size(small)) ///
-        ytitle("`name'", size(small)) ylab(`ymin'(`ygap')`ymax', labsize(vsmall)) yline(0, lcolor(gs10) lpattern(solid)) ///
-        legend(on order(1 "Treated (Level Avg. in t = 1): `trt_mean'" 2 "Control (Level Avg. in t = 1): `ctrl_mean'") pos(6) rows(2)) ///
+        xlab(`lead'(1)`lag', labsize(small)) xtitle("Relative Year", size(small)) ///
+        ytitle("`name'", size(small)) ylab(`ymin'(`ygap')`ymax', labsize(small)) yline(0, lcolor(gs10) lpattern(solid)) ///
+        legend(on order(1 "Treatment Level Avg. in t = 1: `trt_mean'" 2 "Control Level Avg. in t = 1: `ctrl_mean'") pos(7) rows(2) bmargin(zero)) ///
         title(`title', size(small)) plotregion(margin(sides))
         graph export "../output/figures/es/split_`suf'es_`yvar'_`file_suf'.pdf", replace
     restore

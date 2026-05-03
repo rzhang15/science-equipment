@@ -35,6 +35,7 @@ program clean_raw
         bys suppliername: gen num_sup_obs = _N
         drop if num_sup_obs == 1
         replace suppliername = "thermo fisher scientific" if suppliername == "possible missions" & strpos(agencyname, "texas") > 0
+        replace suppliername = "thermo fisher scientific" if suppliername == "life technologies" & year >= 2014
         bys suppliername: gegen tot_sup_spend = total(spend)
         drop if tot_sup_spend  < 0 
     }
@@ -45,10 +46,10 @@ program clean_raw
     di "[Supplier Cut]  N: `total_obs' Total Spend: `total_spend'"
 
     qui {
-        replace category = "cryovials" if strpos(clean_desc, "cryo") >0 & strpos(clean_desc, "vial") >0 
-        replace category = "us fbs" if strpos(clean_desc, "fetal")>0& strpos(clean_desc, "bovine")>0 & strpos(clean_desc, "serum")>0
-        replace category = "us fbs" if strpos(clean_desc, "calf")>0& strpos(clean_desc, "bovine")>0 & strpos(clean_desc, "serum")>0
-        replace category = "elisa kits" if strpos(clean_desc, "duoset") >0 
+        *replace category = "cryovials" if strpos(clean_desc, "cryo") >0 & strpos(clean_desc, "vial") >0 
+        *replace category = "us fbs" if strpos(clean_desc, "fetal")>0& strpos(clean_desc, "bovine")>0 & strpos(clean_desc, "serum")>0
+        *replace category = "us fbs" if strpos(clean_desc, "calf")>0& strpos(clean_desc, "bovine")>0 & strpos(clean_desc, "serum")>0
+        *replace category = "elisa kits" if strpos(clean_desc, "duoset") >0 
         // drop nonsense negatives
         drop if price <= 0 | qty < 1 | spend <= 0
         // filter to consumables
@@ -75,10 +76,15 @@ program clean_raw
             "ajph" "phssr" "capillarys" "analyses" "datalogger" ///
             "professionalism" ".org" "lcmsms" "pre-owned" "enterprise" ///
             "dialysis" "tower" "kelvin" "lithography" "seal" ///
-            "array" "adverstise" {
+            "array" "adverstise" ///
+            "generator" "compressor" "spectrophotometer" "incubator" ///
+            "rotor" "monitor" "paint" "wafer" "hvac" "cycler" ///
+            "machine" "workstation" "monocular" "binocular" "blotter" {
             drop if strpos(clean_desc, "`v'") > 0
         }
         drop if (strpos(clean_desc, "plate") > 0 | strpos(clean_desc, "card")) & category == "synthetic dna oligonucleotide"
+        drop if category == "chromatography-grade water" & ///
+            (strpos(clean_desc, "water") == 0 & strpos(clean_desc, "h2o") == 0)
         // drop borderline terms only when model confidence is low
         foreach v in "service" "repair" "maintenance" "consulting" "training" ///
             "rental" "subscription" "license" "software" "warranty" "support contract" ///
@@ -89,7 +95,7 @@ program clean_raw
         foreach v in "animal - " "fees - " "electronics - " "instrument" "office supplies" "lab furniture" "waste disposal" "equipment" "furniture" "software" ///
           "toolkit" "clamp" "tool" "tubing" "random" "unclear" "wire" "towel" "irrelevant chemicals" "oring" "caps" "gas" "first-aid" "first aid" "desk" "chair" "brushes" "trash" "cleaner" ///
           "cotton ball" "bundle of products" "tape" "miscellaneous" "clips" "flint" "accessories" "stands" "batteries" "ear protection" "apron" "pots" "pants" "stoppers" "closures" "rings" ///
-          "mortar" "pestle" "support" "trays" "applicators and swabs" "bundle" "sequencing" "tem - " "nonlab" {
+          "mortar" "pestle" "support" "trays" "applicators and swabs" "bundle" "sequencing" "tem - " "nonlab" "racks" {
             drop if strpos(category, "`v'") > 0
         }
     }
@@ -100,7 +106,9 @@ program clean_raw
     di "[Remove Possible Non-consumables] N: `total_obs' Total Spend: `total_spend'"
     qui {
         merge m:1 category using ../external/categories/categories_`embed', assert(1 2 3)  keep(1 3) nogen
-        drop if similarity_score <= 0.10 & prediction_source == "Expert Model" 
+        drop if similarity_score <= 0.10 & prediction_source == "Expert Model"
+        drop if precision < 0.10 & !mi(precision)
+        drop if support < 5
         replace category = subinstr(category, "/","-",.)
         gen raw_price = price
         gen raw_qty = qty
@@ -134,12 +142,38 @@ program clean_raw
         drop if raw_price < price1
         drop if raw_price > price99
         drop spend1 spend99 price1 price99 qty1 qty99
+        // MAD filter on log price within category-year (k = 3 raw MAD units)
+        bys category year: gegen med_lp_yr  = median(price)
+        gen abs_dev_lp = abs(price - med_lp_yr)
+        bys category year: gegen mad_lp_yr  = median(abs_dev_lp)
+        bys category year: gegen pre_max_lp = max(price)
+        bys category year: gegen pre_min_lp = min(price)
+        gen pre_range_yr = exp(pre_max_lp - pre_min_lp)
+        drop if abs_dev_lp > min(3 * mad_lp_yr, log(3)) & mad_lp_yr > 0
+        bys category year: gegen post_max_lp = max(price)
+        bys category year: gegen post_min_lp = min(price)
+        gen post_range_yr = exp(post_max_lp - post_min_lp)
     }
     qui count
     local total_obs = r(N)
     qui sum raw_spend, d
     local total_spend : di %16.0f r(sum)
-    di "[Windsorize] N: `total_obs' Total Spend: `total_spend'"
+    di "[Windsorize + MAD log-price filter] N: `total_obs' Total Spend: `total_spend'"
+
+    // diagnostic: within-category-year multiplicative price range, before vs after MAD
+    preserve
+    gcollapse (firstnm) pre_range = pre_range_yr post_range = post_range_yr, by(category year)
+    gcollapse (mean) pre_range post_range, by(category)
+    gen ratio = post_range / pre_range
+    gsort -pre_range
+    di " "
+    di "Top 25 categories by pre-MAD avg within-year price range (multiplicative)"
+    list category pre_range post_range ratio in 1/25, sep(0) noobs abbreviate(40)
+    di " "
+    di "Chromatography categories"
+    list category pre_range post_range ratio if strpos(category, "chromatography") > 0, sep(0) noobs abbreviate(40)
+    restore
+    drop med_lp_yr abs_dev_lp mad_lp_yr pre_max_lp pre_min_lp pre_range_yr post_max_lp post_min_lp post_range_yr
 
     qui {
         preserve
@@ -155,13 +189,6 @@ program clean_raw
         graph export ../output/figures/precision_support_`embed'.pdf, replace
         restore
     }
-    drop if support < 5  
-    qui count
-    local total_obs = r(N)
-    qui sum raw_spend, d
-    local total_spend : di %16.0f r(sum)
-    di "[bad ml categories] N: `total_obs' Total Spend: `total_spend'"
-    
     qui {
         gen obs_cnt = 1
         bys suppliername year: gen supplier_yr = _n == 1
