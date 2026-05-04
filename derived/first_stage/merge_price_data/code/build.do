@@ -51,6 +51,46 @@ program main
         append using ../temp/`f'_`embed'
     }
     rename supplier suppliername
+
+    // === Category consolidation (mirrors prdct_classification step 0 / 1c) ===
+    // UMich and UT Dallas use raw vendor categories (kept as ground truth);
+    // these passes ensure all four sources end up in a consistent taxonomy
+    // and that non-lab labels are dropped before downstream pipelines.
+
+    // Lump all antibody variants into a single "primary antibodies" bucket.
+    qui count if strpos(category, "antibod") > 0
+    di "Antibody consolidation: collapsing " r(N) " obs to 'primary antibodies'"
+    replace category = "primary antibodies" if strpos(category, "antibod") > 0
+
+    // Drop non-lab categories (mirrors NONLAB_PREFIXES in
+    // derived/process_foias/prdct_classification/code/config.py).
+    // Prefix match: drops "electronics", "electronics - cables", etc.
+    foreach v in "fees" "electronics" "instrument" "office" "lab furniture" ///
+        "waste disposal" "equipment" "furniture" "software" "animal" ///
+        "toolkit" "nonlab" "non-lab" "sequencing" "unclear" {
+        qui count if strpos(category, "`v'") == 1
+        di "  dropping prefix '`v'': " r(N) " obs"
+        drop if strpos(category, "`v'") == 1
+    }
+    // Whole-word keyword match (mirrors NONLAB_KEYWORDS).
+    foreach v in "clamp" "clamps" "tool" "random" "unclear" "tubing" "wire" ///
+        "towel" "oring" "caps" "gas" "desk" "chair" "brushes" "trash" ///
+        "cleaner" "tape" "miscellaneous" "clips" "flint" "accessories" ///
+        "stands" "batteries" "apron" "pots" "pans" "stoppers" "closures" ///
+        "rings" "mortar" "pestle" "supports" "trays" {
+        qui count if ustrregexm(category, "\b`v'\b")
+        di "  dropping keyword '`v'': " r(N) " obs"
+        drop if ustrregexm(category, "\b`v'\b")
+    }
+    // Multi-word non-lab phrases (substring match — no word-boundary issues).
+    foreach v in "irrelevant chemicals" "first-aid" "first aid" "cotton ball" ///
+        "bundle of products" "ear protection" "applicators and swabs" ///
+        "bundle of items" {
+        qui count if strpos(category, "`v'") > 0
+        di "  dropping phrase '`v'': " r(N) " obs"
+        drop if strpos(category, "`v'") > 0
+    }
+
     save ../output/first_stage_data_`embed', replace
 
 end

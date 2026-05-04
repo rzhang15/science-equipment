@@ -4713,6 +4713,11 @@ market_rules:
   all_of:
   - '*mini-protean*'
   - '*cooling unit*'
+# NuPAGE-branded SDS-PAGE reagents (NP0004 sample reducing agent, NP0005
+# antioxidant, transfer buffer, MagicMark protein standard) routinely match
+# `*nupage*` / `*bis*tris*gel*` despite not being gels.  In 2012 these
+# reagents made up 29% of the bis-tris-gel cell and pulled mean price from
+# ~$130 to ~$19.  Exclude them from every bis-tris-gel rule.
 - name: pre-cast bis-tris gels
   any_of:
   - '*nupage*'
@@ -4721,6 +4726,14 @@ market_rules:
   - '*buffer*'
   - '*stain*'
   - 'tricine'
+  - '*antioxidant*'
+  - '*antioxident*'
+  - '*reducing agent*'
+  - '*sample reducing*'
+  - '*trans buff*'
+  - '*magicmark*'
+  - '*magic mark*'
+  - '*protein standard*'
 - name: pre-cast bis-tris gels
   all_of:
   - '*np*'
@@ -4730,6 +4743,14 @@ market_rules:
   - '*buffer*'
   - '*stain*'
   - 'tricine'
+  - '*antioxidant*'
+  - '*antioxident*'
+  - '*reducing agent*'
+  - '*sample reducing*'
+  - '*trans buff*'
+  - '*magicmark*'
+  - '*magic mark*'
+  - '*protein standard*'
 - name: pre-cast bis-tris gels
   all_of:
   - '*surepage*'
@@ -4739,6 +4760,14 @@ market_rules:
   - '*buffer*'
   - '*stain*'
   - 'tricine'
+  - '*antioxidant*'
+  - '*antioxident*'
+  - '*reducing agent*'
+  - '*sample reducing*'
+  - '*trans buff*'
+  - '*magicmark*'
+  - '*magic mark*'
+  - '*protein standard*'
 - name: pre-cast bis-tris gels
   all_of:
   - '*bis*'
@@ -4748,6 +4777,14 @@ market_rules:
   - '*buffer*'
   - '*stain*'
   - 'tricine'
+  - '*antioxidant*'
+  - '*antioxident*'
+  - '*reducing agent*'
+  - '*sample reducing*'
+  - '*trans buff*'
+  - '*magicmark*'
+  - '*magic mark*'
+  - '*protein standard*'
 - name: pre-cast bis-tris gels
   all_of:
   - 'NATIVEPAGE'
@@ -4757,6 +4794,14 @@ market_rules:
   - '*buffer*'
   - '*stain*'
   - 'tricine'
+  - '*antioxidant*'
+  - '*antioxident*'
+  - '*reducing agent*'
+  - '*sample reducing*'
+  - '*trans buff*'
+  - '*magicmark*'
+  - '*magic mark*'
+  - '*protein standard*'
 - name: protease inhibitor cocktails
   any_of:
   - '*complete mini*'

@@ -9,9 +9,8 @@ library(stringr)
 # Configuration
 # ---------------------------
 PLACEBO_SEED <- 8975
-MATCH_COVARIATES <- c("log_raw_qty_2013",
-                      "log_raw_spend_2013")
-MATCH_RATIO <- 3
+MATCH_COVARIATES <- c("log_raw_qty_2012", "log_raw_qty_2013")
+MATCH_RATIO <- 2
 
 setwd("~/sci_eq/derived/first_stage/placebo_dist/code")
 dir.create("../output/figures", recursive = TRUE, showWarnings = FALSE)

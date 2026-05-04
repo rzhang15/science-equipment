@@ -118,6 +118,7 @@ program append_predata
     }
     drop if strpos(agencyname, "jr college") > 0 | strpos(agencyname, "city college")  > 0 |strpos(agencyname, "junior college") >0
     drop if inlist(agencyname, "carl sandburg college", "chaffey college", "cuesta college", "daytona state college", "florida state college at jacksonville", "harper college", "hartnell college") | inlist(agencyname, "kishwaukee college", "mchenry county college", "midland college", "miracosta college", "north central state college", "odessa college", "palm beach state college", "parkland college") | inlist(agencyname, "pasadena city college", "pasco-hernando state college", "san jacinto college", "seminole state college", "south georgial state college" , "south plains college", "southeastern illinois college") | inlist(agencyname, "southwestern illinois college", "state college of florida", "suny sullivan")
+    drop if inlist(agencyname, "amarillo college", "arkansas state university, mountain home", "eastern wyoming college", "los angeles pierce college", "morton college", "texas a&m agrilife extension") 
     save ../output/govspend_panel_full, replace
     keep if year >= 2010
     gen month = month(purchasedate)

@@ -233,16 +233,120 @@ program did
 
     graph export ../output/figures/delta_hhi_corr.pdf, replace
     corr b simulated_hhi [aw=spend_2013]
-    local corr : di %4.3f r(rho) 
+    local corr : di %4.3f r(rho)
     binscatter2 b simulated_hhi [aw = spend_2013], legend(on order(- "corr: `corr'") ring(0) pos(1)) xtitle("Simulated HHI") ytitle("Estimated Coefficient")
     graph export ../output/figures/sim_hhi_corr.pdf, replace
+
+    // ============================================================
+    // Empirical Bayes shrinkage of per-market DiD coefficients
+    // ------------------------------------------------------------
+    //   b_i ~ N(theta_i, se_i^2)    (sampling distribution)
+    //   theta_i ~ N(mu, tau^2)      (cross-market prior)
+    // Posterior:
+    //   b_eb_i = w_i * b_i + (1 - w_i) * mu_hat,   w_i = tau^2 / (tau^2 + se_i^2)
+    //   se_eb_i = sqrt(w_i * se_i^2)
+    // mu_hat: precision-weighted mean of b
+    // tau^2 : method of moments, max(0, var(b) - mean(se^2))
+    // Markets with high SE (noisy/few obs) get pulled toward mu_hat.
+    // ============================================================
+    gen var_se = se^2
+    qui sum var_se
+    local mean_var2 = r(mean)
+    qui sum b
+    local sample_var = r(Var)
+    local tau2 = max(0, `sample_var' - `mean_var2')
+    qui sum b [aw = 1/var_se]
+    local mu_hat = r(mean)
+    di "EB shrinkage: mu_hat = `mu_hat', tau2 = `tau2', sample_var(b) = `sample_var', mean(se^2) = `mean_var2'"
+    gen w_eb  = `tau2' / (`tau2' + var_se)
+    gen b_eb  = w_eb * b + (1 - w_eb) * `mu_hat'
+    gen se_eb = sqrt(w_eb * var_se)
+    gen lb_eb = b_eb - 1.96 * se_eb
+    gen ub_eb = b_eb + 1.96 * se_eb
+    drop var_se
+    save ../output/did_coefs_eb, replace
+
+    // ----- EB-shrunk kdensity (mirror of did_coefs_kdens.pdf) -----
+    qui sum b_eb, d
+    local N_eb    = r(N)
+    local mean_eb : di %6.3f r(mean)
+    local sd_eb   : di %6.3f r(sd)
+    qui sum b, d
+    local sd_raw  : di %6.3f r(sd)
+    local tau2_lab : di %6.4f `tau2'
+    local mu_lab   : di %6.3f `mu_hat'
+    tw kdensity b_eb, color(lavender) ///
+        xtitle("DiD Coefficient (EB-shrunk)", size(small)) ///
+        ytitle("Density", size(small)) ///
+        xlab(, labsize(small)) ylab(, labsize(small)) ///
+        xline(0, lcolor(gs6) lpattern(dash)) ///
+        legend(on order(- "N = `N_eb'" "mean = `mean_eb'" "sd = `sd_eb'" ///
+                        "raw sd = `sd_raw'" "tau2 = `tau2_lab'" "mu_hat = `mu_lab'") ///
+               pos(1) ring(0) region(fcolor(none)))
+    graph export ../output/figures/did_coefs_kdens_eb.pdf, replace
+
+    // ----- Overlay raw vs EB-shrunk densities -----
+    tw kdensity b, color(gs10%70) lpattern(dash) || ///
+       kdensity b_eb, color(lavender) ///
+        xtitle("DiD Coefficient", size(small)) ytitle("Density", size(small)) ///
+        xlab(, labsize(small)) ylab(, labsize(small)) ///
+        xline(0, lcolor(gs6) lpattern(dash)) ///
+        legend(on order(1 "Raw (sd=`sd_raw')" 2 "EB-shrunk (sd=`sd_eb')") ///
+               ring(0) pos(1) region(fcolor(none)))
+    graph export ../output/figures/did_coefs_kdens_overlay.pdf, replace
+
+    // ----- EB-shrunk coef-by-rank plot (mirror of coef_rank.pdf) -----
+    drop rank
+    hashsort b_eb
+    gen rank = _n
+    labmask rank, values(category)
+    count
+    local n = r(N)
+    tw rcap ub_eb lb_eb rank, msize(vsmall) || ///
+       scatter b_eb rank, msize(tiny) mcolor(lavender) ///
+       yline(0) ylab(-1(0.2)1, labsize(small)) ysc(titlegap(-6) outergap(0)) ///
+       ytitle("EB DiD Estimate + 95% CI", size(small)) ///
+       xlab(1(1)`n', angle(45) labsize(small) valuelabel) ///
+       graphregion(margin(b+35 l+5)) xtitle("") legend(off)
+    graph export ../output/figures/coef_rank_eb.pdf, replace
+
+    // ----- EB-shrunk coef-by-spend-rank (mirror of coef_spend_rank.pdf) -----
+    drop rank_spend
+    hashsort spend_2013
+    gen rank_spend = _n
+    labmask rank_spend, values(category)
+    count
+    local n = r(N)
+    tw rcap ub_eb lb_eb rank_spend, msize(vsmall) || ///
+       scatter b_eb rank_spend, msize(tiny) mcolor(lavender) ///
+       yline(0) ylab(-1(0.2)1, labsize(small)) ysc(titlegap(-6) outergap(0)) ///
+       ytitle("EB DiD Estimate + 95% CI", size(small)) ///
+       xlab(1(1)`n', angle(45) labsize(small) valuelabel) ///
+       graphregion(margin(b+35 l+5)) xtitle("") legend(off)
+    graph export ../output/figures/coef_spend_rank_eb.pdf, replace
+
+    // ----- EB-shrunk vs delta_hhi (mirror of delta_hhi_corr.pdf) -----
+    corr b_eb delta_hhi [aw=spend_2013]
+    local corr_eb : di %4.3f r(rho)
+    tw scatter b_eb delta_hhi [aw = spend_2013], ///
+        legend(on order(- "corr: `corr_eb'") ring(0) pos(1)) ///
+        xtitle("Delta HHI") ytitle("EB DiD Coefficient")
+    graph export ../output/figures/delta_hhi_corr_eb.pdf, replace
+
+    // ----- EB-shrunk vs simulated_hhi (mirror of sim_hhi_corr.pdf) -----
+    corr b_eb simulated_hhi [aw=spend_2013]
+    local corr_eb : di %4.3f r(rho)
+    tw scatter b_eb simulated_hhi [aw = spend_2013], ///
+        legend(on order(- "corr: `corr_eb'") ring(0) pos(1)) ///
+        xtitle("Simulated HHI") ytitle("EB DiD Coefficient")
+    graph export ../output/figures/sim_hhi_corr_eb.pdf, replace
 end
 
 program event_study
     // naive event study
     use ../external/samp/uni_category_yr_tfidf, clear
     merge m:1 category using ../external/samp/category_hhi_tfidf, assert(1 2 3) keep(3) nogen
-    drop if delta_hhi <= -2500
+    drop if delta_hhi <= -2000
     gen rel = year - 2014
     replace rel = . if treated == 0
     local fes uni_id mkt
@@ -270,7 +374,7 @@ program event_study
     // main pooled result
     use ../external/merged/matched_uni_category_panel ,clear 
     merge m:1 category using ../external/samp/category_hhi_tfidf, assert(1 2 3) keep(3) nogen
-    drop if delta_hhi <= -2500
+    drop if delta_hhi <= -2000
     gegen uni_mkt = group(uni_id mkt)
     bys uni_mkt : egen min_year = min(year)
     bys uni_mkt : egen max_year = max(year)
