@@ -39,17 +39,18 @@ program main
     gen perc_treated_hq = treated_hq/hq* 100
     gen perc_treated_lq = treated_lq/lq* 100
     bys athr_id: egen tot_athr_spend =total(tot_spend)
-    stop 
-    gcollapse (mean) tot_spend nonlab_spend lab_spend hq treated_hq perc_treated_hq perc_lab_spend perc_nonlab_spend perc_hq [aw=tot_athr_spend], by(year)
-    tw line tot_spend year || line lab_spend year || line nonlab_spend year, legend(label(1 "Total Spend") label(2 "Lab Spend") label(3 "Non-Lab Spend")) ytitle("Average Spend") xtitle("Year") title("Average Spend by Year")
-    graph export ../output/figures/avg_spend_by_year.pdf, replace
-    graph hbar (mean) perc_lab_spend perc_nonlab_spend, over(year) stack ///
-      legend(label(1 "Perc Lab Spend") label(2 "Perc Non-Lab Spend")) ///
-      ytitle("Average Percentage of Spend") ///
-      title("Average Percentage of Lab vs Non-Lab Spend by Year")
-    graph export ../output/figures/perc_lab_nonlab_spend_by_year.pdf, replace
-    tw line perc_hq_kept year, legend(label(1 "Perc Lab Spend Kept")) ytitle("Average Percentage of Lab Spend Kept") xtitle("Year") title("Average Percentage of Lab Spend Kept by Year")
-    graph export ../output/figures/perc_labspend_kept_by_year.pdf,replace 
+    sum lab_spend if lab_spend >0, d
+    local mean_lab_spend : di %6.2f r(mean)
+    local sd_lab_spend : di %6.2f r(sd)
+    local min_lab_spend : di %6.2f r(min)
+    local max_lab_spend : di %10.2f r(max)
+    local N_lab_spend : di %6.0f r(N)
+    local q1_lab_spend : di %6.2f r(p25)
+    local q3_lab_spend : di %6.2f r(p75)
+    local median_lab_spend : di %6.2f r(p50)
+   tw hist lab_spend if lab_spend >0, color(edkblue) frac width(5000) xlab(0(7500)150000, angle(45)) ///
+       xtitle("Consumables Expenditure ($)") ytitle("Fraction of PI-Years") legend(on order(- "Mean = `mean_lab_spend'" "SD = `sd_lab_spend'" "Min = `min_lab_spend'" "Q1 = `q1_lab_spend'" "Median = `median_lab_spend'" "Q3 = `q3_lab_spend'" "Max = `max_lab_spend'") pos(1) ring(0) region(fcolor(none)) size(small))
+   graph export ../output/figures/lab_spend.pdf, replace
 end
 
 main

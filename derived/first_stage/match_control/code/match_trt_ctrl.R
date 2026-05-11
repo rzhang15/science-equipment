@@ -30,13 +30,13 @@ dir.create("../output/balance_plots", recursive = TRUE, showWarnings = FALSE)
 # t27 (alternative): annual pre-period prices + spend slope.
 #   Best price-only pretrend (0.095). Preferred when price is the headline
 #   outcome and qty/spend pretrends are secondary.
- MATCH_COVARIATES <- c("log_raw_qty_2012", "log_raw_qty_2013")
+ MATCH_COVARIATES <- c("log_raw_qty_2013", "log_raw_qty_2012", "log_raw_qty_slope")
  #MATCH_COVARIATES <- c("avg_log_price_2010", "avg_log_price_2011",
  #                      "avg_log_price_2012", "avg_log_price_2013",
  #                      "log_raw_spend_slope")
 
 # Number of controls per treated unit (specs evaluated at ratio=3)
-MATCH_RATIO <- 2
+MATCH_RATIO <- 3
 
 # Outcome variables to plot
 OUTCOME_VARS <- c("avg_log_price")

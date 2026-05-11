@@ -10,7 +10,7 @@ program main
     price_dist
 end
 program price_dist
-    use ../external/samp/item_level_tfidf, clear
+/*    use ../external/samp/item_level_tfidf, clear
     keep if category == "us fbs"
     keep if strpos(clean_desc, "500ml")
     keep if year == 2013
@@ -46,22 +46,27 @@ program price_dist
           xtitle("Avg. Log Price")  ytitle("Probability Density") ///
           title("`c'") ///
           legend(order(1 "FIU" 2 "UMich" 3 "Georgia Tech" 4 "Texas Tech") pos(1) ring(0)) 
-        graph export  ../output/figures/`name'_price_uni_dist_2019.pdf, replace
+        graph export  ../output/figures/`name'_price_uni_dist_2019.pdf, replace*/
 
+    use ../external/samp/item_level_tfidf, clear
+    foreach c in "us fbs" {
+        preserve
+        keep if category == "`c'"
+        local name = subinstr("`c'", " ", "_", .)
         forval i = 2010/2019 {
-            tw kdensity avg_log_price if year == `i' , ///
+            tw kdensity price if year == `i' , ///
               xtitle("Avg. Log Price")  ytitle("Probability Density") title("`c'")
             graph export  ../output/figures/`name'_price_dist_`i'.pdf, replace 
         }
 
-        tw kdensity avg_log_price if year == 2010 || ///
-            kdensity avg_log_price if year == 2019 , ///
+        tw kdensity price if year == 2010 || ///
+            kdensity price if year == 2019 , ///
             xtitle("Avg. Log Price")  ytitle("Probability Density") ///
             legend(order(1 "2010" 2 "2019") pos(1) ring(0)) 
         graph export  ../output/figures/`name'_log_price_dist_end_years.pdf, replace
 
         tw kdensity raw_price if year == 2010 || ///
-            kdensity price if year == 2019 , ///
+            kdensity raw_price if year == 2019 , ///
             xtitle("Price")  ytitle("Probability Density") ///
             legend(order(1 "2010" 2 "2019") pos(1) ring(0)) 
         graph export  ../output/figures/`name'_price_dist_end_years.pdf, replace

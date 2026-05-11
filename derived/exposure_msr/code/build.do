@@ -14,14 +14,14 @@ program main
     gen_exposure
 end
 
-program foia_pis 
+program foia_pis
     use ../external/foia/foia_athrs, clear
     merge 1:1 athr_id using ../external/ls_samp/list_of_athrs, assert(1 2 3) keep(3) nogen
     save ../output/foia_athrs, replace
 
     foreach i in 10 { //15 20 25 30 40 50 100 {
         import delimited using ../external/fields/author_static_clusters_`i', clear varnames(1)
-        merge 1:1 athr_id using ../output/foia_athrs, assert(1 2 3) keep(3) nogen 
+        merge 1:1 athr_id using ../output/foia_athrs, assert(1 2 3) keep(3) nogen
         save ../output/foia_athrs_with_clusters_`i', replace
         tab cluster_label
     }
@@ -105,18 +105,21 @@ program clean_foia_data
     qui sum spend, d
     local total_spend : di %16.0f r(sum)
     di "[All purchases EVER] N:  `total_obs' Total Spend:  `total_spend'"
+
     qui {
         merge m:1 suppliername using ../external/sup/lifescience_supplier_map, assert(1 2 3) keep(3) nogen
         rename (suppliername new_suppliername) (old_suppliername suppliername)
-        drop if mi(suppliername)
-        drop if suppliername == "na"
-        bys suppliername: gen num_sup_obs = _N
-        drop if num_sup_obs == 1
+    }
+    qui drop if mi(suppliername)
+    qui drop if suppliername == "na"
+    qui bys suppliername: gen num_sup_obs = _N
+    qui drop if num_sup_obs == 1
+    qui {
         replace suppliername = "thermo fisher scientific" if suppliername == "possible missions" & strpos(uni, "dallas") > 0
         replace suppliername = "thermo fisher scientific" if suppliername == "life technologies" & year >= 2014
         bys suppliername: gegen tot_sup_spend = total(spend)
-        drop if tot_sup_spend  < 0 
     }
+    qui drop if tot_sup_spend < 0
     qui count
     local total_obs = r(N)
     qui sum spend, d
@@ -127,84 +130,88 @@ program clean_foia_data
         replace predicted_market = category if inlist(uni, "utdallas", "umich")
         drop category
         rename predicted_market category
-        drop if price <= 0 | qty < 1 | spend <= 0
-        gen lab = !inlist(category , "Non-Lab", "unclassified")
-        foreach v in "animal - " "fees - " "electronics - " "instrument" "office supplies" "lab furniture" "waste disposal" "equipment" "furniture" "software" ///
-          "toolkit" "clamp" "tool" "tubing" "random" "unclear" "wire" "towel" "irrelevant chemicals" "oring" "caps" "gas" "first-aid" "first aid" "desk" "chair" "brushes" "trash" "cleaner" ///
-          "cotton ball" "bundle of products" "tape" "miscellaneous" "clips" "flint" "accessories" "stands" "batteries" "ear protection" "apron" "pots" "pants" "stoppers" "closures" "rings" ///
-          "mortar" "pestle" "support" "trays" "applicators and swabs" "bundle" "sequencing" "tem - " "nonlab" "racks" "electronics" {
-            drop if strpos(category, "`v'") > 0
-        }
-        keep if lab == 1
-        replace spend = price * qty  if qty != 1
-        replace qty = spend / price if qty == 1
-        drop if similarity_score == 0
     }
+    qui drop if category == "pre-bast bis-tris gels" & strpos(clean_desc, "reducing")
+    qui drop if category == "catalase" & strpos(clean_desc, "kit")
+    // drop nonsense negatives
+    qui drop if price <= 0 | qty < 1 | spend <= 0
+    // filter to consumables
+    qui drop if category == "Non-Lab"
+    qui drop if category == "unclassified"
+    qui replace spend = price * qty if qty != 1
+    qui replace qty = spend / price if qty == 1
+    qui drop if similarity_score == 0
     qui count
     local total_obs = r(N)
     qui sum spend, d
     local total_spend : di %16.0f r(sum)
     di "[ML Consumables & Negative Orders] N: `total_obs' Total Spend: `total_spend'"
+
+    qui drop if spend > 100000 | price > 100000 | qty > 100000
     qui {
-    // get rid of negated orders
-        drop if (spend > 100000 & !mi(spend)) | (price > 100000 & !mi(price)) | (qty > 100000 & !mi(qty))
+        gen byte _kw_match = 0
         foreach v in "graduate " "table" "library" "reader" "po " "replace" ///
-            "thesis" "pay" "delivery" "sequencing" "analysis" "transport" "lease" "order" " ins" "date" ///
-            "delivered" "deliver" "wire" "fitting" "lamp" "nasco" "sport" ///
-            "screw" "wall" "file" "mesh" "chamber" "analyzer" "oven" ///
+            "thesis" "pay" "delivery" "analysis" "transport" "lease" " ins" "date" ///
+            "wire" "fitting" "lamp" "nasco" "sport" ///
+            "wall" "file" "chamber" "analyzer" "oven" ///
             "fume hood" "biosafety cabinet" "wo#" "construction" "flooring" ///
             "lab gases" "glucarpidase" "voraxaze" "supplement issue" ///
             "ajph" "phssr" "capillarys" "analyses" "datalogger" ///
             "professionalism" ".org" "lcmsms" "pre-owned" "enterprise" ///
-            "dialysis" "tower" "kelvin" "lithography" "seal" ///
+            "dialysis" "tower" "kelvin" "lithography" ///
             "array" "adverstise" ///
             "generator" "compressor" "spectrophotometer" "incubator" ///
             "rotor" "monitor" "paint" "wafer" "hvac" "cycler" ///
             "machine" "workstation" "monocular" "binocular" "blotter" {
-            drop if strpos(clean_desc, "`v'") > 0
+            replace _kw_match = 1 if strpos(clean_desc, "`v'") > 0
         }
-        drop if (strpos(clean_desc, "plate") > 0 | strpos(clean_desc, "card")) & category == "synthetic dna oligonucleotide"
-        drop if category == "chromatography-grade water" & ///
-            (strpos(clean_desc, "water") == 0 & strpos(clean_desc, "h2o") == 0)
-        drop if inlist(category, "ddpcr systems", "dialyzer midi", ///
-            "dna loading dye", "cloning cylinders")
-        // unambiguous equipment / instrument descriptions — drop regardless of source/sim
-        foreach v in "homogenizer" "sonicator" "thermocycler" "nutator" "ph meter" ///
-            "bead mill" "tirf mounted" "tank row" "aspirator system" "stirrer " ///
-            "steponeplus" "viia7" "viia 7" "vortex mixer" "minimixer" {
-            drop if strpos(clean_desc, "`v'") > 0
-        }
-        // drop borderline terms when model confidence is low (any source)
-        // NB: skipping "quote" and "labor" — false positives on order#s and "laboratory"
+    }
+    qui drop if _kw_match
+    qui drop _kw_match
+
+    qui drop if (strpos(clean_desc, "plate") > 0 | strpos(clean_desc, "card")) & category == "synthetic dna oligonucleotide"
+    qui drop if category == "chromatography-grade water" & (strpos(clean_desc, "water") == 0 & strpos(clean_desc, "h2o") == 0)
+
+    // drop borderline terms only when model confidence is low
+    qui {
+        gen byte _kw_match = 0
         foreach v in "service" "repair" "maintenance" "consulting" "training" ///
             "rental" "subscription" "license" "software" "warranty" "support contract" ///
-            "calibration" "installation" "shipping" "freight" "estimate" ///
-            "contract" "agreement" "professional" "hourly" {
-            drop if strpos(clean_desc, "`v'") > 0 & similarity_score < 0.20
+            "calibration" "installation" "shipping" "freight" "quote" "estimate" ///
+            "contract" "agreement" "professional" "labor" "hourly" {
+            replace _kw_match = 1 if strpos(clean_desc, "`v'") > 0 & prediction_source == "Expert Model" & similarity_score < 0.20
         }
-        foreach v in "animal - " "fees - " "electronics - " "instrument" "office supplies" "lab furniture" "waste disposal" "equipment" "furniture" "software" ///
+    }
+    qui drop if _kw_match
+    qui drop _kw_match
+
+    qui {
+        gen byte _kw_match = 0
+        foreach v in "animal" "fees" "electronics" "instrument" "office supplies" "lab furniture" "waste disposal" "equipment" "furniture" "software" ///
           "toolkit" "clamp" "tool" "tubing" "random" "unclear" "wire" "towel" "irrelevant chemicals" "oring" "caps" "gas" "first-aid" "first aid" "desk" "chair" "brushes" "trash" "cleaner" ///
           "cotton ball" "bundle of products" "tape" "miscellaneous" "clips" "flint" "accessories" "stands" "batteries" "ear protection" "apron" "pots" "pants" "stoppers" "closures" "rings" ///
           "mortar" "pestle" "support" "trays" "applicators and swabs" "bundle" "sequencing" "tem - " "nonlab" "racks" {
-            drop if strpos(category, "`v'") > 0
-          }
+            replace _kw_match = 1 if strpos(category, "`v'") > 0
+        }
     }
-    count
+    qui drop if _kw_match
+    qui drop _kw_match
+    qui count
     local total_obs = r(N)
     qui sum spend, d
     local total_spend : di %16.0f r(sum)
     di "[Remove Possible Non-consumables] N: `total_obs' Total Spend: `total_spend'"
-    merge m:1 category using ../external/ml/categories_tfidf, assert(2 3) keep(3) nogen
-    drop if prediction_source == "Non-Lab"
-    drop if similarity_score < 0.20 & prediction_source == "Expert Model"
-    drop if similarity_score < 0.10 & prediction_source == "Market Rules"
-    drop if price < 1
-    drop if precision < 0.10 & !mi(precision)
-    drop if support < 5
+    qui merge m:1 category using ../external/ml/categories_tfidf, assert(2 3) keep(3) nogen
+    qui drop if similarity_score <= 0.10 & prediction_source == "Expert Model"
+    qui drop if precision < 0.10 & !mi(precision)
+    qui drop if support < 5
+    qui count
+    local total_obs = r(N)
     qui sum spend, d
     local total_spend : di %16.0f r(sum)
     di "[bad ml categories] N: `total_obs' Total Spend: `total_spend'"
-     qui sum spend 
+
+    qui sum spend
     local tot_spend = r(sum)
     qui sum spend if keep == 1
     di "Total spend in matched categories: " r(sum) " out of " `tot_spend' " (" string(r(sum)/`tot_spend'*100) "%)"

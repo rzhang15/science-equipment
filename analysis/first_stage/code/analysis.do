@@ -70,9 +70,9 @@ program raw_plots
         use ../external/merged/matched_category_panel, clear
         gen keep = 1 if category == "`c'" 
         qui glevelsof delta_hhi if category == "`c'", local(del_hhi) 
-        local del_hhi : dis %6.3f `del_hhi'
+        local del_hhi = round(`del_hhi', 0.001)
         qui glevelsof simulated_hhi if category == "`c'", local(sim_hhi) 
-        local sim_hhi : dis %6.3f `sim_hhi'
+        local sim_hhi = round(`sim_hhi', 0.001)
         local match_name ""
         foreach  m in `match' {
             replace keep = 1 if category == "`m'"
@@ -204,8 +204,8 @@ program did
     save ../output/did_coefs, replace
     sum b, d
     local N    = r(N)
-    local mean : di %6.3f r(mean)
-    local sd   : di %6.3f r(sd)
+    local mean = round(r(mean), 0.001)
+    local sd   = round(r(sd), 0.001)
     tw kdensity b, color(lavender) ///
         xtitle("DiD Coefficient", size(small)) ///
         ytitle("Density", size(small)) ///
@@ -269,12 +269,12 @@ program did
     // ----- EB-shrunk kdensity (mirror of did_coefs_kdens.pdf) -----
     qui sum b_eb, d
     local N_eb    = r(N)
-    local mean_eb : di %6.3f r(mean)
-    local sd_eb   : di %6.3f r(sd)
+    local mean_eb = round(r(mean), 0.001)
+    local sd_eb   = round(r(sd), 0.001)
     qui sum b, d
-    local sd_raw  : di %6.3f r(sd)
-    local tau2_lab : di %6.4f `tau2'
-    local mu_lab   : di %6.3f `mu_hat'
+    local sd_raw  = round(r(sd), 0.001)
+    local tau2_lab = round(`tau2', 0.001)
+    local mu_lab   = round(`mu_hat', 0.001)
     tw kdensity b_eb, color(lavender) ///
         xtitle("DiD Coefficient (EB-shrunk)", size(small)) ///
         ytitle("Density", size(small)) ///
@@ -360,9 +360,9 @@ program event_study
         if "`yvar'" == "qty" local yname "Avg. Log Qty"
         if "`yvar'" == "spend" local yname "Avg. Log Spend"
         qui sum raw_`yvar' if treated == 1 & year == 2013
-        local trt_mean :  dis %6.3f r(mean)
+        local trt_mean = round(r(mean), 0.001)
         qui sum raw_`yvar' if treated == 0 & year == 2013
-        local ctrl_mean : dis %6.3f r(mean)
+        local ctrl_mean = round(r(mean) + 0.001, 0.001)
         if "`yvar'" == "price" {
             di "hi"
             manual_event_study, lag(5) lead(-4) yvar(avg_log_`yvar') ymin(-0.2) ymax(0.6) ygap(0.1) trt_mean(`trt_mean') ctrl_mean(`ctrl_mean')  name(`yname') fes(`fes') wt_var(spend_2013) cluster_var(mkt) file_suf("naive")
@@ -392,9 +392,9 @@ program event_study
         if "`yvar'" == "qty" local yname "Avg. Log Qty"
         if "`yvar'" == "spend" local yname "Avg. Log Spend"
         qui sum raw_`yvar' if treated == 1 & year == 2013
-        local trt_mean :  dis %6.3f r(mean)
+        local trt_mean = round(r(mean), 0.001)
         qui sum raw_`yvar' if treated == 0 & year == 2013
-        local ctrl_mean : dis %6.3f r(mean)
+        local ctrl_mean = round(r(mean) + 0.001, 0.001)
         if "`yvar'" == "price" {
             manual_event_study, lag(5) lead(-4) yvar(avg_log_`yvar') ymin(-0.4) ymax(0.7) ygap(0.1) trt_mean(`trt_mean') ctrl_mean(`ctrl_mean')  name(`yname') fes(`fes') wt_var(spend_2013) cluster_var(mkt) file_suf("pooled")
         }
@@ -407,9 +407,9 @@ program event_study
         mat drop _all
         local yname "Price"
         qui sum `yvar' if treated == 1 & year == 2013
-        local trt_mean :  dis %6.3f r(mean)
+        local trt_mean = round(r(mean), 0.001)
         qui sum `yvar' if treated == 0 & year == 2013
-        local ctrl_mean : dis %6.3f r(mean)
+        local ctrl_mean = round(r(mean) + 0.001, 0.001)
         manual_event_study, lag(5) lead(-4) yvar(`yvar') ymin(-50) ymax(50) ygap(5) trt_mean(`trt_mean') ctrl_mean(`ctrl_mean')  name(`yname') fes(`fes') wt_var(spend_2013) cluster_var(mkt) file_suf("pooled")
         restore
     }
@@ -418,9 +418,9 @@ program event_study
         mat drop _all
         local yname "Qty"
         qui sum `yvar' if treated == 1 & year == 2013
-        local trt_mean :  dis %6.3f r(mean)
+        local trt_mean = round(r(mean), 0.001)
         qui sum `yvar' if treated == 0 & year == 2013
-        local ctrl_mean : dis %6.3f r(mean)
+        local ctrl_mean = round(r(mean) + 0.001, 0.001)
         manual_event_study, lag(5) lead(-4) yvar(`yvar') ymin(-50) ymax(50) ygap(5) trt_mean(`trt_mean') ctrl_mean(`ctrl_mean')  name(`yname') fes(`fes') wt_var(spend_2013) cluster_var(mkt) file_suf("pooled")
         restore
     }
@@ -429,9 +429,9 @@ program event_study
         mat drop _all
         local yname "Spend"
         qui sum `yvar' if treated == 1 & year == 2013
-        local trt_mean :  dis %6.3f r(mean)
+        local trt_mean = round(r(mean), 0.001)
         qui sum `yvar' if treated == 0 & year == 2013
-        local ctrl_mean : dis %6.3f r(mean)
+        local ctrl_mean = round(r(mean) + 0.001, 0.001)
         manual_event_study, lag(5) lead(-4) yvar(`yvar') ymin(-600) ymax(6000) ygap(750) trt_mean(`trt_mean') ctrl_mean(`ctrl_mean')  name(`yname') fes(`fes') wt_var(spend_2013) cluster_var(mkt) file_suf("pooled")
         restore
     }
@@ -489,9 +489,9 @@ program event_study
             if "`yvar'" == "qty" local yname "Avg. Log Qty"
             if "`yvar'" == "spend" local yname "Avg. Log Spend"
             qui sum raw_`yvar' if treated == 1 & year == 2013
-            local trt_mean :  dis %6.3f r(mean)
+            local trt_mean = round(r(mean), 0.001)
             qui sum raw_`yvar' if treated == 0 & year == 2013
-            local ctrl_mean : dis %6.3f r(mean)
+            local ctrl_mean = round(r(mean) + 0.001, 0.001)
             if "`yvar'" == "price" {
                 manual_event_study, lag(5) lead(-4) yvar(avg_log_`yvar') ymin(-0.2) ymax(0.6) ygap(0.1) trt_mean(`trt_mean') ctrl_mean(`ctrl_mean')  name(`yname') fes(`fes') wt_var(spend_2013) cluster_var(mkt) file_suf("`c'")
             }
@@ -580,7 +580,7 @@ program uni_fes
     keep betas*
     rename (betas_placebo1 betas_placebo2 betas_placebo3) (uni_id beta_u_pl se_pl)
     sum beta_u_pl, d
-    local mean_pl : dis %6.3f  r(mean)
+    local mean_pl = round(r(mean), 0.001)
     gen lb_pl = beta_u_pl - 1.96*se_pl
     gen ub_pl = beta_u_pl + 1.96*se_pl
     save ../output/beta_u_placebo, replace
@@ -860,9 +860,9 @@ program manual_event_study
         tw rcap ub lb rel if rel != -1 & inrange(rel, `lead', `lag') , lcolor(ebblue%70) msize(vsmall) || ///
         scatter b rel if inrange(rel, `lead', `lag') , mcolor(ebblue) || ///
         scatteri `ymax' -0.25 `ymax' 0.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
-        xlab(`lead'(1)`lag', labsize(small)) xtitle("Relative Year", size(small)) ///
-        ytitle("`name'", size(small)) ylab(`ymin'(`ygap')`ymax', labsize(small)) yline(0, lcolor(gs10) lpattern(solid)) ///
-        legend(on order(- "Treatment Level Avg. in t = -1: `trt_mean'" "Control Level Avg. in t = -1: `ctrl_mean'") pos(7) rows(2) bmargin(zero)) ///
+        xlab(`lead'(1)`lag') xtitle("Relative Year") ///
+        ytitle("`name'") ylab(`ymin'(`ygap')`ymax') yline(0, lcolor(gs10) lpattern(solid)) ///
+        legend(on order(- "Treatment Level Avg. in t = -1: `trt_mean'" "Control Level Avg. in t = -1: `ctrl_mean'") pos(7) rows(2) bmargin(zero) size(small)) ///
         title(`title', size(small)) plotregion(margin(sides))
         graph export "../output/figures/es/`suf'es_`yvar'_`file_suf'.pdf", replace
         
@@ -871,9 +871,9 @@ program manual_event_study
         scatter trt_coef rel if inrange(rel, `lead', `lag') , mcolor(ebblue) || ///
         scatter year_fes rel_year_fes if inrange(rel, `lead', `lag') , mcolor(dkorange) msymbol(diamond) || ///
         scatteri `ymax' -0.25 `ymax' 0.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
-        xlab(`lead'(1)`lag', labsize(small)) xtitle("Relative Year", size(small)) ///
-        ytitle("`name'", size(small)) ylab(`ymin'(`ygap')`ymax', labsize(small)) yline(0, lcolor(gs10) lpattern(solid)) ///
-        legend(on order(1 "Treatment Level Avg. in t = 1: `trt_mean'" 2 "Control Level Avg. in t = 1: `ctrl_mean'") pos(7) rows(2) bmargin(zero)) ///
+        xlab(`lead'(1)`lag') xtitle("Relative Year") ///
+        ytitle("`name'") ylab(`ymin'(`ygap')`ymax') yline(0, lcolor(gs10) lpattern(solid)) ///
+        legend(on order(1 "Treatment Level Avg. in t = 1: `trt_mean'" 2 "Control Level Avg. in t = 1: `ctrl_mean'") pos(7) rows(2) bmargin(zero) size(small)) ///
         title(`title', size(small)) plotregion(margin(sides))
         graph export "../output/figures/es/split_`suf'es_`yvar'_`file_suf'.pdf", replace
     restore

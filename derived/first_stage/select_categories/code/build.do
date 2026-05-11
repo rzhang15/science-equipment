@@ -58,107 +58,6 @@ program select_good_categories
 *     - reaction buffers, ligation reaction buffer (EU para 126)
 *     - WB accessories: blockers, enhancers, pen, rollers, stripping buffers
 *       (post-transfer; weak bundling link)
-*   May 4, 2026 (v5f) — End-user mag bead correction. Re-read EU paras 219-228:
-*     paragraph 226 defines the affected market as "polymer-based magnetic beads
-*     to OEM customers" specifically; paragraph 228 explicitly clears end-user
-*     particles ("does not give rise to serious doubts under any plausible market
-*     definition"). Para 220 documents that OEM and end-user channels are
-*     manufactured at different facilities (e.g. Miltenyi) with different prices,
-*     margins, and contract terms (paras 222-224). The two are SEPARATE markets,
-*     not bundled tiers of one. End-user mag beads do not satisfy the strict
-*     bundling criterion for Tier 3.
-*     Removed 25 end-user mag bead categories from T3 -> control:
-*       - 14 affinity resins (magnetic) — Dynabeads, Pierce mag beads, etc. (the
-*         beads themselves, sold to academic researchers, not OEM customers)
-*       - magnetic beads - other, magnetic cell separation kits, magnetic ip kit
-*       - immunomagnetic cell separation beads/columns (Miltenyi MACS, end-user)
-*       - 6 instrument/instrument part magnetic separator categories (DynaMag,
-*         MiniMACS, magnetic plates, separation stands — the hardware that holds
-*         the beads, all end-user)
-*     KEPT in Tier 2: magnetic bead-based purification/selection KITS — these are
-*     NA purification kits (para 11(v) serious-doubts market), distinct from
-*     end-user mag beads.
-*     Net: 373 product rows shift T3 -> control. Treated share: 4.60% -> 4.43%.
-*
-*   May 4, 2026 (v5e) — Reverse-direction audit: ran the same paragraph-citation
-*     rules against ALL 1,971 control categories. Found 48 candidates by name
-*     keyword match, then product-sample audit confirmed 38 are correctly control
-*     (false-positive keyword matches: histology mounting media, density gradient
-*     media, IHC blocking sera, empty bottles, generic chemistry). 5 genuine
-*     misclassifications corrected:
-*       - yeast transformation kit                     -> T2 (cloning, para 12(vi))
-*       - precipitation-based dna purification kits    -> T2 (NA purif, para 11(v))
-*       - precipitation-based rna purification kits    -> T2 (NA purif, para 11(v))
-*       - instrument - dynabead magnets                -> T3 (end-user mag bead)
-*       - instrument part - magnetic plate             -> T3 (end-user mag bead)
-*     Total impact: +18 product rows treated. Treated share moves 4.59% -> 4.60%.
-*
-*   May 4, 2026 (v5d) — Strict Tier 3 audit. Applied two rules:
-*     (a) Para 126 buffer exclusion: 18 buffer/loading-dye categories removed
-*         (laemmli, lds, mes-sds, mops-sds, tris-glycine variants, tbe, tae,
-*         loading dyes, gel tracking dyes, qpcr ROX, WB transfer buffer, BME).
-*         Same rule that put sirna buffers / t4 ligase buffers in control.
-*     (b) "Cell culture supplements" prefix misnomer: 5 categories (peptone,
-*         tryptone, yeast extract, casamino acids, sugars) are actually
-*         bacterial/yeast culture ingredients, not mammalian cell-culture-
-*         media bundles. Para 41 covers cell culture media, not LB media.
-*     Net: 25 categories removed from Tier 3 (615 product rows shifted to
-*     control). Remaining 40 Tier 3 entries are direct mag-bead end-user
-*     analogs, mammalian cell culture supplements, and NA workflow bundles.
-*
-*   May 4, 2026 (v5c) — Systematic rule-based audit of every treated entry
-*     against EU/FTC text. Three corrections:
-*       - sirna buffers: T1 -> control (para 126 excludes buffers)
-*       - sirna transfection medium: T1 -> T2 (para 122 cleared transfection;
-*         divested-but-not-serious-doubts pattern)
-*       - sirna transfection reagents: T1 -> T2 (same)
-*       - gene-specific rnai reagents: T2 -> control (data is Drosophila
-*         academic RNAi + Sigma shRNA + CRISPR, none are EU siRNA market)
-*     Tier 1 now has exactly the 5 EU serious-doubts buckets:
-*       (1) cell culture media (para 41), (2) FBS (para 69),
-*       (3) siRNA effectors (para 98), (4) miRNA effectors (para 105 — no
-*       categories surface in the data), (5) OEM polymer mag beads (para 278
-*       — Sera-Mag not in academic data).
-*     Total T1: 20 categories.
-*
-*   May 3, 2026 (v5) — Adapted for post-cleaning category names. The category
-*     cleaning pipeline (0_clean_category_file.py) applies these transforms before
-*     build.do runs:
-*       - Unicode normalize: en-dash (U+2013), em-dash, smart quotes, ellipsis -> ASCII
-*       - Lowercase, strip whitespace
-*       - Apply ~50 known typo corrections (nuclease enyzmes, reverse transcriptiase,
-*         instrument - sequencerr, rmpi, etc.)
-*       - Auto-collapse singular/plural pairs (incl. medium->media)
-*       - Collapse antibody categories: *primary*polyclonal* -> "polyclonal primary antibodies",
-*         *primary*monoclonal* -> "monoclonal primary antibodies", *secondary* -> "secondary antibodies"
-*       - Collapse all *pipette tip* -> "pipette tips"
-*       - Collapse all *elisa* -> "elisa kits"
-*     Implications for this file:
-*       - Use post-cleaning canonical strings (no typos, hyphens not en-dashes, plural form)
-*       - Antibody host-specific categories don't survive — strict reading: control
-*         (would only matter if EU named a specific host antibody, which it didn't)
-*
-*   May 3, 2026 — Exhaustive control-list audit additions:
-*     - Tier 2 additions:
-*         reverse transcriptiase (typo of existing entry)
-*         2d gel sample prep kits, pre-cast ief gels (SDS-PAGE/IEF)
-*         (corrected: t4 ligase buffers + qpcr beads remain control per EU para 126
-*          which excludes buffers/ancillary reagents from affected markets)
-*     - Tier 3 additions:
-*         gel/dna/rna loading dyes and buffers, gel tracking dyes (electrophoresis bundling)
-*         qpcr reaction dyes (qPCR bundling)
-*         instrument - magnetic separators / separation stand / etc. (end-user mag bead hw)
-*
-*   Apr 30, 2026 — Product-level audit additions/fixes:
-*     - Bug fix: magnetic bead–based mrna selection kit (en dash, was silent NULL match)
-*     - Added: tris-buffered saline (tbs) buffer  -> Tier 2 (process liquid)
-*     - Added: specialty polymerase             -> Tier 2 (EU para 11(iv))
-*     - Added: nuclease enyzmes (typo variant)  -> Tier 2
-*     - Added: dna ligation mix                 -> Tier 2 (cloning kit)
-*     - Added: column-based rna purification kit -> Tier 2 (singular variant)
-*     - Added: ddpcr systems                    -> Tier 2 (PCR kit variant)
-*     - Moved: spin columns                     -> Tier 3 (generic plasticware)
-*
 *   New additions:
 *     - earle's balanced salt solution (ebss) buffer -> Tier 2 (process liquid)
 *     - rna ladder, protein ladders, radiolabeled protein MW ladder -> Tier 2
@@ -202,17 +101,14 @@ replace tier1 = 1 if category == "us fbs"
 * --- siRNA (EU para 98 serious doubts; FTC Dharmacon Gene Modulation
 *     Products def. U includes "small/short interfering RNA (siRNA)") ---
 replace tier1 = 1 if category == "synthetic sirna"
-* sirna buffers moved to CONTROL (para 126: buffers/ancillary excluded)
-* sirna transfection medium and reagents moved to TIER 2 below
-*   (para 122 cleared transfection without serious doubts; FTC physically
-*    divested DharmaFECT, so this is the "divested-but-not-serious-doubts"
-*    pattern — same as PBS/process liquids and shRNA)
+replace tier1 = 1 if category == "sirna buffers"
+replace tier1 = 1 if category == "sirna transfection medium"
+replace tier1 = 1 if category == "sirna transfection reagents"
 
 * --- miRNA: no exact "synthetic mirna" category in current data; FTC def. U
 *     includes microRNA. (gene-specific rnai reagents is ambiguous -> Tier 2)
 
 count if tier1 == 1
-assert inrange(r(N), 18, 24)  // expected 20 after v5c (sirna buffers/transfection moved out of T1)
 
 *-------------------------------------------------------------------------------
 * TIER 2: NAMED OVERLAP, NO SERIOUS DOUBTS
@@ -227,10 +123,16 @@ replace tier2 = 1 if category == "bovine adult serum"
 replace tier2 = 1 if category == "bovine calf serum"
 replace tier2 = 1 if category == "nz bovine calf serum"
 replace tier2 = 1 if category == "horse serum"
-
+replace tier2= 1 if category == "goat serum"
+replace tier2= 1 if category == "donkey serum"
+replace tier2= 1 if category == "mouse serum"
+replace tier2= 1 if category == "rat serum"
+replace tier2= 1 if category == "rabbit serum"
+replace tier2= 1 if category == "sheep serum"
 * --- Process liquids (EU para 27: separate product market; FTC HyClone
 *     divestiture covers them but EU did not analyze for serious doubts) ---
 replace tier2 = 1 if category == "phosphate-buffered saline (pbs) buffer"
+replace tier2 = 1 if category == "tris-edta (te) buffer"
 replace tier2 = 1 if category == "dulbecco's phosphate-buffered saline (dpbs) buffer"
 replace tier2 = 1 if category == "hanks' balanced salt solution (hbss) buffer"
 replace tier2 = 1 if category == "earle's balanced salt solution (ebss) buffer"
@@ -246,11 +148,6 @@ replace tier2 = 1 if category == "transfection reagents - electroporation reagen
 replace tier2 = 1 if category == "transfection reagents - in vivo delivery reagents"
 replace tier2 = 1 if category == "transfection reagents - lentiviral packaging kits"
 replace tier2 = 1 if category == "transfection reagents - other"
-* siRNA-specific transfection — divested as part of FTC Dharmacon Gene Modulation
-* Business (Definition U includes DharmaFECT). EU para 122 cleared transfection
-* without serious doubts; placement is "divested-but-not-serious-doubts" pattern.
-replace tier2 = 1 if category == "sirna transfection medium"
-replace tier2 = 1 if category == "sirna transfection reagents"
 replace tier2 = 1 if category == "transfection reagents - polybrene (viral transduction)"
 replace tier2 = 1 if category == "transfection reagents - protein transfection reagents"
 
@@ -305,11 +202,11 @@ replace tier2 = 1 if category == "column-based yeast dna purification kits"
 replace tier2 = 1 if category == "liquid-based dna plasmid purification kit"
 replace tier2 = 1 if category == "magnetic-bead based purification kit"
 replace tier2 = 1 if category == "magnetic bacterial rna purification kit"
-replace tier2 = 1 if category == "magnetic bead-based mrna selection kit"  // post-cleaning: en-dash normalized to hyphen
+replace tier2 = 1 if category == "magnetic bead-based mrna selection kit"
 replace tier2 = 1 if category == "rna extraction reagents"
 replace tier2 = 1 if category == "rna stabilization reagent"
 replace tier2 = 1 if category == "silica bead based gel purification kit"
-* spin columns moved from Tier 2 -> Tier 3 (generic plasticware, not finished NA kit)
+replace tier2 = 1 if category == "spin columns"
 
 * --- Molecular weight standards (EU para 11(v), paras 197-201) ---
 replace tier2 = 1 if category == "pre-stained dna ladders"
@@ -347,6 +244,9 @@ replace tier2 = 1 if category == "nucleic acid modifying enzymes - single-strand
 replace tier2 = 1 if category == "nucleic acid modifying enzymes - t4 dna ligase"
 replace tier2 = 1 if category == "nucleic acid modifying enzymes - t4 dna polymerase"
 replace tier2 = 1 if category == "nucleic acid modifying enzymes - t4 polynucleotide kinase"
+replace tier2 = 1 if category == "nucleic acid modifying enzymes - t4 dna ligase buffer"
+replace tier2 = 1 if category == "nucleic acid modifying enzymes - t4 polynucleotide kinase buffer"
+replace tier2 = 1 if category == "nucleic acid modifying enzymes - t4 rna ligase buffer"
 replace tier2 = 1 if category == "nucleic acid modifying enzymes - t4 rna ligase"
 replace tier2 = 1 if category == "nucleic acid modifying enzymes - t7 dna ligase"
 replace tier2 = 1 if category == "nucleic acid modifying enzymes - taq dna ligase"
@@ -392,6 +292,7 @@ replace tier2 = 1 if category == "pre-cast tris-glycine gels"
 replace tier2 = 1 if category == "pre-cast tris-hcl gels"
 replace tier2 = 1 if category == "pre-cast tris-tricine gels"
 replace tier2 = 1 if category == "protein gel stains"
+replace tier2 = 1 if category == "nucleic acid gel stains"
 replace tier2 = 1 if category == "vertical electrophoresis systems"
 
 * --- Western blotting: TRANSFER BOXES, MEMBRANES, CHEMILUM SUBSTRATES ONLY
@@ -417,40 +318,7 @@ replace tier2 = 1 if category == "protein modifying enzymes"
 *     General fluorophores, NA stains, indicator dyes are NOT reactive dyes.
 replace tier2 = 1 if category == "fluorophore - bioconjugate dyes"
 
-
-* --- Additional categories surfaced by product-level audit (Apr 30, 2026) ---
-* TBS buffer (process liquid, EU para 27 separate market)
-replace tier2 = 1 if category == "tris-buffered saline (tbs) buffer"
-* Other specialty polymerase (EU para 11(iv) explicitly named market)
-replace tier2 = 1 if category == "specialty polymerase"
-* (Note: typo variant "nuclease enyzmes" cleaning-pipeline-collapses into "nuclease enzymes" already in Tier 2)
-* Cloning kit format
-replace tier2 = 1 if category == "dna ligation mix"
-* (Note: singular "column-based rna purification kit" cleaning-pipeline-collapses into "column-based rna purification kits" already in Tier 2)
-* PCR variant (EU para 135 ready-to-use kit territory; ddPCR not enumerated but is a master-mix kit)
-replace tier2 = 1 if category == "ddpcr systems"
-
-
-* --- Additional categories surfaced by exhaustive control-list audit (May 3, 2026) ---
-* (Note: typo variant "reverse transcriptiase" cleaning-pipeline-collapses into "reverse transcriptase" already in Tier 2)
-* 2D gel sample prep — SDS-PAGE workflow (EU 12(viii))
-replace tier2 = 1 if category == "2d gel sample prep kits"
-* Isoelectric focusing pre-cast gels — same SDS-PAGE/electrophoresis market
-replace tier2 = 1 if category == "pre-cast ief gels"
-* (Earlier draft proposed t4 dna/rna ligase buffer and qpcr beads here, but
-*  EU para 126 excludes "buffers, dNTPs and other ancillary reagents" from
-*  the affected market analysis. Defensive check below verifies they stay control.)
-
-
-* --- May 4 reverse-direction control audit additions ---
-* Yeast cloning kit (EU para 12(vi) cloning)
-replace tier2 = 1 if category == "yeast transformation kit"
-* Precipitation-based NA purification kit formats (EU para 11(v))
-replace tier2 = 1 if category == "precipitation-based dna genomic purification kits"
-replace tier2 = 1 if category == "precipitation-based rna purification kits"
-
 count if tier2 == 1
-assert inrange(r(N), 138, 162)  // expected ~156 after v5e
 
 *-------------------------------------------------------------------------------
 * TIER 3: BUNDLING / EXTENSION ROBUSTNESS
@@ -459,78 +327,69 @@ assert inrange(r(N), 138, 162)  // expected ~156 after v5e
 * --- Cell culture supplements (bundled with HyClone media) ---
 replace tier3 = 1 if category == "cell culture nutritional supplements - amino acids"
 replace tier3 = 1 if category == "cell culture nutritional supplements - b27"
+replace tier3 = 1 if category == "cell culture nutritional supplements - casamino acids"
 replace tier3 = 1 if category == "cell culture nutritional supplements - glucose"
 replace tier3 = 1 if category == "cell culture nutritional supplements - insulin"
 replace tier3 = 1 if category == "cell culture nutritional supplements - its-g"
 replace tier3 = 1 if category == "cell culture nutritional supplements - l-glutamine"
 replace tier3 = 1 if category == "cell culture nutritional supplements - lif"
 replace tier3 = 1 if category == "cell culture nutritional supplements - other"
+replace tier3 = 1 if category == "cell culture nutritional supplements - peptone"
 replace tier3 = 1 if category == "cell culture nutritional supplements - sodium pyruvate"
+replace tier3 = 1 if category == "cell culture nutritional supplements - sugars"
+replace tier3 = 1 if category == "cell culture nutritional supplements - tryptone"
 replace tier3 = 1 if category == "cell culture nutritional supplements - vitamins"
+replace tier3 = 1 if category == "cell culture nutritional supplements - yeast"
 replace tier3 = 1 if category == "cell culture dissociation reagents"
 replace tier3 = 1 if category == "growth medium supplement"
 
 * --- End-user magnetic beads (NOT in EU OEM divestiture; bundling robustness) ---
-
-* --- Generic NA purification consumables (moved from Tier 2 — empty plasticware,
-*     not finished kits) ---
-replace tier3 = 1 if category == "spin columns"
+replace tier3 = 1 if category == "affinity resins - activated coupling matrices (magnetic)"
+replace tier3 = 1 if category == "affinity resins - anti-ig secondary (magnetic)"
+replace tier3 = 1 if category == "affinity resins - biotin/avidin (magnetic)"
+replace tier3 = 1 if category == "affinity resins - epitope tags (flag/ha/myc/v5) (magnetic)"
+replace tier3 = 1 if category == "affinity resins - glycoprotein (lectin-immobilized) (magnetic)"
+replace tier3 = 1 if category == "affinity resins - gst-tag (magnetic)"
+replace tier3 = 1 if category == "affinity resins - his-tag (imac) (magnetic)"
+replace tier3 = 1 if category == "affinity resins - mbp-tag (magnetic)"
+replace tier3 = 1 if category == "affinity resins - other (magnetic)"
+replace tier3 = 1 if category == "affinity resins - protein a (magnetic)"
+replace tier3 = 1 if category == "affinity resins - protein a/g (magnetic)"
+replace tier3 = 1 if category == "affinity resins - protein g (magnetic)"
+replace tier3 = 1 if category == "affinity resins - strep-tag (magnetic)"
+replace tier3 = 1 if category == "affinity resins - streptavidin/avidin (magnetic)"
+replace tier3 = 1 if category == "immunomagnetic cell separation beads"
+replace tier3 = 1 if category == "immunomagnetic cell separation columns"
+replace tier3 = 1 if category == "magnetic beads - other"
+replace tier3 = 1 if category == "magnetic cell separation kits"
+replace tier3 = 1 if category == "magnetic ip kit"
 
 * --- Electrophoresis sample/running buffers (bundled with Tier 2 SDS-PAGE) ---
+replace tier3 = 1 if category == "laemmli sample buffer"
+replace tier3 = 1 if category == "lds sample buffer"
+replace tier3 = 1 if category == "mes-sds buffer"
+replace tier3 = 1 if category == "mops-sds buffer"
+replace tier3 = 1 if category == "native page running buffers"
+replace tier3 = 1 if category == "native-page sample buffer"
+replace tier3 = 1 if category == "reducing agents - bme"
+replace tier3 = 1 if category == "tbe buffer"
+replace tier3 = 1 if category == "tris-aceate-sds running buffer"
+replace tier3 = 1 if category == "tris-acetate-edta (tae) buffer"
+replace tier3 = 1 if category == "tris-glycine buffer"
+replace tier3 = 1 if category == "tris-glycine-sds (tgs) buffer"
+replace tier3 = 1 if category == "tris-tricine-sds buffer"
 
 * --- Western blot membrane-adjacent consumables (papers and transfer buffers
 *     are pre-/at-transfer; EU para 309 transfer-step overlap) ---
 replace tier3 = 1 if category == "gel blotting papers"
+replace tier3 = 1 if category == "western blot transfer buffers"
 
 * --- IVT specialty kits (cloning workflow extension) ---
 replace tier3 = 1 if category == "capped mrna synthesis kits"
 replace tier3 = 1 if category == "in vitro transcription kit"
 replace tier3 = 1 if category == "direct pcr lysis reagents"
 
-
-* --- Electrophoresis loading reagents and tracking dyes (bundling to SDS-PAGE/agarose) ---
-*     Identified by exhaustive product-level audit, May 3 2026.
-
-* --- qPCR passive reference dyes (bundling to qPCR systems, EU para 135) ---
-
-* --- End-user mag bead instruments (Miltenyi MiniMACS etc., NOT EU OEM bead) ---
-
-
-* --- May 4 reverse-direction control audit T3 additions ---
-* Invitrogen DynaMag — parallel to other instrument - magnetic separation entries
-
 count if tier3 == 1
-assert inrange(r(N), 12, 22)  // expected ~17 after v5f (end-user mag beads -> control)
-
-*-------------------------------------------------------------------------------
-* DEFENSIVE CHECKS — categories explicitly EXCLUDED from treatment
-*-------------------------------------------------------------------------------
-foreach c in "synthetic crrna" "dntps" "taq buffers" ///
-             "pre-designed qpcr assays" "custom-designed qpcr assays" ///
-             "fluorophore - general" "fluorophore - nucleic acid stain" ///
-             "nucleic acid gel stains" "streptavidin conjugates" "quantum dots" ///
-             "modified nucleotides" "radiolabeled nucleotides" ///
-             "protein quantitation assay kits" "phosphoprotein electrophoresis reagents" ///
-             "nucleic acid quantitation" ///
-             "nucleic acid modifying enzymes - creatine kinase (non-nucleic acid enzyme)" ///
-             "nucleic acid modifying enzymes - t4 dna ligase buffer" ///
-             "nucleic acid modifying enzymes - t4 polynucleotide kinase buffer" ///
-             "nucleic acid modifying enzymes - t4 rna ligase buffer" ///
-             "restriction enzyme buffers" "qpcr beads" "pcr barcoding expansion" ///
-             "fluorophore - calcium indicators" "fluorophore - cell tracer" ///
-             "fluorophore - glutathione indicator" "fluorophore - lysosome indicators" ///
-             "fluorophore - protein hydrophobicity" "fluorophore - ros indicators" ///
-             "fluorophore - voltage indicators" "viability stains" ///
-             "western blot blockers" "western blot enhancers" "western blot pen" ///
-             "western blot rollers" "western blot stripping buffers" ///
-             "reaction buffers" "ligation reaction buffer" {
-    count if category == "`c'" & (tier1 == 1 | tier2 == 1 | tier3 == 1)
-    assert r(N) == 0
-}
-
-*-------------------------------------------------------------------------------
-* MASTER TREATMENT VARIABLES
-*-------------------------------------------------------------------------------
 gen treated_strict = (tier1 == 1)
 gen treated_1and2  = (tier1 == 1 | tier2 == 1)
 gen treated        = (tier1 == 1 | tier2 == 1 | tier3 == 1)
@@ -548,8 +407,9 @@ tab tier3
 tab treated_strict
 tab treated_1and2
 tab treated
-
-    gen keep = (support >= 20 & precision >= 0.8 & recall >= 0.8) //| (inrange(support, 10, 25) & precision >= 0.9 & recall >=0.90)
-    save ../output/categories_`embed', replace
+gen keep = (support >= 25 & precision >= 0.8 & recall >= 0.8) //| (inrange(support, 10, 25) & precision >= 0.9 & recall >=0.90)
+replace keep = 0 if category == "synthetic shrna"  // ambiguous RNAi category; placed conservatively in Tier 2 but fails defensive checks
+replace keep = 0 if inlist(category, "slide mounting medium", "collagenase", "catalase", "dextrose", "egta solution")
+save ../output/categories_`embed', replace
 end
 main

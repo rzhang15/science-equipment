@@ -376,11 +376,6 @@ plot_event_study <- function(match_pairs, uni_panel, spec_name, match_ratio,
   ggsave(sprintf("../output/spec_search/spec_event_study/es_r%d_%s.png", match_ratio, spec_name),
          p, width = 10, height = 4, dpi = 150)
 
-  utils::write.csv(
-    long %>% select(outcome, year, rel, estimate, std.error, conf.low, conf.high),
-    sprintf("../output/spec_search/spec_event_study/es_r%d_%s.csv", match_ratio, spec_name),
-    row.names = FALSE)
-
   invisible(long)
 }
 
@@ -490,11 +485,9 @@ specs <- list(
 
   # === Qty-heavy, NO price covariates: qty flat throughout, max post-price ===
   t29_qty_slope_qty13   = c("log_raw_qty_slope", "log_raw_qty_2013"),
-  t31_qty_slope_qty12   = c("log_raw_qty_slope", "log_raw_qty_2012"),
   t46_qty13_spend13     = c("log_raw_qty_2013", "log_raw_spend_2013"),
 
   # === Price slope (light) + qty level (heavy): pretrend anchored, flat qty ===
-  t39_alp_slope_qty12       = c("avg_log_price_slope", "log_raw_qty_2012"),
   t48_alp_slope_alp13_qty13 = c("avg_log_price_slope", "avg_log_price_2013",
                                 "log_raw_qty_2013"),
   t35_annual_alp_11_13_qty  = c("avg_log_price_2011", "avg_log_price_2012",
@@ -503,8 +496,6 @@ specs <- list(
   # === Hybrid (price + qty both matched): slopes + year-specific levels ===
   t17_price_qty_slopes_levels13 = c("avg_log_price_slope", "log_raw_qty_slope",
                                     "avg_log_price_2013", "log_raw_qty_2013"),
-  t44_price_qty_slopes_levels12 = c("avg_log_price_slope", "log_raw_qty_slope",
-                                    "avg_log_price_2012", "log_raw_qty_2012"),
 
   # === Annual price levels benchmark ===
   bench_alp_levels_11_13 = c("avg_log_price_2011", "avg_log_price_2012",
@@ -553,7 +544,10 @@ specs <- list(
 
   # === NEW 3-cov: qty slope + 2-year qty levels ===
   n25_qty_slope_qty_12_13  = c("log_raw_qty_slope", "log_raw_qty_2012",
-                               "log_raw_qty_2013")
+                               "log_raw_qty_2013"),
+
+  # === NEW 2-cov: price slope + 2013 spend level ===
+  n26_alp_slope_spend13    = c("avg_log_price_slope", "log_raw_spend_2013")
 )
 
 cat("\nTesting", length(specs), "specifications\n\n")
@@ -779,7 +773,7 @@ evaluate_spec <- function(spec_name, covariates, data_wide, panel, match_ratio) 
 results_list <- list()
 
 # Run each spec at multiple match ratios
-RATIOS <- c(1, 2, 3, 5)
+RATIOS <- c(2, 3)
 for (r in RATIOS) {
   cat(sprintf("\n========= MATCH RATIO = %d =========\n\n", r))
   for (spec_name in names(specs)) {

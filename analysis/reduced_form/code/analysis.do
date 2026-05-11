@@ -16,7 +16,7 @@ program main
         // r1 + r2 + public
         restrict_samp, samp(`s') r1r2(1) public(1)
         event_study, samp(`s') r1r2(1) public(1)
-        combine_es_graphs
+        combine_es_graphs, samp(`s')
       /*  // r1 + r2
         restrict_samp, samp(`s') r1r2(1) public(0)
         event_study, samp(`s') r1r2(1) public(0)
@@ -34,14 +34,13 @@ program restrict_samp
     use ../external/samp/athr_panel_full_year_last_`samp'`suf',clear 
 
     bys athr_id: egen min_year = min(year)
-    gen age = 2026-min_year + 35 
-    keep if min_year <= 2013
+    keep if min_year < 2013
     keep if inrange(year, 2009, 2019)
     merge m:1 athr_id using ../temp/exposure, assert(1 2 3) keep(3) nogen
     merge m:1 athr_id using ../external/real_exposure/athr_exposure, assert(1 2 3) keep(1 3) nogen
     replace imputed = exposure if !mi(exposure)
-    drop if exposure < 0
-    drop if imputed < 0
+    drop if exposure <= 0
+    drop if imputed <= 0
     sum exposure , d 
     local mean : di %4.3f r(mean) 
     local sd: di %4.3f r(sd) 
@@ -58,9 +57,9 @@ program restrict_samp
     local imputed_p75: di %4.3f r(p75)
     local imputed_max: di %4.3f  r(max) 
     local imputed_min: di %4.3f r(min) 
-    tw kdensity exposure || kdensity imputed, xtitle("Exposure Measure", size(small)) ytitle("Density", size(small)) ///
-        ylab(, labsize(vsmall)) xlab(#15, labsize(vsmall)) ///
-        legend(on label(1 "FOIA PI Observed Exposure (mean = `mean', sd = `sd')") label(2 "Imputed Exposure (mean = `imputed_mean', sd = `imputed_sd')") pos(1) ring(0) size(vsmall))
+    tw kdensity exposure || kdensity imputed, xtitle("Exposure Measure") ytitle("Density") ///
+        xlab(#15) ///
+        legend(on label(1 "FOIA PI Observed Exposure (mean = `mean', sd = `sd')") label(2 "Imputed Exposure (mean = `imputed_mean', sd = `imputed_sd')") pos(1) ring(0) size(small))
     graph export ../output/figures/`samp'/exposure_dist`suf'.pdf, replace
     drop exposure
     rename imputed exposure
@@ -72,22 +71,27 @@ program restrict_samp
     bys athr_id: gen num_yrs = _N
     bys athr_id inst_id: gen plc_cntr = _n == 1
     bys athr_id : egen num_place = total(plc_cntr)
-    keep if num_yrs != 1
-    keep if num_place == 1
+    keep if num_yrs > 1
+    drop if exposure <= 0
     gegen athr = group(athr_id)
     xtset athr year
     tsfill
     hashsort athr year
-    foreach var in athr_id exposure q1 q2 q3 q4 median {
+    foreach var in athr_id exposure q1 q2 q3 q4 median  inst_id inst msa_comb msa_c_world min_year {
         by athr: replace `var' = `var'[_n-1] if mi(`var')    
     }
-    foreach var in cite_affl_wt ppr_cnt {
+    foreach var in cite_affl_wt ppr_cnt body_affl_wt  {
         replace `var' = 0 if mi(`var')    
     }
+    bys athr_id: egen tot_pprs = total(ppr_cnt)
+    drop if tot_pprs < 7 
+    gen age = 2026-min_year + 30 
     gen above_median = exposure >= `imputed_p50'
     gen below_median = exposure < `imputed_p50'
-    gen young = age < 50
-    gen old = age >= 50
+    sum age, d
+    local med = r(p50)
+    gen young = age < `med'
+    gen old = age >= `med'
     gen r1 = type == "r1" 
     gen r2 = type == "r2" 
     merge 1:1 athr_id year using ../external/coathrs/avg_coathrs, keep(1 3) assert(1 2 3) nogen
@@ -176,10 +180,10 @@ program event_study
         tw rcap ub lb rel if rel != -1 , lcolor(ebblue%70) msize(vsmall) || ///
           scatter b rel, mcolor(ebblue) || ///
           scatteri `ymax' -0.25 `ymax' 0.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
-          xlab(-5(1)5, labsize(vsmall)) xtitle("Relative Year", size(small)) ///
-          ytitle("`var_name'", size(small)) ylab(`ymin'(`gap')`ymax', labsize(vsmall)) ///
+          xlab(-5(1)5) xtitle("Relative Year") ///
+          ytitle("`var_name'") ylab(`ymin'(`gap')`ymax') ///
           yline(0, lcolor(gs10) lpattern(solid)) ///
-          legend(on order(- "Pre-Period Avg : `pre_mean'") pos(7) ring(1) rows(2) bmargin(zero)) plotregion(margin(sides))
+          legend(on order(- "Pre-Period Avg : `pre_mean'") pos(7) ring(1) rows(2) bmargin(zero) size(small)) plotregion(margin(sides))
         graph export ../output/figures/`samp'/es_`yvar'`suf'.pdf, replace
         save ../temp/es_`yvar', replace
         restore
@@ -214,8 +218,8 @@ program event_study
         tw rcap ub lb rel if rel != -1 , lcolor(ebblue%70) msize(vsmall) || ///
           scatter b rel, mcolor(ebblue) || ///
         scatteri 1 -0.25 1 0.25 , bcolor(gs12%10) recast(area) base(-1) ///
-          xlab(-5(1)5, labsize(vsmall)) xtitle("Relative Year", size(small)) ///
-          ytitle("`var_name'", size(small)) ylab(-1(.2)1, labsize(vsmall)) ///
+          xlab(-5(1)5) xtitle("Relative Year") ///
+          ytitle("`var_name'") ylab(-1(.2)1, labsize(vsmall)) ///
           yline(0, lcolor(gs10) lpattern(solid))  legend(off) plotregion(margin(sides))
         graph export ../output/figures/`samp'/es_ln_`yvar'`suf'.pdf, replace
         save ../temp/es_ln_`yvar', replace
@@ -254,9 +258,9 @@ program event_study
             tw rcap ub lb rel if rel != -1 , lcolor(ebblue%70) msize(vsmall) || ///
               scatter b rel, mcolor(ebblue) || ///
             scatteri `ymax' -0.25 `ymax' 0.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
-              xlab(-5(1)5, labsize(vsmall)) xtitle("Relative Year", size(small)) ///
-              ytitle("`var_name'", size(small)) ylab(`ymin'(`gap')`ymax', labsize(vsmall)) ///
-              legend(on order(- "Pre-Period Avg : `pre_mean'") pos(7) ring(1) rows(2) bmargin(zero)) /// 
+              xlab(-5(1)5) xtitle("Relative Year") ///
+              ytitle("`var_name'") ylab(`ymin'(`gap')`ymax') ///
+              legend(on order(- "Pre-Period Avg : `pre_mean'") pos(7) ring(1) rows(2) bmargin(zero) size(small)) /// 
               yline(0, lcolor(gs10) lpattern(solid)) plotregion(margin(sides))
             graph export ../output/figures/`samp'/es_`yvar'`suf'_`cond'.pdf, replace
             save ../temp/es_`yvar'`suf'_`cond', replace
@@ -294,8 +298,8 @@ program event_study
             tw rcap ub lb rel if rel != -1 , lcolor(ebblue%70) msize(vsmall) || ///
               scatter b rel, mcolor(ebblue) || ///
             scatteri `ymax' -0.25 `ymax' 0.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
-              xlab(-5(1)5, labsize(vsmall)) xtitle("Relative Year", size(small)) ///
-              ytitle("`var_name'", size(small)) ylab(`ymin'(`gap')`ymax', labsize(vsmall)) ///
+              xlab(-5(1)5) xtitle("Relative Year") ///
+              ytitle("`var_name'") ylab(`ymin'(`gap')`ymax') ///
               yline(0, lcolor(gs10) lpattern(solid)) legend(off) plotregion(margin(sides))
             graph export ../output/figures/`samp'/es_`yvar'_q`i'`suf'.pdf, replace
             save ../temp/es_`yvar'_q`i', replace
@@ -305,6 +309,7 @@ program event_study
 end
 
 program combine_es_graphs
+    syntax, samp(str)
     foreach yvar in cite_affl_wt ppr_cnt ln_cite_affl_wt ln_ppr_cnt body_affl_wt avg_num_coathrs {
         if "`yvar'" == "cite_affl_wt" local var_name = "Citation Weighted Output" 
         if "`yvar'" == "cite_affl_wt" local gap  1 
@@ -341,10 +346,10 @@ program combine_es_graphs
            scatter b rel if group == "q3", mcolor(green%70) msymbol(smdiamond) msize(small)|| ///  
            rcap ub lb rel if rel != -.95 & group == "q4",  lcolor(cranberry%70) msize(small) || ///     
            scatter b rel if group == "q4", mcolor(red%70) msymbol(smdiamond) msize(small)  ///  
-           xlab(-5(1)5, labsize(small)) ylab(#8, labsize(vsmall)) ///                         
+           xlab(-5(1)5) ylab(#8) ///                         
               yline(0, lcolor(black) lpattern(solid)) ///                                               
-              legend(on order(2 "Q1 Exposed (Post Period Avg: `q1_mean')" 4 "Q2 Exposed (Post Period Avg: `q2_mean')" 6 "Q3 Exposed (Post Period Avg: `q3_mean')" 8 "Q4 Exposed (Post Period Avg: `q4_mean')") pos(7) ring(1) size(small) region(fcolor(none))) xtitle("Relative Year", size(small)) ytitle("`var_name'", size(small)) plotregion(margin(sides))
-        graph export ../output/figures/`samp'/es_`yvar'_split`suf'.pdf, replace     
+              legend(on order(2 "Q1 Exposed (Post Period Avg: `q1_mean')" 4 "Q2 Exposed (Post Period Avg: `q2_mean')" 6 "Q3 Exposed (Post Period Avg: `q3_mean')" 8 "Q4 Exposed (Post Period Avg: `q4_mean')") pos(7) ring(1) size(small) region(fcolor(none))) xtitle("Relative Year") ytitle("`var_name'") plotregion(margin(sides))
+        graph export ../output/figures/`samp'/es_`yvar'_split`suf'_`samp'.pdf, replace     
 
         use "../temp/es_`yvar'_r1_r2_public_below_median", replace                                         
         gen group = "below"                                                                             
@@ -355,14 +360,33 @@ program combine_es_graphs
         replace group = "above" if mi(group)                                                            
         sum b if group == "above" & rel > 0                                                             
         local above_mean : dis %4.3f r(mean)                                                            
-        tw rcap ub lb rel if rel != -1.1 & group == "below",  lcolor(lavender%70) msize(small) || ///   
-           scatter b rel if group == "below", mcolor(lavender%70) msize(small) || ///                   
-           rcap ub lb rel if rel != -1 & group == "above",  lcolor(dkorange%70) msize(small) || ///     
-           scatter b rel if group == "above", mcolor(dkorange%70) msymbol(smdiamond) msize(small)  ///  
-           xlab(-5(1)5, labsize(small)) ylab(#8, labsize(small)) ///                         
+        tw rcap ub lb rel if rel != -1.1 & group == "below",  lcolor(lavender%60) msize(small) || ///   
+           scatter b rel if group == "below", mcolor(lavender%60) msize(small) || ///                   
+           rcap ub lb rel if rel != -1 & group == "above",  lcolor(dkorange) msize(small) || ///     
+           scatter b rel if group == "above", mcolor(dkorange) msymbol(smdiamond) msize(small)  ///  
+           xlab(-5(1)5) ylab(#8) ///                         
               yline(0, lcolor(black) lpattern(solid)) ///                                               
-              legend(on order(2 "Below Median Exposure (Post Period Avg: `below_mean')" 4 "Above Median Exposure (Post Period Avg: `above_mean')" ) pos(11) ring(0) size(small) region(fcolor(none))) xtitle("Relative Year", size(small)) ytitle("`var_name'", size(small)) plotregion(margin(sides))
-        graph export ../output/figures/`samp'/es_`yvar'_split`suf'.pdf, replace     
+              legend(on order(2 "Below Median Exposure (Post Period Avg: `below_mean')" 4 "Above Median Exposure (Post Period Avg: `above_mean')" ) pos(7) ring(1) size(small) region(fcolor(none))) xtitle("Relative Year") ytitle("`var_name'") plotregion(margin(sides))
+        graph export ../output/figures/`samp'/es_`yvar'_split`suf'_`samp'.pdf, replace     
+        
+        use "../temp/es_`yvar'_r1_r2_public_young", replace                                         
+        gen group = "young"                                                                             
+        replace rel = rel - 0.1                                                                         
+        sum b if group == "young" & rel > 0                                                             
+        local young_mean : dis %4.3f r(mean)                                                            
+        append using ../temp/es_`yvar'_r1_r2_public_old
+        replace group = "old" if mi(group)                                                            
+
+        sum b if group == "old" & rel > 0                                                             
+        local old_mean : dis %4.3f r(mean)                                                            
+        tw rcap ub lb rel if rel != -1.1 & group == "young",  lcolor(lavender%60) msize(small) || ///   
+           scatter b rel if group == "young", mcolor(lavender%60) msize(small) || ///                   
+           rcap ub lb rel if rel != -1 & group == "old",  lcolor(dkorange) msize(small) || ///     
+           scatter b rel if group == "old", mcolor(dkorange) msymbol(smdiamond) msize(small)  ///  
+           xlab(-5(1)5) ylab(#8) ///                         
+              yline(0, lcolor(black) lpattern(solid)) ///                                               
+              legend(on order(2 "Below Median Age (Post Period Avg: `young_mean')" 4 "Above Median Age (Post Period Avg: `old_mean')" ) pos(7) ring(1) size(small) region(fcolor(none))) xtitle("Relative Year") ytitle("`var_name'") plotregion(margin(sides))
+        graph export ../output/figures/`samp'/es_`yvar'_age_split`suf'_`samp'.pdf, replace     
     }
 end
 
