@@ -6,11 +6,11 @@ import seaborn as sns
 from sklearn.metrics import r2_score
 
 # --- CONFIGURATION ---
-WEIGHTS_FILE = "../output/validation_weights_k50.npz"
-UNIVERSE_IDS_FILE = "../output/universe_ids.parquet"
-FOIA_IDS_FILE = "../output/foia_ids_ordered.csv"
-USER_EXPOSURE_FILE = "../external/exposure_wts/athr_exposure.dta"
-VALIDATION_PLOT_FILE = "../output/validation_plot.png"
+WEIGHTS_FILE = "../../output/validation_weights_k50.npz"
+UNIVERSE_IDS_FILE = "../../output/universe_ids.parquet"
+FOIA_IDS_FILE = "../../output/foia_ids_ordered.csv"
+USER_EXPOSURE_FILE = "../../external/exposure_wts/athr_exposure.dta"
+VALIDATION_PLOT_FILE = "../../output/validation_plot.png"
 
 def validate_imputation():
     print("--- Starting Leave-One-Out Validation ---")

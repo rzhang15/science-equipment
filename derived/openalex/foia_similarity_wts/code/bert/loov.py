@@ -20,13 +20,15 @@ def main():
                         help="Model tag matching gen_validation_wts_bert.py output.")
     parser.add_argument("--source-k", type=int, default=50,
                         help="K used when building validation_weights (cap on neighbors available).")
+    parser.add_argument("--tag-suffix", default="",
+                        help="Appended to model tag so variants don't clobber each other.")
     args = parser.parse_args()
 
-    tag = args.model.replace("/", "_")
-    weights_file = f"../output/validation_weights_bert_{tag}_k{args.source_k}.npz"
-    foia_ids_file = f"../output/foia_ids_ordered_bert_{tag}.csv"
-    exposure_file = "../external/exposure_wts/athr_exposure.dta"
-    plot_file = f"../output/validation_plot_bert_{tag}.png"
+    tag = args.model.replace("/", "_") + args.tag_suffix
+    weights_file = f"../../output/validation_weights_bert_{tag}_k{args.source_k}.npz"
+    foia_ids_file = f"../../output/foia_ids_ordered_bert_{tag}.csv"
+    exposure_file = "../../external/exposure_wts/athr_exposure.dta"
+    plot_file = f"../../output/validation_plot_bert_{tag}.png"
 
     print("--- BERT LOOV ---")
     W = scipy.sparse.load_npz(weights_file).toarray()  # (n_foia, n_foia)
@@ -71,7 +73,7 @@ def main():
     plt.figure(figsize=(8, 6))
     sns.regplot(x=best_pred, y=E_actual,
                 scatter_kws={"alpha": 0.6}, line_kws={"color": "red"})
-    plt.title(f"BERT LOOV ({args.model}, K={best_k})\nr={best_r:.3f}, R²={best_r2:.3f}, N={n}")
+    plt.title(f"BERT LOOV ({tag}, K={best_k})\nr={best_r:.3f}, R²={best_r2:.3f}, N={n}")
     plt.xlabel("Imputed Exposure (BERT cosine)")
     plt.ylabel("Actual Exposure")
     plt.grid(True, linestyle="--", alpha=0.5)

@@ -93,6 +93,40 @@ program clean_raw
           "mortar" "pestle" "support" "trays" "applicators and swabs" "bundle" "sequencing" "tem - " "nonlab" {
             drop if strpos(category, "`v'") > 0
         }
+
+        // === CATEGORY-SPECIFIC ANTI-KEYWORD DROPS ===
+        // TF-IDF classifier mis-routes items that share substring tokens with the
+        // category name but are obviously different products. These drops were
+        // validated by checking that the within-category sd of yoy log-price
+        // changes drops materially (>10%) without dropping real items.
+
+        // carbon dioxide: bone marrow stem cells, surgical bone grafts, anatomical
+        // skulls, ostase (bone-specific alk phos), decalcification stains
+        foreach v in "bone " "marrow" "skull" "stem cell" "graft tiss" "ostase" "decalcified" "mesenchymal" "mscs" {
+            drop if category == "carbon dioxide" & strpos(clean_desc, "`v'") > 0
+        }
+        // direct pcr lysis reagents: construction primer, paint primer, surgical needles
+        foreach v in "plaster" "primer c-" "gallon pail" "catheter" "butterfly needle" "infusion" "5# pail" {
+            drop if category == "direct pcr lysis reagents" & strpos(clean_desc, "`v'") > 0
+        }
+        // chromatography paper: paper plates (food service), bench protector paper, bundled stripette orders
+        foreach v in "paper plate" "ppr plt" "bench prot" "laycoat" {
+            drop if category == "chromatography paper" & strpos(clean_desc, "`v'") > 0
+        }
+        // rifampicin: rifaximin is a different (related) antibiotic
+        drop if category == "bacterial selection antibiotics - rifampicin" & strpos(clean_desc, "rifaximin") > 0
+        // storage jars: jarid (antibody caught on "jar"), drierite (desiccant), pigments (paint), antibodies
+        foreach v in "jarid" "drierite" "pigment" "anitbody" "antibody" {
+            drop if category == "storage jars" & strpos(clean_desc, "`v'") > 0
+        }
+        // rectangular carboys: bundled non-carboy orders (gas cylinder accessories, cleaning bundles)
+        foreach v in "gas cylinder support" "sparkleen" "stylus" "pen light" {
+            drop if category == "rectangular carboys" & strpos(clean_desc, "`v'") > 0
+        }
+        // zeocin: phleomycin (precursor antibiotic, sold separately), gentamicin, expression plasmids
+        foreach v in "phleomycin" "expression plasmid" "gentamicin" "resistance gene" {
+            drop if category == "cell culture antibiotics - zeocin" & strpos(clean_desc, "`v'") > 0
+        }
     }
     qui count
     local total_obs = r(N)
@@ -213,23 +247,23 @@ program clean_raw
     di "[Balance Cat-years] N: `total_obs' Total Spend: `total_spend'"
     qui sum raw_spend 
     local tot_spend = r(sum)
-    qui sum raw_spend if keep == 1
+    qui sum raw_spend if keep == 1 | (bad_control == 1 & support >= 25 & precision >=0.8 & recall >=0.8)
     di "Total spend in matched categories: " r(sum) " out of " `tot_spend' " (" string(r(sum)/`tot_spend'*100) "%)"
-    qui sum raw_spend if keep == 1 & tier3 == 0
-    di "Total spend in matched categories minus tier3: " r(sum) " out of " `tot_spend' " (" string(r(sum)/`tot_spend'*100) "%)"
     qui count
     local tot_obs = r(N)
-    qui count if keep  == 1
+    qui count if keep  == 1 | (bad_control == 1 & support >= 25 & precision >=0.8 & recall >=0.8)
     di "Total observations in matched categories: " r(N) " out of " `tot_obs' " (" string(r(N)/`tot_obs'*100) "%)"
-    qui count if keep  == 1 & tier3 == 0
-    di "Total observations in matched categories minus tier3: " r(N) " out of " `tot_obs' " (" string(r(N)/`tot_obs'*100) "%)"
+    bys category year: egen min_raw_price = min(raw_price)
+    bys category year: egen max_raw_price = max(raw_price)
+    bys category year: egen sd_raw_price = sd(raw_price)
+    gen range_raw_price = max_raw_price - min_raw_price
     save ../output/full_item_level_`embed', replace
 end
 
 program make_panels
     syntax, embed(string)
     use ../output/full_item_level_`embed', clear
-    collapse (mean) spend_2013 obs_2013 uni_spend_2013 uni_obs_2013 recall precision support treated tier1 tier2 tier3 keep item_price = raw_price avg_log_price = price avg_log_spend = spend avg_log_qty = qty (sum) raw_spend raw_qty obs_cnt (firstnm) mkt agencyname, by(category year uni_id)
+    collapse (mean) min_raw_price max_raw_price sd_raw_price range_raw_price obs_2013 uni_spend_2013 uni_obs_2013 recall precision support treated tier1 tier2 tier3 keep item_price = raw_price avg_log_price = price avg_log_spend = spend avg_log_qty = qty (sum) raw_spend raw_qty obs_cnt (firstnm) mkt agencyname, by(category year uni_id)
     gen raw_price = raw_spend/raw_qty
     gen log_raw_price = ln(raw_price)
     gen log_raw_qty = ln(raw_qty)
@@ -237,7 +271,7 @@ program make_panels
     save ../output/full_uni_category_yr_`embed', replace
 
     use ../output/full_item_level_`embed', clear
-    collapse (max) treated (mean) precision recall support tier1 tier2 tier3 keep spend_2013 obs_2013 uni_spend_2013 uni_obs_2013 item_price = raw_price avg_log_price = price avg_log_spend = spend avg_log_qty = qty (firstnm) mkt (sum) raw_spend raw_qty obs_cnt , by(category year)
+    collapse (max) treated (mean) min_raw_price max_raw_price sd_raw_price range_raw_price precision recall support tier1 tier2 tier3 keep spend_2013 obs_2013 uni_spend_2013 uni_obs_2013 item_price = raw_price avg_log_price = price avg_log_spend = spend avg_log_qty = qty (firstnm) mkt (sum) raw_spend raw_qty obs_cnt , by(category year)
     gen raw_price = raw_spend/raw_qty
     gen log_raw_spend = ln(raw_spend)
     gen log_raw_qty = ln(raw_qty)
@@ -267,6 +301,9 @@ program make_panels
     bys category pre_period (thermo): replace thermo = thermo[_n-1] if mi(thermo)
     gen simulated_hhi = 2 * life_tech * thermo if pre_period == 1
     bys category (simulated_hhi): replace simulated_hhi = simulated_hhi[_n-1] if mi(simulated_hhi) & pre_period == 0
+    replace suppliername = "thermo fisher scientific" if suppliername == "life technologies" & pre_period == 0 
+    drop mkt_shr
+    gen mkt_shr = raw_spend/total_spend * 100
     replace mkt_shr = mkt_shr * mkt_shr
     gcollapse (sum) obs_cnt hhi = mkt_shr (firstnm) simulated_hhi treated mkt, by(category pre_period)
     hashsort category -pre_period
@@ -281,7 +318,7 @@ program make_panels
 
 
     preserve
-    collapse (max) treated (sum) raw_spend raw_qty obs_cnt (mean) spend_2013 obs_2013 precision recall support tier1 tier2 tier3 item_price = raw_price avg_log_price = price avg_log_spend = spend avg_log_qty = qty (firstnm) agencyname mkt , by(uni_id category year)
+    collapse (max) treated (sum) raw_spend raw_qty obs_cnt (mean) min_raw_price max_raw_price sd_raw_price range_raw_price spend_2013 obs_2013 precision recall support tier1 tier2 tier3 item_price = raw_price avg_log_price = price avg_log_spend = spend avg_log_qty = qty (firstnm) agencyname mkt , by(uni_id category year)
     gen raw_price = raw_spend/raw_qty
     gen log_raw_spend = ln(raw_spend)
     gen log_raw_qty = ln(raw_qty)
@@ -289,7 +326,7 @@ program make_panels
     save ../output/uni_category_yr_`embed', replace
     restore
 
-    collapse (max) treated (mean) precision recall support tier1 tier2 tier3 spend_2013 obs_2013 uni_spend_2013 uni_obs_2013 item_price = raw_price avg_log_price = price avg_log_spend = spend avg_log_qty = qty (firstnm) mkt (sum) raw_spend raw_qty obs_cnt , by(category year)
+    collapse (max) treated (mean) min_raw_price max_raw_price sd_raw_price range_raw_price precision recall support tier1 tier2 tier3 spend_2013 obs_2013 uni_spend_2013 uni_obs_2013 item_price = raw_price avg_log_price = price avg_log_spend = spend avg_log_qty = qty (firstnm) mkt (sum) raw_spend raw_qty obs_cnt , by(category year)
     gen raw_price = raw_spend/raw_qty
     gen log_raw_spend = ln(raw_spend)
     gen log_raw_qty = ln(raw_qty)

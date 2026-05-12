@@ -1,0 +1,1346 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       SE—Standard Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. Maximum number of variables is set to 32,767; see help set_maxvar.
+
+. do peek2.do 
+
+. set more off
+
+. use category year product_desc clean_desc price qty similarity_score ///
+>     using /n/home02/cxu75/sci_eq/derived/first_stage/make_mkt_panel/output/fu
+> ll_item_level_tfidf.dta if ///
+>     inlist(category, "cell culture antibiotics - zeocin", "direct pcr lysis r
+> eagents", "colorimetric substrates - dab", "crystallizing dishes", "lds sampl
+> e buffer", "rectangular carboys"), clear
+
+. keep if inrange(year, 2010, 2018)
+(237 observations deleted)
+
+. rename price log_price
+
+. bysort category: egen med_lp = median(log_price)
+
+. bysort category: egen p25_lp = pctile(log_price), p(25)
+
+. bysort category: egen p75_lp = pctile(log_price), p(75)
+
+. gen iqr_lp = p75_lp - p25_lp
+
+. gen abs_dev = abs(log_price - med_lp)
+
+. gen outlier = abs_dev > 2 * iqr_lp & iqr_lp > 0
+
+. gen low_sim = similarity_score < 0.30
+
+. gen suspect = outlier | low_sim
+
+. keep if suspect == 1
+(1,178 observations deleted)
+
+. 
+. * Show one example per unique product_desc per category
+. bysort category product_desc: keep if _n == 1
+(90 observations deleted)
+
+. format similarity_score log_price %5.2f
+
+. gen reason = cond(low_sim==1 & outlier==1, "BOTH", cond(low_sim==1, "LOW_SIM"
+> , "OUTLIER"))
+
+. sort category similarity_score
+
+. list category similarity_score log_price reason product_desc, sep(0) noobs st
+> ring(75)
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |  cell culture antibiotics - zeocin  |      0.17  |      3.50  |     BOTH  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | zeocint 100 mg/ml in hepes 1ml                                            |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |  cell culture antibiotics - zeocin  |      0.27  |      5.65  |  LOW_SIM  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | PHLEOMYCIN                                                                |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |  cell culture antibiotics - zeocin  |      0.74  |      3.68  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | zeocin 100 mg/ml in hepes sterile-fi 1ml                                  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |  cell culture antibiotics - zeocin  |      0.76  |      3.95  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | gentamicin (50 mg/ml) zeocin selection reagent                            |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |  cell culture antibiotics - zeocin  |      0.83  |      6.07  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | expression plasmid with gfp::zeocin resistance gene fusion                |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |  cell culture antibiotics - zeocin  |      0.84  |      6.17  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | r25001-zeocin selection antibiotic (100 mg/ml)                            |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |  cell culture antibiotics - zeocin  |      0.86  |      6.78  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | zeocin selection antibiotic (100 mg/ml)                                   |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |  cell culture antibiotics - zeocin  |      0.87  |      6.78  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | catalog #r250-05, zeocin selection antibiotic, 50ml                       |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |  cell culture antibiotics - zeocin  |      0.91  |      6.45  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | anti-zn-5p, zeocin powder, 5g                                             |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |  cell culture antibiotics - zeocin  |      0.91  |      6.45  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | zeocin? (ant-zn-5p), 5g (powder)                                          |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |  cell culture antibiotics - zeocin  |      0.92  |      4.09  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | zeocin 100mg/ml solution 100mg                                            |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |  cell culture antibiotics - zeocin  |      0.92  |      6.49  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | zeocin? (powder) (ant-zn-5p)                                              |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |  cell culture antibiotics - zeocin  |      0.93  |      4.94  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | zeocin (solution) 500 mg (5 x 1ml)                                        |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |  cell culture antibiotics - zeocin  |      0.93  |      6.45  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | zeocin (powder) 5 gm                                                      |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |  cell culture antibiotics - zeocin  |      0.94  |      6.45  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | zeocin? (powder), 5g                                                      |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |  cell culture antibiotics - zeocin  |      0.94  |      6.45  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | zeocin? (powder), 5 g                                                     |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |  cell culture antibiotics - zeocin  |      0.94  |      6.45  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | zeocin (powder) 5g                                                        |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |  cell culture antibiotics - zeocin  |      0.94  |      6.45  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | zeocin, powder, 5g                                                        |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |  cell culture antibiotics - zeocin  |      0.95  |      3.56  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | zeocin? selection reagent                                                 |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |  cell culture antibiotics - zeocin  |      0.95  |      6.71  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | r25005-zeocin                                                             |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |  cell culture antibiotics - zeocin  |      0.95  |      6.45  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | zeocin (powder)                                                           |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |  cell culture antibiotics - zeocin  |      0.96  |      4.39  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | zeocin tm                                                                 |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |  cell culture antibiotics - zeocin  |      0.96  |      4.86  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | zeocin selection reagent                                                  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |  cell culture antibiotics - zeocin  |      0.97  |      4.14  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | ZEOCIN TM                                                                 |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |  cell culture antibiotics - zeocin  |      0.97  |      6.75  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | zeocin                                                                    |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.01  |      3.40  |     BOTH  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | Catalog # SC-209686 - 3,3'-Diaminobenzidine tetrahydrochloride, 1g        |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.20  |      5.91  |     BOTH  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | ab111574 mcl1 ser 159 active act                                          |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.25  |      4.08  |  LOW_SIM  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | 32750-5g-f ~ 3,3"-diaminobenzidine tetrahydrochloride hydrate (5g)        |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.26  |      4.34  |  LOW_SIM  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | d5637-5g 3-3'-diaminobenzidine tetrahydrochloride hydrate                 |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.27  |      5.18  |  LOW_SIM  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | d4293-50set-sigmafast(tm) 3 3'-diaminobenzidine ta                        |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.27  |      3.29  |     BOTH  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | 3 3 -DIAMINOBENZIDINE 5GR                                                 |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.28  |      3.76  |     BOTH  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | 3,3' -DIAMINOBENZIDINE T 5GR                                              |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.28  |      3.36  |     BOTH  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | d5637-1g-3,3'-diaminobenzidine tetrahydrochloride                         |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.28  |      5.37  |  LOW_SIM  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | geranylgeranylacetone, geranylgeranylacetone 3,3'-diaminobenzidine tetr.. |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.29  |      5.06  |  LOW_SIM  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | d4293-50set-sigmafasttm 3,3'-diaminobenzidine tabl                        |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.29  |      3.60  |     BOTH  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | 3,3'-DIAMINOBENZIDINE, 99%, 3,3'-DIAMINOBENZIDINE, 99%                    |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.29  |      3.95  |     BOTH  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | 3,3'-DIAMINOBENZIDINE TETRAHYDROCHLORID&amp;, 3,3'-DIAMINOBENZIDINE TET.. |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.29  |      4.05  |  LOW_SIM  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | 3,3'-DIAMINOBENZIDINE TETRAHYDROCHLORID&, 3,3'-DIAMINOBENZIDINE TETRAHY.. |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.54  |      3.57  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | potassium bromide xtra pure, dab, ph. eu, potassium bromide xtra pure, .. |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.59  |      3.71  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | sulfur extra pure, dab, b. p., ph. franc, sulfur extra pure, dab, b. p... |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.60  |      4.04  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | benzyl alcohol extra pure, dab, ph. eur., benzyl alcohol extra pure, da.. |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.63  |      6.31  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | doublestain ihc kit: r amp;rt on human/mouse tissue (dab amp; ap/red), .. |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.63  |      3.84  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | dl(+-)-camphor racemic, dab, ph. eur., b, dl(+-)-camphor racemic, dab, .. |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.64  |      6.51  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | ultramap dab-ms/rb)-ihc staining of tissue microar                        |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.64  |      3.32  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | 15604-250g-urea extra pure, dab, ph. eur., b. p.,                         |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.64  |      3.72  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | (-)-menthol extra pure, dab, ph. eur., b, (-)-menthol extra pure, dab, .. |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.66  |      3.34  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | sigma fast dab with metal enhancer, tru&                                  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.66  |      3.50  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | sigma fast dab with metal enhancer, tru amp;, sigma fast dab with metal.. |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.66  |      3.43  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | sigma fast dab with metal enhancer, tru&, sigma fast dab with metal enh.. |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.69  |      3.41  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | d0426 sigma fast dab with metal enhancer-                                 |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.70  |      3.56  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | d0426-5set-sigmafast(tm) dab with metal enhancer t                        |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.71  |      4.00  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | dab sbstr kit biotinylated anti mouse i 1.5mg biotinyl. anti-rabb         |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.71  |      5.84  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | vector mouse on mse kit peroxidase substrate kit (dab)                    |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.72  |      3.34  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | sigmafast? dab with metal enhancer , product number d0426-5set            |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.72  |      6.99  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | envision dual link hrp dab+,for immunohistochemistry                      |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.72  |      6.51  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | ultramap dab-ms/rb)-antibody optimization using th                        |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.73  |      6.85  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | envision(tm) g|2 doublestain system,rb/mo (dab+/permanent red)quote #90.. |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.73  |      3.38  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | dab enhancer                                                              |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.73  |      6.97  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | envision g/2 doublestain system, rb/mo (dab+/permanent red) for immunoh.. |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.74  |      6.99  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | envision dual link hrp dab+,                                              |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.74  |      7.04  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | k4006 envision+ kits, hrp. mouse (dab+), 150 tests                        |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.74  |      6.99  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | envision dual link hrp dab+                                               |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.75  |      6.21  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | sk-4105-immpact dab peroxidase (hrp) substrate                            |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.75  |      6.97  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | envision g/2 doublestain system, rb/mo (dab+/permanent red)               |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.75  |      5.72  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | sk-4100-dab peroxidase (hrp) substrate kit (with n                        |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.75  |      4.03  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | dab tetrahydrochloride hydrate 10g                                        |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.76  |      5.74  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | peroxidase substrate kit (dab)                                            |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.78  |      6.04  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | uv one hrp dab pls 75-150/ea                                              |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.79  |      5.76  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | tl015hdj-uv one hrp dab pls 75-150/ea                                     |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.79  |      7.12  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | kit hrp dab mouse 1100tsts                                                |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.79  |      3.74  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | he signalstain? dab substrate kit                                         |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.79  |      4.04  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | 71897 ihc select? dab chromogen a closed clo                              |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.80  |      6.45  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | sigma fast dab                                                            |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.81  |      5.87  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | histostain-plus mouse-dab                                                 |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.81  |      5.93  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | 879551-histomouse-max kit, dab, broad spectrum                            |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.82  |      5.80  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | histostain-plus ihc kit, dab, mouse                                       |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.82  |      5.87  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | 482830dk-tacs-xl - dab 30 tests                                           |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.82  |      3.58  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | 3-3" diaminobenzidine (dab) 50                                            |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.83  |      6.49  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | sigmafast dab (5ml) 5x50set                                               |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.84  |      5.72  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | rutin, dab 500gr                                                          |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.84  |      5.75  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | betazoid dab chromogen 100ml                                              |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.86  |      5.77  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | quanto dab chromogen for ihc                                              |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.86  |      3.90  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | item no. hl35020685 smack dab in the middle i pack arr. meader            |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.86  |      3.49  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | vaseline white, dab, vaseline white, dab                                  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.87  |      6.21  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | dab kit (brown)                                                           |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.88  |      5.84  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | sk-4105-immpact dab                                                       |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.88  |      5.88  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | d5905 dab                                                                 |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.88  |      5.76  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | dab dection kit                                                           |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |      colorimetric substrates - dab  |      0.89  |      4.00  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | dab sbstr kit                                                             |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |               crystallizing dishes  |      0.54  |      3.04  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | collodial silica suspension, 0.05 micron, non-crystallizing, 16 oz (480.. |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |               crystallizing dishes  |      0.69  |      2.21  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | dishes, crystallizing                                                     |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |               crystallizing dishes  |      0.83  |      2.03  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | ff crystallizing dish                                                     |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |               crystallizing dishes  |      0.83  |      3.09  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | crystallizing dish volume capacity 42ml package quantity 12               |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |               crystallizing dishes  |      0.84  |      1.31  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | 115-28207 crystallizing dish w/spout, 350ml, 50mmh x 100mmd               |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |               crystallizing dishes  |      0.84  |      1.31  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | crystallizing dish w/spout, 350ml, 50mmh x 100mmd                         |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |               crystallizing dishes  |      0.86  |      2.18  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | glass6108 - 2 50x35mm crystallizing dish                                  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |               crystallizing dishes  |      0.90  |      2.24  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | vact tb k2edta 13x100 6ml c/pk dish crystallizing 190mm 2/pk              |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |               crystallizing dishes  |      0.93  |      2.40  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | d290700:::dish- crystallizing- 500ml active act                           |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |               crystallizing dishes  |      0.93  |      2.11  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | d290170:::dish- crystallizing- 150ml active act                           |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |               crystallizing dishes  |      0.93  |      2.79  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | d291200:::dish- crystallizing- 900ml active act                           |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |               crystallizing dishes  |      0.93  |      3.09  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | cg-8276-p125-dish, crystallizing, 740ml, 125 x 65m                        |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |               crystallizing dishes  |      0.94  |      2.57  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | cg-8276-90 dish, crystallizing, 90 mm x 50 mm, (c-3140)                   |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |               crystallizing dishes  |      0.94  |      2.20  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | dish, crystallizing, with spouts, 150ml                                   |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |               crystallizing dishes  |      0.94  |      1.90  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | thermomtr 76mm imm -10 to 260c dish crystallizing 150mm 4/pk              |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |               crystallizing dishes  |      0.94  |      2.18  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | cg-8276-p70-dish, crystallizing, 180ml, 70 x 50mm                         |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |               crystallizing dishes  |      0.94  |      2.49  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | dish, crystallizing, with spouts, 250 ml                                  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |               crystallizing dishes  |      0.94  |      2.90  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | dish, crystallizing, with spouts, 250ml                                   |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |               crystallizing dishes  |      0.95  |      1.15  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | d292600 dish crystallizing 190x90 2000ml                                  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |               crystallizing dishes  |      0.95  |      2.56  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | dish, crystallizing, 70 mm x 50 mm                                        |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |               crystallizing dishes  |      0.95  |      2.96  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | dish, crystallizing, 325ml, 100 x 50mm                                    |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |               crystallizing dishes  |      0.95  |      2.52  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | dish, crystallizing, 500 ml                                               |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |               crystallizing dishes  |      0.95  |      2.23  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | dish, crystallizing, 150 ml                                               |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |               crystallizing dishes  |      0.95  |      2.16  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | dish crystallizing 150ml                                                  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |               crystallizing dishes  |      0.95  |      2.58  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | dish, crystallizing, 270ml, 90 x 50mm                                     |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |               crystallizing dishes  |      0.95  |      2.88  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | dish, crystallizing, with spouts, 900ml                                   |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |               crystallizing dishes  |      0.95  |      2.90  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | dish, crystallizing, 900 ml                                               |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |               crystallizing dishes  |      0.95  |      2.83  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | dish, crystallizing, 900ml                                                |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |               crystallizing dishes  |      0.96  |      2.52  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | dish crystallizing 80x45mm                                                |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |          direct pcr lysis reagents  |      0.11  |      4.48  |     BOTH  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | 872-539-1-primer, plaster/lb (5# pail)                                    |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |          direct pcr lysis reagents  |      0.12  |      3.69  |     BOTH  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | primer c-36 (4 gallon pail)                                               |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |          direct pcr lysis reagents  |      0.29  |      5.40  |  LOW_SIM  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | denat./lysis soln. 100 ml (totally)                                       |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |          direct pcr lysis reagents  |      0.31  |      4.54  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | magmax lysis/binding soln. con 100ml                                      |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |          direct pcr lysis reagents  |      0.35  |      4.16  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | c2978-50ml-cellytictm m, cell lysis reagent, suita                        |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |          direct pcr lysis reagents  |      0.36  |      4.21  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | c3228-50ml-cellytictm mt cell lysis reagent, for &                        |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |          direct pcr lysis reagents  |      0.36  |      5.85  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | b7435-500ml-cellytictm b cell lysis reagent, for b                        |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |          direct pcr lysis reagents  |      0.38  |      1.72  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | sai infusion technologies - mouse tail vein catheter - 27g butterfly ne.. |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |          direct pcr lysis reagents  |      0.41  |      4.42  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | phusion blood directpcr 100rxn                                            |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |          direct pcr lysis reagents  |      0.46  |      4.37  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | viagen directpcr dna extraction system                                    |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |          direct pcr lysis reagents  |      0.47  |      6.81  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | maxwell 16 mouse tail dna purification kit                                |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |          direct pcr lysis reagents  |      0.47  |      3.77  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | gentra puregene mouse tail kit (100mg)                                    |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |          direct pcr lysis reagents  |      0.61  |      4.71  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | dir pcr lysis rgnt(mouse tail                                             |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |          direct pcr lysis reagents  |      0.75  |      4.37  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | directpcr lysis reagent (cell) 50 ml                                      |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |          direct pcr lysis reagents  |      0.77  |      4.44  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | 301-C,  DirectPCR Lysis Reagent (Cell) 50 ml                              |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |          direct pcr lysis reagents  |      0.94  |      4.37  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | 101-t-directpcr lysis reagent (mouse tail)                                |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |          direct pcr lysis reagents  |      0.95  |      4.44  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | 101-T, DirectPCR Lysis Reagent (Mouse Tail) 50ml                          |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |                  lds sample buffer  |      0.20  |      5.04  |     BOTH  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | ha tag, dylight 800 4x peg                                                |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |                  lds sample buffer  |      0.24  |      5.65  |     BOTH  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | tc-4x12c 4x monocular                                                     |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |                  lds sample buffer  |      0.25  |      5.25  |     BOTH  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | tc-4x12c 4x monoculars                                                    |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |                  lds sample buffer  |      0.59  |      5.69  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | glve dispnsr-4compw/4seprt lds                                            |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |                  lds sample buffer  |      0.68  |      4.67  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | nupage lds 4x lds sample buffer                                           |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |                  lds sample buffer  |      0.68  |      4.70  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | np0008-nupage reg lds 4x lds sample buffer                                |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |                  lds sample buffer  |      0.69  |      4.93  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | nupage novex 10% bis-tris protein gels, 1.0 mm, 12 well nupage lds samp.. |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |                  lds sample buffer  |      0.71  |      4.67  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | np0008-nupagertm lds 4x lds sample buffer                                 |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |                  lds sample buffer  |      0.79  |      4.84  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | benchmark protein ladder nupage lds sample buffer (4x)                    |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |                  lds sample buffer  |      0.83  |      4.91  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | bolt bistris plus 4-12% 10well np lds sample buf (4x) magicmark xp west.. |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |                  lds sample buffer  |      0.87  |      4.90  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | nupage 4x lds sample buffer                                               |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |                  lds sample buffer  |      0.88  |      4.61  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | np0008, invitrogen? novex? nupage? lds sample buffer (4x), see attached.. |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |                  lds sample buffer  |      0.89  |      4.74  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | nupage? lds sample buffer (4x) (250 ml)                                   |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |                  lds sample buffer  |      0.90  |      4.79  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | nupage lds sample buffer (4x)                                             |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |                  lds sample buffer  |      0.90  |      4.79  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | NuPAGEÂ® LDS Sample Buffer (4X)                                           |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |                  lds sample buffer  |      0.91  |      4.81  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | cat#np0008 nupage lds sample buffer (4x) closed clo                       |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |                  lds sample buffer  |      0.93  |      4.70  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | np0008-nupagertm lds sample buffer (4x) (250 ml)                          |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |                rectangular carboys  |      0.58  |      5.91  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | bottle carboy wm autoclave 20l                                            |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |                rectangular carboys  |      0.63  |      5.93  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | bottle carboy pp 20l                                                      |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |                rectangular carboys  |      0.69  |      3.49  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | gas cylinder support carboy fluor rect 20l 1/cs                           |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |                rectangular carboys  |      0.76  |      3.45  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | sparkleen i manwsh 3-1/4lb box fb carboy rect 20l hdpe w spig parafilm .. |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |                rectangular carboys  |      0.79  |      3.45  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | fb carboy rect 9l hdpe cs1 bg pe clrpln 24x36 200/pk pen light stylus 2.. |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |                rectangular carboys  |      0.84  |      6.24  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | #6q0444168#bottle carboy rect w/spig 2gl                                  |
+  +---------------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------------+
+  |                           category  |  simila~e  |  log_pr~e  |   reason  |
+  |                rectangular carboys  |      0.95  |      6.27  |  OUTLIER  |
+  |---------------------------------------------------------------------------|
+  | product_desc                                                              |
+  | CARBOY RECT W/SPIGOT PP 20L                                               |
+  +---------------------------------------------------------------------------+
+
+. 
+end of do-file

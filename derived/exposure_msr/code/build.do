@@ -27,14 +27,14 @@ program foia_pis
     }
 end
 
-program clean_foia_data
-    use ../external/foia/merged_foias_with_pis, clear
+// Apply config.CATEGORY_CONSOLIDATION rollups to the `category` variable on the
+// currently-loaded dataset.  Keep in sync with prdct_classification/code/
+// 0_clean_category_file.py and config.CATEGORY_CONSOLIDATION — if the classifier
+// pipeline was last run with an older config, predicted_market values still
+// carry un-rolled-up labels and won't match categories_tfidf.
+program consolidate_categories
     qui {
-        gen purchase_date = date(date, "YMD")
-        gen year = year(purchase_date)
-        keep if inrange(year, 2010, 2019)
-        drop if mi(athr_id)
-        // 1. Antibody buckets (collapse poly/mono primary into "primary antibodies")
+        // 1. Antibody buckets
         replace category = "primary antibodies" if strpos(category, "antibod") > 0 & strpos(category, "primary") > 0
         replace category = "secondary antibodies" if strpos(category, "antibod") > 0 & strpos(category, "secondary") > 0
 
@@ -95,10 +95,33 @@ program clean_foia_data
         replace category = "recombinant proteins" if inlist(category, "recombinant human protein", "recombinant mouse protein", "recombinant human/mouse/rat protein", "recombinant human/mouse protein", "recombinant human/murine/rat protein", "recombinant cas9 protein")
 
         // Expression plasmids
-        replace category = "expression plasmids" if inlist(category, "synthetic mammalian expression plasmids", "synthetic bacterial expression plasmids", "synthetic plasmids", "aav plasmids")
+        replace category = "expression plasmids" if inlist(category, "synthetic mammalian expression plasmids", "synthetic bacterial expression plasmids", "synthetic plasmids", "aav plasmids", "non-viral expression plasmids")
+
+        // Synthetic DNA oligos — purified vs desalted rarely in descriptions.
+        replace category = "synthetic dna oligonucleotide - desalted" if category == "synthetic dna oligonucleotide - purified"
+
+        // PCR tubes vs tube strips — descriptions don't reveal strip-vs-singleton.
+        replace category = "pcr tube strips" if category == "pcr tubes"
+
+        // Radiolabeled nucleotides — only "-32p"/"-33p" distinguishes labeled.
+        replace category = "nucleotides" if category == "radiolabeled nucleotides"
+
+        // "drug - other" indistinguishable from small molecule inhibitors.
+        replace category = "small molecule inhibitors" if category == "drug - other"
+        replace category = "ethanol" if category == "molecular biology ethanol"
 
         // Vials
         replace category = "vials" if inlist(category, "sample vials", "scintillation vials", "autosampler vials", "drosophila vials", "screw cap vials")
+    }
+end
+
+program clean_foia_data
+    use ../external/foia/merged_foias_with_pis, clear
+    qui {
+        gen purchase_date = date(date, "YMD")
+        gen year = year(purchase_date)
+        keep if inrange(year, 2010, 2019)
+        drop if mi(athr_id)
     }
     qui count
     local total_obs = r(N)
@@ -131,6 +154,9 @@ program clean_foia_data
         drop category
         rename predicted_market category
     }
+    // Roll up the unified `category` column to match config.CATEGORY_CONSOLIDATION
+    // before the categories_tfidf merge below.
+    consolidate_categories
     qui drop if category == "pre-bast bis-tris gels" & strpos(clean_desc, "reducing")
     qui drop if category == "catalase" & strpos(clean_desc, "kit")
     // drop nonsense negatives
@@ -233,6 +259,7 @@ program gen_true_exposure
     gen year = year(date(date, "YMD"))
     drop if year > 2013
     keep if inlist(uni, "utdallas", "umich")
+    consolidate_categories
     merge m:1 category using ../external/ml/categories_tfidf, keep(1 3)
     keep if keep == 1
     gcollapse (sum) spend, by(athr_id category)

@@ -81,13 +81,16 @@ def main(gatekeeper_name: str, expert_choice: str, source_abbrev: str = None):
             # multiply+sum path below all handle sparse natively.
             category_vectors_for_similarity = expert_predictor.category_vectors.tocsr()
             category_names_map = {name: i for i, name in enumerate(expert_predictor.category_names)}
-        elif expert_choice == 'bert':
-            expert_predictor = EmbeddingItemCategorizer("bert", "all-MiniLM-L6-v2")
-            vectorizer_for_similarity = expert_predictor.encoder_model # The BERT model itself
+        elif expert_choice in config.BERT_MODELS:
+            expert_predictor = EmbeddingItemCategorizer(expert_choice, config.BERT_MODELS[expert_choice])
+            vectorizer_for_similarity = expert_predictor.encoder_model
             category_vectors_for_similarity = expert_predictor.category_vectors
             category_names_map = {name: i for i, name in enumerate(expert_predictor.category_names)}
         else:
-            raise ValueError(f"Unsupported expert choice: {expert_choice}")
+            raise ValueError(
+                f"Unsupported expert choice: {expert_choice}. "
+                f"Expected 'tfidf' or one of: {list(config.BERT_MODELS)}"
+            )
 
         rule_categorizer = RuleBasedCategorizer(config.MARKET_RULES_YAML)
 
@@ -242,6 +245,28 @@ def main(gatekeeper_name: str, expert_choice: str, source_abbrev: str = None):
             )
             step2_indices = lab_descriptions.index
 
+            # Step 2.5: Supplier-based category force.  Mono-category vendors
+            # (Peprotech / Avanti / Addgene / Bachem / ...) get their expert
+            # prediction overridden to the canonical category for that vendor.
+            # Runs before veto + market rules so a description-specific rule
+            # in Step 4 still wins.  Only fires when the supplier name matches
+            # and the category exists in the expert's known categories
+            # (otherwise the override is silently skipped to avoid debug
+            # warnings in Step 5).
+            supp_cat_regex = getattr(config, 'SUPPLIER_CATEGORY_REGEX', None)
+            if supp_cat_regex and lab_suppliers is not None:
+                lab_supp_lower = lab_suppliers.astype(str).str.lower()
+                total_forced = 0
+                for cat, regex in supp_cat_regex.items():
+                    if cat not in category_names_map:
+                        continue
+                    mask = lab_supp_lower.str.contains(regex, na=False)
+                    if mask.any():
+                        expert_predictions.loc[mask] = cat
+                        total_forced += int(mask.sum())
+                if total_forced:
+                    print(f"  - Step 2.5: Supplier-category force overrode {total_forced} expert predictions.")
+
             print("  - Step 3: Applying prediction veto rules...")
             validated_predictions = rule_categorizer.validate_predictions_batch(
                 expert_predictions, lab_descriptions
@@ -378,9 +403,34 @@ def main(gatekeeper_name: str, expert_choice: str, source_abbrev: str = None):
         # taxonomy roll-up belongs in script 0's CATEGORY_CONSOLIDATION so
         # the expert learns the collapsed labels in the first place.
 
+        # Detect items where the rule layer assigned a NON-LAB market
+        # category (e.g. "animal - drosophila supplies",
+        # "irrelevant chemicals - solvents", "instrument part - buffer dams").
+        # The rule patterns are deliberately kept in market_rules.yml so the
+        # granular category is preserved for downstream non-lab analysis —
+        # but for the binary lab/non-lab decision we trust the rule over the
+        # gatekeeper here.  Mark them so step 5 skips the lab-similarity
+        # lookup (which would just warn about missing categories — the
+        # expert is built on lab categories only).  Uses the same regex
+        # that scripts 0/1 use to define non-lab.
+        nonlab_from_rules_mask = y_pred.astype(str).str.contains(
+            config.NONLAB_REGEX, na=False
+        )
+        if nonlab_from_rules_mask.any():
+            n_nl = int(nonlab_from_rules_mask.sum())
+            print(f"  - {n_nl} items have a non-lab market category from rules; "
+                  f"keeping granular label, flagging as non-lab for binary eval.")
+            df_new.loc[nonlab_from_rules_mask, 'is_nonlab_market'] = True
+
         # +++ Step 5: Calculate FINAL similarity scores +++
         print("  - Step 5: Calculating final similarity scores for lab predictions...")
-        final_lab_mask = (y_pred != "Non-Lab") & (y_pred != "unclassified") & (y_pred != "Prediction Error") & (y_pred != "No Description")
+        final_lab_mask = (
+            (y_pred != "Non-Lab")
+            & (y_pred != "unclassified")
+            & (y_pred != "Prediction Error")
+            & (y_pred != "No Description")
+            & ~nonlab_from_rules_mask  # skip rule-assigned non-lab categories
+        )
 
         if final_lab_mask.any():
             lab_indices = final_lab_mask[final_lab_mask].index
@@ -396,7 +446,7 @@ def main(gatekeeper_name: str, expert_choice: str, source_abbrev: str = None):
                 positions = step2_indices.get_indexer(lab_indices)
                 lab_embeddings = step2_vectors[positions]
             else:
-                if expert_choice == 'bert':
+                if expert_choice in config.BERT_MODELS:
                     lab_embeddings = expert_predictor._encode_with_supplier(
                         lab_final_descs.tolist(), lab_final_suppliers
                     )
@@ -464,9 +514,11 @@ def main(gatekeeper_name: str, expert_choice: str, source_abbrev: str = None):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run product market predictions on new data.")
     parser.add_argument("source_abbrev", type=str, nargs='?', default=None, help="Abbreviation of data source (e.g., 'utdallas', 'govspend', university prefix). If empty, processes all non-UTDallas, non-GovSpend files.")
-    parser.add_argument("model", type=str, nargs='?', default=None, choices=['tfidf', 'bert'], help="Shortcut: use this model for BOTH gatekeeper and expert. Overridden per-role by --gatekeeper / --expert.")
-    parser.add_argument("--gatekeeper", type=str, default=None, choices=['tfidf', 'bert'])
-    parser.add_argument("--expert", type=str, default=None, choices=['tfidf', 'bert'])
+    _model_choices = ['tfidf'] + list(config.BERT_MODELS.keys())
+    parser.add_argument("model", type=str, nargs='?', default=None, choices=_model_choices,
+                        help="Shortcut: use this model for BOTH gatekeeper and expert. Overridden per-role by --gatekeeper / --expert.")
+    parser.add_argument("--gatekeeper", type=str, default=None, choices=_model_choices)
+    parser.add_argument("--expert", type=str, default=None, choices=_model_choices)
     args = parser.parse_args()
 
     gatekeeper = args.gatekeeper or args.model

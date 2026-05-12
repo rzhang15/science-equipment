@@ -18,12 +18,14 @@ def main():
                         help="Model tag matching 1_vectorize_bert.py output filenames.")
     parser.add_argument("--k", type=int, default=50,
                         help="Top-K neighbors to keep (must be >= max K used in loov sweep).")
+    parser.add_argument("--tag-suffix", default="",
+                        help="Appended to model tag so variants don't clobber each other.")
     args = parser.parse_args()
 
-    tag = args.model.replace("/", "_")
-    foia_emb_path = f"../output/bert_foia_{tag}.npy"
-    foia_ids_path = f"../output/bert_foia_ids_{tag}.csv"
-    output_path = f"../output/validation_weights_bert_{tag}_k{args.k}.npz"
+    tag = args.model.replace("/", "_") + args.tag_suffix
+    foia_emb_path = f"../../output/bert_foia_{tag}.npy"
+    foia_ids_path = f"../../output/bert_foia_ids_{tag}.csv"
+    output_path = f"../../output/validation_weights_bert_{tag}_k{args.k}.npz"
 
     print(f"Loading {foia_emb_path}")
     E = np.load(foia_emb_path)  # shape (n_foia, dim)
@@ -53,7 +55,7 @@ def main():
     scipy.sparse.save_npz(output_path, W_sparse)
 
     # also write a foia_ids_ordered-style file so loov.py can find the same id order
-    aligned_ids = f"../output/foia_ids_ordered_bert_{tag}.csv"
+    aligned_ids = f"../../output/foia_ids_ordered_bert_{tag}.csv"
     df_ids.to_csv(aligned_ids, index=False)
     print(f"Saved {aligned_ids}")
 

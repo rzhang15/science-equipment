@@ -492,6 +492,19 @@ keywords:
   - replacement shaft
   - performance verification
 
+  # Pipette replacement / repair parts.  Manual pipettors hold-out precision
+  # was 0.51 — most FPs landing in that bucket are bare pipette spare parts
+  # (plunger / piston / spring / ejector button).  These are instrument
+  # service items, not pipettors.
+  - piston seal
+  - plunger button
+  - pipette plunger
+  - ejector button
+  - tip ejector
+  - replacement piston
+  - pipette spring
+  - pipette piston
+
   # Sequencing library-prep kit brands (complements generic "sequencing")
   - miseq
   - nextera
@@ -505,3 +518,9 @@ keywords:
   - forcep
   - tweezer
   - scissor
+
+  # Animal-care items (from FP audit: ~24 in "animal - diet" plus
+  # ~16 in "animal - drosophila supplies").  `food` is rare in true
+  # lab-product descriptions (~26 TPs vs ~17 FPs); the asymmetry is
+  # the cleanest token-level signal in the FP file.
+  - food

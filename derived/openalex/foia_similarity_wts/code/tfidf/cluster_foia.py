@@ -5,9 +5,9 @@ import pickle
 from sklearn.cluster import KMeans
 
 # --- CONFIGURATION ---
-FOIA_MATRIX_PATH = "../output/tfidf_foia.npz"
-FOIA_IDS_PATH = "../output/foia_ids_ordered.csv"
-FEATURE_NAMES_PATH = "../output/feature_names.pkl" # Created in Step 1
+FOIA_MATRIX_PATH = "../../output/tfidf_foia.npz"
+FOIA_IDS_PATH = "../../output/foia_ids_ordered.csv"
+FEATURE_NAMES_PATH = "../../output/feature_names.pkl" # Created in Step 1
 
 def analyze_foia():
     print("Loading Data...")
@@ -61,7 +61,7 @@ def analyze_foia():
         print(f"Top Terms: {', '.join(keywords)}")
         
         # Optional: Save results to inspect later
-        # df_ids[df_ids['cluster'] == cluster_id].to_csv(f"../output/cluster_{cluster_id}_ids.csv")
+        # df_ids[df_ids['cluster'] == cluster_id].to_csv(f"../../output/cluster_{cluster_id}_ids.csv")
 
 if __name__ == "__main__":
     analyze_foia()

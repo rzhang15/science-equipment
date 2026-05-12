@@ -178,9 +178,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Validate pipeline output against ground truth."
     )
-    parser.add_argument("model", type=str, nargs='?', default=None, choices=['tfidf', 'bert'], help="Shortcut: use this model for BOTH gatekeeper and expert. Overridden per-role by --gatekeeper / --expert.")
-    parser.add_argument("--gatekeeper", type=str, default=None, choices=['tfidf', 'bert'])
-    parser.add_argument("--expert", type=str, default=None, choices=['tfidf', 'bert'])
+    _model_choices = ['tfidf'] + list(config.BERT_MODELS.keys())
+    parser.add_argument("model", type=str, nargs='?', default=None, choices=_model_choices,
+                        help="Shortcut: use this model for BOTH gatekeeper and expert. Overridden per-role by --gatekeeper / --expert.")
+    parser.add_argument("--gatekeeper", type=str, default=None, choices=_model_choices)
+    parser.add_argument("--expert", type=str, default=None, choices=_model_choices)
     parser.add_argument("--min_support", type=int, default=25)
     args = parser.parse_args()
 

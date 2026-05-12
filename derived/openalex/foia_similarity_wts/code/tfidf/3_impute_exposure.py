@@ -3,12 +3,12 @@ import numpy as np
 import scipy.sparse
 import os
 
-WEIGHTS_FILE = "../output/weight_matrix.npz"
-UNIVERSE_IDS_FILE = "../output/universe_ids.parquet"
-FOIA_IDS_FILE = "../output/foia_ids_ordered.csv"
-USER_EXPOSURE_FILE = "../external/exposure_wts/athr_exposure.dta" 
+WEIGHTS_FILE = "../../output/weight_matrix.npz"
+UNIVERSE_IDS_FILE = "../../output/universe_ids.parquet"
+FOIA_IDS_FILE = "../../output/foia_ids_ordered.csv"
+USER_EXPOSURE_FILE = "../../external/exposure_wts/athr_exposure.dta" 
 
-OUTPUT_FILE = "../output/final_imputed_exposure.csv"
+OUTPUT_FILE = "../../output/final_imputed_exposure.csv"
 
 if not os.path.exists(USER_EXPOSURE_FILE):
     print("Please create your exposure CSV first!")

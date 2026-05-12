@@ -74,7 +74,7 @@ UT_CAT_COL = "category"
 SUPPLIER_WEIGHT = 0.15
 DESC_WEIGHT = 1.0 - SUPPLIER_WEIGHT  # 0.85
 
-PREDICTION_THRESHOLD = 0.7
+PREDICTION_THRESHOLD = 0.5
 CATEGORY_VECTORIZER_MIN_DF = 7
 GATEKEEPER_VECTORIZER_MIN_DF = 5
 
@@ -106,7 +106,11 @@ SUPPLIER_PRIOR_MIN_COUNT = 20
 # in training data (>=95% of items one class).  The 0.05 lower bound means
 # "supplier's items are 95%+ non-lab in training → flip lab→non-lab".
 SUPPLIER_PRIOR_LAB_THRESHOLD = 0.05       # <=5% lab → flip lab→non-lab
-SUPPLIER_PRIOR_LAB_HIGH_THRESHOLD = 0.95  # >=95% lab → flip non-lab→lab
+# Tightened from 0.95 → 0.99 after FP audit: Invitrogen-style high-lab-rate
+# vendors were flipping non-lab predictions to lab too aggressively (~43
+# Invitrogen FPs on umich_supplier UMich hold-out).  At 0.99 the supplier
+# prior only acts as a safety net for truly mono-class suppliers.
+SUPPLIER_PRIOR_LAB_HIGH_THRESHOLD = 0.99  # >=99% lab → flip non-lab→lab
 
 # Primer / oligo name rule.  UMich FN audit showed ~100 synthetic DNA oligos
 # being classified non-lab because the descriptions are bare primer names
@@ -227,9 +231,36 @@ STRONG_LAB_SIGNALS = [
     "deficient plasma",
 ]
 
+# Engineered features (description-level numeric features appended to the
+# TF-IDF + supplier matrix in 1b / classifier).  Targets the commodity-FN
+# cluster from the bake-off audit (pipette tips / microcentrifuge tubes /
+# weigh boats) — these items have short, vocabulary-anchored descriptions
+# that the TF-IDF channel struggles with.
+#
+# Set USE_ENGINEERED_FEATURES = False to drop them (e.g. when running an
+# A/B comparison against the no-features baseline).  When changing
+# FEATURE_WEIGHT or toggling USE_ENGINEERED_FEATURES, you must rerun 1b
+# AND 2 so the LR sees the correct feature dimensionality.
+USE_ENGINEERED_FEATURES = True
+FEATURE_WEIGHT = 0.10
+
 # Expert model similarity thresholds
 TFIDF_MIN_SCORE_THRESHOLD = 0.01
 BERT_MIN_SCORE_THRESHOLD = 0.1
+
+# Transformer-encoder registry.  Short name -> HuggingFace model id.
+# Scripts 1b / 1c / 2 / 3 look up the model id by short name so the
+# pipeline can A/B-test encoders without touching code.
+#
+# NOTE on specter2: `allenai/specter2_base` loads via sentence-transformers
+# with default mean pooling, which is a usable approximation.  The full
+# SPECTER2 pipeline expects the AllenAI `adapters` library to attach the
+# proximity adapter on top of the base encoder; if the bake-off shows
+# promise, switch to the adapter for the production run.
+BERT_MODELS = {
+    'minilm':   'sentence-transformers/all-MiniLM-L6-v2',
+    'specter2': 'allenai/specter2_base',
+}
 
 # ------------------------------------------------------------------
 # Sibling-category consolidation.  Applied at data-ingest time (step 0)
@@ -365,6 +396,37 @@ CATEGORY_CONSOLIDATION = {
     'synthetic bacterial expression plasmids': 'expression plasmids',
     'synthetic plasmids': 'expression plasmids',
     'aav plasmids': 'expression plasmids',
+    # Non-viral expression plasmids — diagnostic on combined hold-out
+    # showed 231/815 expression-plasmid FNs landed here.  `pet/pgex/pcdna`
+    # vectors aren't reliably split as viral-vs-non-viral from descriptions.
+    'non-viral expression plasmids': 'expression plasmids',
+
+    # Synthetic DNA oligos — desalted vs purified is a purification-tag
+    # distinction that almost never appears in descriptions.  Combined
+    # hold-out: 903/982 "purified" FNs land in "desalted" (P=0.49, R=0.05
+    # on the purified label).  Merging recovers ~900 errors.
+    'synthetic dna oligonucleotide - purified': 'synthetic dna oligonucleotide - desalted',
+
+    # PCR tubes vs tube strips — descriptions like "0.2ml pcr tb fcap rd"
+    # don't reveal strip-vs-singleton.  266/359 FNs cross-flow.  Merge.
+    'pcr tubes': 'pcr tube strips',
+
+    # Radiolabeled vs unlabeled nucleotides — distinguishing feature is
+    # only the `-32p` / `-33p` token.  ~300 FNs in the "radiolabeled"
+    # bucket get misrouted (often to "sodium phosphate" via the
+    # "deoxy*-phosphate sodium" pattern collision).  Collapse to plain
+    # nucleotides; downstream code can still detect "32p"/"33p" if it
+    # cares about the labeling distinction.
+    'radiolabeled nucleotides': 'nucleotides',
+
+    # "drug - other" is essentially indistinguishable from "small molecule
+    # inhibitors" and "irrelevant chemicals - bioactive small molecules"
+    # from procurement-line text alone — it gets P=0.33, R=0.37 in the
+    # combined hold-out, the worst per-category score among support>=100
+    # categories.  Items like "lovastatin", "indomethacin", "clobetasol"
+    # are research-grade drugs used as lab reagents.  Collapse into
+    # small molecule inhibitors (the dominant FP target).
+    'drug - other': 'small molecule inhibitors',
     # Vials — sample / scintillation / autosampler / drosophila / screw cap
     # variants collapse into a single `vials` bucket.  Cryovials are kept
     # separate (distinct storage use case; usually labeled in descriptions).
@@ -480,7 +542,12 @@ LAB_SUPPLIER_KEYWORDS = [
     "electron microscopy sciences",
     "ems acquisition",
     # Small molecules / inhibitors
-    "cayman chemical",
+    # NOTE: `cayman chemical` removed after FP audit (umich_supplier UMich
+    # hold-out): Cayman is responsible for ~62 FPs labeled as
+    # `irrelevant chemicals - bioactive small molecules` in the ground
+    # truth.  Their catalog skews toward bulk research chemicals which
+    # the taxonomy treats as non-lab.  The ML head + seed keywords still
+    # catch genuine lab orders from Cayman.
     "selleck chemical",
     "lc laboratories",
     "enzo life sciences",
@@ -492,7 +559,17 @@ LAB_SUPPLIER_KEYWORDS = [
     "echelon biosciences",
     # Plasmids / cell culture specialty
     "addgene",
+    "origene",
+    "genecopoeia",
     "viagen biotech",
+    # Recombinant proteins / cytokines
+    "peprotech",
+    "boston biochem",
+    # Synthetic peptides
+    "bachem",
+    "anaspec",
+    "peptide 2.0",
+    "peptide 2 0",
     # Blood / coagulation reagents
     "haematologic technologies",
     # Microbial phenotyping
@@ -503,9 +580,13 @@ LAB_SUPPLIER_KEYWORDS = [
     "mp biomedicals",
     "research products international",
     "phenomenex",
-    "revvity health sciences",
+    # NOTE: `revvity health sciences` removed — catalog spans
+    # radiolabeled compounds and bulk chemistry that the taxonomy
+    # labels non-lab (~39 FPs on the umich_supplier hold-out).
     # Plasticware / labware specialists
-    "usa scientific",
+    # NOTE: `usa scientific` removed — catalog includes instrument
+    # accessories (racks, plate holders) labeled as `instrument part`
+    # rather than lab consumables (~39 FPs).
     "denville scientific",
     "dot scientific",
     "life science products",
@@ -517,6 +598,45 @@ LAB_SUPPLIER_KEYWORDS = [
 _lab_supplier_patterns = [re.escape(k.lower()) for k in LAB_SUPPLIER_KEYWORDS]
 LAB_SUPPLIER_REGEX = (re.compile('|'.join(_lab_supplier_patterns), re.IGNORECASE)
                       if _lab_supplier_patterns else None)
+
+# Supplier -> forced expert category overlay.  When a supplier's name
+# contains the key as a substring (case-insensitive), the expert's
+# category prediction is overridden to the value before the veto / market
+# rule layers.  Market rules can still beat this if they fire (Step 4 of
+# script 3), so a description-specific rule remains authoritative.
+#
+# Use only for vendors whose catalogs are nearly mono-category — these
+# suppliers are essentially specialty foundries for one product class:
+#   PEPROTECH / BOSTON BIOCHEM  -> recombinant proteins
+#   AVANTI / NU-CHEK-PREP       -> purified lipids
+#   DHARMACON                   -> synthetic sirna
+#   ADDGENE / ORIGENE / GENECOPOEIA -> expression plasmids
+#   BACHEM / ANASPEC / PEPTIDE 2.0  -> synthetic peptides
+SUPPLIER_CATEGORY_FORCE = {
+    "peprotech": "recombinant proteins",
+    "boston biochem": "recombinant proteins",
+    "avanti polar lipids": "purified lipids",
+    "nu-chek-prep": "purified lipids",
+    "nu-chek prep": "purified lipids",
+    "dharmacon": "synthetic sirna",
+    "addgene": "expression plasmids",
+    "origene": "expression plasmids",
+    "genecopoeia": "expression plasmids",
+    "bachem": "synthetic peptides",
+    "anaspec": "synthetic peptides",
+    "peptide 2.0": "synthetic peptides",
+    "peptide 2 0": "synthetic peptides",
+}
+
+# Precompile per-category regex once so script 3 can do a single
+# str.contains pass per category over the supplier column.
+_supp_cat_patterns = {}
+for _k, _cat in SUPPLIER_CATEGORY_FORCE.items():
+    _supp_cat_patterns.setdefault(_cat, []).append(re.escape(_k.lower()))
+SUPPLIER_CATEGORY_REGEX = {
+    cat: re.compile('|'.join(pats), re.IGNORECASE)
+    for cat, pats in _supp_cat_patterns.items()
+}
 
 # ==============================================================================
 # 7. Model Token Filtering
@@ -566,33 +686,43 @@ def normalize_supplier(supplier_name):
 def clean_for_model(text):
     """Strip non-semantic tokens from a description before vectorization.
 
-    Handles both data that has already been through clean_foia_data.py
-    (where most of these are no-ops) and raw data that has not been
-    upstream-cleaned (e.g. raw GovSpend).
+    Inference-time twin of the regex stage in clean_foia_text/clean_foia_data.
+    Mirrors the upstream pipeline so descriptions arriving at predict time
+    (raw GovSpend, live inference, etc.) get cleaned consistently with the
+    training-time `clean_desc`.
 
     Strips:
       - HTML entities and XML escape sequences (&amp;, &#153;, etc.)
       - Price / cost references ($300.00, (actual price $xx))
-      - Quote / offer / PO number references embedded in descriptions
+      - Quote / offer / PO / order / invoice numbered references
       - DNA/RNA nucleotide sequences (10+ consecutive base characters)
       - Gene-synthesis order metadata (configurationid, sequence:, etc.)
       - Catalog/part numbers (AB-1234, cat#12345)
-      - Dimensions (12x75mm, 100ml, 4.5in)
-      - Pure standalone numbers
+
+    Notably does NOT strip:
+      - Dimensions (12x75mm, 100ml) — these carry product-defining info and
+        match what the upstream `size_unit_capture` rule preserves.
+      - Pure numbers — upstream keeps short numerics; only 5+ digit pure
+        numbers are stripped (as SKU fragments) at training time, and the
+        same can happen at inference via the catalog-num rule above.
     """
     if not isinstance(text, str):
         return ""
     # Remove HTML entities (&amp; &#153; &lt; etc.)
     text = re.sub(r'&(?:[a-zA-Z]+|#\d+);', ' ', text)
-    # Remove price references: "$300.00", "(actual price $xx)", "price $xx"
+    # Remove price references: "$300.00", "(actual price $xx)"
     text = re.sub(r'\(actual\s+price[^)]*\)', ' ', text, flags=re.IGNORECASE)
     text = re.sub(r'\$[\d,]+(?:\.\d+)?', ' ', text)
-    # Remove quote/offer/PO number references
-    # e.g. "quote #: 7145-4647-26", "Quote # COVQ32522", "offer #EQ1409000026",
-    #      "per attached quoteJSKYQ3711", "Quote No: 1163184"
+    # Numbered admin references — one rule per keyword (mirrors upstream).
+    # The (?:...)+ group allows chained separators like `#:` or `no:` and
+    # requires at least one explicit indicator keyword so we don't strip
+    # prose like "quote follows".  Trailing id token must be ≥3 chars.
     text = re.sub(r'\bper\s+attached\s+quote\w*', ' ', text, flags=re.IGNORECASE)
-    text = re.sub(r'\b(?:quote|offer|po)\s*[#:no.]+\s*[\w/-]+', ' ', text, flags=re.IGNORECASE)
-    text = re.sub(r'\bquote\s+no\.?\s*[\w/-]+', ' ', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bquote\s*(?:(?:no\.?|number|[#:])\s*)+[\w\-/]{3,}\b', ' ', text, flags=re.IGNORECASE)
+    text = re.sub(r'\boffer\s*(?:(?:no\.?|number|[#:])\s*)+[\w\-/]{3,}\b', ' ', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bp\.?\s*o\.?\s*(?:(?:no\.?|number|[#:])\s*)+[\w\-/]{3,}\b', ' ', text, flags=re.IGNORECASE)
+    text = re.sub(r'\b(?:order|ord)\s*(?:(?:no\.?|number|[#:])\s*)+[\w\-/]{3,}\b', ' ', text, flags=re.IGNORECASE)
+    text = re.sub(r'\binvoice\s*(?:(?:no\.?|number|[#:])\s*)+[\w\-/]{3,}\b', ' ', text, flags=re.IGNORECASE)
     # Remove DNA/RNA nucleotide sequences (10+ consecutive base chars)
     text = re.sub(r'\b[ATCGNatcgn]{10,}\b', ' ', text)
     # Remove gene-synthesis order metadata fields and their values
@@ -605,13 +735,6 @@ def clean_for_model(text):
     # Remove catalog/part numbers (e.g., "AB-1234", "cat#12345")
     # Requires a separator (# or -) so drug names like CHIR99021, AZD6244 survive
     text = re.sub(r'\b[a-zA-Z]{1,4}[#-]\d{3,}\b', ' ', text)
-    # Remove dimensions (e.g., "12x75mm", "100ml", "4.5in")
-    text = re.sub(
-        r'\b\d+(\.\d+)?\s*(x\s*\d+(\.\d+)?\s*)*(mm|cm|ml|ul|mg|kg|oz|lb|in|ft|gal)\b',
-        ' ', text, flags=re.IGNORECASE
-    )
-    # Remove pure numbers (standalone integers/decimals)
-    text = re.sub(r'\b\d+(\.\d+)?\b', ' ', text)
     # Collapse whitespace
     return re.sub(r'\s+', ' ', text).strip()
 

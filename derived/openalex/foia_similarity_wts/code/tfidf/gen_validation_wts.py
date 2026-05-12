@@ -4,11 +4,11 @@ import scipy.sparse
 
 # --- CONFIGURATION ---
 # We use the same inputs, but we will filter the rows to ONLY FOIA authors
-UNIVERSE_IDS_FILE = "../output/universe_ids.parquet"
-FOIA_IDS_FILE = "../output/foia_ids_ordered.csv" 
-UNIVERSE_MATRIX = "../output/tfidf_universe.npz"
-FOIA_MATRIX = "../output/tfidf_foia.npz"
-OUTPUT_VAL_WEIGHTS = "../output/validation_weights_k50.npz"
+UNIVERSE_IDS_FILE = "../../output/universe_ids.parquet"
+FOIA_IDS_FILE = "../../output/foia_ids_ordered.csv" 
+UNIVERSE_MATRIX = "../../output/tfidf_universe.npz"
+FOIA_MATRIX = "../../output/tfidf_foia.npz"
+OUTPUT_VAL_WEIGHTS = "../../output/validation_weights_k50.npz"
 
 K_HIGH = 50  # Keep 50 so we can test K=5, 10, 20, etc. later
 

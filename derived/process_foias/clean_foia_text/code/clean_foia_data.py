@@ -48,7 +48,48 @@ CATALOG_DIR = ROOT_DIR / "external" / "catalogs"
 GOVSPEND_DIR = ROOT_DIR / "external" / "govspend"
 DEFAULT_OUT_DIR = ROOT_DIR / "output"
 
+# -- Greek-letter transliteration ------------------------------------------- #
+# The ASCII normalization line below (encode "ascii", "ignore") strips any
+# non-ASCII codepoint, which destroys chemistry/biology signal carried by
+# Greek letters (`α-amino acid`, `β-lactam`, `µl` micro liters).  Translate
+# them to ASCII equivalents BEFORE the destructive normalization step.
+# Both the micro sign U+00B5 (`µ`) and Greek small mu U+03BC (`μ`) map to "u"
+# so `µl` / `μg` align with the existing SIZE_UNITS vocabulary (ul, ug, ...).
+_GREEK_TRANSLITERATION = str.maketrans({
+    "α": "alpha",   "Α": "alpha",
+    "β": "beta",    "Β": "beta",
+    "γ": "gamma",   "Γ": "gamma",
+    "δ": "delta",   "Δ": "delta",
+    "ε": "epsilon", "Ε": "epsilon",
+    "ζ": "zeta",    "Ζ": "zeta",
+    "η": "eta",     "Η": "eta",
+    "θ": "theta",   "Θ": "theta",
+    "ι": "iota",    "Ι": "iota",
+    "κ": "kappa",   "Κ": "kappa",
+    "λ": "lambda",  "Λ": "lambda",
+    "μ": "u",       "Μ": "u",       # Greek mu — used for micro
+    "µ": "u",                       # micro sign (separate codepoint)
+    "ν": "nu",      "Ν": "nu",
+    "ξ": "xi",      "Ξ": "xi",
+    "π": "pi",      "Π": "pi",
+    "ρ": "rho",     "Ρ": "rho",
+    "σ": "sigma",   "Σ": "sigma",
+    "ς": "sigma",                   # final-form sigma
+    "τ": "tau",     "Τ": "tau",
+    "υ": "upsilon", "Υ": "upsilon",
+    "φ": "phi",     "Φ": "phi",
+    "χ": "chi",     "Χ": "chi",
+    "ψ": "psi",     "Ψ": "psi",
+    "ω": "omega",   "Ω": "omega",
+    # Common scientific symbols that ASCII-encode would drop
+    "°": " deg ",
+    "±": " plusminus ",
+    "·": " ",                       # middle dot in chemistry names
+    "→": " to ",
+})
+
 # -- Pre-compile regexes & pre-filter keys (once, at import time) ----------- #
+# Used for SKU / unit extraction (independent of the cleaning pipeline).
 SKU_REGEX_KEYS = [
     "cas_full", "item_ref_full", "sku_multi_hyphen", "sku_num_num",
     "sku_very_long_num", "sku_alpha_hyphen_num", "sku_letters_digits",
@@ -57,10 +98,41 @@ UNIT_REGEX_KEYS = [
     "num_in_paren_unit_counts", "num_in_paren_quantities", "unitpack",
     "sets_pk", "dimensions", "mult", "trailing_slash_unit", "size_unit_capture",
 ]
-NOISE_REGEX_KEYS = [
-    k for k in config.REGEXES_NORMALIZE
-    if k not in SKU_REGEX_KEYS and k not in UNIT_REGEX_KEYS
+
+# Ordered pipeline for the full cleaning pass on each description.  Earlier
+# rules clean up structured patterns (HTML entities, primer suffixes, admin
+# tags) so later rules see canonical text.  Critically, admin-reference
+# rules (quote/PO/order/invoice) run BEFORE SKU rules so an entire
+# "quote #: 7145-4647-26" is stripped as a unit, not partially eaten by
+# `sku_num_num` first.
+CLEAN_REGEX_ORDER = [
+    # Stage 0 -- encoding artifacts
+    "html_entities",
+    # Stage 1 -- spacing & symbol normalization
+    "comma_space_to_space",
+    "percent_ge_symbols", "simple_percent", "stray_math_symbols",
+    # Stage 2 -- protect structural primer suffixes
+    "primer_suffix_fwd", "primer_suffix_rev",
+    # Stage 3 -- hash-enclosed admin tags
+    "remove_hash_enclosed", "remove_hash_prefix", "remove_hash_suffix",
+    # Stage 4 -- named admin / metadata patterns (BEFORE SKU rules)
+    "dr_name", "cas_full", "item_ref_full",
+    "actual_price_paren", "dollar_amount", "per_attached_quote",
+    "quote_num_full", "offer_num_full", "po_num_full",
+    "order_num_full", "invoice_num_full",
+    "dna_sequence", "gene_synth_meta", "sequence_field", "catalog_num_short",
+    # Stage 5 -- unit / quantity normalization
+    "num_in_paren_unit_counts", "num_in_paren_quantities",
+    "unitpack", "sets_pk", "dimensions", "mult",
+    "trailing_slash_unit", "size_unit_capture",
+    # Stage 6 -- SKU patterns (run AFTER admin patterns are cleaned)
+    "sku_multi_hyphen", "sku_num_num", "sku_very_long_num",
+    "sku_alpha_hyphen_num", "sku_letters_digits",
+    # Stage 7 -- general character cleanup
+    "nonalp", "trailh", "withslash", "clean_hyphens", "empty_parens",
+    "multispc",  # always last
 ]
+
 
 def _compile_regex_list(keys):
     """Return [(compiled_pattern, replacement)] for keys present in config.
@@ -82,10 +154,9 @@ def _compile_regex_list(keys):
     return out
 
 # Compiled once -- used in every row without re-parsing
-_SKU_COMPILED   = _compile_regex_list(SKU_REGEX_KEYS)
-_UNIT_COMPILED  = _compile_regex_list(UNIT_REGEX_KEYS)
-_NOISE_COMPILED = _compile_regex_list(NOISE_REGEX_KEYS)
-_ALL_COMPILED   = _SKU_COMPILED + _UNIT_COMPILED + _NOISE_COMPILED
+_SKU_COMPILED  = _compile_regex_list(SKU_REGEX_KEYS)
+_UNIT_COMPILED = _compile_regex_list(UNIT_REGEX_KEYS)
+_ALL_COMPILED  = _compile_regex_list(CLEAN_REGEX_ORDER)
 
 # Stopword set -- built once
 _ALL_STOPWORDS = STOP_EN | config.OTHER_STOPWORDS | set(config.UNIT_TOKENS)
@@ -98,6 +169,10 @@ def get_clean_description(desc) -> str:
         return ""
 
     text = str(desc).lower()
+    # Transliterate Greek letters and select scientific symbols BEFORE the
+    # ASCII-encode step destroys them.  Without this, `α-amino`, `β-lactam`,
+    # `µl` lose all non-ASCII characters silently.
+    text = text.translate(_GREEK_TRANSLITERATION)
     text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("utf-8")
 
     for compiled_re, repl in _ALL_COMPILED:

@@ -1,0 +1,329 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       SE—Standard Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. Maximum number of variables is set to 32,767; see help set_maxvar.
+
+. do test_thresholds.do 
+
+. set more off
+
+. local bumpy_str `" "human serum" "crystallizing dishes" "rectangular carboys"
+>  "nitrogen" "bacterial selection antibiotics - rifampicin" "storage jars" "po
+> tassium acetate" "carbon dioxide" "depc" "sodium sulfate" "colorimetric subst
+> rates - onpg" "ammonium sulfate" "paraffin" "thrombin" "colorimetric substrat
+> es - dab" "chromatography paper" "flash chromatography columns - silica gel" 
+> "cell lysis detergents - digitonin" "cell culture antibiotics - zeocin" "dewa
+> r flasks" "drug - anticoagulant" "direct pcr lysis reagents" "lds sample buff
+> er" "'
+
+. 
+. use category year price similarity_score ///
+>     using /n/home02/cxu75/sci_eq/derived/first_stage/make_mkt_panel/output/fu
+> ll_item_level_tfidf.dta if ///
+>     inlist(category, "human serum", "crystallizing dishes", "rectangular carb
+> oys", "nitrogen", "bacterial selection antibiotics - rifampicin", "storage ja
+> rs") | ///
+>     inlist(category, "potassium acetate", "carbon dioxide", "depc", "sodium s
+> ulfate", "colorimetric substrates - onpg", "ammonium sulfate") | ///
+>     inlist(category, "paraffin", "thrombin", "colorimetric substrates - dab",
+>  "chromatography paper", "flash chromatography columns - silica gel", "cell l
+> ysis detergents - digitonin") | ///
+>     inlist(category, "cell culture antibiotics - zeocin", "dewar flasks", "dr
+> ug - anticoagulant", "direct pcr lysis reagents", "lds sample buffer"), clear
+
+. keep if inrange(year, 2010, 2018)
+(829 observations deleted)
+
+. rename price log_price
+
+. 
+. foreach thr in 0.15 0.20 0.25 0.30 {
+  2.     local thrlbl = strofreal(`thr', "%4.2f")
+  3.     preserve
+  4.         keep if similarity_score >= `thr'
+  5.         collapse (mean) avg_lp = log_price (count) n_items = log_price, by
+> (category year)
+  6.         sort category year
+  7.         by category: gen dlp = avg_lp - avg_lp[_n-1]
+  8.         collapse (sd) sd_thr_`=substr("`thrlbl'",3,2)' = dlp (sum) total_i
+> tems = n_items, by(category)
+  9.         rename total_items n_`=substr("`thrlbl'",3,2)'
+ 10.         tempfile r_`=substr("`thrlbl'",3,2)'
+ 11.         save `r_`=substr("`thrlbl'",3,2)''
+ 12.     restore
+ 13. }
+(36 observations deleted)
+(23 missing values generated)
+file /tmp/St1635792.000002 saved as .dta format
+(52 observations deleted)
+(23 missing values generated)
+file /tmp/St1635792.000004 saved as .dta format
+(72 observations deleted)
+(23 missing values generated)
+file /tmp/St1635792.000006 saved as .dta format
+(102 observations deleted)
+(23 missing values generated)
+file /tmp/St1635792.000008 saved as .dta format
+
+. 
+. * before (no filter)
+. preserve
+
+.     collapse (mean) avg_lp = log_price (count) n_items = log_price, by(catego
+> ry year)
+
+.     sort category year
+
+.     by category: gen dlp = avg_lp - avg_lp[_n-1]
+(23 missing values generated)
+
+.     collapse (sd) sd_before = dlp, by(category)
+
+.     tempfile before
+
+.     save `before'
+file /tmp/St1635792.00000a saved as .dta format
+
+. restore
+
+. 
+. use `before', clear
+
+. foreach t in 15 20 25 30 {
+  2.     merge 1:1 category using `r_`t'', nogen
+  3. }
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                                23  
+    -----------------------------------------
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                                23  
+    -----------------------------------------
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                                23  
+    -----------------------------------------
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                                23  
+    -----------------------------------------
+
+. gsort -sd_before
+
+. format sd_before sd_thr_15 sd_thr_20 sd_thr_25 sd_thr_30 %5.2f
+
+. list category sd_before sd_thr_15 sd_thr_20 sd_thr_25 sd_thr_30 n_15 n_20 n_2
+> 5 n_30, sep(0) noobs
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_bef~e | sd_th~15 |
+  |                    direct pcr lysis reagents |     0.88 |     0.42 |
+  |--------------------------------------------------------------------|
+  | sd_th~20  | sd_th~25  | sd_th~30  | n_15  | n_20  | n_25  |  n_30  |
+  |     0.42  |     0.42  |     0.43  |  116  |  116  |  116  |   115  |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_bef~e | sd_th~15 |
+  |                                  human serum |     0.86 |     0.86 |
+  |--------------------------------------------------------------------|
+  | sd_th~20  | sd_th~25  | sd_th~30  | n_15  | n_20  | n_25  |  n_30  |
+  |     0.86  |     0.86  |     0.86  |   85  |   85  |   85  |    85  |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_bef~e | sd_th~15 |
+  |                         crystallizing dishes |     0.72 |     0.72 |
+  |--------------------------------------------------------------------|
+  | sd_th~20  | sd_th~25  | sd_th~30  | n_15  | n_20  | n_25  |  n_30  |
+  |     0.72  |     0.72  |     0.72  |  354  |  354  |  354  |   354  |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_bef~e | sd_th~15 |
+  |                          rectangular carboys |     0.70 |     0.70 |
+  |--------------------------------------------------------------------|
+  | sd_th~20  | sd_th~25  | sd_th~30  | n_15  | n_20  | n_25  |  n_30  |
+  |     0.70  |     0.70  |     0.70  |   49  |   49  |   49  |    49  |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_bef~e | sd_th~15 |
+  |                                     nitrogen |     0.69 |     0.70 |
+  |--------------------------------------------------------------------|
+  | sd_th~20  | sd_th~25  | sd_th~30  | n_15  | n_20  | n_25  |  n_30  |
+  |     0.74  |     0.70  |     0.70  |  150  |  148  |  145  |   145  |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_bef~e | sd_th~15 |
+  | bacterial selection antibiotics - rifampicin |     0.67 |     0.67 |
+  |--------------------------------------------------------------------|
+  | sd_th~20  | sd_th~25  | sd_th~30  | n_15  | n_20  | n_25  |  n_30  |
+  |     0.67  |     0.67  |     0.56  |   47  |   47  |   47  |    46  |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_bef~e | sd_th~15 |
+  |                                 storage jars |     0.57 |     0.58 |
+  |--------------------------------------------------------------------|
+  | sd_th~20  | sd_th~25  | sd_th~30  | n_15  | n_20  | n_25  |  n_30  |
+  |     0.58  |     0.55  |     0.55  |  172  |  171  |  168  |   168  |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_bef~e | sd_th~15 |
+  |                            potassium acetate |     0.56 |     0.56 |
+  |--------------------------------------------------------------------|
+  | sd_th~20  | sd_th~25  | sd_th~30  | n_15  | n_20  | n_25  |  n_30  |
+  |     0.56  |     0.56  |     0.56  |   67  |   67  |   67  |    67  |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_bef~e | sd_th~15 |
+  |                               carbon dioxide |     0.50 |     0.50 |
+  |--------------------------------------------------------------------|
+  | sd_th~20  | sd_th~25  | sd_th~30  | n_15  | n_20  | n_25  |  n_30  |
+  |     0.50  |     0.50  |     0.50  | 2059  | 2059  | 2059  |  2057  |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_bef~e | sd_th~15 |
+  |                                         depc |     0.48 |     0.50 |
+  |--------------------------------------------------------------------|
+  | sd_th~20  | sd_th~25  | sd_th~30  | n_15  | n_20  | n_25  |  n_30  |
+  |     0.50  |     0.50  |     0.48  |   66  |   66  |   66  |    65  |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_bef~e | sd_th~15 |
+  |                               sodium sulfate |     0.47 |     0.45 |
+  |--------------------------------------------------------------------|
+  | sd_th~20  | sd_th~25  | sd_th~30  | n_15  | n_20  | n_25  |  n_30  |
+  |     0.53  |     0.52  |     0.52  |  135  |  130  |  128  |   126  |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_bef~e | sd_th~15 |
+  |               colorimetric substrates - onpg |     0.46 |     0.48 |
+  |--------------------------------------------------------------------|
+  | sd_th~20  | sd_th~25  | sd_th~30  | n_15  | n_20  | n_25  |  n_30  |
+  |     0.48  |     0.57  |     0.64  |   46  |   46  |   41  |    38  |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_bef~e | sd_th~15 |
+  |                             ammonium sulfate |     0.46 |     0.46 |
+  |--------------------------------------------------------------------|
+  | sd_th~20  | sd_th~25  | sd_th~30  | n_15  | n_20  | n_25  |  n_30  |
+  |     0.46  |     0.46  |     0.46  |   70  |   70  |   70  |    70  |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_bef~e | sd_th~15 |
+  |                            lds sample buffer |     0.43 |     0.43 |
+  |--------------------------------------------------------------------|
+  | sd_th~20  | sd_th~25  | sd_th~30  | n_15  | n_20  | n_25  |  n_30  |
+  |     0.44  |     0.47  |     0.47  |  168  |  167  |  165  |   165  |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_bef~e | sd_th~15 |
+  |                                     paraffin |     0.42 |     0.42 |
+  |--------------------------------------------------------------------|
+  | sd_th~20  | sd_th~25  | sd_th~30  | n_15  | n_20  | n_25  |  n_30  |
+  |     0.42  |     0.42  |     0.42  |  472  |  472  |  471  |   471  |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_bef~e | sd_th~15 |
+  |                                     thrombin |     0.41 |     0.41 |
+  |--------------------------------------------------------------------|
+  | sd_th~20  | sd_th~25  | sd_th~30  | n_15  | n_20  | n_25  |  n_30  |
+  |     0.41  |     0.43  |     0.43  |  121  |  121  |  120  |   120  |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_bef~e | sd_th~15 |
+  |                colorimetric substrates - dab |     0.39 |     0.39 |
+  |--------------------------------------------------------------------|
+  | sd_th~20  | sd_th~25  | sd_th~30  | n_15  | n_20  | n_25  |  n_30  |
+  |     0.39  |     0.39  |     0.41  |  581  |  580  |  580  |   564  |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_bef~e | sd_th~15 |
+  |                         chromatography paper |     0.39 |     0.39 |
+  |--------------------------------------------------------------------|
+  | sd_th~20  | sd_th~25  | sd_th~30  | n_15  | n_20  | n_25  |  n_30  |
+  |     0.38  |     0.41  |     0.41  |  190  |  189  |  186  |   186  |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_bef~e | sd_th~15 |
+  |    flash chromatography columns - silica gel |     0.38 |     0.38 |
+  |--------------------------------------------------------------------|
+  | sd_th~20  | sd_th~25  | sd_th~30  | n_15  | n_20  | n_25  |  n_30  |
+  |     0.38  |     0.38  |     0.38  |  102  |  102  |  102  |   102  |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_bef~e | sd_th~15 |
+  |            cell lysis detergents - digitonin |     0.35 |     0.41 |
+  |--------------------------------------------------------------------|
+  | sd_th~20  | sd_th~25  | sd_th~30  | n_15  | n_20  | n_25  |  n_30  |
+  |     0.37  |     0.37  |     0.37  |  142  |  140  |  140  |   140  |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_bef~e | sd_th~15 |
+  |            cell culture antibiotics - zeocin |     0.35 |     0.35 |
+  |--------------------------------------------------------------------|
+  | sd_th~20  | sd_th~25  | sd_th~30  | n_15  | n_20  | n_25  |  n_30  |
+  |     0.37  |     0.37  |     0.38  |  154  |  151  |  151  |   147  |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_bef~e | sd_th~15 |
+  |                                 dewar flasks |     0.33 |     0.32 |
+  |--------------------------------------------------------------------|
+  | sd_th~20  | sd_th~25  | sd_th~30  | n_15  | n_20  | n_25  |  n_30  |
+  |     0.32  |     0.32  |     0.32  |  388  |  388  |  388  |   388  |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_bef~e | sd_th~15 |
+  |                         drug - anticoagulant |     0.32 |     0.32 |
+  |--------------------------------------------------------------------|
+  | sd_th~20  | sd_th~25  | sd_th~30  | n_15  | n_20  | n_25  |  n_30  |
+  |     0.32  |     0.32  |     0.32  |  148  |  148  |  148  |   148  |
+  +--------------------------------------------------------------------+
+
+. 
+end of do-file

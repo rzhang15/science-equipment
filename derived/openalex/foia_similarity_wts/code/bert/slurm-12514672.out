@@ -1,0 +1,28 @@
+Model: allenai-specter   Stage: validate   K: 5
+Device: cuda
+Loading model: allenai-specter
+/n/holylabs/LABS/pakes_lab/Lab/env/lib/python3.10/site-packages/transformers/tokenization_utils_base.py:1617: FutureWarning: `clean_up_tokenization_spaces` was not set. It will be set to `True` by default. This behavior will be deprecated in transformers v4.45, and will be then set to `False` by default. For more details check this issue: https://github.com/huggingface/transformers/issues/31884
+  warnings.warn(
+Loading FOIA texts...
+FOIA authors: 188
+FOIA embedding shape: (188, 768)
+Saved ../../output/bert_foia_allenai-specter.npy and ../../output/bert_foia_ids_allenai-specter.csv
+Loading ../../output/bert_foia_allenai-specter.npy
+Embeddings: (188, 768)
+Filtering to top 50 per row...
+Saving ../../output/validation_weights_bert_allenai-specter_k50.npz
+Saved ../../output/foia_ids_ordered_bert_allenai-specter.csv
+--- BERT LOOV ---
+Aligned 188 authors. Weight shape: (188, 188)
+K sweep: [3, 5, 7, 10, 15, 20, 50]
+K=   3 -> r=0.1262, R2=-0.0745
+K=   5 -> r=0.0810, R2=-0.0673
+K=   7 -> r=0.0402, R2=-0.0698
+K=  10 -> r=0.0236, R2=-0.0595
+K=  15 -> r=-0.0014, R2=-0.0463
+K=  20 -> r=0.0335, R2=-0.0306
+K=  50 -> r=0.0746, R2=-0.0052
+----------------------------------------
+BEST: K=3 -> r=0.1262, R2=-0.0745
+----------------------------------------
+Plot: ../../output/validation_plot_bert_allenai-specter.png

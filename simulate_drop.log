@@ -1,0 +1,356 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       SE—Standard Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. Maximum number of variables is set to 32,767; see help set_maxvar.
+
+. do simulate_drop.do 
+
+. set more off
+
+. local bumpy_str `" "human serum" "crystallizing dishes" "rectangular carboys"
+>  "nitrogen" "bacterial selection antibiotics - rifampicin" "storage jars" "po
+> tassium acetate" "carbon dioxide" "depc" "sodium sulfate" "colorimetric subst
+> rates - onpg" "ammonium sulfate" "paraffin" "thrombin" "colorimetric substrat
+> es - dab" "chromatography paper" "flash chromatography columns - silica gel" 
+> "cell lysis detergents - digitonin" "cell culture antibiotics - zeocin" "dewa
+> r flasks" "drug - anticoagulant" "direct pcr lysis reagents" "lds sample buff
+> er" "'
+
+. 
+. use category year product_desc clean_desc price qty spend similarity_score pr
+> ediction_source supplier_id ///
+>     using /n/home02/cxu75/sci_eq/derived/first_stage/make_mkt_panel/output/fu
+> ll_item_level_tfidf.dta if ///
+>     inlist(category, "human serum", "crystallizing dishes", "rectangular carb
+> oys", "nitrogen", "bacterial selection antibiotics - rifampicin", "storage ja
+> rs") | ///
+>     inlist(category, "potassium acetate", "carbon dioxide", "depc", "sodium s
+> ulfate", "colorimetric substrates - onpg", "ammonium sulfate") | ///
+>     inlist(category, "paraffin", "thrombin", "colorimetric substrates - dab",
+>  "chromatography paper", "flash chromatography columns - silica gel", "cell l
+> ysis detergents - digitonin") | ///
+>     inlist(category, "cell culture antibiotics - zeocin", "dewar flasks", "dr
+> ug - anticoagulant", "direct pcr lysis reagents", "lds sample buffer"), clear
+
+. keep if inrange(year, 2010, 2018)
+(829 observations deleted)
+
+. 
+. * Note: variable "price" here is log price
+. rename price log_price
+
+. 
+. * Outlier detection: per-category median and IQR of log_price
+. bysort category: egen med_lp = median(log_price)
+
+. bysort category: egen p25_lp = pctile(log_price), p(25)
+
+. bysort category: egen p75_lp = pctile(log_price), p(75)
+
+. gen iqr_lp = p75_lp - p25_lp
+
+. gen abs_dev = abs(log_price - med_lp)
+
+. gen outlier = abs_dev > 2 * iqr_lp & iqr_lp > 0
+
+. gen low_sim = similarity_score < 0.30
+
+. gen suspect = outlier | low_sim
+
+. 
+. * === BEFORE: avg log price by category-year, then SD of yoy changes ===
+. preserve
+
+.     collapse (mean) avg_lp = log_price, by(category year)
+
+.     sort category year
+
+.     by category: gen dlp = avg_lp - avg_lp[_n-1]
+(23 missing values generated)
+
+.     collapse (sd) sd_dlp_before = dlp (count) n_yrs = year, by(category)
+
+.     tempfile before
+
+.     save `before'
+file /tmp/St1618338.000002 saved as .dta format
+
+. restore
+
+. 
+. * === AFTER: drop suspect items, then recompute ===
+. preserve
+
+.     drop if suspect == 1
+(586 observations deleted)
+
+.     collapse (mean) avg_lp = log_price (count) n_items = log_price, by(catego
+> ry year)
+
+.     sort category year
+
+.     by category: gen dlp = avg_lp - avg_lp[_n-1]
+(23 missing values generated)
+
+.     collapse (sd) sd_dlp_after = dlp (sum) total_items = n_items, by(category
+> )
+
+.     tempfile after
+
+.     save `after'
+file /tmp/St1618338.000004 saved as .dta format
+
+. restore
+
+. 
+. * === Count suspects per category ===
+. preserve
+
+.     collapse (sum) n_suspect = suspect n_outlier = outlier n_low_sim = low_si
+> m (count) n_total = log_price, by(category)
+
+.     gen pct_suspect = 100*n_suspect/n_total
+
+.     tempfile counts
+
+.     save `counts'
+file /tmp/St1618338.000006 saved as .dta format
+
+. restore
+
+. 
+. use `before', clear
+
+. merge 1:1 category using `after', nogen
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                                23  
+    -----------------------------------------
+
+. merge 1:1 category using `counts', nogen
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                                23  
+    -----------------------------------------
+
+. 
+. gen improvement = sd_dlp_before - sd_dlp_after
+
+. gen pct_improve = 100*improvement/sd_dlp_before
+
+. gsort -sd_dlp_before
+
+. format sd_dlp_before sd_dlp_after improvement %5.2f
+
+. format pct_improve pct_suspect %5.1f
+
+. list category sd_dlp_before sd_dlp_after pct_improve n_total n_suspect pct_su
+> spect, sep(0) noobs
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_dlp~e | sd_dlp~r |
+  |                    direct pcr lysis reagents |     0.88 |     0.17 |
+  |--------------------------------------------------------------------|
+  |    pct_im~e    |    n_total    |    n_susp~t     |    pct_su~t     |
+  |        80.1    |        120    |          29     |        24.2     |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_dlp~e | sd_dlp~r |
+  |                                  human serum |     0.86 |     0.45 |
+  |--------------------------------------------------------------------|
+  |    pct_im~e    |    n_total    |    n_susp~t     |    pct_su~t     |
+  |        47.4    |         85    |           4     |         4.7     |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_dlp~e | sd_dlp~r |
+  |                         crystallizing dishes |     0.72 |     0.19 |
+  |--------------------------------------------------------------------|
+  |    pct_im~e    |    n_total    |    n_susp~t     |    pct_su~t     |
+  |        73.9    |        354    |          31     |         8.8     |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_dlp~e | sd_dlp~r |
+  |                          rectangular carboys |     0.70 |     0.34 |
+  |--------------------------------------------------------------------|
+  |    pct_im~e    |    n_total    |    n_susp~t     |    pct_su~t     |
+  |        51.8    |         49    |           8     |        16.3     |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_dlp~e | sd_dlp~r |
+  |                                     nitrogen |     0.69 |     0.71 |
+  |--------------------------------------------------------------------|
+  |    pct_im~e    |    n_total    |    n_susp~t     |    pct_su~t     |
+  |        -3.1    |        151    |           8     |         5.3     |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_dlp~e | sd_dlp~r |
+  | bacterial selection antibiotics - rifampicin |     0.67 |     0.56 |
+  |--------------------------------------------------------------------|
+  |    pct_im~e    |    n_total    |    n_susp~t     |    pct_su~t     |
+  |        16.5    |         47    |           1     |         2.1     |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_dlp~e | sd_dlp~r |
+  |                                 storage jars |     0.57 |     0.38 |
+  |--------------------------------------------------------------------|
+  |    pct_im~e    |    n_total    |    n_susp~t     |    pct_su~t     |
+  |        33.4    |        175    |          24     |        13.7     |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_dlp~e | sd_dlp~r |
+  |                            potassium acetate |     0.56 |     0.33 |
+  |--------------------------------------------------------------------|
+  |    pct_im~e    |    n_total    |    n_susp~t     |    pct_su~t     |
+  |        40.6    |         68    |           3     |         4.4     |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_dlp~e | sd_dlp~r |
+  |                               carbon dioxide |     0.50 |     0.24 |
+  |--------------------------------------------------------------------|
+  |    pct_im~e    |    n_total    |    n_susp~t     |    pct_su~t     |
+  |        51.1    |       2059    |         228     |        11.1     |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_dlp~e | sd_dlp~r |
+  |                                         depc |     0.48 |     0.48 |
+  |--------------------------------------------------------------------|
+  |    pct_im~e    |    n_total    |    n_susp~t     |    pct_su~t     |
+  |         1.0    |         67    |           2     |         3.0     |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_dlp~e | sd_dlp~r |
+  |                               sodium sulfate |     0.47 |     0.52 |
+  |--------------------------------------------------------------------|
+  |    pct_im~e    |    n_total    |    n_susp~t     |    pct_su~t     |
+  |       -10.8    |        137    |          11     |         8.0     |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_dlp~e | sd_dlp~r |
+  |               colorimetric substrates - onpg |     0.46 |     0.64 |
+  |--------------------------------------------------------------------|
+  |    pct_im~e    |    n_total    |    n_susp~t     |    pct_su~t     |
+  |       -38.7    |         66    |          28     |        42.4     |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_dlp~e | sd_dlp~r |
+  |                             ammonium sulfate |     0.46 |     0.43 |
+  |--------------------------------------------------------------------|
+  |    pct_im~e    |    n_total    |    n_susp~t     |    pct_su~t     |
+  |         6.5    |         70    |           1     |         1.4     |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_dlp~e | sd_dlp~r |
+  |                            lds sample buffer |     0.43 |     0.20 |
+  |--------------------------------------------------------------------|
+  |    pct_im~e    |    n_total    |    n_susp~t     |    pct_su~t     |
+  |        55.0    |        168    |          18     |        10.7     |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_dlp~e | sd_dlp~r |
+  |                                     paraffin |     0.42 |     0.42 |
+  |--------------------------------------------------------------------|
+  |    pct_im~e    |    n_total    |    n_susp~t     |    pct_su~t     |
+  |        -0.1    |        472    |           1     |         0.2     |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_dlp~e | sd_dlp~r |
+  |                                     thrombin |     0.41 |     0.43 |
+  |--------------------------------------------------------------------|
+  |    pct_im~e    |    n_total    |    n_susp~t     |    pct_su~t     |
+  |        -3.7    |        121    |           1     |         0.8     |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_dlp~e | sd_dlp~r |
+  |                colorimetric substrates - dab |     0.39 |     0.11 |
+  |--------------------------------------------------------------------|
+  |    pct_im~e    |    n_total    |    n_susp~t     |    pct_su~t     |
+  |        72.6    |        582    |         120     |        20.6     |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_dlp~e | sd_dlp~r |
+  |                         chromatography paper |     0.39 |     0.41 |
+  |--------------------------------------------------------------------|
+  |    pct_im~e    |    n_total    |    n_susp~t     |    pct_su~t     |
+  |        -5.5    |        190    |           4     |         2.1     |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_dlp~e | sd_dlp~r |
+  |    flash chromatography columns - silica gel |     0.38 |     0.38 |
+  |--------------------------------------------------------------------|
+  |    pct_im~e    |    n_total    |    n_susp~t     |    pct_su~t     |
+  |         0.0    |        102    |           0     |         0.0     |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_dlp~e | sd_dlp~r |
+  |            cell lysis detergents - digitonin |     0.35 |     0.25 |
+  |--------------------------------------------------------------------|
+  |    pct_im~e    |    n_total    |    n_susp~t     |    pct_su~t     |
+  |        27.5    |        143    |           7     |         4.9     |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_dlp~e | sd_dlp~r |
+  |            cell culture antibiotics - zeocin |     0.35 |     0.07 |
+  |--------------------------------------------------------------------|
+  |    pct_im~e    |    n_total    |    n_susp~t     |    pct_su~t     |
+  |        79.1    |        154    |          43     |        27.9     |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_dlp~e | sd_dlp~r |
+  |                                 dewar flasks |     0.33 |     0.24 |
+  |--------------------------------------------------------------------|
+  |    pct_im~e    |    n_total    |    n_susp~t     |    pct_su~t     |
+  |        25.7    |        390    |          11     |         2.8     |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_dlp~e | sd_dlp~r |
+  |                         drug - anticoagulant |     0.32 |     0.32 |
+  |--------------------------------------------------------------------|
+  |    pct_im~e    |    n_total    |    n_susp~t     |    pct_su~t     |
+  |         1.2    |        148    |           3     |         2.0     |
+  +--------------------------------------------------------------------+
+
+. 
+end of do-file

@@ -5,7 +5,7 @@
 
 Loading necessary models and categorizers...
   - Initializing TfidfItemCategorizer...
-  - Loaded word feats: 84322, char feats: 265937, supplier feats: 2138, contrastive weights: yes
+  - Loaded word feats: 78325, char feats: 265122, supplier feats: 2137, contrastive weights: yes
 Initializing RuleBasedCategorizer with upgraded logic...
   - Loaded 923 market override rules.
   - Loaded 30 exact-match veto rules.
@@ -16,19 +16,18 @@ GovSpend specified. Loading the GovSpend panel data.
 
 --- Processing file: govspend_panel_clean.csv ---
   - Step 1: Running gatekeeper...
-  - Gatekeeper identified 2819231 potential lab items.
-  - Supplier filter: 33976 items forced to Non-Lab (117311 total supplier Non-Lab).
+  - Gatekeeper identified 3013130 potential lab items.
+  - Supplier filter: 37758 items forced to Non-Lab (117311 total supplier Non-Lab).
   - Step 2: Predicting markets with 'tfidf' expert (batched)...
+  - Step 2.5: Supplier-category force overrode 14058 expert predictions.
   - Step 3: Applying prediction veto rules...
-  - WARNING:Vetoed 51455 expert predictions.
+  - WARNING:Vetoed 62357 expert predictions.
   - Step 4: Applying final market override rules...
   - 1509436 unique description pairs among 4004554 rows
-  - Applied 1711267 market override rules.
+  - Applying market rules in parallel: 16 workers x 64 chunks (~23585 rows/chunk).
+  - Applied 1711918 market override rules.
+  - 966136 items have a non-lab market category from rules; keeping granular label, flagging as non-lab for binary eval.
   - Step 5: Calculating final similarity scores for lab predictions...
-  -  DEBUG: Category mismatch. Rule category 'animal - drosophila supplies' not found in expert model's category list.
-  -  DEBUG: Category mismatch. Rule category 'instrument part - buffer dams' not found in expert model's category list.
-  -  DEBUG: Category mismatch. Rule category 'irrelevant chemicals - inorganic salts' not found in expert model's category list.
-  -  DEBUG: Category mismatch. Rule category 'irrelevant chemicals - solvents' not found in expert model's category list.
 Prediction file saved to: /n/holylabs/pakes_lab/Lab/sci_eq/derived/process_foias/prdct_classification/output/umich_supplier/govspend_panel_clean_classified_with_tfidf.csv
 
 --- All files processed. ---

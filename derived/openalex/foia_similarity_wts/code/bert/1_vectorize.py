@@ -23,9 +23,9 @@ DEFAULT_MODEL = "allenai-specter"  # other options:
 # "pritamdeka/S-Scibert-snli-multinli-stsb"
 # "allenai/scibert_scivocab_uncased"
 
-UNIVERSE_PARQUET = "../external/us_appended_text/cleaned_static_author_text_pre_us.parquet"
-FOIA_CSV = "../output/foia_author_text_final.csv"
-OUT_DIR = "../output/"
+UNIVERSE_PARQUET = "../../external/us_appended_text/cleaned_static_author_text_pre_us.parquet"
+FOIA_CSV = "../../output/foia_author_text_final.csv"
+OUT_DIR = "../../output/"
 
 ROW_BATCH = 4096
 ENCODE_BATCH = 256
@@ -72,9 +72,9 @@ def encode_authors(model, ids: list[str], texts: list[str]) -> np.ndarray:
     return out
 
 
-def embed_foia(model, out_emb: str, out_ids: str) -> None:
-    print("Loading FOIA texts...")
-    df = pd.read_csv(FOIA_CSV)
+def embed_foia(model, out_emb: str, out_ids: str, foia_csv: str = FOIA_CSV) -> None:
+    print(f"Loading FOIA texts from {foia_csv}...")
+    df = pd.read_csv(foia_csv)
     df[TEXT_COL] = df[TEXT_COL].fillna("").astype(str)
     print(f"FOIA authors: {len(df)}")
 
@@ -130,6 +130,10 @@ def main():
                         help="Also embed the full universe (slow; needs GPU).")
     parser.add_argument("--limit", type=int, default=None,
                         help="Cap universe rows (smoke test).")
+    parser.add_argument("--foia-csv", default=FOIA_CSV,
+                        help="Override the FOIA-text CSV (e.g. the un-stemmed variant).")
+    parser.add_argument("--tag-suffix", default="",
+                        help="Appended to output filenames so variants don't clobber each other.")
     args = parser.parse_args()
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -142,10 +146,10 @@ def main():
     if device == "cuda":
         model = model.half()
 
-    model_tag = args.model.replace("/", "_")
+    model_tag = args.model.replace("/", "_") + args.tag_suffix
     foia_emb = os.path.join(OUT_DIR, f"bert_foia_{model_tag}.npy")
     foia_ids = os.path.join(OUT_DIR, f"bert_foia_ids_{model_tag}.csv")
-    embed_foia(model, foia_emb, foia_ids)
+    embed_foia(model, foia_emb, foia_ids, args.foia_csv)
 
     if args.universe:
         univ_emb = os.path.join(OUT_DIR, f"bert_universe_{model_tag}.npy")

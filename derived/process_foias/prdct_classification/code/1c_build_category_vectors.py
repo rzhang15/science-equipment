@@ -6,18 +6,40 @@ from the UT Dallas data. This creates the knowledge base for the BERT expert mod
 import pandas as pd
 import joblib
 import os
+import argparse
 from sentence_transformers import SentenceTransformer
 from sklearn.preprocessing import normalize
 from scipy.sparse import hstack
 import numpy as np
 import config
 
-MODELS_TO_PREPARE = {
-    "bert": "all-MiniLM-L6-v2"
-}
 
-def main():
-    print(f"--- Starting Step 1c: Preparing BERT Expert Category Vectors [Variant: {config.VARIANT}] ---")
+def _load_encoder(model_id):
+    import torch
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    print(f"  Loading encoder '{model_id}' on device={device}")
+    model = SentenceTransformer(model_id, device=device)
+    if device == 'cuda':
+        model.half()
+    return model
+
+
+def _encode_dedup(model, texts, batch_size=256):
+    codes, uniques = pd.factorize(pd.Series(texts), sort=False)
+    print(f"    Encoding {len(uniques)} unique texts (from {len(texts)} total)")
+    uniq_vecs = model.encode(
+        list(uniques),
+        batch_size=batch_size,
+        show_progress_bar=True,
+        convert_to_numpy=True,
+        normalize_embeddings=True,
+    )
+    return uniq_vecs[codes].astype(np.float32)
+
+def main(embedding_name):
+    model_id = config.BERT_MODELS[embedding_name]
+    print(f"--- Starting Step 1c: Preparing Expert Category Vectors "
+          f"[Variant: {config.VARIANT}, model: {embedding_name}] ---")
 
     print("Loading pre-cleaned and merged data...")
     frames = []
@@ -62,53 +84,68 @@ def main():
         supp_map = {s: config.normalize_supplier(str(s)) for s in unique_supp}
         df_lab_only['supplier_token'] = df_lab_only['supplier'].fillna('').map(supp_map)
 
-    for short_name, model_name in MODELS_TO_PREPARE.items():
-        print(f"\n--- Preparing vectors for expert model: {short_name} ---")
-        model = SentenceTransformer(model_name)
+    short_name = embedding_name
+    print(f"\n--- Preparing vectors for expert model: {short_name} ({model_id}) ---")
+    model = _load_encoder(model_id)
 
-        print("  - Generating embeddings for all lab item descriptions...")
+    print("  - Generating embeddings for all lab item descriptions...")
 
-        descriptions_list = df_lab_only[config.CLEAN_DESC_COL].fillna('').tolist()
-        embeddings = model.encode(descriptions_list, show_progress_bar=True)
+    descriptions_list = df_lab_only[config.CLEAN_DESC_COL].fillna('').tolist()
+    embeddings = _encode_dedup(model, descriptions_list)
 
-        if supplier_vectorizer is not None:
-            supp_tokens = df_lab_only['supplier_token'].fillna('').astype(str).tolist()
-            X_supp = supplier_vectorizer.transform(supp_tokens)
-            desc_n = normalize(embeddings, norm='l2')
-            supp_n = normalize(X_supp, norm='l2')
-            item_vectors = hstack([desc_n * config.DESC_WEIGHT,
-                                   supp_n * config.SUPPLIER_WEIGHT]).tocsr()
-            print(f"  - Combined: {config.DESC_WEIGHT:.0%} BERT + {config.SUPPLIER_WEIGHT:.0%} supplier"
-                  f" = {item_vectors.shape[1]} feats")
+    if supplier_vectorizer is not None:
+        supp_tokens = df_lab_only['supplier_token'].fillna('').astype(str).tolist()
+        X_supp = supplier_vectorizer.transform(supp_tokens)
+        desc_n = normalize(embeddings, norm='l2')
+        supp_n = normalize(X_supp, norm='l2')
+        item_vectors = hstack([desc_n * config.DESC_WEIGHT,
+                               supp_n * config.SUPPLIER_WEIGHT]).tocsr()
+        print(f"  - Combined: {config.DESC_WEIGHT:.0%} {short_name} + {config.SUPPLIER_WEIGHT:.0%} supplier"
+              f" = {item_vectors.shape[1]} feats")
 
-            print("  - Averaging combined vectors by category...")
-            categories = pd.Categorical(df_lab_only[config.UT_CAT_COL])
-            from scipy.sparse import csr_matrix
-            G = csr_matrix(
-                (np.ones(len(categories)), (categories.codes, np.arange(len(categories)))),
-                shape=(len(categories.categories), len(categories)),
-            )
-            cat_sums = G.dot(item_vectors)
-            cat_counts = np.bincount(categories.codes)[:, np.newaxis]
-            cat_vectors = cat_sums / np.maximum(cat_counts, 1)
-            category_data = {
-                'category_names': categories.categories.tolist(),
-                'category_vectors': cat_vectors,
-            }
-        else:
-            df_lab_only[f'embeddings_{short_name}'] = list(embeddings)
-            print("  - Averaging embeddings by category...")
-            category_vectors_df = df_lab_only.groupby(config.UT_CAT_COL)[f'embeddings_{short_name}'].apply(lambda x: np.mean(x.tolist(), axis=0))
-            category_data = {
-                'category_names': category_vectors_df.index.tolist(),
-                'category_vectors': np.vstack(category_vectors_df.values)
-            }
+        print("  - Averaging combined vectors by category...")
+        categories = pd.Categorical(df_lab_only[config.UT_CAT_COL])
+        from scipy.sparse import csr_matrix
+        G = csr_matrix(
+            (np.ones(len(categories)), (categories.codes, np.arange(len(categories)))),
+            shape=(len(categories.categories), len(categories)),
+        )
+        cat_sums = G.dot(item_vectors)
+        cat_counts = np.bincount(categories.codes)[:, np.newaxis]
+        cat_vectors = cat_sums / np.maximum(cat_counts, 1)
+        category_data = {
+            'category_names': categories.categories.tolist(),
+            'category_vectors': cat_vectors,
+        }
+    else:
+        df_lab_only[f'embeddings_{short_name}'] = list(embeddings)
+        print("  - Averaging embeddings by category...")
+        category_vectors_df = df_lab_only.groupby(config.UT_CAT_COL)[f'embeddings_{short_name}'].apply(lambda x: np.mean(x.tolist(), axis=0))
+        category_data = {
+            'category_names': category_vectors_df.index.tolist(),
+            'category_vectors': np.vstack(category_vectors_df.values)
+        }
 
-        output_path = os.path.join(config.OUTPUT_DIR, f"category_vectors_{short_name}.joblib")
-        joblib.dump(category_data, output_path)
-        print(f"  Saved '{short_name}' expert knowledge base to {output_path}")
+    output_path = os.path.join(config.OUTPUT_DIR, f"category_vectors_{short_name}.joblib")
+    joblib.dump(category_data, output_path)
+    print(f"  Saved '{short_name}' expert knowledge base to {output_path}")
 
-    print("\n--- BERT expert category vector preparation complete. ---")
+    del model
+    try:
+        import torch
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    except ImportError:
+        pass
+
+    print("\n--- Expert category vector preparation complete. ---")
+
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    choices = list(config.BERT_MODELS.keys())
+    parser.add_argument("embedding_name", type=str, choices=choices,
+                        help=f"Which expert encoder to build category vectors for. "
+                             f"One of: {choices}")
+    args = parser.parse_args()
+    main(args.embedding_name)

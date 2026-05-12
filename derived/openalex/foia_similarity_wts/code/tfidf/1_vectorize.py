@@ -6,9 +6,9 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from config import stopwords_list
 
 # --- CONFIGURATION ---
-UNIVERSE_PATH = "../external/us_appended_text/cleaned_static_author_text_pre_us.parquet"
-FOIA_PATH = "../output/foia_author_text_final.csv"
-OUTPUT_DIR = "../output/"
+UNIVERSE_PATH = "../../external/us_appended_text/cleaned_static_author_text_pre_us.parquet"
+FOIA_PATH = "../../output/foia_author_text_final.csv"
+OUTPUT_DIR = "../../output/"
 MAX_FEATURES = 5000
 MIN_DF = 150
 SAMPLE_SIZE = 500_000  # Cap fit() corpus at this many docs; transform() still runs on the full universe

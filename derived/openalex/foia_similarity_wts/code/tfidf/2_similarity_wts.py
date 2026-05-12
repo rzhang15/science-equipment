@@ -3,9 +3,9 @@ import numpy as np
 import scipy.sparse
 
 # --- CONFIGURATION ---
-UNIVERSE_MATRIX = "../output/tfidf_universe.npz"
-FOIA_MATRIX = "../output/tfidf_foia.npz"
-OUTPUT_WEIGHTS = "../output/weight_matrix.npz"
+UNIVERSE_MATRIX = "../../output/tfidf_universe.npz"
+FOIA_MATRIX = "../../output/tfidf_foia.npz"
+OUTPUT_WEIGHTS = "../../output/weight_matrix.npz"
 
 BATCH_SIZE = 50000 
 SIMILARITY_THRESHOLD = 0.01  # Minimum similarity to even consider (keeps matrix sparse)

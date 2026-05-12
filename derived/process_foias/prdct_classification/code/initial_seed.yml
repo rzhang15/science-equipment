@@ -571,26 +571,34 @@ keywords:
   # Lab detergents (validated >=91% lab in Dallas + UMich training)
   - 7x detergent
   - 7x cleaning           # ES 7X cleaning solution
+  - alcojet               # Alconox Alcojet lab detergent
   - alconox
   - bioclenz
   - citranox
+  - clear bath            # Sigma Clear Bath glassware soak
   - contrad
   - decon 90
   - liqui-nox
   - liquinox
+  - lubrol                # Sigma polyoxyethylene detergent
   - micro-90
+  - n-per                 # Thermo N-PER protein extraction reagent
   - rbs-35
+  - saponin               # plant-derived detergent / membrane permeabilizer
+  - sodium cholate        # bile salt detergent
   - softcide
   - solujet               # Alconox Solujet phosphate-free detergent
   - sparkleen             # Fisher Sparkleen lab glassware detergent
   - sporgon
   - tergazyme
   - versa-clean
+  - zwittergent           # zwitterionic detergent (cell lysis)
 
   # Household-brand soaps used as labware detergents
   # (per user guidance, household soaps belong to "labware detergents and
   # cleaners", NOT anti-seed)
   - dawn dish
+  - dial gold soap
   - dish detergent
   - dish soap
   - dishwashing liquid
@@ -599,7 +607,9 @@ keywords:
   - hand soap
   - hand wash
   - liquid soap
+  - lysol
   - palmolive
+  - soft soap             # Colgate Soft Soap (with space)
   - softsoap
 
   # Disinfectants & germicidals
@@ -1327,6 +1337,52 @@ keywords:
   - n-ethylmaleimide
   - sulfur
   - tubocurarine
+
+  # ====================================================================
+  # SMALL MOLECULE INHIBITORS (canonical research compound names)
+  # ====================================================================
+  # Recall on `small molecule inhibitors` was lagging because catalog
+  # entries are often just the compound name with no surrounding lab
+  # vocabulary (e.g. bare "Y-27632 2HCl, 10mg").  Seeded so a single
+  # token forces lab.
+  - chir99021
+  - chir 99021
+  - y-27632
+  - sb203580
+  - sb-203580
+  - u0126
+  - u-0126
+  - ly294002
+  - ly-294002
+  - pd98059
+  - pd-98059
+  - mg-132
+  - mg132
+  - dorsomorphin
+  - forskolin
+  - okadaic acid
+  - staurosporine
+  - wortmannin
+  - pifithrin
+  - bortezomib
+  - thapsigargin
+  - ionomycin
+  - a-83-01
+  - ml-7
+  - sp600125
+  - sp-600125
+  - bay 11-7082
+  - aphidicolin
+  - nocodazole
+  - colchicine
+  - cytochalasin
+  - latrunculin
+  - jasplakinolide
+  - gefitinib
+  - imatinib
+  - erlotinib
+  - sorafenib
+  - sunitinib
 
   # ====================================================================
   # METABOLISM & ASSAY KITS

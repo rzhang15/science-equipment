@@ -389,6 +389,11 @@ replace tier3 = 1 if category == "capped mrna synthesis kits"
 replace tier3 = 1 if category == "in vitro transcription kit"
 replace tier3 = 1 if category == "direct pcr lysis reagents"
 
+* --- BSA: bovine-derived (shares input with Tier 1 FBS); HyClone sold BSA as
+*     part of cell-culture portfolio; co-purchased with FBS as serum
+*     supplement/blocker (bundling) ---
+replace tier3 = 1 if category == "bovine serum albumin"
+
 count if tier3 == 1
 gen treated_strict = (tier1 == 1)
 gen treated_1and2  = (tier1 == 1 | tier2 == 1)
@@ -407,9 +412,82 @@ tab tier3
 tab treated_strict
 tab treated_1and2
 tab treated
+
+*===============================================================================
+* BAD CONTROL CATEGORIES
+* Categories that pass quality filters and are NOT treated by the merger, but
+* nonetheless experienced their own price/supply "action" during the analysis
+* window (~2010-2018) or are workflow-bundled with treated categories. These
+* contaminate the control group, so we drop them (keep=0) and record the
+* reason in bad_control_reason.
+*-------------------------------------------------------------------------------
+* Window screen: shocks limited to roughly 2010-2018 around the Feb 2014 TFL
+* merger. COVID-19 (2020-22), acetonitrile crisis (2008-09), and earlier
+* helium shortage (2011-13, no helium category in data) are NOT used.
+*===============================================================================
+
+gen bad_control = 0
+gen bad_control_reason = ""
+
+* --- Antibody market shocks: reproducibility crisis 2014-16 + Sigma-Aldrich
+*     -> MilliporeSigma merger Nov 2015 absorbed one of the largest antibody
+*     portfolios in the industry ---
+replace bad_control = 1 if inlist(category, "primary antibodies", "secondary antibodies")
+replace bad_control_reason = "antibody reproducibility crisis 2014-16; Sigma-Aldrich/MilliporeSigma merger Nov 2015 affected major antibody supplier" ///
+    if inlist(category, "primary antibodies", "secondary antibodies")
+
+* --- Antibody-adjacent and probe/hybridization reagents that co-move with the
+*     antibody and reactive-dye markets (latter is Tier 2) ---
+replace bad_control = 1 if inlist(category, "avidin products", "phalloidin conjugates", "dna-salmon sperm")
+replace bad_control_reason = "biotin-avidin/probe/hybridization reagent; co-moves with antibody and reactive-dye markets" ///
+    if inlist(category, "avidin products", "phalloidin conjugates", "dna-salmon sperm")
+
+* --- Stain/dye family bundling: reactive dyes are Tier 2; general cell stains
+*     and viability stains co-move within the dye/probe market ---
+replace bad_control = 1 if inlist(category, "viability stains", "histology & cell stains")
+replace bad_control_reason = "stain/probe family bundled with reactive dyes (Tier 2)" ///
+    if inlist(category, "viability stains", "histology & cell stains")
+
+* --- Western blot workflow consumables: chemiluminescent substrates and
+*     membranes are Tier 2; stripping buffers and protein denaturants are
+*     consumed in the same workflow ---
+replace bad_control = 1 if inlist(category, "western blot stripping buffers", "protein denaturants")
+replace bad_control_reason = "WB workflow consumable - bundled with Tier 2 chemilum substrates and membranes" ///
+    if inlist(category, "western blot stripping buffers", "protein denaturants")
+
+* --- Cloning/expression cofactors bundled with cloning kits and restriction
+*     enzymes (Tier 2): IPTG induces, gene expression inducers similar,
+*     spermidine is a restriction-enzyme reaction cofactor ---
+replace bad_control = 1 if inlist(category, "iptg", "gene expression inducers", "spermidine")
+replace bad_control_reason = "cloning/expression cofactor bundled with Tier 2 cloning enzymes/kits" ///
+    if inlist(category, "iptg", "gene expression inducers", "spermidine")
+
+* --- Phosphoprotein electrophoresis reagents: changelog notes ambiguous
+*     classification (Tier 2 -> control); flag as bad control instead of
+*     contaminating either group ---
+replace bad_control = 1 if category == "phosphoprotein electrophoresis reagents"
+replace bad_control_reason = "ambiguous classification - specialty SDS-PAGE reagent overlapping with Tier 2 protein workflow" ///
+    if category == "phosphoprotein electrophoresis reagents"
+
+count if bad_control == 1
+tab bad_control
+
+label var bad_control        "Drop from controls: action/shock/bundling in 2010-2018 window"
+label var bad_control_reason "Reason category was flagged as bad control"
+
 gen keep = (support >= 25 & precision >= 0.8 & recall >= 0.8) //| (inrange(support, 10, 25) & precision >= 0.9 & recall >=0.90)
 replace keep = 0 if category == "synthetic shrna"  // ambiguous RNAi category; placed conservatively in Tier 2 but fails defensive checks
-replace keep = 0 if inlist(category, "slide mounting medium", "collagenase", "catalase", "dextrose", "egta solution")
+replace keep = 0 if inlist(category, "slide mounting medium", "collagenase", "catalase", "dextrose", "egta solution", "pipes buffers")
+replace keep = 0 if bad_control == 1  // drop bad controls from analysis sample
+
+* --- Export bad_control documentation CSV ---
+preserve
+    keep if bad_control == 1
+    keep category bad_control bad_control_reason
+    sort category
+    export delimited using ../output/bad_control_documentation.csv, replace
+restore
+
 save ../output/categories_`embed', replace
 end
 main

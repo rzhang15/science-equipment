@@ -1,0 +1,943 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 120,000; see help set_maxvar.
+
+. do "/tmp/diag_merge.do" 
+
+. set more off
+
+. clear all
+
+. use ../external/foia/merged_foias_with_pis, clear
+
+. keep if !mi(athr_id)
+(62,139 observations deleted)
+
+. gen year = year(date(date, "YMD"))
+
+. keep if inrange(year, 2010, 2019)
+(44,336 observations deleted)
+
+. replace predicted_market = category if inlist(uni, "utdallas", "umich")
+(97,941 real changes made)
+
+. drop category
+
+. rename predicted_market category
+
+. preserve
+
+. contract category
+
+. keep category
+
+. save /tmp/cats_master, replace
+(file /tmp/cats_master.dta not found)
+file /tmp/cats_master.dta saved
+
+. restore
+
+. use ../external/ml/categories_tfidf, clear
+
+. keep category
+
+. gen in_tfidf = 1
+
+. save /tmp/cats_tfidf, replace
+(file /tmp/cats_tfidf.dta not found)
+file /tmp/cats_tfidf.dta saved
+
+. use /tmp/cats_master, clear
+
+. merge 1:1 category using /tmp/cats_tfidf
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                           857
+        from master                       844  (_merge==1)
+        from using                         13  (_merge==2)
+
+    Matched                             1,086  (_merge==3)
+    -----------------------------------------
+
+. keep if _merge == 1
+(1,099 observations deleted)
+
+. di "=== Categories in foia data but NOT in categories_tfidf ==="
+=== Categories in foia data but NOT in categories_tfidf ===
+
+. list category, sep(0) noobs
+
+  +--------------------------------------------------------------------+
+  |                                                           category |
+  |--------------------------------------------------------------------|
+  |                                                            Non-Lab |
+  |                                         animal - aquarium supplies |
+  |                                               animal - bone slices |
+  |                                                      animal - cage |
+  |                                             animal - cage supplies |
+  |                                                      animal - care |
+  |                                       animal - cattle iv catheters |
+  |                                                   animal - clipper |
+  |                                                      animal - diet |
+  |                                         animal - drosophila stocks |
+  |                                      animal - drosophila vial tray |
+  |                                                 animal - ear punch |
+  |                                            animal - euthanasia lid |
+  |                                           animal - feeding needles |
+  |                                             animal - feeding tubes |
+  |                                                      animal - frog |
+  |                                             animal - guide cannula |
+  |                                                   animal - housing |
+  |                                               animal - irradiation |
+  |                                                    animal - lancet |
+  |                                                animal - medication |
+  |                                                      animal - mice |
+  |                                       animal - microdialysis probe |
+  |                                             animal - misc supplies |
+  |                                             animal - osmotic pumps |
+  |                                                animal - restrainer |
+  |                                                     animal - scale |
+  |                                                   animal - service |
+  |                                        animal - steel brain matrix |
+  |                                            animal - styptic powder |
+  |                                                   animal - surgery |
+  |                                                      animal - tags |
+  |                                             animal - tattoo system |
+  |                                       animal - transport container |
+  |                                      animal - vascular access port |
+  |                                              animal - worm strains |
+  |                                                animal - wound clip |
+  |                                                   animal - xenopus |
+  |                                                 animal - zebrafish |
+  |                                        animal - zebrafish supplies |
+  |                                              applicators and swabs |
+  |                                                          argon gas |
+  |                                                 bundle of products |
+  |                                       caps and closures - dialysis |
+  |                                          caps and closures - tubes |
+  |                                          caps and closures - vials |
+  |                                     carboy spigots and accessories |
+  |                                                       drug - other |
+  |                                                        electronics |
+  |                                          electronics - accessories |
+  |                                             electronics - adapters |
+  |                                  electronics - arduino starter kit |
+  |                                         electronics - banana plugs |
+  |                                            electronics - batteries |
+  |                                               electronics - cables |
+  |                                           electronics - calculator |
+  |                                            electronics - camcorder |
+  |                                               electronics - camera |
+  |                                         electronics - card adapter |
+  |                                                electronics - cases |
+  |                                        electronics - circuit board |
+  |                                            electronics - computing |
+  |                                           electronics - connectors |
+  |                                                  electronics - daq |
+  |                                           electronics - desk riser |
+  |                                              electronics - desktop |
+  |                                    electronics - desktop computers |
+  |                                                electronics - discs |
+  |                                      electronics - display adapter |
+  |                                              electronics - earbuds |
+  |                                             electronics - ethernet |
+  |                                           electronics - flashdrive |
+  |                                                electronics - fuses |
+  |                                            electronics - harddrive |
+  |                                            electronics - heat sink |
+  |                                           electronics - i/o device |
+  |                                              electronics - jumpers |
+  |                                             electronics - keyboard |
+  |                                   electronics - keyboard and mouse |
+  |                                                electronics - lamps |
+  |                                               electronics - laptop |
+  |                                         electronics - laptop cases |
+  |                                        electronics - laptop cooler |
+  |                                           electronics - led lights |
+  |                                          electronics - light bulbs |
+  |                                                electronics - magic |
+  |                                               electronics - memory |
+  |                                        electronics - memory boards |
+  |                                          electronics - memory card |
+  |                                   electronics - memory card reader |
+  |                                              electronics - monitor |
+  |                                        electronics - monitor mount |
+  |                                               electronics - motors |
+  |                                                electronics - mount |
+  |                                                electronics - mouse |
+  |                                           electronics - mouse pads |
+  |                                                electronics - other |
+  |                                                electronics - phone |
+  |                                          electronics - pin adapter |
+  |                                              electronics - pointer |
+  |                                                electronics - power |
+  |                                        electronics - power adapter |
+  |                                           electronics - power cord |
+  |                                       electronics - power supplies |
+  |                                              electronics - printer |
+  |                                             electronics - resistor |
+  |                                             electronics - scanners |
+  |                                    electronics - screen protectors |
+  |                               electronics - single board computers |
+  |                                             electronics - software |
+  |                                       electronics - soldering kits |
+  |                                    electronics - solid state drive |
+  |                                             electronics - speakers |
+  |                                               electronics - stylus |
+  |                                                electronics - surge |
+  |                                     electronics - surge protectors |
+  |                                     electronics - switching device |
+  |                                          electronics - tablet case |
+  |                                              electronics - tablets |
+  |                                   electronics - thermocouple cable |
+  |                              electronics - thermocouple connectors |
+  |                                        electronics - thermocouples |
+  |                                        electronics - toggle switch |
+  |                                          electronics - transistors |
+  |                                                  electronics - usb |
+  |                                              electronics - usb hub |
+  |                                               electronics - webcam |
+  |                                        electronics - wifi adapters |
+  |                                                 electronics - wire |
+  |                     environmental sampling bottles and accessories |
+  |                                         eye protection accessories |
+  |                                                    fees - analysis |
+  |                                                      fees - animal |
+  |                                                 fees - animal care |
+  |                                                 fees - animal scan |
+  |                                                  fees - blanket po |
+  |                                                     fees - cloning |
+  |                                                  fees - conference |
+  |                                                  fees - consulting |
+  |                                                    fees - contract |
+  |                                       fees - cryo recovery service |
+  |                                            fees - custom synthesis |
+  |                                              fees - cylinder usage |
+  |                                            fees - data acquisition |
+  |                                                    fees - disposal |
+  |                                                        fees - fuel |
+  |                                                   fees - histology |
+  |                                                fees - histone prep |
+  |                                                     fees - imaging |
+  |                                       fees - imaging equipment use |
+  |                                                fees - installation |
+  |                                                   fees - insurance |
+  |                                                       fees - labor |
+  |                                              fees - labor/training |
+  |                                          fees - maintenance/repair |
+  |                                           fees - mass spectrometry |
+  |                                                     fees - meeting |
+  |                                                       fees - other |
+  |                                          fees - other reimbursable |
+  |                           fees - paraffin processing and embedding |
+  |                                                  fees - processing |
+  |                                          fees - publication/papers |
+  |                                                  fees - restocking |
+  |                                                  fees - sequencing |
+  |                                                     fees - service |
+  |                                                       fees - setup |
+  |                                                    fees - shipping |
+  |                                                    fees - software |
+  |                                            fees - spectrometry use |
+  |                                                    fees - stamping |
+  |                                                    fees - subaward |
+  |                                                         fees - tax |
+  |                                                    fees - teaching |
+  |                                           fees - tissue processing |
+  |                                                      fees - travel |
+  |                                                     fees - unclear |
+  |                                     fees - viral vector production |
+  |                                                    fees - warranty |
+  |                                                     flask supports |
+  |                                         gas chromatography columns |
+  |                                   hotplate accessories - pie wedge |
+  |                                            ief equilibration trays |
+  |                                                         instrument |
+  |                                          instrument - ac amplifier |
+  |                                 instrument - acid digestion vessel |
+  |                                   instrument - air quality monitor |
+  |                                                 instrument - alarm |
+  |                                       instrument - alcohol burners |
+  |                                        instrument - ampule breaker |
+  |                                    instrument - analog thermometer |
+  |                                     instrument - anesthesia system |
+  |                                   instrument - animal brain matrix |
+  |                                              instrument - balances |
+  |                                             instrument - bath tank |
+  |                                       instrument - benchtop cooler |
+  |                                          instrument - blot scanner |
+  |                                   instrument - blotting instrument |
+  |                                                instrument - burner |
+  |                                            instrument - calculator |
+  |                                                instrument - camera |
+  |                                           instrument - camera lens |
+  |                                instrument - can and drum dispenser |
+  |                                          instrument - capping tool |
+  |                                         instrument - cell counters |
+  |                                    instrument - cell density meter |
+  |                                           instrument - centrifuges |
+  |                                               instrument - chamber |
+  |                                              instrument - chillers |
+  |                                instrument - chromatography systems |
+  |                                            instrument - circulator |
+  |                                   instrument - conductivity meters |
+  |                                         instrument - control valve |
+  |                                              instrument - counters |
+  |                                     instrument - counting chambers |
+  |                                       instrument - cryotube cooler |
+  |                                        instrument - current probes |
+  |                                           instrument - cutting mat |
+  |                                        instrument - cuvette washer |
+  |                                      instrument - data acquisition |
+  |                                           instrument - desiccators |
+  |                                        instrument - deuterium lamp |
+  |                                       instrument - dialysis device |
+  |                                      instrument - digital calipers |
+  |                                            instrument - dispensers |
+  |                                    instrument - drosophila monitor |
+  |                                             instrument - dry baths |
+  |                                                instrument - drying |
+  |                                      instrument - dynabead magnets |
+  |                                             instrument - ear punch |
+  |                                    instrument - ear tag applicator |
+  |                                             instrument - electrode |
+  |                                       instrument - electroporation |
+  |                                             instrument - extractor |
+  |                                        instrument - filter adapter |
+  |                                   instrument - filter fluorometers |
+  |                                  instrument - filter holder system |
+  |                                        instrument - filter holders |
+  |                                        instrument - flow cytometer |
+  |                                           instrument - flow meters |
+  |                                      instrument - fluorescent lamp |
+  |                                           instrument - fplc system |
+  |                                         instrument - freeze dryers |
+  |                                              instrument - freezers |
+  |                                              instrument - furnaces |
+  |                                    instrument - gas chromatography |
+  |                                          instrument - gas detector |
+  |                                       instrument - gas drying unit |
+  |                                        instrument - gas generators |
+  |                                          instrument - gas lighters |
+  |                                        instrument - gas regulators |
+  |                                  instrument - gel extraction tools |
+  |                                   instrument - gel imaging systems |
+  |                                             instrument - generator |
+  |                                             instrument - glove box |
+  |                                          instrument - halogen lamp |
+  |                                              instrument - heat gun |
+  |                                             instrument - heat sink |
+  |                                         instrument - heating baths |
+  |                                          instrument - heating pads |
+  |                                     instrument - heating tape cord |
+  |                                           instrument - homogenizer |
+  |                                             instrument - hotplates |
+  |                                        instrument - imaging system |
+  |                                     instrument - incubator shakers |
+  |                                            instrument - incubators |
+  |                                    instrument - induction chambers |
+  |                                         instrument - infrared lamp |
+  |                                           instrument - ir emsa kit |
+  |                                                 instrument - lamps |
+  |                                                instrument - lasers |
+  |                               instrument - liquid nitrogen removal |
+  |                                instrument - liquid nitrogen storer |
+  |                             instrument - magnetic separation stand |
+  |                                   instrument - magnetic separators |
+  |                                 instrument - mass flow controllers |
+  |                                     instrument - mass spectroscopy |
+  |                                        instrument - metal hardware |
+  |                                       instrument - microcentrifuge |
+  |                                   instrument - microdialysis probe |
+  |                                         instrument - microinjector |
+  |                                     instrument - micromanipulators |
+  |                                     instrument - microplate reader |
+  |                               instrument - microscope filter cubes |
+  |                                   instrument - microscope inverter |
+  |                                        instrument - microscope kit |
+  |                              instrument - microscope light sources |
+  |                                           instrument - microscopes |
+  |                                             instrument - microwave |
+  |                                    instrument - multi-gas analyzer |
+  |                                            instrument - multimeter |
+  |                                      instrument - nmr tube washers |
+  |                                    instrument - optical components |
+  |                                       instrument - orbital shakers |
+  |                                                 instrument - other |
+  |                                                 instrument - ovens |
+  |                                      instrument - pcr capping tool |
+  |                                         instrument - ph electrodes |
+  |                                             instrument - ph meters |
+  |                              instrument - pipet cleaning equipment |
+  |                                 instrument - pipette cleaning jars |
+  |                                    instrument - pipette controller |
+  |                                             instrument - pipettors |
+  |                                        instrument - power supplies |
+  |                                        instrument - pressure gauge |
+  |                                        instrument - pulse oximeter |
+  |                                                 instrument - pumps |
+  |                                       instrument - qpcr instrument |
+  |                                       instrument - quaternary pump |
+  |                                              instrument - reactors |
+  |                                         instrument - refrigerators |
+  |                                  instrument - rockers and rotators |
+  |                                   instrument - rockers and shakers |
+  |                                                instrument - roller |
+  |                                           instrument - rotary tool |
+  |                                            instrument - rotavapors |
+  |                                 instrument - scintillation counter |
+  |                                        instrument - sealing paddle |
+  |                                instrument - semicylindrical heater |
+  |                                            instrument - sequencers |
+  |                                               instrument - shakers |
+  |                                      instrument - sharpening stone |
+  |                                         instrument - slide warmers |
+  |                                        instrument - soldering kits |
+  |                                      instrument - sound enclosures |
+  |                                  instrument - spe vacuum manifolds |
+  |                                          instrument - spectrometer |
+  |                                     instrument - spectrophotometer |
+  |                                           instrument - sterilizers |
+  |                                              instrument - stirrers |
+  |                                          instrument - syringe pump |
+  |                            instrument - syringe repeating adaptors |
+  |                                        instrument - tag applicator |
+  |                               instrument - temperature controllers |
+  |                                     instrument - thermal analyzers |
+  |                                       instrument - thermal cyclers |
+  |                                         instrument - thermocouples |
+  |                                          instrument - thermometers |
+  |                                           instrument - thermomixer |
+  |                                                instrument - timers |
+  |                                       instrument - tissue grinders |
+  |                                instrument - tlc developing chamber |
+  |                                      instrument - tlc plate cutter |
+  |                                     instrument - transilluminators |
+  |                                           instrument - tube topper |
+  |                                         instrument - tubing cutter |
+  |                                         instrument - tungsten lamp |
+  |                                    instrument - ultrasonic cleaner |
+  |                                              instrument - uv lamps |
+  |                                       instrument - uv purification |
+  |                                   instrument - uv transilluminator |
+  |                                     instrument - vacuum controller |
+  |                                       instrument - vacuum degasser |
+  |                                     instrument - vacuum desiccator |
+  |                                      instrument - vacuum manifolds |
+  |                                          instrument - vacuum ovens |
+  |                                          instrument - vacuum pumps |
+  |                                            instrument - vibratomes |
+  |                                        instrument - voltage probes |
+  |                                         instrument - vortex mixers |
+  |                                              instrument - vortexer |
+  |                                      instrument - water aspirators |
+  |                                           instrument - water baths |
+  |                                    instrument - water purification |
+  |                                                    instrument part |
+  |                                         instrument part - adapters |
+  |                                       instrument part - air filter |
+  |                          instrument part - aluminum heating blocks |
+  |                         instrument part - aluminum reaction blocks |
+  |                                       instrument part - amplifiers |
+  |                             instrument part - anaerobic indicators |
+  |                                    instrument part - atomizer bulb |
+  |                                     instrument part - autosamplers |
+  |                                       instrument part - bath clamp |
+  |                                       instrument part - bath water |
+  |                                        instrument part - batteries |
+  |                                  instrument part - benchtop cooler |
+  |                                     instrument part - blade holder |
+  |                                           instrument part - blades |
+  |                  instrument part - blotting instrument cooling kit |
+  |                         instrument part - blotting instrument core |
+  |                       instrument part - blotting instrument module |
+  |                                  instrument part - blotting sponge |
+  |                                          instrument part - bracket |
+  |                                      instrument part - buffer tank |
+  |                                      instrument part - buffer tray |
+  |                                             instrument part - bulb |
+  |                                        instrument part - bulb cell |
+  |                                        instrument part - bump trap |
+  |                                     instrument part - burner wicks |
+  |                                    instrument part - butane refill |
+  |                              instrument part - cable for ph sensor |
+  |                             instrument part - calibration standard |
+  |                               instrument part - camera accessories |
+  |                                  instrument part - camera adapters |
+  |                                   instrument part - camera adaptor |
+  |                                      instrument part - camera lens |
+  |                                          instrument part - cameras |
+  |                                          instrument part - cannula |
+  |                                   instrument part - capillary tube |
+  |                                   instrument part - carbon dioxide |
+  |                                     instrument part - carbon paper |
+  |                                        instrument part - cartridge |
+  |                                    instrument part - cartridge c18 |
+  |                                   instrument part - casting stands |
+  |                                         instrument part - catalyst |
+  |                           instrument part - cell counting chambers |
+  |                             instrument part - cell counting slides |
+  |                                         instrument part - cell lid |
+  |                              instrument part - centrifuge adapters |
+  |                               instrument part - centrifuge rotator |
+  |                                instrument part - centrifuge rotors |
+  |                                   instrument part - charging stand |
+  |                         instrument part - chromatography reservoir |
+  |                             instrument part - chromatography septa |
+  |                           instrument part - chromatography syringe |
+  |                    instrument part - chromatography syringe needle |
+  |                           instrument part - chromatography systems |
+  |                                            instrument part - chuck |
+  |                                    instrument part - circuit board |
+  |                                    instrument part - clickseal lid |
+  |                                         instrument part - co2 pump |
+  |                                   instrument part - column adaptor |
+  |                                     instrument part - column valve |
+  |                                        instrument part - condenser |
+  |                              instrument part - condenser glassware |
+  |                                 instrument part - condenser insert |
+  |                                 instrument part - conditioning kit |
+  |                                       instrument part - controller |
+  |                                instrument part - counting chambers |
+  |                          instrument part - cryogenic storage tanks |
+  |                                       instrument part - cryosleeve |
+  |                                    instrument part - cup and cover |
+  |                                 instrument part - desiccator cover |
+  |                                      instrument part - desiccators |
+  |                                         instrument part - detector |
+  |                                   instrument part - deuterium bulb |
+  |                                     instrument part - dewar insert |
+  |                                  instrument part - dichroic mirror |
+  |                                          instrument part - diluent |
+  |          instrument part - dispenser for water purification system |
+  |                                     instrument part - drive sleeve |
+  |                                    instrument part - drum adapters |
+  |                             instrument part - dry block incubators |
+  |                                  instrument part - dry block tubes |
+  |                                          instrument part - dry ice |
+  |                               instrument part - electrode assembly |
+  |                                  instrument part - electrode stand |
+  |                                       instrument part - electrodes |
+  |                           instrument part - electrophoresis plates |
+  |                          instrument part - electrophoresis spacers |
+  |        instrument part - evaporating flasks for rotary evaporators |
+  |                            instrument part - evaporator bump traps |
+  |                                   instrument part - exhaust filter |
+  |                                   instrument part - extractor body |
+  |                                        instrument part - eyepieces |
+  |                             instrument part - filing tube for pump |
+  |                                       instrument part - fill ports |
+  |                                   instrument part - filter adapter |
+  |                                     instrument part - filter block |
+  |                                 instrument part - filter cartridge |
+  |                                    instrument part - filter holder |
+  |                         instrument part - filter holder components |
+  |                                  instrument part - filter supports |
+  |                                      instrument part - filter unit |
+  |                                          instrument part - fitting |
+  |                                            instrument part - flask |
+  |                                    instrument part - flask adapter |
+  |                                            instrument part - flint |
+  |                                     instrument part - flow adaptor |
+  |                                      instrument part - flow meters |
+  |                         instrument part - fluorescence filter cube |
+  |                                       instrument part - foam block |
+  |                                             instrument part - frit |
+  |                               instrument part - fritted glass base |
+  |                                           instrument part - funnel |
+  |                                             instrument part - fuse |
+  |                            instrument part - gas cylinder supports |
+  |                                instrument part - gas inlet filters |
+  |                                     instrument part - gas lighters |
+  |                                   instrument part - gas regulators |
+  |                                  instrument part - gas switch tank |
+  |                                          instrument part - gaskets |
+  |                                    instrument part - gel cassettes |
+  |                               instrument part - gel casting module |
+  |                                instrument part - gel casting stand |
+  |               instrument part - gel electrophoresis power supplies |
+  |                                    instrument part - gel releasers |
+  |                                instrument part - gel support frame |
+  |                                         instrument part - gel tray |
+  |                                  instrument part - germicidal bulb |
+  |                                    instrument part - glass adapter |
+  |      instrument part - glass connector for buchi rotavapor systems |
+  |                              instrument part - glass for cryostats |
+  |                                   instrument part - glass hardware |
+  |                                     instrument part - glass plates |
+  |                                    instrument part - glass stopper |
+  |                                        instrument part - glove box |
+  |                                     instrument part - halogen bulb |
+  |                                    instrument part - halogen lamps |
+  |                                 instrument part - heating elements |
+  |                                     instrument part - heating pads |
+  |                                      instrument part - hepa filter |
+  |                      instrument part - high pressure inline filter |
+  |              instrument part - high vacuum physisorption analyzers |
+  |                                      instrument part - homogenizer |
+  |                                instrument part - imaging kit tools |
+  |                                    instrument part - immersion oil |
+  |                            instrument part - incubator accessories |
+  |                                instrument part - incubator filters |
+  |                                instrument part - induction chamber |
+  |                                      instrument part - inlet liner |
+  |                                      instrument part - inlet valve |
+  |                                   instrument part - inline filters |
+  |                                instrument part - instrument driver |
+  |                      instrument part - instrument verification kit |
+  |                            instrument part - interface control box |
+  |                             instrument part - lab shaker platforms |
+  |                                            instrument part - lamps |
+  |                                 instrument part - lase line filter |
+  |                                            instrument part - latch |
+  |                                         instrument part - led cube |
+  |                                             instrument part - lens |
+  |                                        instrument part - lens tube |
+  |                                            instrument part - lever |
+  |                                              instrument part - lid |
+  |                     instrument part - lid gasket for freeze dryers |
+  |                                       instrument part - light bulb |
+  |                                       instrument part - lint cloth |
+  |                                       instrument part - lubricants |
+  |                                             instrument part - luer |
+  |                                   instrument part - magnetic plate |
+  |                       instrument part - magnetic separation plates |
+  |                                  instrument part - maintenance kit |
+  |                    instrument part - mechanical homogenizer pestle |
+  |                                   instrument part - metal hardware |
+  |                                  instrument part - microplate rack |
+  |                               instrument part - microscope adapter |
+  |                                  instrument part - microscope part |
+  |                                 instrument part - microtome blades |
+  |                                      instrument part - mineral oil |
+  |                                       instrument part - motor gear |
+  |                                           instrument part - motors |
+  |                                    instrument part - mounting post |
+  |                                           instrument part - needle |
+  |                             instrument part - ngc cartridge holder |
+  |                            instrument part - nitrogen gas cylinder |
+  |                           instrument part - nylon suction strainer |
+  |                                 instrument part - objective lenses |
+  |                              instrument part - oil mist eliminator |
+  |                               instrument part - optical components |
+  |                            instrument part - optical mounting post |
+  |                                           instrument part - orings |
+  |                                            instrument part - other |
+  |                                       instrument part - oven motor |
+  |                                   instrument part - overspeed disc |
+  |               instrument part - oxygen and moisture removal column |
+  | instrument part - oxygen and moisture removal column support frame |
+  |                                    instrument part - oxygen sensor |
+  |                              instrument part - ph electrode bottle |
+  |                                    instrument part - ph electrodes |
+  |                                        instrument part - pin mount |
+  |                                             instrument part - pins |
+  |                            instrument part - pipette filler filter |
+  |                               instrument part - pipette nose cones |
+  |                                    instrument part - pipette parts |
+  |                                     instrument part - piston seals |
+  |                                     instrument part - plastic disc |
+  |                                 instrument part - plastic hardware |
+  |                                            instrument part - plate |
+  |                                    instrument part - plate spinner |
+  |                                          instrument part - plunger |
+  |                                           instrument part - pm kit |
+  |                             instrument part - polishing cartridges |
+  |                                      instrument part - post holder |
+  |                                   instrument part - power supplies |
+  |                                   instrument part - pressure gauge |
+  |                              instrument part - pressure transducer |
+  |                                   instrument part - pressure tubes |
+  |                                  instrument part - pressure vessel |
+  |                                          instrument part - printer |
+  |                                         instrument part - pump oil |
+  |                                    instrument part - pump plungers |
+  |                                       instrument part - pump seals |
+  |                                    instrument part - pump tip seal |
+  |                                            instrument part - pumps |
+  |                               instrument part - quarter wave plate |
+  |                                   instrument part - quartz filters |
+  |                                      instrument part - quartz wool |
+  |                                      instrument part - qubit tools |
+  |                                            instrument part - racks |
+  |                                instrument part - rat tether spring |
+  |                                            instrument part - relay |
+  |                                       instrument part - repair kit |
+  |                                instrument part - replace cartridge |
+  |                              instrument part - replacement channel |
+  |                              instrument part - replacement needles |
+  |                         instrument part - reservoir chromatography |
+  |                                         instrument part - resistor |
+  |                                  instrument part - rocker platform |
+  |                                      instrument part - rocker tray |
+  |                                   instrument part - rotor lid seal |
+  |                                       instrument part - rotor part |
+  |                                           instrument part - rotors |
+  |                                     instrument part - rubber cover |
+  |                                   instrument part - running module |
+  |                             instrument part - sample loading guide |
+  |                                instrument part - sampling cylinder |
+  |                                           instrument part - screen |
+  |                                            instrument part - screw |
+  |                                   instrument part - sealing paddle |
+  |                                            instrument part - seals |
+  |                                           instrument part - sensor |
+  |                                 instrument part - shaker accessory |
+  |                                    instrument part - shaker clamps |
+  |                                      instrument part - shaker part |
+  |                                 instrument part - sharpening stone |
+  |                                     instrument part - sheath fluid |
+  |                                       instrument part - side stage |
+  |                                    instrument part - silicone oils |
+  |                           instrument part - silicone rubber heater |
+  |                                           instrument part - socket |
+  |                                  instrument part - soldering paste |
+  |                                instrument part - spectrometer cell |
+  |                                         instrument part - spr chip |
+  |                                     instrument part - stacking kit |
+  |                                            instrument part - stand |
+  |                                          instrument part - stirrer |
+  |                           instrument part - surface area analyzers |
+  |                        instrument part - syringe for mini-extruder |
+  |                                             instrument part - tank |
+  |                                     instrument part - teflon seals |
+  |                                    instrument part - thermal paper |
+  |                          instrument part - thermocouple connectors |
+  |                  instrument part - thermogravimetric analyzers cup |
+  |                                   instrument part - tip protectors |
+  |                                 instrument part - tissue processor |
+  |                           instrument part - tlc developing chamber |
+  |                                             instrument part - tray |
+  |                                           instrument part - tripod |
+  |                                    instrument part - tube adapters |
+  |                                  instrument part - tube assemblies |
+  |                             instrument part - tube holder platform |
+  |                               instrument part - tubing accessories |
+  |                                       instrument part - tuning kit |
+  |                                 instrument part - tweezer assembly |
+  |                                         instrument part - uv bulbs |
+  |                                          instrument part - vactrap |
+  |                                  instrument part - vacuum adapters |
+  |                                   instrument part - vacuum bottles |
+  |                                     instrument part - vacuum clamp |
+  |                                instrument part - vacuum desiccator |
+  |                                   instrument part - vacuum filters |
+  |                                    instrument part - vacuum flange |
+  |                                      instrument part - vacuum hose |
+  |                                  instrument part - vacuum manifold |
+  |                                      instrument part - vacuum pump |
+  |                        instrument part - vacuum pump for glove box |
+  |                                  instrument part - vacuum pump oil |
+  |                       instrument part - vacuum pump oil eliminator |
+  |                                     instrument part - vacuum seals |
+  |                                instrument part - vacuum trap flask |
+  |                                  instrument part - valve cartridge |
+  |                                           instrument part - valves |
+  |                                       instrument part - vapor duct |
+  |                                      instrument part - vent filter |
+  |                                   instrument part - vibratome glue |
+  |                                      instrument part - vortex base |
+  |                                       instrument part - vycor tips |
+  |                                 instrument part - water bath racks |
+  |                             instrument part - water bath treatment |
+  |                          instrument part - water filtration filter |
+  |                     instrument part - water purification cartridge |
+  |                        instrument part - water purification filter |
+  |                          instrument part - water purification part |
+  |                       instrument part - water quality testing kits |
+  |                                       instrument part - well combs |
+  |                                 instrument part - well plate stand |
+  |                                             instrument part - wire |
+  |                                      instrument part - xenon bulbs |
+  |                                    instrument part - xray cassette |
+  |                           instrument part - zero diffraction plate |
+  |                                               irrelevant chemicals |
+  |                                       irrelevant chemicals - acids |
+  |                        irrelevant chemicals - adhesives and resins |
+  |                                 irrelevant chemicals - amino acids |
+  |                 irrelevant chemicals - amino acids and derivatives |
+  |                        irrelevant chemicals - analytical standards |
+  |                            irrelevant chemicals - bases and amines |
+  |                   irrelevant chemicals - bioactive small molecules |
+  |                     irrelevant chemicals - bioconjugation reagents |
+  |                        irrelevant chemicals - biological materials |
+  |                              irrelevant chemicals - boron reagents |
+  |                                   irrelevant chemicals - chelators |
+  |                     irrelevant chemicals - chromatography reagents |
+  |      irrelevant chemicals - coupling and protecting group reagents |
+  |                                irrelevant chemicals - crosslinkers |
+  |                                 irrelevant chemicals - denaturants |
+  |                  irrelevant chemicals - detergents and surfactants |
+  |                         irrelevant chemicals - deuterated solvents |
+  |                 irrelevant chemicals - dyes and fluorescent probes |
+  |                                     irrelevant chemicals - enzymes |
+  |                                 irrelevant chemicals - fatty acids |
+  |                            irrelevant chemicals - fluorescent dyes |
+  |                                       irrelevant chemicals - gases |
+  |                        irrelevant chemicals - halogenated organics |
+  |                                    irrelevant chemicals - halogens |
+  |                           irrelevant chemicals - hapten conjugates |
+  |                   irrelevant chemicals - isotope-labeled compounds |
+  |                                      irrelevant chemicals - lipids |
+  |                           irrelevant chemicals - media supplements |
+  |                             irrelevant chemicals - metal compounds |
+  |                  irrelevant chemicals - metals and metal compounds |
+  |                 irrelevant chemicals - nucleotides and derivatives |
+  |                            irrelevant chemicals - organic reagents |
+  |                      irrelevant chemicals - organolithium reagents |
+  |                    irrelevant chemicals - organometallic catalysts |
+  |                                       irrelevant chemicals - other |
+  |                         irrelevant chemicals - pegylation reagents |
+  |                  irrelevant chemicals - peptide synthesis reagents |
+  |                                    irrelevant chemicals - polymers |
+  |                  irrelevant chemicals - polymers and nanomaterials |
+  |                   irrelevant chemicals - polymers and peg reagents |
+  |                        irrelevant chemicals - rare earth compounds |
+  |                              irrelevant chemicals - silyl reagents |
+  |                    irrelevant chemicals - sugars and carbohydrates |
+  |                      irrelevant chemicals - vitamins and cofactors |
+  |                              lab furniture - freezer storage racks |
+  |                                          molecular biology ethanol |
+  |                                      non-viral expression plasmids |
+  |                                             nonlab - aluminum foil |
+  |                                                 nonlab - batteries |
+  |                                     nonlab - beakers and measuring |
+  |                                                     nonlab - books |
+  |                                                   nonlab - brushes |
+  |                                        nonlab - bundle of products |
+  |                                                     nonlab - carts |
+  |                                       nonlab - clamps and supports |
+  |                                         nonlab - cleaning supplies |
+  |                                          nonlab - compressed gases |
+  |                               nonlab - disposable wipes and towels |
+  |                                     nonlab - electronic components |
+  |                                                 nonlab - fasteners |
+  |                                                 nonlab - first aid |
+  |                                        nonlab - gas cylinder carts |
+  |                                                nonlab - hand tools |
+  |                                                  nonlab - hardware |
+  |                                             nonlab - lab furniture |
+  |                             nonlab - lab furniture - acrylic sheet |
+  |                               nonlab - lab furniture - beaker rack |
+  |                        nonlab - lab furniture - benchtop organizer |
+  |                       nonlab - lab furniture - benchtop protectors |
+  |                                   nonlab - lab furniture - buckets |
+  |                                  nonlab - lab furniture - cabinets |
+  |                                     nonlab - lab furniture - carts |
+  |                                     nonlab - lab furniture - desks |
+  |                                   nonlab - lab furniture - dusters |
+  |                                 nonlab - lab furniture - floormats |
+  |                             nonlab - lab furniture - freezer racks |
+  |                     nonlab - lab furniture - freezer storage racks |
+  |                               nonlab - lab furniture - glass plate |
+  |                              nonlab - lab furniture - glass sheets |
+  |                                 nonlab - lab furniture - lab jacks |
+  |                                      nonlab - lab furniture - mops |
+  |                                     nonlab - lab furniture - other |
+  |                                   nonlab - lab furniture - shelves |
+  |                                 nonlab - lab furniture - spillmats |
+  |                                   nonlab - lab furniture - sponges |
+  |                               nonlab - lab furniture - step stools |
+  |                              nonlab - lab furniture - storage bins |
+  |                                              nonlab - lab hardware |
+  |                                                    nonlab - labels |
+  |                                          nonlab - markers and pens |
+  |                                            nonlab - metal hardware |
+  |                                             nonlab - miscellaneous |
+  |                                       nonlab - mortars and pestles |
+  |                                           nonlab - office supplies |
+  |                                    nonlab - office supplies - glue |
+  |                             nonlab - office supplies - label tapes |
+  |                                 nonlab - office supplies - labeler |
+  |                                  nonlab - office supplies - labels |
+  |                  nonlab - office supplies - markers, pens, pencils |
+  |                                   nonlab - office supplies - other |
+  |                             nonlab - office supplies - paper goods |
+  |                           nonlab - office supplies - printer toner |
+  |                                nonlab - office supplies - scissors |
+  |                                nonlab - office supplies - shipping |
+  |                          nonlab - office supplies - tape cartridge |
+  |               nonlab - office supplies - tapes and tape dispensers |
+  |                                                     nonlab - other |
+  |                             nonlab - personal protective equipment |
+  |                                              nonlab - pest control |
+  |                                                  nonlab - plumbing |
+  |                                             nonlab - pots and pans |
+  |                                                       nonlab - ppe |
+  |                                   nonlab - safety - safety glasses |
+  |                                          nonlab - safety equipment |
+  |                                                  nonlab - software |
+  |                                                nonlab - spill kits |
+  |                                          nonlab - stands and rings |
+  |                                     nonlab - stoppers and closures |
+  |                                              nonlab - storage bins |
+  |                                   nonlab - surgical tools - blades |
+  |                                    nonlab - surgical tools - clips |
+  |                                  nonlab - surgical tools - forceps |
+  |                                  nonlab - surgical tools - needles |
+  |                                    nonlab - surgical tools - other |
+  |                                     nonlab - surgical tools - pins |
+  |                                    nonlab - surgical tools - probe |
+  |                      nonlab - surgical tools - scalpels and blades |
+  |                                 nonlab - surgical tools - scissors |
+  |                                  nonlab - surgical tools - sutures |
+  |                                 nonlab - surgical tools - tweezers |
+  |                                                      nonlab - tape |
+  |                     nonlab - temperature indication tapes and dots |
+  |                                               nonlab - test strips |
+  |                                             nonlab - toolkit tools |
+  |                                                     nonlab - trays |
+  |                                                    nonlab - tubing |
+  |                                              nonlab - unclassified |
+  |                                                   nonlab - unclear |
+  |                           nonlab - waste disposal - biohazard bags |
+  |                     nonlab - waste disposal - biohazard containers |
+  |                     nonlab - waste disposal - glass disposal boxes |
+  |                                    nonlab - waste disposal - other |
+  |                        nonlab - waste disposal - sharps containers |
+  |                               nonlab - waste disposal - trash cans |
+  |                                               pcr tube accessories |
+  |                                                          pcr tubes |
+  |                                                     pipette stands |
+  |                                            platinum wire and gauze |
+  |                                           radiolabeled nucleotides |
+  |                                         random mutagenesis systems |
+  |                                      sequencing - library prep kit |
+  |                                            sequencing gel reagents |
+  |                                                     sequencing kit |
+  |                                                    spe accessories |
+  |                           synthetic dna oligonucleotide - purified |
+  |                                 tissue embedding accessories - kit |
+  |                            tissue embedding accessories - matrices |
+  |                               tissue embedding accessories - molds |
+  |                               tissue embedding accessories - other |
+  |                                          tris-caps transfer buffer |
+  |                                                  tubing - dialysis |
+  |                                                 vial storage trays |
+  +--------------------------------------------------------------------+
+
+. count
+  844
+
+. 
+end of do-file

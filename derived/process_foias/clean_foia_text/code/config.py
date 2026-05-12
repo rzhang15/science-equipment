@@ -62,12 +62,12 @@ CHEM_FRAGMENTS = [
     "na", "pe", "tris", "dibenzylideneacetone", "dipalladium", "divinyl",
     "tetramet", "ethylhexyl", "dioxane", "insulin", "transferrin",
     "selenium", "ethyl", "mono", "hexyl",
-]
-
-CHEM_SUFFIX_LIST = [
-    "acid", "chloride", "bromide", "iodide", "acetate", "sulfate",
-    "phosphate", "hydroxide", "ethanol", "methanol", "propanol",
-    "isopropanol", "acetone", "dimethyl", "methyl", "butyl", "amine", "amide",
+    # Greek letters (ASCII forms produced by the transliteration step in
+    # clean_foia_data.py).  Required so multi-hyphen lab terms like
+    # `anti-alpha-tubulin` or `tnf-alpha` don't trip sku_multi_hyphen.
+    "alpha", "beta", "gamma", "delta", "epsilon", "zeta", "eta", "theta",
+    "iota", "kappa", "lambda", "nu", "xi", "pi", "rho", "sigma", "tau",
+    "upsilon", "phi", "chi", "psi", "omega",
 ]
 
 OTHER_STOPWORDS = {
@@ -86,51 +86,8 @@ KEEP_CHARS = {
     "l", "n", "m", "o", "d", "x", "b", "g",
 }
 
-SYNONYMS = {
-    "polymerase chain reaction": "pcr",
-    "quantitative polymerase chain reaction": "qpcr",
-    "phosphate buffered saline": "pbs",
-    "bovine serum albumin": "bsa",
-    "fetal bovine serum": "fbs",
-    "tris borate edta": "tbe",
-    "microtub": "microtube",
-    "antibdy": "antibody",
-    "dnapolym": "dna polymerase",
-    "stpr": "stopper",
-    "col": "column",
-    "syrflt": "syringe filter",
-    "flsk": "flask",
-    "cult": "culture",
-    "erlenm": "erlenmeyer",
-    "mstr mix": "master mix",
-    "tbe buffer": "tbe",
-    "lbl": "label",
-    "pcr tb": "pcr tube",
-    "mct": "microtube",
-    "micropipt": "micropipette",
-    "rec": "recombinant",
-    "deep wl": "deep well",
-    "blch": "bleach",
-    "glv": "glove", "glvs": "glove", "gloves": "glove", "examglove": "glove",
-    "pipet": "pipette", "kt": "kit", "assy": "assay", "cntrfugl": "centrifugal",
-    "fltr": "filter", "flt": "filter", "ultraviolet": "uv", "clr": "clear",
-    "syrng": "syringe", "syr": "syringe",
-    "alum": "aluminum", "tubes": "tube", "sieves": "sieve",
-}
-
-PROTECTED_WORDS = {
-    "rneasy", "rnase", "dnase", "dna", "rna", "pcr", "taq", "fbs", "bsa",
-    "cryobox", "buffer",
-}
-
 # ==============================================================================
-# 5. SpaCy / ML Parameters
-# ==============================================================================
-SPACY_MODEL_SM = "en_core_web_sm"
-SPACY_MODEL_CHEM = "en_ner_bc5cdr_md"
-
-# ==============================================================================
-# 6. Compiled Regex Patterns
+# 5. Compiled Regex Patterns
 # ==============================================================================
 
 # -- Building blocks for regex patterns --
@@ -143,22 +100,11 @@ _FRAG_PATTERN = "|".join(map(re.escape, CHEM_FRAGMENTS))
 _PLACEHOLDER_PREFIX = "protectedmarker"
 _TAG_CONTENT_PATTERN = r"\S*[a-zA-Z0-9]\S*"
 
-_MONTHS_FULL = (
-    r"(?:january|february|march|april|may|june"
-    r"|july|august|september|october|november|december)"
-)
-_MONTHS_ABBR = r"(?:jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec)"
-_MONTHS_PATTERN = rf"(?:{_MONTHS_FULL}|{_MONTHS_ABBR})"
-_YEARS_PATTERN = r"(?:200[0-9]|201[0-9]|202[0-5])"
-_DAY_PATTERN = r"\d{1,2}(?:st|nd|rd|th)?"
-
 # -- Build the non-alphanumeric cleanup regex from KEEP_CHARS --
 _ALLOWED_SYMBOLS = "".join(
     c for c in KEEP_CHARS if not c.isspace() and not c.isalnum()
 )
 _NONALP_REGEX_PATTERN = r"[^a-z0-9\s" + re.escape(_ALLOWED_SYMBOLS) + r"]"
-
-CAS_REGEX = re.compile(r"\b\d{2,7}-\d{2}-\d\b")
 
 
 def _primer_suffix_repl(direction):
@@ -178,6 +124,12 @@ def _primer_suffix_repl(direction):
 # -- Main regex dictionary: (compiled_pattern, replacement) --
 # Applied in order by clean_foia_data.py.  Keys are grouped by stage.
 REGEXES_NORMALIZE = {
+    # --- Stage 0: Encoding artifacts (run before anything else) ---
+    # HTML/XML entities: &amp; &lt; &#153; etc.  These break word-boundary
+    # matching downstream if left in place.
+    "html_entities": (
+        re.compile(r"&(?:[a-zA-Z]+|#\d+);"), " "),
+
     # --- Stage 1: Spacing, symbols, specific patterns (before SKUs) ---
     "comma_space_to_space": (
         re.compile(r",\s+"), " "),
@@ -214,6 +166,54 @@ REGEXES_NORMALIZE = {
         re.compile(
             r"\b(?:item\s*#?[\s-]*[a-z0-9\-]{3,}"
             r"|ref\s*#?[\s-]*[a-z0-9\-]{3,})\b", re.I), " "),
+
+    # --- Admin / commerce noise: prices, quote / PO / order / invoice refs ---
+    # Bracketed "actual price" notes appended to descriptions.
+    "actual_price_paren": (
+        re.compile(r"\(actual\s+price[^)]*\)", re.I), " "),
+    # Bare dollar amounts: $300, $1,234.56
+    "dollar_amount": (
+        re.compile(r"\$[\d,]+(?:\.\d+)?"), " "),
+    # Common phrasing that prefixes a quote tag jammed onto the description,
+    # e.g. "per attached quoteJSKYQ3711".
+    "per_attached_quote": (
+        re.compile(r"\bper\s+attached\s+quote\w*", re.I), " "),
+    # Numbered admin references.  One rule per keyword so the captured tail
+    # (the actual id token) is bounded by the keyword's lexical signal.  The
+    # `(?:...)+` group allows chained separators like `#:` or `no:` (real
+    # data shows "quote #: 7145-4647" and "Quote No: 1163184"), and requires
+    # at least one explicit separator keyword so we don't strip prose like
+    # "quote follows".  The trailing token must be ≥3 alphanumeric/-// chars.
+    "quote_num_full": (
+        re.compile(r"\bquote\s*(?:(?:no\.?|number|[#:])\s*)+[\w\-/]{3,}\b", re.I), " "),
+    "offer_num_full": (
+        re.compile(r"\boffer\s*(?:(?:no\.?|number|[#:])\s*)+[\w\-/]{3,}\b", re.I), " "),
+    "po_num_full": (
+        re.compile(r"\bp\.?\s*o\.?\s*(?:(?:no\.?|number|[#:])\s*)+[\w\-/]{3,}\b", re.I), " "),
+    "order_num_full": (
+        re.compile(r"\b(?:order|ord)\s*(?:(?:no\.?|number|[#:])\s*)+[\w\-/]{3,}\b", re.I), " "),
+    "invoice_num_full": (
+        re.compile(r"\binvoice\s*(?:(?:no\.?|number|[#:])\s*)+[\w\-/]{3,}\b", re.I), " "),
+
+    # --- Sequence-shaped junk that survives SKU rules ---
+    # Raw DNA/RNA strings (10+ contiguous bases) — common in gene-synthesis
+    # order lines.  Strip before SKU rules so the run of letters doesn't get
+    # interpreted as a SKU fragment.
+    "dna_sequence": (
+        re.compile(r"\b[atcgn]{10,}\b", re.I), " "),
+    # Gene-synthesis order metadata: `configurationid: 1391711`, `typecode: STANDARD`,
+    # `sequence: ATCG...` style key:value pairs that appear in IDT/Twist orders.
+    "gene_synth_meta": (
+        re.compile(
+            r"\b(?:configurationid|typecode|purification|format|tubes|scale|umo)"
+            r"\s*:\s*\S+", re.I), " "),
+    "sequence_field": (
+        re.compile(r"\bsequence\s*:\s*\S+", re.I), " "),
+    # Short catalog/part numbers like "AB-1234" or "cat#12345".  The longer
+    # SKU rules below don't catch this shape (1-4 letter prefix + separator +
+    # 3+ digits).
+    "catalog_num_short": (
+        re.compile(r"\b[a-z]{1,4}[#-]\d{3,}\b", re.I), " "),
     "num_in_paren_unit_counts": (
         re.compile(
             r"\(\s*\d+\s*(?:ea|pk|cs|columns|bottles|units)?\s*\)", re.I), " "),
@@ -265,8 +265,16 @@ REGEXES_NORMALIZE = {
     # --- Stage 4: General character cleanup & formatting ---
     "nonalp": (
         re.compile(_NONALP_REGEX_PATTERN), " "),
+    # Strip SKU-prefix-shaped `digits-` runs (e.g. `162-`, `7145-`) without
+    # destroying chemistry position numbers like `4-aminobenzoic`,
+    # `2,3,5,6-tetrafluoropyridin`, or `4,4'-bipyridyl`.  Conditions:
+    #   (?<![\d,])  — must NOT be preceded by another digit or comma, which
+    #                 excludes the middle positions in `2,3,5,6-` and the
+    #                 second number in `1024-5678` SKU pairs.
+    #   \d{3,}      — require ≥3 digits, so single-digit chemistry
+    #                 positions (`4-`, `2-`, `1-`) are preserved.
     "trailh": (
-        re.compile(r"\b\d+\s*-\s*"), " "),
+        re.compile(r"(?<![\d,])\b\d{3,}\s*-\s*"), " "),
     "withslash": (
         re.compile(r"\bw/\s*", re.I), " "),
     "clean_hyphens": (

@@ -4,10 +4,47 @@ import pandas as pd
 import yaml
 import re
 import ahocorasick
-from scipy.sparse import hstack
+from scipy.sparse import hstack, csr_matrix
 from sklearn.preprocessing import normalize
 
 import config
+
+# --- Engineered features ----------------------------------------------------
+# Description-level numeric features appended to the TF-IDF + supplier matrix
+# at both training (1b_create_text_embeddings.py) and inference time.  Kept
+# thin so they don't dilute the TF-IDF signal; the LR learns their weights.
+
+_VOLUME_UNIT_REGEX = re.compile(
+    r'\b\d+(?:\.\d+)?\s*'
+    r'(?:ml|ul|mg|kg|ug|ng|nm|um|nmol|umol|pmol|fmol|mol|liter|microliter)\b',
+    re.IGNORECASE,
+)
+
+
+def compute_engineered_features(descriptions, weight=None):
+    """Return a (n, 2) sparse CSR matrix of engineered features:
+        col 0 — scaled token count: min(words, 50) / 50, in [0, 1]
+        col 1 — has-volume-unit flag: 0 or 1 (matches tokens like
+                '1.5ml', '100ul', '5nmol' — preserved by the new
+                cleaning pipeline).
+
+    Scaled by `weight` (defaults to config.FEATURE_WEIGHT).  Callers must
+    use this same function at training and inference so the LR sees the
+    same column meanings on both sides.
+    """
+    w = config.FEATURE_WEIGHT if weight is None else weight
+
+    if isinstance(descriptions, pd.Series):
+        texts = descriptions.fillna('').astype(str)
+    else:
+        texts = pd.Series([str(d) if isinstance(d, str) else '' for d in descriptions])
+
+    tok_count = texts.str.split().str.len().fillna(0).clip(upper=50).astype(float) / 50.0
+    has_vol = texts.str.contains(_VOLUME_UNIT_REGEX, regex=True, na=False).astype(float)
+
+    arr = np.column_stack([tok_count.values, has_vol.values]) * w
+    return csr_matrix(arr)
+
 
 # --- Helper Functions ---
 def _normalize_separator_pattern(token):
@@ -458,6 +495,12 @@ class HybridClassifier:
                                   supp_norm * config.SUPPLIER_WEIGHT])
             else:
                 vectors = desc_vectors
+
+            # Append engineered description-level features (token count,
+            # has-volume-unit).  Must mirror the same call in 1b.
+            if getattr(config, 'USE_ENGINEERED_FEATURES', False):
+                extra = compute_engineered_features(to_predict_ml['data'])
+                vectors = hstack([vectors, extra])
 
             ml_probas = self.ml_model.predict_proba(vectors)[:, 1]
             for j, idx in enumerate(to_predict_ml['indices']):

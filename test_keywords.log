@@ -1,0 +1,461 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       SE—Standard Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. Maximum number of variables is set to 32,767; see help set_maxvar.
+
+. do test_keywords.do 
+
+. set more off
+
+. use category year product_desc clean_desc price similarity_score ///
+>     using /n/home02/cxu75/sci_eq/derived/first_stage/make_mkt_panel/output/fu
+> ll_item_level_tfidf.dta if ///
+>     inlist(category, "human serum", "crystallizing dishes", "rectangular carb
+> oys", "nitrogen", "bacterial selection antibiotics - rifampicin", "storage ja
+> rs") | ///
+>     inlist(category, "potassium acetate", "carbon dioxide", "depc", "sodium s
+> ulfate", "colorimetric substrates - onpg", "ammonium sulfate") | ///
+>     inlist(category, "paraffin", "thrombin", "colorimetric substrates - dab",
+>  "chromatography paper", "flash chromatography columns - silica gel", "cell l
+> ysis detergents - digitonin") | ///
+>     inlist(category, "cell culture antibiotics - zeocin", "dewar flasks", "dr
+> ug - anticoagulant", "direct pcr lysis reagents", "lds sample buffer"), clear
+
+. keep if inrange(year, 2010, 2018)
+(829 observations deleted)
+
+. rename price log_price
+
+. gen kept = 1
+
+. 
+. * === Apply category-specific keyword filters ===
+. * CARBON DIOXIDE: anatomical/stem cell/bone-related
+. foreach v in "bone " "marrow" "skull" "stem cell" "graft tiss" "ostase" "deca
+> lcified" "mesenchymal" "mscs" {
+  2.     replace kept = 0 if category == "carbon dioxide" & strpos(clean_desc, 
+> "`v'") > 0
+  3. }
+(268 real changes made)
+(1 real change made)
+(1 real change made)
+(0 real changes made)
+(0 real changes made)
+(0 real changes made)
+(1 real change made)
+(0 real changes made)
+(0 real changes made)
+
+. 
+. * DIRECT PCR LYSIS REAGENTS: construction/paint primer, medical needles
+. foreach v in "plaster" "primer c-" "gallon pail" "catheter" "butterfly needle
+> " "infusion" "5# pail" {
+  2.     replace kept = 0 if category == "direct pcr lysis reagents" & strpos(c
+> lean_desc, "`v'") > 0
+  3. }
+(3 real changes made)
+(1 real change made)
+(0 real changes made)
+(1 real change made)
+(0 real changes made)
+(0 real changes made)
+(0 real changes made)
+
+. 
+. * STORAGE JARS: drierite, pigments, antibodies caught on "jar"
+. foreach v in "jarid" "drierite" "pigment" "anitbody" "antibody" {
+  2.     replace kept = 0 if category == "storage jars" & strpos(clean_desc, "`
+> v'") > 0
+  3. }
+(1 real change made)
+(2 real changes made)
+(9 real changes made)
+(0 real changes made)
+(0 real changes made)
+
+. 
+. * COLORIMETRIC DAB: pharmacopoeia-grade other chemicals (DAB = Deutsches Arzn
+> eibuch)
+. foreach v in "extra pure dab" "xtra pure dab" "ph. eur" "ph. franc" "ph. eu" 
+> {
+  2.     replace kept = 0 if category == "colorimetric substrates - dab" & strp
+> os(clean_desc, "`v'") > 0
+  3. }
+(15 real changes made)
+(1 real change made)
+(2 real changes made)
+(0 real changes made)
+(0 real changes made)
+
+. 
+. * CRYSTALLIZING DISHES: non-crystallizing items
+. foreach v in "non-crystallizing" "polishing" {
+  2.     replace kept = 0 if category == "crystallizing dishes" & strpos(clean_
+> desc, "`v'") > 0
+  3. }
+(9 real changes made)
+(0 real changes made)
+
+. 
+. * RECTANGULAR CARBOYS: bundled orders, gas accessories
+. foreach v in "gas cylinder support" "sparkleen" "stylus" "pen light" {
+  2.     replace kept = 0 if category == "rectangular carboys" & strpos(clean_d
+> esc, "`v'") > 0
+  3. }
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(0 real changes made)
+
+. 
+. * ZEOCIN: different antibiotics (phleomycin, gentamicin), expression plasmids
+. foreach v in "phleomycin" "expression plasmid" "gentamicin" "resistance gene"
+>  {
+  2.     replace kept = 0 if category == "cell culture antibiotics - zeocin" & 
+> strpos(clean_desc, "`v'") > 0
+  3. }
+(4 real changes made)
+(1 real change made)
+(1 real change made)
+(0 real changes made)
+
+. 
+. * DIGITONIN: stopwatches caught on "digit"
+. foreach v in "stopwatch" "digital stopwatch" {
+  2.     replace kept = 0 if category == "cell lysis detergents - digitonin" & 
+> strpos(clean_desc, "`v'") > 0
+  3. }
+(3 real changes made)
+(0 real changes made)
+
+. 
+. * CHROMATOGRAPHY PAPER: paper plates / bench protector / bundled
+. foreach v in "paper plate" "ppr plt" "bench prot" "laycoat" {
+  2.     replace kept = 0 if category == "chromatography paper" & strpos(clean_
+> desc, "`v'") > 0
+  3. }
+(0 real changes made)
+(18 real changes made)
+(1 real change made)
+(0 real changes made)
+
+. 
+. * LDS SAMPLE BUFFER: 4x monoculars, antibodies, glove dispensers
+. foreach v in "monocular" "ha tag dylight" "glve dispnsr" "glove dispenser" {
+  2.     replace kept = 0 if category == "lds sample buffer" & strpos(clean_des
+> c, "`v'") > 0
+  3. }
+(2 real changes made)
+(1 real change made)
+(1 real change made)
+(0 real changes made)
+
+. 
+. * NITROGEN: bacterial media (tryptone source nitrogen), antibodies, polymeras
+> es
+. foreach v in "tryptone" "peptone" "casein" "dna pol" "primary 100ul" "calibra
+> tion gas" {
+  2.     replace kept = 0 if category == "nitrogen" & strpos(clean_desc, "`v'")
+>  > 0
+  3. }
+(17 real changes made)
+(1 real change made)
+(0 real changes made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+
+. 
+. * RIFAMPICIN: rifaximin (related drug, different)
+. replace kept = 0 if category == "bacterial selection antibiotics - rifampicin
+> " & strpos(clean_desc, "rifaximin") > 0
+(1 real change made)
+
+. 
+. * HUMAN SERUM: albumin (BSA-like)
+. replace kept = 0 if category == "human serum" & strpos(clean_desc, "albumin")
+>  > 0
+(5 real changes made)
+
+. 
+. * DRUG - ANTICOAGULANT: cell culture supplement form
+. foreach v in "endothelial cell growth" "cell culture tested" {
+  2.     replace kept = 0 if category == "drug - anticoagulant" & strpos(clean_
+> desc, "`v'") > 0
+  3. }
+(1 real change made)
+(83 real changes made)
+
+. 
+. * THROMBIN: antithrombin (inhibitor, not thrombin)
+. replace kept = 0 if category == "thrombin" & strpos(clean_desc, "antithrombin
+> ") > 0
+(1 real change made)
+
+. 
+. * === COMPARE BEFORE/AFTER ===
+. preserve
+
+.     collapse (mean) avg_lp = log_price (count) n=log_price, by(category year)
+
+.     sort category year
+
+.     by category: gen dlp = avg_lp - avg_lp[_n-1]
+(23 missing values generated)
+
+.     collapse (sd) sd_before = dlp (sum) n_b=n, by(category)
+
+.     tempfile b
+
+.     save `b'
+file /tmp/St1647940.000002 saved as .dta format
+
+. restore
+
+. preserve
+
+.     keep if kept == 1
+(462 observations deleted)
+
+.     collapse (mean) avg_lp = log_price (count) n=log_price, by(category year)
+
+.     sort category year
+
+.     by category: gen dlp = avg_lp - avg_lp[_n-1]
+(23 missing values generated)
+
+.     collapse (sd) sd_after = dlp (sum) n_a=n, by(category)
+
+.     tempfile a
+
+.     save `a'
+file /tmp/St1647940.000004 saved as .dta format
+
+. restore
+
+. 
+. use `b', clear
+
+. merge 1:1 category using `a', nogen
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                                23  
+    -----------------------------------------
+
+. gen pct = 100*(sd_before-sd_after)/sd_before
+
+. gen n_drop = n_b - n_a
+
+. gsort -sd_before
+
+. format sd_before sd_after %5.2f
+
+. format pct %5.1f
+
+. list category sd_before sd_after pct n_b n_drop, sep(0) noobs
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_bef~e | sd_after |
+  |                    direct pcr lysis reagents |     0.88 |     0.30 |
+  |--------------------------------------------------------------------|
+  |          pct         |         n_b         |        n_drop         |
+  |         66.0         |         120         |             5         |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_bef~e | sd_after |
+  |                                  human serum |     0.86 |     0.92 |
+  |--------------------------------------------------------------------|
+  |          pct         |         n_b         |        n_drop         |
+  |         -7.1         |          85         |             5         |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_bef~e | sd_after |
+  |                         crystallizing dishes |     0.72 |     0.73 |
+  |--------------------------------------------------------------------|
+  |          pct         |         n_b         |        n_drop         |
+  |         -0.9         |         354         |             9         |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_bef~e | sd_after |
+  |                          rectangular carboys |     0.70 |     0.61 |
+  |--------------------------------------------------------------------|
+  |          pct         |         n_b         |        n_drop         |
+  |         12.2         |          49         |             3         |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_bef~e | sd_after |
+  |                                     nitrogen |     0.69 |     0.76 |
+  |--------------------------------------------------------------------|
+  |          pct         |         n_b         |        n_drop         |
+  |        -11.0         |         151         |            21         |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_bef~e | sd_after |
+  | bacterial selection antibiotics - rifampicin |     0.67 |     0.56 |
+  |--------------------------------------------------------------------|
+  |          pct         |         n_b         |        n_drop         |
+  |         16.5         |          47         |             1         |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_bef~e | sd_after |
+  |                                 storage jars |     0.57 |     0.48 |
+  |--------------------------------------------------------------------|
+  |          pct         |         n_b         |        n_drop         |
+  |         15.5         |         175         |            12         |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_bef~e | sd_after |
+  |                            potassium acetate |     0.56 |     0.56 |
+  |--------------------------------------------------------------------|
+  |          pct         |         n_b         |        n_drop         |
+  |          0.0         |          68         |             0         |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_bef~e | sd_after |
+  |                               carbon dioxide |     0.50 |     0.34 |
+  |--------------------------------------------------------------------|
+  |          pct         |         n_b         |        n_drop         |
+  |         31.0         |        2059         |           271         |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_bef~e | sd_after |
+  |                                         depc |     0.48 |     0.48 |
+  |--------------------------------------------------------------------|
+  |          pct         |         n_b         |        n_drop         |
+  |          0.0         |          67         |             0         |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_bef~e | sd_after |
+  |                               sodium sulfate |     0.47 |     0.47 |
+  |--------------------------------------------------------------------|
+  |          pct         |         n_b         |        n_drop         |
+  |          0.0         |         137         |             0         |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_bef~e | sd_after |
+  |               colorimetric substrates - onpg |     0.46 |     0.46 |
+  |--------------------------------------------------------------------|
+  |          pct         |         n_b         |        n_drop         |
+  |          0.0         |          66         |             0         |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_bef~e | sd_after |
+  |                             ammonium sulfate |     0.46 |     0.46 |
+  |--------------------------------------------------------------------|
+  |          pct         |         n_b         |        n_drop         |
+  |          0.0         |          70         |             0         |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_bef~e | sd_after |
+  |                            lds sample buffer |     0.43 |     0.43 |
+  |--------------------------------------------------------------------|
+  |          pct         |         n_b         |        n_drop         |
+  |          0.1         |         168         |             4         |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_bef~e | sd_after |
+  |                                     paraffin |     0.42 |     0.42 |
+  |--------------------------------------------------------------------|
+  |          pct         |         n_b         |        n_drop         |
+  |          0.0         |         472         |             0         |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_bef~e | sd_after |
+  |                                     thrombin |     0.41 |     0.43 |
+  |--------------------------------------------------------------------|
+  |          pct         |         n_b         |        n_drop         |
+  |         -3.7         |         121         |             1         |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_bef~e | sd_after |
+  |                colorimetric substrates - dab |     0.39 |     0.40 |
+  |--------------------------------------------------------------------|
+  |          pct         |         n_b         |        n_drop         |
+  |         -3.0         |         582         |            18         |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_bef~e | sd_after |
+  |                         chromatography paper |     0.39 |     0.28 |
+  |--------------------------------------------------------------------|
+  |          pct         |         n_b         |        n_drop         |
+  |         27.3         |         190         |            19         |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_bef~e | sd_after |
+  |    flash chromatography columns - silica gel |     0.38 |     0.38 |
+  |--------------------------------------------------------------------|
+  |          pct         |         n_b         |        n_drop         |
+  |          0.0         |         102         |             0         |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_bef~e | sd_after |
+  |            cell lysis detergents - digitonin |     0.35 |     0.37 |
+  |--------------------------------------------------------------------|
+  |          pct         |         n_b         |        n_drop         |
+  |         -8.2         |         143         |             3         |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_bef~e | sd_after |
+  |            cell culture antibiotics - zeocin |     0.35 |     0.34 |
+  |--------------------------------------------------------------------|
+  |          pct         |         n_b         |        n_drop         |
+  |          2.5         |         154         |             6         |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_bef~e | sd_after |
+  |                                 dewar flasks |     0.33 |     0.33 |
+  |--------------------------------------------------------------------|
+  |          pct         |         n_b         |        n_drop         |
+  |          0.0         |         390         |             0         |
+  +--------------------------------------------------------------------+
+
+  +--------------------------------------------------------------------+
+  |                                     category | sd_bef~e | sd_after |
+  |                         drug - anticoagulant |     0.32 |     0.16 |
+  |--------------------------------------------------------------------|
+  |          pct         |         n_b         |        n_drop         |
+  |         49.8         |         148         |            84         |
+  +--------------------------------------------------------------------+
+
+. 
+end of do-file

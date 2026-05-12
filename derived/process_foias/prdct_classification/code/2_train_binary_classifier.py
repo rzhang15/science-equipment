@@ -29,6 +29,11 @@ def main(embedding_name: str):
 
     print("  - Loading data...")
     X = joblib.load(embedding_path)
+    # 1b previously saved supplier-combined embeddings as scipy COO matrices,
+    # which don't support row indexing.  Convert to CSR defensively so older
+    # on-disk artifacts still work.
+    if hasattr(X, 'tocsr'):
+        X = X.tocsr()
     df_labels = pd.read_parquet(config.PREPARED_DATA_PATH)
 
     # Split the main DataFrame to preserve all columns for the hold-out set
@@ -36,8 +41,11 @@ def main(embedding_name: str):
         df_labels, test_size=0.2, random_state=42, stratify=df_labels['label']
     )
 
-    # Save the 20% hold-out DataFrame for potential use in later scripts
-    holdout_path = os.path.join(config.OUTPUT_DIR, "holdout_data_for_validation.parquet")
+    # Save the 20% hold-out DataFrame for potential use in later scripts.
+    # Per-model filename keeps tfidf/minilm/specter2 runs from clobbering
+    # each other (the split itself is identical — same random_state — but
+    # downstream tools shouldn't have to assume that).
+    holdout_path = os.path.join(config.OUTPUT_DIR, f"holdout_data_for_validation_{embedding_name}.parquet")
     df_test.to_parquet(holdout_path, index=False)
     print(f"Hold-out data for validation saved to: {holdout_path}")
 
@@ -66,8 +74,14 @@ def main(embedding_name: str):
     # 1. Train the ML model component
     print("  - Training the LogisticRegression component...")
     from sklearn.linear_model import LogisticRegression
+    # C=10 from sweep_params.py grid search (strong signal across the
+    # leaderboard).  class_weight kept as 'balanced' because the UMich
+    # hold-out slice is ~5:1 lab-heavy — without class re-weighting the
+    # LR drifts toward predicting "lab" and non-lab recall craters.  The
+    # sweep didn't see this because it pools UTD+UMich together; the
+    # imbalance only bites on the UMich slice alone.
     clf = LogisticRegression(
-        C=1.0, class_weight='balanced', max_iter=1000,
+        C=10.0, class_weight='balanced', max_iter=1000,
         solver='liblinear', random_state=42, n_jobs=None,
     )
     clf.fit(X_train, y_train)
@@ -78,9 +92,19 @@ def main(embedding_name: str):
     if embedding_name == 'tfidf':
         vectorizer_path = os.path.join(config.OUTPUT_DIR, "vectorizer_tfidf.joblib")
         vectorizer = joblib.load(vectorizer_path)
-    elif embedding_name == 'bert':
-        model_object_path = os.path.join(config.OUTPUT_DIR, "model_object_all-MiniLM-L6-v2.joblib")
-        vectorizer = joblib.load(model_object_path)
+    elif embedding_name in config.BERT_MODELS:
+        # Re-instantiate the encoder from HuggingFace cache rather than
+        # loading a pickled SentenceTransformer.  The HybridClassifier holds
+        # a reference to this encoder for inference-time gatekeeping.
+        from sentence_transformers import SentenceTransformer
+        import torch
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        vectorizer = SentenceTransformer(config.BERT_MODELS[embedding_name], device=device)
+    else:
+        raise ValueError(
+            f"Unknown embedding_name '{embedding_name}'. "
+            f"Expected 'tfidf' or one of: {list(config.BERT_MODELS)}"
+        )
 
     # Load supplier vectorizer if available
     supplier_vectorizer = None
@@ -161,12 +185,12 @@ def main(embedding_name: str):
         print(report)
 
         df_fp = df_slice[(df_slice['label'] == 0) & (df_slice['predicted_label'] == 1)]
-        fp_path = os.path.join(config.OUTPUT_DIR, f"false_positives{fp_suffix}.csv")
+        fp_path = os.path.join(config.OUTPUT_DIR, f"false_positives{fp_suffix}_{embedding_name}.csv")
         df_fp.to_csv(fp_path, index=False)
         print(f"  - Saved {len(df_fp)} False Positives to: {fp_path}")
 
         df_fn = df_slice[(df_slice['label'] == 1) & (df_slice['predicted_label'] == 0)]
-        fn_path = os.path.join(config.OUTPUT_DIR, f"false_negatives{fn_suffix}.csv")
+        fn_path = os.path.join(config.OUTPUT_DIR, f"false_negatives{fn_suffix}_{embedding_name}.csv")
         df_fn.to_csv(fn_path, index=False)
         print(f"  - Saved {len(df_fn)} False Negatives to: {fn_path}")
 
@@ -205,6 +229,8 @@ def main(embedding_name: str):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train Hybrid Classifier and evaluate on hold-out data.")
-    parser.add_argument("embedding_name", type=str, help="The name of the embedding set to use (e.g., 'tfidf', 'bert').")
+    choices = ['tfidf'] + list(config.BERT_MODELS.keys())
+    parser.add_argument("embedding_name", type=str, choices=choices,
+                        help=f"Which embedding set to train on. One of: {choices}")
     args = parser.parse_args()
     main(args.embedding_name)
