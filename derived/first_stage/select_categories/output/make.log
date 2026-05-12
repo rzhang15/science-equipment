@@ -1,0 +1,771 @@
+--------------------------------------------------------------------------------
+Makelog started: 2026-05-04 17:17:06
+Working directory: /n/holylabs/pakes_lab/Lab/sci_eq/derived/first_stage/select_categories/code
+--------------------------------------------------------------------------------
+External links successfully created!
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 120,000; see help set_maxvar.
+
+. do "/n/holylabs/pakes_lab/Lab/sci_eq/derived/first_stage/select_categories/co
+> de/build.do" 
+
+. set more off
+
+. clear all
+
+. capture log close
+
+. program drop _all
+
+. set scheme modern
+
+. preliminaries
+
+. version 17
+
+. 
+. program main
+  1.     select_good_categories, embed("tfidf")
+  2. end
+
+. 
+. program select_good_categories
+  1.     syntax, embed(string)
+  2.     import delimited ../external/samp/combined_full_report_gatekeeper_tfidf_expert_`embed', clear
+  3.     cap rename v1 category
+  4.     drop if inlist(category, "macro avg", "weighted avg", "Non-Lab", "accuracy")
+  5. 
+. *===============================================================================
+. * TREATED PRODUCT MARKET CLASSIFICATION (STRICT AUDIT)
+. * Thermo Fisher / Life Technologies Merger
+. *
+. * Strict rule: a category is treated only when the antitrust document text
+. * directly supports the placement.
+. *   - Tier 1: subject of an EU "serious doubts" finding (EU paras 41, 69, 98,
+. *             105, 250) OR explicitly named in the FTC Dharmacon Gene Modulation
+. *             Products definition (FTC Order def. U) for siRNA/miRNA-specific items.
+. *   - Tier 2: named in EU para 11 (detailed analysis, no doubts) or para 12
+. *             (mentioned overlap, summary clearance) or otherwise identified
+. *             as an overlap in the body text of section IV (e.g., footnote 44
+. *             for non-FBS sera).
+. *   - Tier 3: bundling/extension robustness (NOT directly antitrust-document-
+. *             named; co-purchased with Tier 1/Tier 2 products).
+. *-------------------------------------------------------------------------------
+. * CHANGELOG vs. previous build.do (strict audit):
+. *   Tier 1 -> Tier 2:
+. *     - bovine adult/calf serum, nz bovine calf serum, horse serum (footnote 44)
+. *     - PBS / DPBS / HBSS (process liquids: EU para 27 separate market;
+. *       not in serious-doubts finding)
+. *     - gene-specific rnai reagents (ambiguous between siRNA/shRNA/miRNA)
+. *   Tier 2 -> control:
+. *     - pre-designed/custom-designed qpcr assays (oligonucleotides, not kits)
+. *     - qpcr beads (not in EU kit market list)
+. *     - nucleic acid quantitation (not in any EU market)
+. *     - phosphoprotein electrophoresis reagents (specialty)
+. *     - fluorophore - general / NA stain, NA gel stains, streptavidin conjugates,
+. *       quantum dots (EU para 318 "reactive dyes" only)
+. *     - modified/radiolabeled nucleotides (EU para 126 ancillary reagents)
+. *     - creatine kinase (label flags non-NA enzyme)
+. *     - all enzyme reaction buffers (EU para 126 buffers excluded)
+. *     - protein quantitation assay kits (not in EU markets)
+. *     - pcr barcoding expansion (sequencing library prep)
+. *   Tier 2 -> Tier 3:
+. *     - capped mrna synthesis / IVT / direct pcr lysis (specialty derivatives)
+. *   Tier 3 -> control:
+. *     - all non-reactive-dye fluorophores (calcium/cell tracer/lysosome/etc.)
+. *     - viability stains (live-cell imaging)
+. *     - reaction buffers, ligation reaction buffer (EU para 126)
+. *     - WB accessories: blockers, enhancers, pen, rollers, stripping buffers
+. *       (post-transfer; weak bundling link)
+. *   New additions:
+. *     - earle's balanced salt solution (ebss) buffer -> Tier 2 (process liquid)
+. *     - rna ladder, protein ladders, radiolabeled protein MW ladder -> Tier 2
+. *     - site-directed mutagenesis kits, transposon mutagenesis kits,
+. *       random mutagenesis systems -> Tier 2 (cloning, EU para 12(vi))
+. *===============================================================================
+. 
+. gen tier1 = 0
+  6. gen tier2 = 0
+  7. gen tier3 = 0
+  8. 
+. *-------------------------------------------------------------------------------
+. * TIER 1: SERIOUS DOUBTS FINDING IN EU OR FTC GENE MODULATION DIVESTITURE
+. *-------------------------------------------------------------------------------
+. 
+. * --- Cell culture media (EU para 41 serious doubts; FTC HyClone divested) ---
+. replace tier1 = 1 if category == "basal medium eagle"
+  9. replace tier1 = 1 if category == "dmem"
+ 10. replace tier1 = 1 if category == "dmem/f-12"
+ 11. replace tier1 = 1 if category == "dry basal media, not chemically defined"
+ 12. replace tier1 = 1 if category == "hams f12"
+ 13. replace tier1 = 1 if category == "imdm"
+ 14. replace tier1 = 1 if category == "insect cell media"
+ 15. replace tier1 = 1 if category == "leibovitz l15 media"
+ 16. replace tier1 = 1 if category == "mccoys 5a"
+ 17. replace tier1 = 1 if category == "mem"
+ 18. replace tier1 = 1 if category == "neurobasal media"
+ 19. replace tier1 = 1 if category == "optimem"
+ 20. replace tier1 = 1 if category == "rpmi"
+ 21. replace tier1 = 1 if category == "specialty cell culture media"
+ 22. replace tier1 = 1 if category == "stem cell media"
+ 23. 
+. * --- FBS (EU para 69 serious doubts; FTC HyClone divested) ---
+. *     EU para 58: "main area of overlap is the supply of FBS"
+. *     Non-FBS sera (calf, adult bovine, equine) -> Tier 2 (footnote 44)
+. replace tier1 = 1 if category == "australian fbs"
+ 24. replace tier1 = 1 if category == "canadian fbs"
+ 25. replace tier1 = 1 if category == "new zealand fbs"
+ 26. replace tier1 = 1 if category == "us fbs"
+ 27. 
+. * --- siRNA (EU para 98 serious doubts; FTC Dharmacon Gene Modulation
+. *     Products def. U includes "small/short interfering RNA (siRNA)") ---
+. replace tier1 = 1 if category == "synthetic sirna"
+ 28. replace tier1 = 1 if category == "sirna buffers"
+ 29. replace tier1 = 1 if category == "sirna transfection medium"
+ 30. replace tier1 = 1 if category == "sirna transfection reagents"
+ 31. 
+. * --- miRNA: no exact "synthetic mirna" category in current data; FTC def. U
+. *     includes microRNA. (gene-specific rnai reagents is ambiguous -> Tier 2)
+. 
+. count if tier1 == 1
+ 32. 
+. *-------------------------------------------------------------------------------
+. * TIER 2: NAMED OVERLAP, NO SERIOUS DOUBTS
+. *-------------------------------------------------------------------------------
+. 
+. * --- shRNA (EU para 88: no serious doubts; bundled in Dharmacon divestiture) ---
+. replace tier2 = 1 if category == "synthetic shrna"
+ 33. 
+. * --- Non-FBS sera (footnote 44: overlap markets covered by FBS commitment,
+. *     "not further considered" by EU) ---
+. replace tier2 = 1 if category == "bovine adult serum"
+ 34. replace tier2 = 1 if category == "bovine calf serum"
+ 35. replace tier2 = 1 if category == "nz bovine calf serum"
+ 36. replace tier2 = 1 if category == "horse serum"
+ 37. replace tier2= 1 if category == "goat serum"
+ 38. replace tier2= 1 if category == "donkey serum"
+ 39. replace tier2= 1 if category == "mouse serum"
+ 40. replace tier2= 1 if category == "rat serum"
+ 41. replace tier2= 1 if category == "rabbit serum"
+ 42. replace tier2= 1 if category == "sheep serum"
+ 43. * --- Process liquids (EU para 27: separate product market; FTC HyClone
+. *     divestiture covers them but EU did not analyze for serious doubts) ---
+. replace tier2 = 1 if category == "phosphate-buffered saline (pbs) buffer"
+ 44. replace tier2 = 1 if category == "tris-edta (te) buffer"
+ 45. replace tier2 = 1 if category == "dulbecco's phosphate-buffered saline (dpbs) buffer"
+ 46. replace tier2 = 1 if category == "hanks' balanced salt solution (hbss) buffer"
+ 47. replace tier2 = 1 if category == "earle's balanced salt solution (ebss) buffer"
+ 48. 
+. * --- RNAi mixed/ambiguous (placed conservatively in Tier 2) ---
+. replace tier2 = 1 if category == "gene-specific rnai reagents"
+ 49. 
+. * --- Transfection (EU para 11(iii), section IV.D.2; cleared para 122) ---
+. replace tier2 = 1 if category == "transfection reagents"
+ 50. replace tier2 = 1 if category == "transfection reagents - cellfectin (insect cell)"
+ 51. replace tier2 = 1 if category == "transfection reagents - electroporation kits"
+ 52. replace tier2 = 1 if category == "transfection reagents - electroporation reagent"
+ 53. replace tier2 = 1 if category == "transfection reagents - in vivo delivery reagents"
+ 54. replace tier2 = 1 if category == "transfection reagents - lentiviral packaging kits"
+ 55. replace tier2 = 1 if category == "transfection reagents - other"
+ 56. replace tier2 = 1 if category == "transfection reagents - polybrene (viral transduction)"
+ 57. replace tier2 = 1 if category == "transfection reagents - protein transfection reagents"
+ 58. 
+. * --- NA amplification standalone enzymes (EU para 11(iv), section IV.D.3;
+. *     paras 142, 152, 159, 165, 175 cleared) ---
+. replace tier2 = 1 if category == "high-fidelity dna polymerase"
+ 59. replace tier2 = 1 if category == "high-fidelity hot start dna polymerase"
+ 60. replace tier2 = 1 if category == "high-fidelity hot start pcr systems"
+ 61. replace tier2 = 1 if category == "high-fidelity pcr systems"
+ 62. replace tier2 = 1 if category == "hot start pcr systems"
+ 63. replace tier2 = 1 if category == "hot start taq polymerase"
+ 64. replace tier2 = 1 if category == "reverse transcriptase"
+ 65. replace tier2 = 1 if category == "taq polymerases"
+ 66. 
+. * --- NA amplification ready-to-use kits (EU para 12(iv), para 135 list:
+. *     PCR kits, dye/probe-based qPCR kits, cDNA synthesis kits, RT-PCR kits,
+. *     dye/probe-based RT-qPCR kits) ---
+. replace tier2 = 1 if category == "pcr systems"
+ 67. replace tier2 = 1 if category == "dye-based qpcr systems"
+ 68. replace tier2 = 1 if category == "probe-based qpcr systems"
+ 69. replace tier2 = 1 if category == "dye-based rt-qpcr systems"
+ 70. replace tier2 = 1 if category == "probe-based rt-qpcr systems"
+ 71. replace tier2 = 1 if category == "rt-pcr systems"
+ 72. replace tier2 = 1 if category == "first-strand cdna synthesis systems"
+ 73. replace tier2 = 1 if category == "long template pcr systems"
+ 74. replace tier2 = 1 if category == "tissue pcr systems"
+ 75. replace tier2 = 1 if category == "microrna reverse transcription kit"
+ 76. replace tier2 = 1 if category == "pre amplification kits"
+ 77. replace tier2 = 1 if category == "qrt-pcr titration kit"
+ 78. 
+. * --- NA purification kits (EU section IV.D.4, paras 178-201; column-based
+. *     and magnetic-bead-based finished kits) ---
+. replace tier2 = 1 if category == "column-based dna and rna extraction kits"
+ 79. replace tier2 = 1 if category == "column-based dna genomic purification kits"
+ 80. replace tier2 = 1 if category == "column-based dna plasmid gigaprep"
+ 81. replace tier2 = 1 if category == "column-based dna plasmid maxiprep"
+ 82. replace tier2 = 1 if category == "column-based dna plasmid megaprep"
+ 83. replace tier2 = 1 if category == "column-based dna plasmid midiprep"
+ 84. replace tier2 = 1 if category == "column-based dna plasmid miniprep"
+ 85. replace tier2 = 1 if category == "column-based dna purification kits"
+ 86. replace tier2 = 1 if category == "column-based gel dna extraction kits"
+ 87. replace tier2 = 1 if category == "column-based gel rna extraction kits"
+ 88. replace tier2 = 1 if category == "column-based microbial dna purification kits"
+ 89. replace tier2 = 1 if category == "column-based pcr and gel purification kit"
+ 90. replace tier2 = 1 if category == "column-based pcr purification kits"
+ 91. replace tier2 = 1 if category == "column-based pcr purification reagent"
+ 92. replace tier2 = 1 if category == "column-based plant dna purification kits"
+ 93. replace tier2 = 1 if category == "column-based plant rna purification kits"
+ 94. replace tier2 = 1 if category == "column-based protein purification kit"
+ 95. replace tier2 = 1 if category == "column-based rna purification kits"
+ 96. replace tier2 = 1 if category == "column-based yeast dna purification kits"
+ 97. replace tier2 = 1 if category == "liquid-based dna plasmid purification kit"
+ 98. replace tier2 = 1 if category == "magnetic-bead based purification kit"
+ 99. replace tier2 = 1 if category == "magnetic bacterial rna purification kit"
+100. replace tier2 = 1 if category == "magnetic bead-based mrna selection kit"
+101. replace tier2 = 1 if category == "rna extraction reagents"
+102. replace tier2 = 1 if category == "rna stabilization reagent"
+103. replace tier2 = 1 if category == "silica bead based gel purification kit"
+104. replace tier2 = 1 if category == "spin columns"
+105. 
+. * --- Molecular weight standards (EU para 11(v), paras 197-201) ---
+. replace tier2 = 1 if category == "pre-stained dna ladders"
+106. replace tier2 = 1 if category == "pre-stained protein molecular-weight ladder"
+107. replace tier2 = 1 if category == "pre-stained rna ladders"
+108. replace tier2 = 1 if category == "unstained dna ladders"
+109. replace tier2 = 1 if category == "unstained protein molecular-weight ladder"
+110. replace tier2 = 1 if category == "unstained rna ladders"
+111. replace tier2 = 1 if category == "rna ladder"
+112. replace tier2 = 1 if category == "protein ladders"
+113. replace tier2 = 1 if category == "radiolabeled protein molecular-weight ladder"
+114. 
+. * --- Cloning enzymes (restriction + modifying; EU para 12(vi), paras 202-207) ---
+. replace tier2 = 1 if category == "restriction enzymes"
+115. replace tier2 = 1 if category == "dnase i"
+116. replace tier2 = 1 if category == "rnase"
+117. replace tier2 = 1 if category == "rnase inhibitors"
+118. replace tier2 = 1 if category == "nuclease enzymes"
+119. replace tier2 = 1 if category == "rna polymerases"
+120. replace tier2 = 1 if category == "taq dna ligases"
+121. replace tier2 = 1 if category == "nucleic acid modifying enzymes - alkaline phosphatases"
+122. replace tier2 = 1 if category == "nucleic acid modifying enzymes - dna fragmentases"
+123. replace tier2 = 1 if category == "nucleic acid modifying enzymes - dna methylases"
+124. replace tier2 = 1 if category == "nucleic acid modifying enzymes - end repair enzymes"
+125. replace tier2 = 1 if category == "nucleic acid modifying enzymes - endonucleases"
+126. replace tier2 = 1 if category == "nucleic acid modifying enzymes - exonucleases"
+127. replace tier2 = 1 if category == "nucleic acid modifying enzymes - klenow fragment"
+128. replace tier2 = 1 if category == "nucleic acid modifying enzymes - other"
+129. replace tier2 = 1 if category == "nucleic acid modifying enzymes - other dna polymerases"
+130. replace tier2 = 1 if category == "nucleic acid modifying enzymes - other nucleases"
+131. replace tier2 = 1 if category == "nucleic acid modifying enzymes - poly(a) polymerases"
+132. replace tier2 = 1 if category == "nucleic acid modifying enzymes - pyrophosphatases"
+133. replace tier2 = 1 if category == "nucleic acid modifying enzymes - recombinases"
+134. replace tier2 = 1 if category == "nucleic acid modifying enzymes - single-stranded dna binding proteins"
+135. replace tier2 = 1 if category == "nucleic acid modifying enzymes - t4 dna ligase"
+136. replace tier2 = 1 if category == "nucleic acid modifying enzymes - t4 dna polymerase"
+137. replace tier2 = 1 if category == "nucleic acid modifying enzymes - t4 polynucleotide kinase"
+138. replace tier2 = 1 if category == "nucleic acid modifying enzymes - t4 dna ligase buffer"
+139. replace tier2 = 1 if category == "nucleic acid modifying enzymes - t4 polynucleotide kinase buffer"
+140. replace tier2 = 1 if category == "nucleic acid modifying enzymes - t4 rna ligase buffer"
+141. replace tier2 = 1 if category == "nucleic acid modifying enzymes - t4 rna ligase"
+142. replace tier2 = 1 if category == "nucleic acid modifying enzymes - t7 dna ligase"
+143. replace tier2 = 1 if category == "nucleic acid modifying enzymes - taq dna ligase"
+144. replace tier2 = 1 if category == "nucleic acid modifying enzymes - terminal transferase"
+145. replace tier2 = 1 if category == "nucleic acid modifying enzymes - topoisomerases"
+146. replace tier2 = 1 if category == "nucleic acid modifying enzymes - transposases"
+147. * (Excluded: creatine kinase by category-name flag "non-nucleic acid enzyme";
+. *  enzyme reaction buffers (t4 ligase buffer, t4 PNK buffer, t4 RNA ligase
+. *  buffer, restriction enzyme buffer) by EU para 126.)
+. 
+. * --- Cloning kits (EU para 12(vi), para 205) ---
+. replace tier2 = 1 if category == "blunt-end cloning kits"
+148. replace tier2 = 1 if category == "directional topo cloning kits"
+149. replace tier2 = 1 if category == "gateway cloning kits"
+150. replace tier2 = 1 if category == "rapid dna ligation kits"
+151. replace tier2 = 1 if category == "seamless cloning kits"
+152. replace tier2 = 1 if category == "ta cloning kits"
+153. replace tier2 = 1 if category == "topo ta cloning kits"
+154. replace tier2 = 1 if category == "zero blunt topo cloning kits"
+155. 
+. * --- Cloning-adjacent: bacterial transformation (cloning workflow) ---
+. replace tier2 = 1 if category == "chemically competent cells"
+156. replace tier2 = 1 if category == "electrocompetent cells"
+157. replace tier2 = 1 if category == "bacterial transformation reagents"
+158. replace tier2 = 1 if category == "expression plasmids"
+159. replace tier2 = 1 if category == "plasmid vectors"
+160. 
+. * --- Mutagenesis (cloning kits per EU para 12(vi)) ---
+. replace tier2 = 1 if category == "site-directed mutagenesis systems"
+161. replace tier2 = 1 if category == "site-directed mutagenesis kits"
+162. replace tier2 = 1 if category == "transposon mutagenesis kits"
+163. replace tier2 = 1 if category == "random mutagenesis systems"
+164. 
+. * --- SDS-PAGE (EU para 12(vii), paras 302-306; named: vertical gel boxes,
+. *     power suppliers, pre-cast gels, standards, gel stains) ---
+. replace tier2 = 1 if category == "acrylamide/bis solution"
+165. replace tier2 = 1 if category == "horizontal electrophoresis systems"
+166. replace tier2 = 1 if category == "polyacrylamide gels casting kit"
+167. replace tier2 = 1 if category == "pre-cast bis-tris gels"
+168. replace tier2 = 1 if category == "pre-cast tbe gels"
+169. replace tier2 = 1 if category == "pre-cast tris-acetate gels"
+170. replace tier2 = 1 if category == "pre-cast tris-glycine gels"
+171. replace tier2 = 1 if category == "pre-cast tris-hcl gels"
+172. replace tier2 = 1 if category == "pre-cast tris-tricine gels"
+173. replace tier2 = 1 if category == "protein gel stains"
+174. replace tier2 = 1 if category == "nucleic acid gel stains"
+175. replace tier2 = 1 if category == "vertical electrophoresis systems"
+176. 
+. * --- Western blotting: TRANSFER BOXES, MEMBRANES, CHEMILUM SUBSTRATES ONLY
+. *     (EU para 309 narrowly defines this overlap) ---
+. replace tier2 = 1 if category == "chemiluminescent substrates"
+177. replace tier2 = 1 if category == "chemiluminescent western blot detection"
+178. replace tier2 = 1 if category == "nitrocellulose blotting membranes"
+179. replace tier2 = 1 if category == "precut nitrocellulose transfer blotting packs"
+180. replace tier2 = 1 if category == "precut pvdf transfer blotting packs"
+181. replace tier2 = 1 if category == "pvdf blotting membranes"
+182. replace tier2 = 1 if category == "western blot boxes"
+183. 
+. * --- Protein modification (EU para 12(ix), paras 313-317;
+. *     chemical modification, cross-linking, proteases) ---
+. replace tier2 = 1 if category == "antibody labeling kits"
+184. replace tier2 = 1 if category == "bioconjugation reagents"
+185. replace tier2 = 1 if category == "crosslinking reagents"
+186. replace tier2 = 1 if category == "protein and antibody labeling kits"
+187. replace tier2 = 1 if category == "protein modifying enzymes"
+188. 
+. * --- Reactive dyes (EU para 12(x), paras 318-321) ---
+. *     STRICT: only "reactive dyes" — amine/thiol-reactive activated fluorophores.
+. *     General fluorophores, NA stains, indicator dyes are NOT reactive dyes.
+. replace tier2 = 1 if category == "fluorophore - bioconjugate dyes"
+189. 
+. count if tier2 == 1
+190. 
+. *-------------------------------------------------------------------------------
+. * TIER 3: BUNDLING / EXTENSION ROBUSTNESS
+. *-------------------------------------------------------------------------------
+. 
+. * --- Cell culture supplements (bundled with HyClone media) ---
+. replace tier3 = 1 if category == "cell culture nutritional supplements - amino acids"
+191. replace tier3 = 1 if category == "cell culture nutritional supplements - b27"
+192. replace tier3 = 1 if category == "cell culture nutritional supplements - casamino acids"
+193. replace tier3 = 1 if category == "cell culture nutritional supplements - glucose"
+194. replace tier3 = 1 if category == "cell culture nutritional supplements - insulin"
+195. replace tier3 = 1 if category == "cell culture nutritional supplements - its-g"
+196. replace tier3 = 1 if category == "cell culture nutritional supplements - l-glutamine"
+197. replace tier3 = 1 if category == "cell culture nutritional supplements - lif"
+198. replace tier3 = 1 if category == "cell culture nutritional supplements - other"
+199. replace tier3 = 1 if category == "cell culture nutritional supplements - peptone"
+200. replace tier3 = 1 if category == "cell culture nutritional supplements - sodium pyruvate"
+201. replace tier3 = 1 if category == "cell culture nutritional supplements - sugars"
+202. replace tier3 = 1 if category == "cell culture nutritional supplements - tryptone"
+203. replace tier3 = 1 if category == "cell culture nutritional supplements - vitamins"
+204. replace tier3 = 1 if category == "cell culture nutritional supplements - yeast"
+205. replace tier3 = 1 if category == "cell culture dissociation reagents"
+206. replace tier3 = 1 if category == "growth medium supplement"
+207. 
+. * --- End-user magnetic beads (NOT in EU OEM divestiture; bundling robustness) ---
+. replace tier3 = 1 if category == "affinity resins - activated coupling matrices (magnetic)"
+208. replace tier3 = 1 if category == "affinity resins - anti-ig secondary (magnetic)"
+209. replace tier3 = 1 if category == "affinity resins - biotin/avidin (magnetic)"
+210. replace tier3 = 1 if category == "affinity resins - epitope tags (flag/ha/myc/v5) (magnetic)"
+211. replace tier3 = 1 if category == "affinity resins - glycoprotein (lectin-immobilized) (magnetic)"
+212. replace tier3 = 1 if category == "affinity resins - gst-tag (magnetic)"
+213. replace tier3 = 1 if category == "affinity resins - his-tag (imac) (magnetic)"
+214. replace tier3 = 1 if category == "affinity resins - mbp-tag (magnetic)"
+215. replace tier3 = 1 if category == "affinity resins - other (magnetic)"
+216. replace tier3 = 1 if category == "affinity resins - protein a (magnetic)"
+217. replace tier3 = 1 if category == "affinity resins - protein a/g (magnetic)"
+218. replace tier3 = 1 if category == "affinity resins - protein g (magnetic)"
+219. replace tier3 = 1 if category == "affinity resins - strep-tag (magnetic)"
+220. replace tier3 = 1 if category == "affinity resins - streptavidin/avidin (magnetic)"
+221. replace tier3 = 1 if category == "immunomagnetic cell separation beads"
+222. replace tier3 = 1 if category == "immunomagnetic cell separation columns"
+223. replace tier3 = 1 if category == "magnetic beads - other"
+224. replace tier3 = 1 if category == "magnetic cell separation kits"
+225. replace tier3 = 1 if category == "magnetic ip kit"
+226. 
+. * --- Electrophoresis sample/running buffers (bundled with Tier 2 SDS-PAGE) ---
+. replace tier3 = 1 if category == "laemmli sample buffer"
+227. replace tier3 = 1 if category == "lds sample buffer"
+228. replace tier3 = 1 if category == "mes-sds buffer"
+229. replace tier3 = 1 if category == "mops-sds buffer"
+230. replace tier3 = 1 if category == "native page running buffers"
+231. replace tier3 = 1 if category == "native-page sample buffer"
+232. replace tier3 = 1 if category == "reducing agents - bme"
+233. replace tier3 = 1 if category == "tbe buffer"
+234. replace tier3 = 1 if category == "tris-aceate-sds running buffer"
+235. replace tier3 = 1 if category == "tris-acetate-edta (tae) buffer"
+236. replace tier3 = 1 if category == "tris-glycine buffer"
+237. replace tier3 = 1 if category == "tris-glycine-sds (tgs) buffer"
+238. replace tier3 = 1 if category == "tris-tricine-sds buffer"
+239. 
+. * --- Western blot membrane-adjacent consumables (papers and transfer buffers
+. *     are pre-/at-transfer; EU para 309 transfer-step overlap) ---
+. replace tier3 = 1 if category == "gel blotting papers"
+240. replace tier3 = 1 if category == "western blot transfer buffers"
+241. 
+. * --- IVT specialty kits (cloning workflow extension) ---
+. replace tier3 = 1 if category == "capped mrna synthesis kits"
+242. replace tier3 = 1 if category == "in vitro transcription kit"
+243. replace tier3 = 1 if category == "direct pcr lysis reagents"
+244. 
+. count if tier3 == 1
+245. gen treated_strict = (tier1 == 1)
+246. gen treated_1and2  = (tier1 == 1 | tier2 == 1)
+247. gen treated        = (tier1 == 1 | tier2 == 1 | tier3 == 1)
+248. 
+. label var tier1          "Tier 1: serious-doubts finding (EU paras 41/69/98/105) or FTC Dharmacon"
+249. label var tier2          "Tier 2: named overlap, no serious doubts (EU paras 11, 12, fn 44)"
+250. label var tier3          "Tier 3: bundling / extension robustness"
+251. label var treated_strict "Treated (Tier 1 only)"
+252. label var treated_1and2  "Treated (Tier 1 + Tier 2)"
+253. label var treated        "Treated (Tier 1 + Tier 2 + Tier 3)"
+254. 
+. tab tier1
+255. tab tier2
+256. tab tier3
+257. tab treated_strict
+258. tab treated_1and2
+259. tab treated
+260. gen keep = (support >= 25 & precision >= 0.8 & recall >= 0.8) //| (inrange(support, 10, 25) & precision >= 0.9 & recall >=0.90)
+261. replace keep = 0 if category == "synthetic shrna"  // ambiguous RNAi category; placed conservatively in Tier 2 but fails defensive checks
+262. replace keep = 0 if inlist(category, "slide mounting medium", "collagenase", "catalase", "dextrose", "egta solution")
+263. save ../output/categories_`embed', replace
+264. end
+
+. main
+(encoding automatically selected: ISO-8859-1)
+(5 vars, 1,109 obs)
+(4 observations deleted)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+  23
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(0 real changes made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+  156
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(0 real changes made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+  53
+
+    Tier 1: |
+serious-dou |
+bts finding |
+  (EU paras |
+41/69/98/10 |
+  5) or FTC |
+  Dharmacon |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          0 |      1,082       97.92       97.92
+          1 |         23        2.08      100.00
+------------+-----------------------------------
+      Total |      1,105      100.00
+
+    Tier 2: |
+      named |
+overlap, no |
+    serious |
+ doubts (EU |
+  paras 11, |
+ 12, fn 44) |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          0 |        949       85.88       85.88
+          1 |        156       14.12      100.00
+------------+-----------------------------------
+      Total |      1,105      100.00
+
+    Tier 3: |
+ bundling / |
+  extension |
+ robustness |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          0 |      1,052       95.20       95.20
+          1 |         53        4.80      100.00
+------------+-----------------------------------
+      Total |      1,105      100.00
+
+    Treated |
+    (Tier 1 |
+      only) |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          0 |      1,082       97.92       97.92
+          1 |         23        2.08      100.00
+------------+-----------------------------------
+      Total |      1,105      100.00
+
+    Treated |
+  (Tier 1 + |
+    Tier 2) |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          0 |        926       83.80       83.80
+          1 |        179       16.20      100.00
+------------+-----------------------------------
+      Total |      1,105      100.00
+
+    Treated |
+  (Tier 1 + |
+   Tier 2 + |
+    Tier 3) |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          0 |        873       79.00       79.00
+          1 |        232       21.00      100.00
+------------+-----------------------------------
+      Total |      1,105      100.00
+(1 real change made)
+(5 real changes made)
+(file ../output/categories_tfidf.dta not found)
+file ../output/categories_tfidf.dta saved
+
+. 
+end of do-file
+
+--------------------------------------------------------------------------------
+Makelog ended: 2026-05-04 17:17:07
+Working directory: /n/holylabs/pakes_lab/Lab/sci_eq/derived/first_stage/select_categories/code
+--------------------------------------------------------------------------------
