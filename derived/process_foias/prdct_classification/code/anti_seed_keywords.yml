@@ -190,6 +190,13 @@ keywords:
   - water bottles
   - incubator
   - cytometer
+  - gel scanner
+  - tray gel
+  - gel tray
+  - gel cutter
+  - gel drying
+  - gel-dry
+  - x-tracta
   - spectrometer
   - refrigerator
   - generator
@@ -422,6 +429,23 @@ keywords:
   - publication
   - sequencing
   - electrode
+  # ut_dallas FN audit (2026-05-12): instrument-name hits found in
+  # 30+ non-lab recall misses.  The fisher_lab "lab" overlap (~85 rows
+  # total across the keywords below) is itself mis-labeled instrument
+  # catalog SKUs, so flipping them to non-lab corrects the labels too.
+  - analytical balance
+  - precision bal
+  - microtome
+  - desiccator
+  - dessicator
+  - desi-vac
+  - quartz wool
+  - syringe pump
+  - infusion pump
+  - gas regulator
+  - centring ring
+  - centering ring
+  - pressure vessel
 
   # Service / repair / calibration compound phrases.  Safer than adding bare
   # "repair" or "calibrate" (which hit DNA repair kits, calibration standards).
@@ -446,6 +470,29 @@ keywords:
   - shipping charge
   - maintenance contract
   - service contract
+  # UMich FN audit (2026-05-12): fees / service / shipping line-item patterns.
+  # Catches ~30-40 of 138 fees misses on UMich hold-out; all verified to have
+  # 0-1 lab hits across 80k training rows (the 1 hit on `p.o. for` is a noise
+  # text artifact, not a lab consumable).
+  - please ship
+  - repairs to
+  - repair of
+  - repair on
+  - repairs on
+  - for repair
+  - to pay invoice
+  - quote #
+  - quote ref
+  - pipette cal
+  - pipettes repair
+  - p.o. for
+  - estimate for repair
+  - evaluation charge
+  - shipping/handling
+  - shiping and handling
+  - overnight for
+  - our latest promo
+  - short code
 
   # Microscope / cytometer consumables that we treat as instrument-adjacent.
   - immersion oil

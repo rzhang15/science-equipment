@@ -33,6 +33,7 @@ SEED_KEYWORD_YAML = os.path.join(CODE_DIR, "initial_seed.yml")
 ANTI_SEED_KEYWORD_YAML = os.path.join(CODE_DIR, "anti_seed_keywords.yml")
 FISHER_LAB = os.path.join(BASE_DIR, "external", "samp", "fisher_lab_clean.csv")
 FISHER_NONLAB = os.path.join(BASE_DIR, "external", "samp", "fisher_nonlab_clean.csv")
+FISHER_CHEMICAL = os.path.join(BASE_DIR, "external", "samp", "fisher_chemical_clean.csv")
 MARKET_RULES_YAML = os.path.join(CODE_DIR, "market_rules.yml")
 GOVSPEND_PANEL_CSV = os.path.join(BASE_DIR, "external", "samp", "govspend_panel_clean.csv")
 
@@ -495,6 +496,145 @@ _keyword_patterns = [r'\b' + re.escape(k.strip()) + r'\b' for k in NONLAB_KEYWOR
 _all_patterns = _prefix_patterns + _keyword_patterns
 NONLAB_REGEX = re.compile('|'.join(_all_patterns), re.IGNORECASE)
 
+# ------------------------------------------------------------------------------
+# Coarse non-lab spending buckets.  Any item whose predicted category matches
+# NONLAB_REGEX gets a `nonlab_bucket` label via assign_nonlab_bucket(); lab
+# items get ''.  Rules are evaluated in order; first match wins, so list more
+# specific patterns above general ones.
+# ------------------------------------------------------------------------------
+_ANIMALS_LIVE = (
+    "mice", "frog", "xenopus", "zebrafish", "drosophila stocks",
+    "worm strains", "bone slices",
+)
+_OFFICE_SUFFIXES = (
+    "office supplies", "labels", "tape", "books", "markers and pens",
+    "temperature indication tapes and dots",
+)
+_CLEANING_SUFFIXES = (
+    "disposable wipes and towels", "cleaning supplies", "brushes",
+    "aluminum foil",
+)
+_CLEANING_BARE = ("applicators and swabs",)
+
+_LAB_HW_SUFFIXES = (
+    "lab furniture", "lab hardware", "hardware", "metal hardware",
+    "plumbing", "stands and rings", "clamps and supports",
+    "mortars and pestles", "trays", "carts", "storage bins", "belts",
+    "fasteners", "pots and pans",
+    "toolkit tools", "hand tools", "beakers and measuring",
+    "gas cylinder carts",
+)
+_LAB_HW_BARE = (
+    "pipette stands", "flask supports", "vial storage trays",
+    "carboy spigots and accessories", "platinum wire and gauze",
+    "environmental sampling bottles and accessories",
+)
+
+_WASTE_SAFETY_SUFFIXES = (
+    "waste disposal", "first aid", "ppe", "personal protective equipment",
+    "safety", "safety equipment", "spill kits", "pest control",
+)
+_WASTE_SAFETY_BARE = ("eye protection accessories",)
+
+_ELECTRONICS_SUFFIXES = ("batteries", "electronic components")
+
+# Instrument-adjacent categories that don't start with "instrument".
+_INSTRUMENTS_BARE = (
+    "tissue embedding accessories",
+    "pcr tube accessories",
+    "spe accessories",
+    "ief equilibration trays",
+    "random mutagenesis systems",
+)
+
+# Tubing — its own bucket (nonlab - tubing + tubing - dialysis).
+# Closures and seals — caps and closures - *, stoppers, test strips.
+_CLOSURES_NONLAB = ("stoppers and closures", "test strips")
+
+NONLAB_BUCKET_RULES = [
+    # Chemicals / fees / electronics — single-prefix families.
+    (re.compile(r'^irrelevant chemicals\b', re.IGNORECASE),  'chemicals'),
+    (re.compile(r'^fees\b',                  re.IGNORECASE), 'fees'),
+    (re.compile(r'^electronics\b',           re.IGNORECASE), 'electronics'),
+
+    # Gases + a few chem strings caught by other NONLAB keywords ("caps" matches
+    # "tris-caps transfer buffer").  Routed to chemicals explicitly.
+    (re.compile(r'^nonlab\s*-\s*compressed gases\b', re.IGNORECASE), 'chemicals'),
+    (re.compile(r'^argon gas\b',             re.IGNORECASE), 'chemicals'),
+    (re.compile(r'^tris-caps transfer buffer\b', re.IGNORECASE), 'chemicals'),
+
+    # Animals: live organisms vs. supplies.  Live rule must precede catch-all.
+    (re.compile(r'^animal\s*-\s*(?:' + '|'.join(re.escape(x) for x in _ANIMALS_LIVE) + r')\b',
+                re.IGNORECASE), 'animals_live'),
+    (re.compile(r'^animal\b',                re.IGNORECASE), 'animal_supplies'),
+
+    # Tubing + closures/caps/seals — folded into instruments_and_parts.
+    (re.compile(r'^nonlab\s*-\s*tubing\b',   re.IGNORECASE), 'instruments_and_parts'),
+    (re.compile(r'^tubing\b',                re.IGNORECASE), 'instruments_and_parts'),
+    (re.compile(r'^caps and closures\b',     re.IGNORECASE), 'instruments_and_parts'),
+    (re.compile(r'^nonlab\s*-\s*(?:' + '|'.join(re.escape(x) for x in _CLOSURES_NONLAB) + r')\b',
+                re.IGNORECASE), 'instruments_and_parts'),
+
+    # Software.
+    (re.compile(r'^nonlab\s*-\s*software\b', re.IGNORECASE), 'software'),
+
+    # Instruments and instrument parts.
+    (re.compile(r'^instrument\b',            re.IGNORECASE), 'instruments_and_parts'),
+    (re.compile(r'^sequencing\b',            re.IGNORECASE), 'instruments_and_parts'),
+    (re.compile(r'^gas chromatography\b',    re.IGNORECASE), 'instruments_and_parts'),
+    (re.compile(r'^hotplate\b',              re.IGNORECASE), 'instruments_and_parts'),
+    (re.compile(r'^(?:' + '|'.join(re.escape(x) for x in _INSTRUMENTS_BARE) + r')\b',
+                re.IGNORECASE), 'instruments_and_parts'),
+
+    # nonlab - * subfamilies, most specific first.
+    (re.compile(r'^nonlab\s*-\s*surgical tools\b', re.IGNORECASE), 'surgical_tools'),
+    (re.compile(r'^nonlab\s*-\s*(?:' + '|'.join(re.escape(x) for x in _OFFICE_SUFFIXES) + r')\b',
+                re.IGNORECASE), 'office_supplies'),
+    (re.compile(r'^nonlab\s*-\s*(?:' + '|'.join(re.escape(x) for x in _CLEANING_SUFFIXES) + r')\b',
+                re.IGNORECASE), 'cleaning_and_disposables'),
+    (re.compile(r'^(?:' + '|'.join(re.escape(x) for x in _CLEANING_BARE) + r')\b',
+                re.IGNORECASE), 'cleaning_and_disposables'),
+    (re.compile(r'^nonlab\s*-\s*(?:' + '|'.join(re.escape(x) for x in _LAB_HW_SUFFIXES) + r')\b',
+                re.IGNORECASE), 'lab_furniture_and_hardware'),
+    (re.compile(r'^(?:' + '|'.join(re.escape(x) for x in _LAB_HW_BARE) + r')\b',
+                re.IGNORECASE), 'lab_furniture_and_hardware'),
+    (re.compile(r'^nonlab\s*-\s*(?:' + '|'.join(re.escape(x) for x in _WASTE_SAFETY_SUFFIXES) + r')\b',
+                re.IGNORECASE), 'waste_and_safety'),
+    (re.compile(r'^(?:' + '|'.join(re.escape(x) for x in _WASTE_SAFETY_BARE) + r')\b',
+                re.IGNORECASE), 'waste_and_safety'),
+    (re.compile(r'^nonlab\s*-\s*(?:' + '|'.join(re.escape(x) for x in _ELECTRONICS_SUFFIXES) + r')\b',
+                re.IGNORECASE), 'electronics'),
+
+    # Standalone `lab furniture` (no nonlab prefix).
+    (re.compile(r'^lab furniture\b',         re.IGNORECASE), 'lab_furniture_and_hardware'),
+]
+
+
+def assign_nonlab_bucket(category):
+    """Map a predicted category string to a coarse non-lab spending bucket.
+
+    Returns '' for lab items (anything that doesn't match NONLAB_REGEX) and
+    'other_misc' for non-lab items that don't match any bucket rule.  By
+    design, only genuinely undefined categories fall through to other_misc:
+    `nonlab - miscellaneous`, `nonlab - unclear`, `nonlab - unclassified`,
+    `nonlab - bundle of products`, `bundle of products`, `nonlab - other`.
+    """
+    if not isinstance(category, str) or not category:
+        return ''
+    if not NONLAB_REGEX.search(category):
+        return ''
+    for pattern, bucket in NONLAB_BUCKET_RULES:
+        if pattern.search(category):
+            return bucket
+    return 'other_misc'
+
+
+def assign_nonlab_bucket_series(s):
+    """Vectorized assign_nonlab_bucket for a pandas Series of categories."""
+    import pandas as pd  # local import keeps config import-light
+    return s.fillna('').astype(str).map(assign_nonlab_bucket)
+
+
 # ==============================================================================
 # 6. Supplier-Based Non-Lab Classification
 # ==============================================================================
@@ -787,45 +927,26 @@ NONLAB_SUPPLIER_KEYWORDS = [
 # ==============================================================================
 # TREATED PRODUCT MARKET CLASSIFICATION - Thermo Fisher / Life Technologies
 # Source of truth: ../../first_stage/select_categories/code/build.do
-#   tier1 = divestitures required (48 cats)
-#   tier2 = EU confirmed overlap, cleared (159 cats)
-#   tier3 = bundled with documented overlap markets (43 cats)
+#   tier1 = serious-doubts finding (EU paras 41/69/98/105/250) or FTC
+#           Dharmacon divestiture (23 cats)
+#   tier2 = EU detailed-analysis / overlap mentioned (no doubts) or
+#           overlap identified in section IV body text (157 cats)
+#   tier3 = bundling / extension robustness — not antitrust-document-named
+#           but co-purchased with Tier 1/2 (55 cats)
 #   treated = tier1 | tier2 | tier3
+# Re-sync with build.do whenever its tier assignments change.
 # ==============================================================================
 TIER1_CATEGORIES = frozenset([
-    "affinity resins - activated coupling matrices (magnetic)",
     "australian fbs",
-    "bovine adult serum",
-    "canadian fbs",
-    "dmem/f-12",
-    "affinity resins - anti-ig secondary (magnetic)",
-    "affinity resins - biotin/avidin (magnetic)",
-    "affinity resins - epitope tags (flag/ha/myc/v5) (magnetic)",
-    "affinity resins - glycoprotein (lectin-immobilized) (magnetic)",
-    "affinity resins - gst-tag (magnetic)",
-    "affinity resins - his-tag (imac) (magnetic)",
-    "affinity resins - mbp-tag (magnetic)",
-    "affinity resins - other (magnetic)",
-    "affinity resins - protein a (magnetic)",
-    "affinity resins - protein a/g (magnetic)",
-    "affinity resins - protein g (magnetic)",
-    "affinity resins - strep-tag (magnetic)",
-    "affinity resins - streptavidin/avidin (magnetic)",
     "basal medium eagle",
-    "bovine calf serum",
+    "canadian fbs",
     "dmem",
+    "dmem/f-12",
     "dry basal media, not chemically defined",
-    "gene-specific rnai reagents",
     "hams f12",
     "imdm",
-    "immunomagnetic cell separation beads",
-    "immunomagnetic cell separation columns",
     "insect cell media",
     "leibovitz l15 media",
-    "magnetic bead-based mrna selection kit",
-    "magnetic beads - other",
-    "magnetic cell separation kits",
-    "magnetic ip kit",
     "mccoys 5a",
     "mem",
     "neurobasal media",
@@ -837,8 +958,6 @@ TIER1_CATEGORIES = frozenset([
     "sirna transfection reagents",
     "specialty cell culture media",
     "stem cell media",
-    "synthetic crrna",
-    "synthetic shrna",
     "synthetic sirna",
     "us fbs",
 ])
@@ -849,10 +968,11 @@ TIER2_CATEGORIES = frozenset([
     "bacterial transformation reagents",
     "bioconjugation reagents",
     "blunt-end cloning kits",
-    "capped mrna synthesis kits",
+    "bovine adult serum",
+    "bovine calf serum",
     "chemically competent cells",
-    "chemiluminescent western blot detection",
     "chemiluminescent substrates",
+    "chemiluminescent western blot detection",
     "column-based dna and rna extraction kits",
     "column-based dna genomic purification kits",
     "column-based dna plasmid gigaprep",
@@ -873,39 +993,40 @@ TIER2_CATEGORIES = frozenset([
     "column-based rna purification kits",
     "column-based yeast dna purification kits",
     "crosslinking reagents",
-    "custom-designed qpcr assays",
-    "direct pcr lysis reagents",
     "directional topo cloning kits",
     "dnase i",
-    "dntps",
+    "donkey serum",
+    "dulbecco's phosphate-buffered saline (dpbs) buffer",
     "dye-based qpcr systems",
+    "dye-based rt-qpcr systems",
+    "earle's balanced salt solution (ebss) buffer",
     "electrocompetent cells",
     "expression plasmids",
     "first-strand cdna synthesis systems",
     "fluorophore - bioconjugate dyes",
-    "fluorophore - general",
-    "fluorophore - nucleic acid stain",
     "gateway cloning kits",
-    "gel blotting papers",
+    "gene-specific rnai reagents",
+    "goat serum",
+    "hanks' balanced salt solution (hbss) buffer",
     "high-fidelity dna polymerase",
     "high-fidelity hot start dna polymerase",
     "high-fidelity hot start pcr systems",
     "high-fidelity pcr systems",
     "horizontal electrophoresis systems",
-    "hot start taq polymerase",
+    "horse serum",
     "hot start pcr systems",
-    "in vitro transcription kit",
+    "hot start taq polymerase",
     "liquid-based dna plasmid purification kit",
     "long template pcr systems",
     "magnetic bacterial rna purification kit",
+    "magnetic bead-based mrna selection kit",
     "magnetic-bead based purification kit",
     "microrna reverse transcription kit",
-    "modified nucleotides",
+    "mouse serum",
     "nitrocellulose blotting membranes",
     "nuclease enzymes",
     "nucleic acid gel stains",
     "nucleic acid modifying enzymes - alkaline phosphatases",
-    "nucleic acid modifying enzymes - creatine kinase (non-nucleic acid enzyme)",
     "nucleic acid modifying enzymes - dna fragmentases",
     "nucleic acid modifying enzymes - dna methylases",
     "nucleic acid modifying enzymes - end repair enzymes",
@@ -931,10 +1052,9 @@ TIER2_CATEGORIES = frozenset([
     "nucleic acid modifying enzymes - terminal transferase",
     "nucleic acid modifying enzymes - topoisomerases",
     "nucleic acid modifying enzymes - transposases",
-    "nucleic acid quantitation",
-    "pcr barcoding expansion",
+    "nz bovine calf serum",
     "pcr systems",
-    "phosphoprotein electrophoresis reagents",
+    "phosphate-buffered saline (pbs) buffer",
     "plasmid vectors",
     "polyacrylamide gels casting kit",
     "pre amplification kits",
@@ -944,7 +1064,6 @@ TIER2_CATEGORIES = frozenset([
     "pre-cast tris-glycine gels",
     "pre-cast tris-hcl gels",
     "pre-cast tris-tricine gels",
-    "pre-designed qpcr assays",
     "pre-stained dna ladders",
     "pre-stained protein molecular-weight ladder",
     "pre-stained rna ladders",
@@ -954,34 +1073,36 @@ TIER2_CATEGORIES = frozenset([
     "probe-based rt-qpcr systems",
     "protein and antibody labeling kits",
     "protein gel stains",
+    "protein ladders",
     "protein modifying enzymes",
     "pvdf blotting membranes",
-    "qpcr beads",
     "qrt-pcr titration kit",
-    "quantum dots",
-    "radiolabeled nucleotides",
+    "rabbit serum",
+    "radiolabeled protein molecular-weight ladder",
+    "random mutagenesis systems",
     "rapid dna ligation kits",
-    "restriction enzyme buffers",
+    "rat serum",
     "restriction enzymes",
     "reverse transcriptase",
     "rna extraction reagents",
+    "rna ladder",
     "rna polymerases",
     "rna stabilization reagent",
     "rnase",
     "rnase inhibitors",
     "rt-pcr systems",
     "seamless cloning kits",
+    "sheep serum",
     "silica bead based gel purification kit",
+    "site-directed mutagenesis kits",
     "site-directed mutagenesis systems",
     "spin columns",
-    "streptavidin conjugates",
+    "synthetic shrna",
     "ta cloning kits",
-    "taq buffers",
     "taq dna ligases",
     "taq polymerases",
     "tissue pcr systems",
     "topo ta cloning kits",
-    "protein quantitation assay kits",
     "transfection reagents",
     "transfection reagents - cellfectin (insect cell)",
     "transfection reagents - electroporation kits",
@@ -991,21 +1112,33 @@ TIER2_CATEGORIES = frozenset([
     "transfection reagents - other",
     "transfection reagents - polybrene (viral transduction)",
     "transfection reagents - protein transfection reagents",
+    "transposon mutagenesis kits",
+    "tris-edta (te) buffer",
     "unstained dna ladders",
     "unstained protein molecular-weight ladder",
     "unstained rna ladders",
     "vertical electrophoresis systems",
-    "western blot blockers",
     "western blot boxes",
-    "western blot enhancers",
-    "western blot pen",
-    "western blot rollers",
-    "western blot stripping buffers",
-    "western blot transfer buffers",
     "zero blunt topo cloning kits",
 ])
 
 TIER3_CATEGORIES = frozenset([
+    "affinity resins - activated coupling matrices (magnetic)",
+    "affinity resins - anti-ig secondary (magnetic)",
+    "affinity resins - biotin/avidin (magnetic)",
+    "affinity resins - epitope tags (flag/ha/myc/v5) (magnetic)",
+    "affinity resins - glycoprotein (lectin-immobilized) (magnetic)",
+    "affinity resins - gst-tag (magnetic)",
+    "affinity resins - his-tag (imac) (magnetic)",
+    "affinity resins - mbp-tag (magnetic)",
+    "affinity resins - other (magnetic)",
+    "affinity resins - protein a (magnetic)",
+    "affinity resins - protein a/g (magnetic)",
+    "affinity resins - protein g (magnetic)",
+    "affinity resins - strep-tag (magnetic)",
+    "affinity resins - streptavidin/avidin (magnetic)",
+    "bovine serum albumin",
+    "capped mrna synthesis kits",
     "cell culture dissociation reagents",
     "cell culture nutritional supplements - amino acids",
     "cell culture nutritional supplements - b27",
@@ -1022,26 +1155,21 @@ TIER3_CATEGORIES = frozenset([
     "cell culture nutritional supplements - tryptone",
     "cell culture nutritional supplements - vitamins",
     "cell culture nutritional supplements - yeast",
-    "dulbecco's phosphate-buffered saline (dpbs) buffer",
-    "fluorophore - calcium indicators",
-    "fluorophore - cell tracer",
-    "fluorophore - glutathione indicator",
-    "fluorophore - lysosome indicators",
-    "fluorophore - protein hydrophobicity",
-    "fluorophore - ros indicators",
-    "viability stains",
-    "fluorophore - voltage indicators",
+    "direct pcr lysis reagents",
+    "gel blotting papers",
     "growth medium supplement",
-    "hanks' balanced salt solution (hbss) buffer",
+    "immunomagnetic cell separation beads",
+    "immunomagnetic cell separation columns",
+    "in vitro transcription kit",
     "laemmli sample buffer",
     "lds sample buffer",
-    "ligation reaction buffer",
+    "magnetic beads - other",
+    "magnetic cell separation kits",
+    "magnetic ip kit",
     "mes-sds buffer",
     "mops-sds buffer",
     "native page running buffers",
     "native-page sample buffer",
-    "phosphate-buffered saline (pbs) buffer",
-    "reaction buffers",
     "reducing agents - bme",
     "tbe buffer",
     "tris-aceate-sds running buffer",
@@ -1049,6 +1177,65 @@ TIER3_CATEGORIES = frozenset([
     "tris-glycine buffer",
     "tris-glycine-sds (tgs) buffer",
     "tris-tricine-sds buffer",
+    "western blot transfer buffers",
 ])
 
 TREATED_CATEGORIES = TIER1_CATEGORIES | TIER2_CATEGORIES | TIER3_CATEGORIES
+
+# ==============================================================================
+# 7. Per-Source Training Sample Weights
+# ==============================================================================
+# Multiplicative weights on the LogisticRegression sample_weight parameter.
+# Composes with class_weight='balanced' — sklearn multiplies them, so the
+# lab/non-lab class balance is preserved regardless of these knobs.
+#
+# Keys can be:
+#   - a `data_source` string (applies to every row of that source), or
+#   - a (data_source, label) tuple (overrides for that specific combo).
+# Tuple keys take priority over string keys.  Unlisted sources default to 1.0.
+#
+# Current row counts in the baseline prepared set (label=0 / label=1 / total):
+#   ca_non_lab:      162,975 /      0 / 162,975
+#   fisher_lab:        1,876 / 57,894 /  59,770
+#   ut_dallas:        14,574 / 21,985 /  36,559
+#   fisher_non_lab:    6,408 /    529 /   6,937
+#
+# Rationale for the defaults below:
+#   - fisher_non_lab + ut_dallas are real procurement text (most similar to
+#     the inference-time distribution), so upweight them.
+#   - ca_non_lab is large but procurement-distant, so downweight.
+#   - fisher_lab is left at 1.0 as the baseline.
+SOURCE_WEIGHTS = {
+    'ca_non_lab':     0.5,
+    'fisher_non_lab': 3.0,
+    'ut_dallas':      2.0,
+    'umich':          2.0,
+    'fisher_lab':     0.5,
+    # fisher_chemical: ~37k Fisher chemicals, seed-filtered to drop
+    # life-sci essentials.  Default 1.0; raise to push harder on
+    # bulk-chemistry non-lab recall.
+    'fisher_chemical': 1.5,
+}
+
+
+def get_sample_weights(data_sources, labels):
+    """Build a sample_weight array aligned to (data_sources, labels).
+
+    Looks up (source, label) tuple keys first, falls back to source-only
+    keys, defaults to 1.0.  Returns a numpy float array.
+    """
+    import numpy as np
+    import pandas as pd
+
+    src = pd.Series(data_sources).astype(str).reset_index(drop=True)
+    lab = pd.Series(labels).astype(int).reset_index(drop=True)
+
+    src_only = {k: float(v) for k, v in SOURCE_WEIGHTS.items() if isinstance(k, str)}
+    weights = src.map(src_only).fillna(1.0).to_numpy(dtype=float)
+
+    for key, w in SOURCE_WEIGHTS.items():
+        if isinstance(key, tuple) and len(key) == 2:
+            s, l = key
+            mask = (src.values == s) & (lab.values == int(l))
+            weights[mask] = float(w)
+    return weights

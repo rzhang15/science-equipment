@@ -45,6 +45,37 @@ def load_fisher_non_lab_data():
     df['data_source'] = 'fisher_non_lab'
     return df
 
+
+def load_fisher_chemical_data(seed_automaton=None):
+    """Load the Fisher chemicals catalog as non-lab training data.
+
+    The catalog (~37k chemicals Fisher sells) is mostly bulk chemistry the
+    taxonomy treats as `irrelevant chemicals - *`, but it overlaps with
+    life-sci essentials labs do use (ethanol, tris, edta, glycerol, ...).
+    To avoid teaching the model "all chemicals = non-lab", we drop any row
+    whose description matches the existing seed keyword automaton — i.e.,
+    rows that look like life-sci consumables in our taxonomy.
+
+    Even after the guard, the dedup + conflict-resolution stage in main()
+    is a second safety net: any row that collides with a fisher_lab item
+    gets forced to label=0 (downgrades win).
+    """
+    df = pd.read_csv(config.FISHER_CHEMICAL)
+    df['cleaned_description'] = df[config.CLEAN_DESC_COL].fillna('')
+    df['label'] = 0
+    df['data_source'] = 'fisher_chemical'
+    n_raw = len(df)
+
+    if seed_automaton is not None:
+        seed_match = batch_has_match(df['cleaned_description'], seed_automaton)
+        n_kept = int((~seed_match).sum())
+        print(f"  - fisher_chemical: dropped {int(seed_match.sum())}/{n_raw} "
+              f"rows matching seed (life-sci essentials); kept {n_kept} as non-lab.")
+        df = df.loc[~seed_match].reset_index(drop=True)
+    else:
+        print(f"  - fisher_chemical: loaded {n_raw} rows (no seed guard applied).")
+    return df
+
 def _batched_transform(vectorizer, descriptions, batch_size=5000, desc=""):
     vector_batches = []
     for i in tqdm(range(0, len(descriptions), batch_size), desc=desc):
@@ -152,12 +183,21 @@ def main():
         df_ca_non_lab = load_ca_data()
         df_fisher_lab = load_fisher_lab_data()
         df_fisher_non_lab = load_fisher_non_lab_data()
+        # fisher_chemical needs the seed automaton to drop life-sci essential
+        # chemicals before labeling the rest as non-lab.  Build it now so
+        # load_fisher_chemical_data can use it.  The other automatons are
+        # rebuilt below at the labeling step.
+        _seed_for_chem = load_keywords_and_build_automaton(config.SEED_KEYWORD_YAML)
+        df_fisher_chemical = load_fisher_chemical_data(seed_automaton=_seed_for_chem)
     except Exception as e:
         print(f"Error loading data: {e}")
         return
 
     print("- Combining all data sources...")
-    df_combined = pd.concat(labeled_frames + [df_ca_non_lab, df_fisher_lab, df_fisher_non_lab], ignore_index=True)
+    df_combined = pd.concat(
+        labeled_frames + [df_ca_non_lab, df_fisher_lab, df_fisher_non_lab, df_fisher_chemical],
+        ignore_index=True,
+    )
 
     # Drop rows with empty/whitespace-only descriptions — useless as training
     # examples and they drive a huge block of spurious "conflicts" at dedup.

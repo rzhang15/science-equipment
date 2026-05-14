@@ -381,6 +381,196 @@ required_keywords:
     - '*selenomet*'
     - '*primer*'
     - '*oligo*'
+  # Gate Expert-Model "column-based rna purification kits" predictions.
+  # Without this, the model emits the label on any oligo / primer / RNA
+  # sequence description containing "rna" (StarFire miRNA primers, FISH
+  # probes), library-prep kits, antibodies (~125 FPs).  Require explicit
+  # extraction-kit signal (column, miniprep, spin, RNeasy, etc.).
+  column-based rna purification kits:
+    any_of:
+    - '*column*'
+    - '*spin*'
+    - '*miniprep*'
+    - '*midiprep*'
+    - '*maxiprep*'
+    - '*rneasy*'
+    - '*purelink*'
+    - '*ribopure*'
+    - '*genejet*rna*'
+    - '*quick-rna*'
+    - '*quickprep*'
+    - '*zymo*rna*'
+    - '*direct-zol*'
+    - '*nucleospin*rna*'
+    - '*absolutely rna*'
+    - '*total rna*kit*'
+    - '*rna isolation*kit*'
+    - '*rna purification*kit*'
+    - '*rna extraction*kit*'
+    - '*mrna purification*'
+    - '*mirneasy*'
+    none_of:
+    - '*primer*'
+    - '*oligo*'
+    - '*sequence*'
+    - '*fish*'
+    - '*sirna*'
+    - '*shrna*'
+    - '*library*'
+    - '*ngs*'
+    - '*seq*kit*'
+    - '*starfire*'
+    - '*antibod*'
+    - '*configurationid*'
+  # Gate Expert-Model "first-strand cdna synthesis systems" predictions.
+  # Without this, the model emits the label on cDNA primers / hexamers,
+  # cDNA clones in expression plasmids, MGC IMAGE clones, and ORF clones
+  # (100 FPs in evaluation; precision drops from market-rule 0.92 to 0.66).
+  first-strand cdna synthesis systems:
+    any_of:
+    - '*first-strand*'
+    - '*first strand*'
+    - '*1st strand*'
+    - '*1st-strand*'
+    - '*cdna synthesis*'
+    - '*cdna*kit*'
+    - '*cdna*master mix*'
+    - '*cdna*supermix*'
+    - '*cdna*super mix*'
+    - '*cdna*reaction mix*'
+    - '*superscript*'
+    - '*iscript*'
+    - '*primescript*'
+    - '*transcriptor*'
+    - '*vilo*'
+    - '*high capacity cdna*'
+    - '*ss iii*'
+    - '*ssiii*'
+    - '*sscrii*'
+    - '*omniscript*'
+    - '*quantitect*reverse*'
+    none_of:
+    - '*primer*'
+    - '*oligo*'
+    - '*hexamer*'
+    - '*clone*'
+    - '*sequenced-verified*'
+    - '*sequence-verified*'
+    - '*image*clone*'
+    - '*mgc*clone*'
+    - '*orf clone*'
+    - '*orf*plasmid*'
+    - '*plasmid*cdna*'
+    - '*cdna*clone*'
+    - '*clone id*'
+    - '*configurationid*'
+    - '*sirna*'
+    - '*shrna*'
+    - '*antibod*'
+  # Gate Expert-Model "fluorophore - bioconjugate dyes" predictions.
+  # Without this the model emits the label on bare chemistry reagents
+  # like N-ethylmaleimide and dibromomaleimide (41 FPs in evaluation).
+  # Require an explicit dye-name + reactive-group cue.
+  fluorophore - bioconjugate dyes:
+    any_of:
+    - '*alexa*'
+    - '*irdye*'
+    - '*cy3*'
+    - '*cy5*'
+    - '*cy7*'
+    - '*atto*'
+    - '*fitc*'
+    - '*tritc*'
+    - '*rhodamine*'
+    - '*fluorescein*'
+    - '*carboxyfluorescein*'
+    - '*dansyl*'
+    - '*bodipy*'
+    - '*texas red*'
+    - '*pacific blue*'
+    - '*pacific orange*'
+    - '*oregon green*'
+    - '*cascade blue*'
+    - '*sulfo-cy*'
+    - '*sulfo-nhs*'
+    - '*aminomethylcoumarin*'
+    - '*coumarin*'
+    - '*lucifer yellow*'
+    - '*polymethine*'
+    - '*phycoerythrin*'
+    - '*tamra*'
+    none_of:
+    - '*antibod*'
+    - '*primer*'
+    - '*oligo*'
+  # Gate Expert-Model "fluorophore - general" predictions.  Without this,
+  # the model emits the label on short primer-like descriptions (e.g.
+  # "c144 frwd", "tgif For 430", "GBAA0802 5") because they superficially
+  # resemble dye codes — driving precision to ~0.02 on 494 true examples
+  # while predicting it 2798× (2594 of those are actually DNA oligos).
+  # Require at least one explicit dye/stain/tracker token.
+  fluorophore - general:
+    any_of:
+    - '*fluor*'
+    - '*rhodamine*'
+    - '*tamra*'
+    - '*sulforhodamine*'
+    - '*bodipy*'
+    - '*alexa*'
+    - '*atto*'
+    - '*irdye*'
+    - '*texas red*'
+    - '*pacific blue*'
+    - '*pacific orange*'
+    - '*oregon green*'
+    - '*dansyl*'
+    - '*coumarin*'
+    - '*cyanine*'
+    - '*cy3*'
+    - '*cy5*'
+    - '*cy7*'
+    - '*amplex*'
+    - '*polymethine*'
+    - '*cardiogreen*'
+    - '*lucifer yellow*'
+    - '*calcium green*'
+    - '*magnesium green*'
+    - '*newport green*'
+    - '*phen green*'
+    - '*nile red*'
+    - '*nile blue*'
+    - '*phrodo*'
+    - '*halotag*'
+    - '*fm 4-64*'
+    - '*fm 1-43*'
+    - '*vybrant*'
+    - '*cellmask*'
+    - '*celllight*'
+    - '*mitoview*'
+    - '*propidium iodide*'
+    - '*hoechst*'
+    - '*dapi*'
+    - '*diamidino*'
+    - '*7-aad*'
+    - '*sytox*'
+    - '*filipin*'
+    - '*monobromobimane*'
+    - '*phthalazinedion*'
+    - '*ddao*'
+    - '*qsy*'
+    - '*tritc*'
+    - '*fitc*'
+    - '*fluozin*'
+    - '*bimane*'
+    - '*phycoerythrin*'
+    - '*dye*'
+    - '*stain*'
+    - '*tracker*'
+    none_of:
+    - '*primer*'
+    - '*oligo*'
+    - '*sirna*'
+    - '*shrna*'
 keyword_groups:
   # DNA-oligo subcategorization.  OLIGO_WORD is a broad "this-is-an-oligo"
   # signal (oligo/primer/sirna/grna).  OLIGO_MODIFIER lists the
@@ -459,11 +649,51 @@ keyword_groups:
   - '*phusion*'
   - '*accuprime*'
   - q5
+  - '*failsafe*'
+  - '*fail-safe*'
+  - '*expand high fidelity*'
   HOT_START:
   - '*hot start*'
   - '*fast start*'
   - fs
   - hs
+  # Sibling-protection veto for "pcr systems" rules — qPCR products (SYBR/
+  # TaqMan/LightCycler), purification kits, cDNA synthesis kits, and TOPO/
+  # blunt cloning kits all share the "PCR" token and otherwise get scooped
+  # up by the generic "pcr + master + mix" / "pcr + kit" rules.  Apply this
+  # in none_of for every "- name: pcr systems" rule.
+  PCR_SYSTEMS_VETO:
+  - '*sybr*'
+  - '*taqman*'
+  - '*lightcycler*'
+  - '*real-time*'
+  - '*real time*'
+  - '*purif*'
+  - '*clean-up*'
+  - '*cleanup*'
+  - '*clean up*'
+  - '*pcr clean*'
+  - '*cdna*'
+  - '*c-dna*'
+  - '*first-strand*'
+  - '*first strand*'
+  - '*superscript*'
+  - '*reverse transcript*'
+  - '*topo*'
+  - '*blunt*'
+  - '*cloning*'
+  - '*gibson*'
+  - '*in-fusion*'
+  - '*failsafe*'
+  - '*fail-safe*'
+  - '*high fidelity*'
+  - '*high-fidelity*'
+  - '*expand high*'
+  - '*pfu*'
+  - '*phusion*'
+  - '*accuprime*'
+  - '*tip*'
+  - '*pipette*'
   APOPTOSIS:
   - '*apoptosis*'
   - '*caspase*'
@@ -1140,6 +1370,11 @@ market_rules:
   # Forward / reverse primer phrasing in either order
   - '(?i)\b(?:forward|reverse)\s+primer\b'
   - '(?i)\bprimer\s+(?:forward|reverse)\b'
+  # Concatenated primer phrasing — "fwdprimer", "revprimer", "forwardprimer",
+  # "reverseprimer", "fwprimer", "rvprimer".  Catches IDT/order-sheet exports
+  # where the direction and "primer" tokens are joined (1,400+ hits in
+  # training, ~all on oligo orders).
+  - '(?i)\b(?:fwd|fw|rev|rv|forward|reverse)primer\b'
   # Reverse-complement phrasing — canonical primer-pair descriptor
   - '(?i)\b(?:rev|reverse)\s+complement\b'
   # IDT / oligo-order metadata tokens.  Every one of these is nearly
@@ -1160,10 +1395,11 @@ market_rules:
   # like "reverse transcriptase" and "forward scatter".
   - '(?i)^(?:rev|fwd)\s+\w'
   # Direction marker at end of a digit-bearing slug (UMich primer SKUs:
-  # "pmi3228 fw", "tcf7 109 rev", "c3019del fw").  Requires the preceding
-  # slug to carry a digit, which avoids matching "m-mlv rev" or "mutagen
-  # rev" where the preceding token is pure alpha.
-  - '(?i)\b\w*\d\w*[\s_\-](?:fw|fwd|rev|reverse)$'
+  # "pmi3228 fw", "tcf7 109 rev", "c3019del fw", "myc12 rv").  Requires the
+  # preceding slug to carry a digit, which avoids matching "m-mlv rev" or
+  # "mutagen rev" where the preceding token is pure alpha.  No trailing
+  # \d* — that would let antibody clones like "rv202" sneak in.
+  - '(?i)\b\w*\d\w*[\s_\-](?:fw|fwd|rv|rev|reverse)$'
   # Reverse-primer / forward-primer shorthand (rp / fp) at end of slug.
   # Unlike rev/reverse, "rp" and "fp" are essentially never meaningful
   # suffixes outside primer naming, so no digit guard is needed.
@@ -1173,7 +1409,11 @@ market_rules:
   # pattern requires whitespace directly after "mutant"; this variant
   # permits a short token between.
   - '(?i)\bmut(?:ant|agenesis|\d+)?[\s\-_]\w*[\s\-_](?:fwd|rev|forward|reverse|primer)\b'
-  # Concatenated slug+direction: "d9mit226rev", "hoxa10chiprev4", "c2405checkfwd"
+  # Concatenated slug+direction: "d9mit226rev", "hoxa10chiprev4", "c2405checkfwd".
+  # Only `rev|fwd|forward|reverse` (3+ chars) — bare `fw`/`rv` matches restriction
+  # enzyme names like "ecorv" and common-word suffixes ("listserv", "observ",
+  # "fiberv"), all of which are false positives.  For fw/rv-ending primers use
+  # the digit-bearing-slug pattern above (separator required).
   - '(?i)\b[a-z0-9]{3,}(?:rev|fwd|forward|reverse)\d*\b'
   # Suffix-compounded primer naming: "confirmf", "chiprev", "seq 1r", "checkfwd"
   - '(?i)(?:^|[\s_\-])confirm[fr]\d*\b'
@@ -1216,6 +1456,74 @@ market_rules:
   - '*custom cloning:*'
   - '*mutagenesis:*'
   - '*target insert name:*'
+  - '*vectorark cloning*'
+  - '*vectorark cloning:*'
+  - '*subcloning*'
+  - '*plasmid preparation*'
+  - '*expression vector*'
+  - '*ptarget*expression*'
+  - '*pcdna*expression*'
+  - '*pcdna3*'
+  - '*pcdna 3*'
+  - '*pcmv-sport*'
+  - '*pcmv sport*'
+  - '*pcr-blunt*'
+# Common expression vector names — pET-21a(+), pET-28b(+), pGEX-XX,
+# pBAD-XX, pcDNA3.X, pCMV-SPORT, pFastBac, pBacPAK, pTriEx, pENTR, pDEST.
+# Be careful: these are vector names but procurement orders often list
+# them in cloning service descriptions ("pET-28b(+) Vector name:").  Veto
+# primers / oligos / sequence-bearing rows.
+- name: synthetic bacterial expression plasmids
+  any_of:
+  - '*pet-21*'
+  - '*pet 21*'
+  - '*pet21*'
+  - '*pet-28*'
+  - '*pet 28*'
+  - '*pet28*'
+  - '*pet-23*'
+  - '*pet 23*'
+  - '*pet-11*'
+  - '*pet 11*'
+  - '*pet-15*'
+  - '*pet 15*'
+  - '*pet-29*'
+  - '*pet 29*'
+  - '*pet-30*'
+  - '*pet 30*'
+  - '*pet-32*'
+  - '*pet 32*'
+  - '*pet-41*'
+  - '*pet-50*'
+  - '*pgex-1*'
+  - '*pgex-2*'
+  - '*pgex-3*'
+  - '*pgex-4*'
+  - '*pgex-5*'
+  - '*pgex-6*'
+  - '*pgex 6p*'
+  - '*pgex-6p*'
+  - '*pgex6p*'
+  - '*pbad*expression*'
+  - '*pfastbac*'
+  - '*pbacpak*'
+  - '*ptriex*'
+  - '*pentr*'
+  - '*pdest*'
+  - '*plenti*'
+  - '*plko*'
+  none_of:
+  - '*primer*'
+  - '*oligo*'
+  - '*sirna*'
+  - '*shrna*'
+  - '*sequence:*'
+  - '*configurationid*'
+  - '*fwd*'
+  - '*forward*'
+  - '*reverse*'
+  - '*-rev*'
+  - '*for *'  # primer naming
 # Syringes with abbreviated descriptions — "luer-lok syr", "syrg nd" etc.
 # Must come before the cloning-site oligo rule (Rule 19) which has a
 # combined (?i) that makes [FR][_-][A-Z] case-insensitive, so "luer-lok"
@@ -1264,6 +1572,10 @@ market_rules:
   # Catches "Sort SbfI R", "idsD sphI F", "CHIF 891 STOP XHOI R", etc.
   # The (?i) makes the enzyme-stem pattern and [FR] both case-insensitive.
   - '(?i)\b(?:bamh|ecor?v?|hind|xho|xba|xma|sal|sph|sac|kpn|not|nhe|cla|bgl|pst|pvu|spe|nco|nde|pac|pci|pme|sbf|mfe|mlu|stu|sma|sca|nar|dra|mbo|blp|bgl|avr|bsr|bss|bss|bsm|bst|bsu|bcu|bfa|bse|age|ale|alu|ase|ava|afl|acl|mfe|pml|nsi|msl|xcm|bstx|pflm|bcc|bse|fau|tsp|msp|hpa|scr|styd|bsaj|bsl|btg|nci|mnl|bbv|bpu|bsu|eco|dpn|msp|hae|hinf|csp|sau3a)\w*i\b.*[\s._\-][FR]\d*\s*$'
+  # Enzyme stem directly concatenated with direction marker (no separator).
+  # Catches "XhoIfwd", "BamHIrev", "SbfIfw", "EcoRIrv", "PstIforward", etc.
+  # Same enzyme stem alternation as the separator-form rule above.
+  - '(?i)\b(?:bamh|ecor?v?|hind|xho|xba|xma|sal|sph|sac|kpn|not|nhe|cla|bgl|pst|pvu|spe|nco|nde|pac|pci|pme|sbf|mfe|mlu|stu|sma|sca|nar|dra|mbo|blp|avr|bsr|bss|bsm|bst|bsu|bcu|bfa|bse|age|ale|alu|ase|ava|afl|acl|pml|nsi|msl|xcm|bstx|pflm|bcc|fau|tsp|msp|hpa|scr|styd|bsaj|bsl|btg|nci|mnl|bbv|bpu|eco|dpn|hae|hinf|csp|sau3a)\w*i(?:fwd|forward|reverse|rev|fw|rv)\d*\b'
   # F at very start of identifier before underscore/hyphen: "F_extension_XmaI"
   - '^[FR][_\-]'
   # F or R embedded in compound identifier before underscore/hyphen to uppercase:
@@ -2442,6 +2754,22 @@ market_rules:
   all_of:
   - $HIGH_FIDELITY
   - master
+# FailSafe / Expand High Fidelity PCR products often ship without "master"
+# in the SKU (e.g. "FailSafe PCR System with PreMix Choice", "Expand High
+# FidelityPLUS PCR System").  Catch via $HIGH_FIDELITY + pcr, with vetos
+# to avoid stealing oligos/primers/cleanup-kit descriptions.
+- name: high-fidelity pcr systems
+  all_of:
+  - $HIGH_FIDELITY
+  - pcr
+  none_of:
+  - '*primer*'
+  - '*oligo*'
+  - '*sequenc*'
+  - '*antibod*'
+  - '*purif*'
+  - '*clean-up*'
+  - '*cleanup*'
 - name: pcr systems
   all_of:
   - pcr
@@ -2449,6 +2777,7 @@ market_rules:
   none_of:
   - sequenc
   - purification
+  - $PCR_SYSTEMS_VETO
 - name: pcr systems
   all_of:
   - gotaq
@@ -2457,6 +2786,7 @@ market_rules:
   - sequence
   - qpcr
   - purification
+  - $PCR_SYSTEMS_VETO
 - name: pcr systems
   all_of:
   - pcr
@@ -2465,6 +2795,7 @@ market_rules:
   - sequence
   - qpcr
   - purification
+  - $PCR_SYSTEMS_VETO
 - name: pcr systems
   all_of:
   - pcr
@@ -2474,6 +2805,7 @@ market_rules:
   - sequence
   - qpcr
   - purification
+  - $PCR_SYSTEMS_VETO
 - name: pcr systems
   all_of:
   - taq 
@@ -2483,6 +2815,7 @@ market_rules:
   - $HOT_START
   - $HIGH_FIDELITY
   - purification
+  - $PCR_SYSTEMS_VETO
 - name: pcr systems
   all_of:
   - taq 
@@ -2491,6 +2824,7 @@ market_rules:
   - $HOT_START
   - $HIGH_FIDELITY
   - purification
+  - $PCR_SYSTEMS_VETO
 - name: pcr systems
   all_of:
   - dreamtaq 
@@ -2499,6 +2833,7 @@ market_rules:
   - $HOT_START
   - $HIGH_FIDELITY
   - purification
+  - $PCR_SYSTEMS_VETO
 - name: pcr systems
   all_of:
   - emeraldamp
@@ -2506,6 +2841,7 @@ market_rules:
   - qpcr
   - sequence
   - purification
+  - $PCR_SYSTEMS_VETO
 - name: pcr systems
   all_of:
   - failsafe
@@ -2514,6 +2850,7 @@ market_rules:
   - qpcr
   - sequence
   - purification
+  - $PCR_SYSTEMS_VETO
 - name: pcr systems
   all_of:
   - puretaq 
@@ -2522,6 +2859,7 @@ market_rules:
   - qpcr
   - sequence
   - purification
+  - $PCR_SYSTEMS_VETO
 - name: pcr systems
   all_of:
   - pcr
@@ -2530,6 +2868,7 @@ market_rules:
   - qpcr
   - sequence
   - purification
+  - $PCR_SYSTEMS_VETO
 - name: pcr systems
   all_of:
   - pcr
@@ -2538,6 +2877,7 @@ market_rules:
   - qpcr
   - sequence
   - purification
+  - $PCR_SYSTEMS_VETO
 - name: pcr systems
   all_of:
   - pcr
@@ -2546,6 +2886,7 @@ market_rules:
   - qpcr
   - sequence
   - purification
+  - $PCR_SYSTEMS_VETO
 - name: pcr systems
   all_of:
   - meangreen 
@@ -2554,6 +2895,7 @@ market_rules:
   none_of:
   - qpcr
   - sequence
+  - $PCR_SYSTEMS_VETO
   none_of:
   - qpcr
   - sequence
@@ -2564,6 +2906,7 @@ market_rules:
   none_of:
   - qpcr
   - sequence
+  - $PCR_SYSTEMS_VETO
 - name: site-directed mutagenesis systems
   any_of:
   - '*quikchange*'
@@ -2650,15 +2993,128 @@ market_rules:
   - taqman
   - gt
   - master
+# Broad dye-qPCR catch-all — generic SYBR-mix descriptions (Master Mix,
+# Supermix, ReadyMix, FastMix, PreMix, kit) escape the narrow brand rules
+# above (iTaq SsoAdvanced PerfectaSYBR LightCycler etc.).  Place AFTER the
+# brand-specific rules in case any depend on stricter veto behavior.
+- name: dye-based qpcr systems
+  any_of:
+  - '*sybr*master*'
+  - '*sybr*supermix*'
+  - '*sybr*readymix*'
+  - '*sybr*ready mix*'
+  - '*sybr*fastmix*'
+  - '*sybr*fast mix*'
+  - '*sybr*premix*'
+  - '*sybr*pre-mix*'
+  - '*sybr*green*mix*'
+  - '*sybr*one-step*'
+  - '*sybr*1-step*'
+  - '*sybr*one step*'
+  - '*sybr*kit*'
+  - '*sybrsupermix*'
+  - '*sybr-supermix*'
+  - '*sybrgreensupermix*'
+  none_of:
+  - '*primer*'
+  - '*oligo*'
+  - '*antibod*'
+  - '*sirna*'
+  - '*shrna*'
+# Broad probe-qPCR catch-all — generic TaqMan-mix descriptions (Master Mix,
+# Universal, Advanced, Gene Expression, MicroRNA Assays).  Custom TaqMan
+# assays route to "custom-designed qpcr assays" via the *custom* veto.
+- name: probe-based qpcr systems
+  any_of:
+  - '*taqman*master*'
+  - '*taqman*supermix*'
+  - '*taqman*advanced*'
+  - '*taqman*universal*'
+  - '*taqmanfast*'
+  - '*taqman fast*'
+  - '*taqman*gene*expres*'
+  - '*taqmangeneexpres*'
+  - '*taqman*microrna*'
+  - '*taqmanmicrorna*'
+  - '*probe*supermix*'
+  - '*probes*supermix*'
+  - '*kapa probe fast*'
+  none_of:
+  - '*primer*'
+  - '*oligo*'
+  - '*antibod*'
+  - '*sirna*'
+  - '*shrna*'
+  - '*custom*'
 - name: custom-designed qpcr assays
   all_of:
   - '*custom*'
   any_of:
   - '*taqman*'
   - '*qpcr*assay*'
+# Applied Biosystems / Life Tech pre-designed TaqMan Gene Expression
+# Assays — identified by their assay-ID schema (species prefix + 8 digits
+# + suffix like _m1/_s1/_g1) or by the legacy 4331182 catalog prefix.
+# These descriptions overwhelm the model and currently bleed into
+# probe-based qpcr systems (543 FNs).
 - name: pre-designed qpcr assays
   any_of:
   - '*vhps*'
+  - '*taqman gene expression assay*'
+  - '*taqman gene ex assay*'
+  - '*taqman gene ex*'
+  - '*taqman*assay id*'
+  - '*taqman*copy number*'
+  - '*taqman copy number*'
+  - '*pre-designed*assay*'
+  - '*predesigned*assay*'
+  - '*real time taqman*'
+  - '*real-time taqman*'
+  - '*taqman microrna assay*'
+  - '*taqmanmicrornaassay*'
+  - '*taqman microrna*'
+  - '*taqmanmirna*'
+  - '*taqman mirna*'
+  - '*taqman miRNA*'
+  - '*taqman primer set*'
+  - '*taqman primer kit*'
+  - '*taqman probe set*'
+  - '*taqman probe,*'
+  - '*taqmangeneexpres*'
+  - '*primetime*qpcr*'
+  - '*primetime qpcr*'
+  - '*primetime mini qpcr*'
+  - '*primetime std qpcr*'
+  - '*4331182*'
+  - '*4331348*'
+  - '*4351368*'
+  - '*4351370*'
+  - '*4351372*'
+  - '*4448892*'
+  - '*4453320*'
+  - '*4453322*'
+  - '*4448486*'
+  - '*4448489*'
+  - '*4448484*'
+  - '*4366596*'
+  - '*4427975*'
+  - '*4400291*'
+  - '*4400294*'
+  - '*4403326*'
+  - '*4458366*'
+  regex_any_of:
+  # Applied Biosystems assay ID — species prefix + 8 digits + _m{1,2}/_s1/_g1/_ml (OCR'd "_m1")/_cn
+  - '(?i)\b(?:hs|mm|rn|cf|bt|mmu|gg|dr|ce|dm|ss|oc|at|mr)\d{8}_[a-z][a-z0-9]?\b'
+  - '(?i)\bhs999999\d{2}_[a-z][a-z0-9]?\b'
+  none_of:
+  - '*custom*'
+  - '*primer*sequence*'
+  - '*oligo*sequence*'
+- name: t7 in vitro transcription kit 
+  all_of:
+  - t7
+  - maxiscript 
+  - $ASSAY_OR_KIT 
 - name: first-strand cdna synthesis systems
   all_of:
   - first-strand
@@ -2669,6 +3125,7 @@ market_rules:
   - iscript
   none_of:
   - '*rnase*'
+  - '*t7*'
 - name: first-strand cdna synthesis systems
   all_of:
   - iscript
@@ -2740,28 +3197,6 @@ market_rules:
 - name: transfection reagents - cellfectin (insect cell)
   any_of:
   - '*cellfectin*'
-- name: transfection reagents
-  any_of:
-  - lipofectamine
-  - '*lipofectamin*'
-  - '*fugene*'
-  - '*effectene*'
-  - '*xfect*'
-  - '*jetprime*'
-  - '*turbofect*'
-  - '*transfect*'
-  none_of:
-  - '*sirna*'
-  - '*shrna*'
-  - '*rnai*'
-  - '*rnaimax*'
-  - '*dharmafect*'
-  - '*electropor*'
-  - '*nucleofect*'
-  - '*nucleofactor*'
-  - '*neon system*'
-  - '*transfection-ready*'
-  - '*orf clone*'
 - name: in situ hybridization reagents
   any_of:
   - '*rnascope*'
@@ -2835,6 +3270,7 @@ market_rules:
   - '*cfse*'
   - '*cfda se*'
   - '*cfda-se*'
+  - '*snap-cell*'
   - '*carboxyfluorescein diacetate succinimidyl*'
   - '*celltrace*far red*'
   - '*celltrace*violet*'
@@ -2941,12 +3377,209 @@ market_rules:
   - '*ion exchange*'
   - '*magnetic*'
   - '*streptavidin*'
+# Free / unconjugated fluorophores go to "fluorophore - general".  Must
+# come BEFORE the bioconjugate rules below — the legacy bioconjugate rule
+# fired on bare 'carboxyfluorescein' and stole ~66 truly-general descriptions
+# (free 6-CFAM, 5(6)-carboxyfluorescein) into the wrong sibling.  Cell
+# tracer / viability stain / dextran-conjugate rules above are placed
+# first; modifier-bearing dyes (NHS / succinimidyl / maleimide / hydrazide
+# / azide / alkyne / chloride) are vetoed here so they fall to bioconjugate.
+# Several dyes that appear ONLY in sibling categories (DAPI, Hoechst, FITC,
+# Pacific Blue, propidium iodide, sytox, 7-aad, calcein, tritc) are not
+# included even though they're fluorophores — they belong elsewhere.
+- name: fluorophore - general
+  any_of:
+  - '*carboxyfluorescein*'
+  - '*fluorescein*'
+  - '*rhodamine*'
+  - '*sulforhodamine*'
+  - '*dansyl*'
+  - '*coumarin*'
+  - '*filipin*'
+  - '*monobromobimane*'
+  - '*lucifer yellow*'
+  - '*oregon green*'
+  - '*pacific orange*'
+  - '*phrodo*'
+  - '*cardiogreen*'
+  - '*polymethine dye*'
+  - '*irdye 800cw carboxylate*'
+  - '*irdye 680rd carboxylate*'
+  - '*tamra-fp*'
+  - '*ddao*'
+  - '*celllight*'
+  - '*amplex ultrared*'
+  - '*amplex red*'
+  - '*nile red*'
+  - '*nile blue*'
+  - '*halotag tmr*'
+  - '*halotag-tmr*'
+  - '*aminomethylcoumarin*'
+  - '*phthalazinedion*'
+  - '*texas red*'
+  - '*bodipy*'
+  - '*atto*'
+  - '*fluozin*'
+  - '*newport green*'
+  - '*phen green*'
+  none_of:
+  # Antibody-conjugate context (CD-markers, MAB, IgG, anti-target patterns)
+  - '*antibod*'
+  - '*anti-*'
+  - '* anti *'
+  - '* mab *'
+  - '* mab,*'
+  - '*-mab*'
+  - '*mab '
+  - '*-igg*'
+  - '* igg*'
+  - '*-igm*'
+  - '* igm*'
+  - '*antimouse*'
+  - '*antirat*'
+  - '*antirabbit*'
+  - '*antihuman*'
+  - '*-conjug*'
+  - '*conjugate*'
+  - '*labeled*'
+  - '*-labeled*'
+  - '*-tagged*'
+  # Active-dye modifiers (drive to bioconjugate-dyes sibling)
+  - '*nhs*'
+  - '*succinimid*'
+  - '*n-hydroxysuccin*'
+  - '*maleimide*'
+  - '*maleinimide*'
+  - '*hydrazide*'
+  - '*-azide*'
+  - '*alkyne*'
+  - '*cadaverine*'
+  - '*isothiocyanate*'
+  - '*-chloride*'
+  - '* chloride*'
+  - '*chloride bioreagent*'
+  - '*-amine*'
+  - '*amine bioreagent*'
+  - '*fluoresceinamine*'
+  - '*tfp ester*'
+  - '*tetrafluorophenyl*'
+  - '*free acid*'
+  - '*-biotin*'
+  - '*biotin-*'
+  - '*-streptavidin*'
+  - '*streptavidin-*'
+  # Cell-tracer / viability / carbohydrate-label / indicator siblings
+  - '*tracker*'
+  - '*cell trace*'
+  - '*celltrace*'
+  - '*cmfda*'
+  - '*pkh26*'
+  - '*pkh67*'
+  - '*dextran*'
+  - '*phalloidin*'
+  # ROS indicator-specific structures (DCFDA, DAF-FM, dichlorodihydrofluorescein)
+  - '*ros indicator*'
+  - '*ros-indicator*'
+  - '*calcium indicator*'
+  - '*dcfda*'
+  - '*dcf-da*'
+  - '*dichlorodihydro*'
+  - '*chloromethyl*fluor*'
+  - '*difluorofluorescein*'
+  - '*daf-fm*'
+  - '*daffm*'
+  - '*mitosox*'
+  - '*hyper7*'
+  # Calcium-indicator BAPTA chelator (Oregon Green 488 BAPTA, fluo-4, etc.)
+  - '*bapta*'
+  - '*fluo-3*'
+  - '*fluo-4*'
+  - '*fluo-5*'
+  - '*indo-1*'
+  - '*fura-2*'
+  - '*fura 2*'
+  - '*quin-2*'
+  # Laser dye perchlorate salts (not biological fluorophores)
+  - '*perchlorate*'
+  # Coumarin / fluorescein small-molecule scaffolds (boronic acid, complex)
+  - '*boronic*'
+  - '*aminocoumarin*'
+  - '*hydroxycoumarin*'
+  - '*fluorescein complex*'
+  - '*coumarin complex*'
+  # Fluor-labeled protein products (tubulin-rhodamine etc.)
+  - '*tubulin*'
+  - '*protein \(rhodamine\)*'
+  - '*protein \(x-rhodamine\)*'
+  - '*protein \(fluorescein\)*'
+  # Mitochondrial-potential dyes (TMRM/TMRE = methylated rhodamine esters)
+  - '*tmrm*'
+  - '*tmre*'
+  - '*rhodamine, methyl*'
+  - '*rhodamine, ethyl*'
+  - '*methyl ester, perchlorate*'
+  - '*ethyl ester, perchlorate*'
+  # Slide mounting / antifade / histology / staining kits
+  - '*mountant*'
+  - '*mounting*'
+  - '*antifade*'
+  - '*anti-fade*'
+  - '*prolong*'
+  - '*fluoromount*'
+  - '*vectashield*'
+  - '*histolog*'
+  # Detection kits (apoptosis / annexin / TUNEL / caspase / TSA)
+  - '*annexin*'
+  - '*tunel*'
+  - '*caspase*'
+  - '*apoptosis*'
+  - '*apoptag*'
+  - '*in situ cell death*'
+  - '*cell death*'
+  - '*detection kit*'
+  - '*detection system*'
+  - '*deadend*'
+  - '*tsa plus*'
+  - '*tsa-plus*'
+  - '*tsa system*'
+  - '*tsatm*'
+  - '*tsa(tm)*'
+  - '*tsa*fluorescein system*'
+  - '*tyramide*'
+  - '*tyramide signal*'
+  # Lectin conjugates
+  - '*lectin*'
+  - '*ulex*'
+  - '*concanavalin*'
+  - '*phaseolus*'
+  - '*vicia*'
+  - '*wga*'
+  # Small-molecule fluorescent inhibitors that have BODIPY/fluor cores
+  - '*vancomycin bodipy*'
+  - '*bodipy*vancomycin*'
+  # Oligo / sirna / shrna / probe
+  - '*primer*'
+  - '*oligo*'
+  - '*sirna*'
+  - '*shrna*'
+  - '*synthetic dna*'
+  - '*sephadex*'
+  - '*superdex*'
+  - '*configurationid*'
 - name: fluorophore - bioconjugate dyes
   all_of:
   - 'rhodamine isothiocyanate'
 - name: fluorophore - bioconjugate dyes
   all_of:
-  - 'carboxyfluorescein'
+  - carboxyfluorescein
+  any_of:
+  - '*succinimidyl*'
+  - '*nhs ester*'
+  - '*-se*'
+  - '*maleimide*'
+  - '*hydrazide*'
+  - '*cadaverine*'
+  - '*diacetate*'  # CFDA — bioconjugate-eligible
 - name: fluorophore - bioconjugate dyes
   any_of:
   - '*alexa fluor*hydrazide*'
@@ -2981,7 +3614,6 @@ market_rules:
   - '*tritc*'
   - '*iodoacetamidofluorescein*'
   - '*snap-surface*'
-  - '*snap-cell*'
   - '*halotag*ligand*'
   none_of:
   - '*antibod*'
@@ -3167,6 +3799,47 @@ market_rules:
   - '*tgx*'
   - '*stain-free*'
   - '*stain free*'
+# Specific protein gel stain products — Coomassie R-250/G-250, Brilliant
+# Blue, Ponceau S, Page Blue, SilverSnap, SYPRO Ruby, Pro-Q Emerald.
+# These don't always have "protein gel stain" in the description.
+- name: protein gel stains
+  any_of:
+  - '*coomassie*brilliant blue*'
+  - '*brilliant blue r-250*'
+  - '*brilliant blue r 250*'
+  - '*brilliant blue r250*'
+  - '*brilliant blue g-250*'
+  - '*brilliant blue g 250*'
+  - '*brilliant blue g250*'
+  - '*ponceau*'
+  - '*pageblue*'
+  - '*page blue*'
+  - '*page-blue*'
+  - '*silversnap*'
+  - '*silver snap*'
+  - '*silver stain*kit*'
+  - '*sypro*ruby*'
+  - '*sypro ruby*'
+  - '*sypro orange*'
+  - '*sypro red*'
+  - '*ruby protein gel*'
+  - '*ruby gel stain*'
+  - '*pro-q emerald*'
+  - '*pro q emerald*'
+  - '*pro-q diamond*'
+  - '*proq diamond*'
+  - '*krypton fluorescent protein stain*'
+  - '*flamingo*protein gel*'
+  - '*coomassie r-250*'
+  - '*coomassie r250*'
+  - '*coomassie g-250*'
+  - '*coomassie g250*'
+  none_of:
+  - '*assay kit*'  # Bradford/BCA assay kits are protein quantitation, not gel stains
+  - '*bca*'
+  - '*bradford reagent*'
+  - '*primer*'
+  - '*oligo*'
 - name: nucleic acid gel stains
   all_of:
   - gelstar
@@ -3296,6 +3969,9 @@ market_rules:
 - name: dntps
   all_of:
   - datp
+  - dctp
+  - dttp
+  - dgtp
   # Individual 100mM single-nucleotide solutions are "nucleotides", not dNTP mixes.
   none_of:
   - supermix
@@ -3320,10 +3996,13 @@ market_rules:
   - '*cy5-*'
   - '*100mm*'
   - '*100 mm*'
-- name: dntps
+- name: nucleotides
   all_of:
   - dttp
   none_of:
+  - datp
+  - dctp
+  - dgtp
   - supermix
   - cdna
   - kit
@@ -3346,10 +4025,42 @@ market_rules:
   - '*cy5-*'
   - '*100mm*'
   - '*100 mm*'
-- name: dntps
+- name: nucleotides
+  all_of:
+  - datp
+  none_of:
+  - dttp
+  - dctp
+  - dgtp
+  - supermix
+  - cdna
+  - kit
+  - '*radioactive*'
+  - '*32p*'
+  - '*p32*'
+  - '*p-32*'
+  - '*p 32*'
+  - '*alpha-*'
+  - '*alpha *'
+  - '*[32-p]*'
+  - '*[32p]*'
+  - '*35s*'
+  - '*35-s*'
+  - '*33p*'
+  - '*3h*'
+  - '*biotin-*'
+  - '*fluor-*'
+  - '*cy3-*'
+  - '*cy5-*'
+  - '*100mm*'
+  - '*100 mm*'
+- name: nucleotides
   all_of:
   - dgtp
   none_of:
+  - datp
+  - dctp
+  - dttp
   - supermix
   - cdna
   - kit
@@ -3372,10 +4083,13 @@ market_rules:
   - '*cy5-*'
   - '*100mm*'
   - '*100 mm*'
-- name: dntps
+- name: nucleotides
   all_of:
   - dctp
   none_of:
+  - datp
+  - dttp
+  - dgtp
   - supermix
   - cdna
   - kit
@@ -3407,6 +4121,50 @@ market_rules:
   all_of:
   - '*spin*'
   - '*column*'
+  none_of:
+  # Sibling categories with strong ownership of these brands.  Truth labels:
+  # zeba   -> 163 spin desalting / 3 spin columns       (route to desalting)
+  # vivaspin/amicon/spin-x UF -> centrifugal ultrafilt
+  # Bio-Spin / Nucaway / Microspin keep firing as spin columns because their
+  # truth labels are dominantly "spin columns" (~148/149 bio-spin, etc.).
+  - '*zeba*'
+  - '*spin*x*uf*'
+  - '*spinx*uf*'
+  - '*spin-x*uf*'
+  - '*vivaspin*'
+  - '*amicon*'
+  - '*ultracel*'
+  - '*ultracon*'
+  - '*ultrafilt*'
+  - '*ultrafil*'
+- name: spin columns
+  any_of:
+  - '*pierce*spn clmn*'
+  - '*spn clmn*'
+  - '*spin basket*'
+  - '*spincolumn*'
+  - '*spin colmn*'
+  - '*zymo-spin*'
+  - '*zymo spin*'
+  - '*zymospin*'
+  - '*zymo zpin*'
+  - '*zpin*'
+  - '*ez-10 column*'
+  - '*ez10 column*'
+  - '*ez-10*collection*'
+  - '*ez10*collection*'
+  - '*anion exch col mini*'
+  - '*anion exch col*mini*'
+  - '*spin col*'
+  - '*spincol*'
+  none_of:
+  - '*zeba*'
+  - '*vivaspin*'
+  - '*amicon*'
+  - '*ultracel*'
+  - '*ultrafilt*'
+  - '*primer*'
+  - '*oligo*'
 
 # -----------------------------------------------------------------------------
 # RNA purification / extraction disambiguation (placed BEFORE generic column-
@@ -5128,6 +5886,61 @@ market_rules:
 - name: specialty cell culture media
   any_of:
   - '*brff*'
+# Lonza BulletKit / SingleQuot family (MEGM, BEGM, EGM-2MV, HEGM, NGM,
+# fibroblast basal) plus other specialty media that aren't dmem/rpmi/mem:
+# UltraCULTURE, XF Base Medium (Seahorse), BioExpress (CIL), NBActiv4
+# (BrainBits), CO2-Independent (Gibco), Hibernate (BrainBits), FB Essence
+# (Atlanta).  Place before dmem/f-12 / generic rpmi / mem to win on these.
+- name: specialty cell culture media
+  any_of:
+  - '*megm*'
+  - '*mebm*'
+  - '*begm*'
+  - '*hegm*'
+  - '*rebm*'
+  - '*regm*'
+  - '*egm-2*'
+  - '*egm 2*'
+  - '*egm2*'
+  - '*egm-mv*'
+  - '*ngm*'
+  - '*fb essence*'
+  - '*fbessence*'
+  - '*ultraculture*'
+  - '*ultra culture*'
+  - '*xf base*'
+  - '*xf-base*'
+  - '*xf*base medium*'
+  - '*bioexpress*'
+  - '*nbactiv*'
+  - '*nb-activ*'
+  - '*co2 independent*'
+  - '*co2-independent*'
+  - '*co2 indep*'
+  - '*t-medium*'
+  - '*fibroblast basal*'
+  - '*fibroblast growth kit*'
+  - '*bulletkit*'
+  - '*bullet kit*'
+  - '*bulletkt*'
+  - '*singlequot*'
+  - '*single quot*'
+  - '*growth media*'
+  - '*hepatocyte*wash*'
+  - '*hepatocyte*med*'
+  - '*waymouth*'
+  - '*m2 media*'
+  - '*m2 medium*'
+  - '*ksom*'
+  - '*silac*'
+  - '*m63 med*'
+  - '*m63 medium*'
+  - '*defined keratinocyte*'
+  - '*basal media kit*'
+  none_of:
+  - '*antibod*'
+  - '*kit*lysate*'
+  - '*stem cell*'
 # DMEM/F-12 must be matched before plain DMEM so the broad `*dmem*` rule
 # below doesn't steal F-12 descriptions and collapse them to `dmem`.
 - name: dmem/f-12
@@ -5161,6 +5974,16 @@ market_rules:
   - '*f/12*'
 - name: rpmi
   any_of:
+  - '*rpmi*'
+# clean_desc strips "RPMI-1640" SKU prefix (treats it as a product code),
+# leaving descriptions like "medium l-glutamine" that the cleaned rule
+# above can't match.  Run a case-sensitive variant against raw_desc so
+# "RPMI-1640 MEDIUM, WITH L-GLUTAMINE" gets routed correctly.
+- name: rpmi
+  case_sensitive: true
+  any_of:
+  - '*RPMI*'
+  - '*Rpmi*'
   - '*rpmi*'
 - name: mem
   any_of:
@@ -5285,7 +6108,25 @@ market_rules:
   all_of:
   - edta
   - trypsn
+# Trypsin + EDTA → cell culture dissociation (modern spelling).  Placed
+# BEFORE the bare-trypsin → proteases rule so the dissociation case wins.
 - name: cell culture dissociation reagents
+  all_of:
+  - trypsin
+  - edta
+  none_of:
+  - '*tpck*'
+  - '*mass spec*'
+  - '*sequencing*'
+  - '*seq grade*'
+  - '*agarose*'
+  - '*gold*'
+  - '*affinity*'
+# Trypsin on its own (no edta/versene/tryple/accutase/dispase markers) is
+# the protease, not a dissociation reagent.  The cell-culture-dissociation
+# rules above claim the trypsin+EDTA / trypsin+versene / trypsin+bovine+
+# pancreas variants first; whatever's left here is bench protease.
+- name: proteases
   all_of:
   - trypsin
   none_of:
@@ -5300,24 +6141,140 @@ market_rules:
   - '*type i*'
   - '*type ii*'
   - '*type iii*'
+  - '*edta*'
+  - '*versene*'
+  - '*tryple*'
+  - '*accutase*'
+  - '*dispase*'
+  - '*accumax*'
 # collagenase type iv is labeled "collagenase" (not cell culture dissociation)
 # in umich ground truth — removed the broad collagenase type iv rule to avoid FPs
 - name: cell culture dissociation reagents
   all_of:
   - versene
+# Crosslinking reagents — only NAMED crosslinker products.  Bare chemistry
+# tokens (maleimide, carbodiimide, succinimidyl, formaldehyde) are too
+# broad — they catch fluorophore-conjugates, irrelevant-chemicals, tissue
+# fixatives.  Short bare codes (DSP/DSS/DST/DMP/DTBP/SDA/DMS) also collide
+# with disposable abbreviations and are excluded; those fall through to
+# the expert model.  Glutaraldehyde + bismaleimide-PEG products are
+# kept because they are unambiguously crosslinker-grade catalog items.
 - name: crosslinking reagents
-  all_of:
-  - egs
-- name: crosslinking reagents
-  all_of:
+  any_of:
+  - bs3
+  - bs-3
   - edc
+  - egs
+  - dsg
+  - dtssp
+  - sdad
+  - smcc
+  - spdp
+  - sbed
+  - bmoe
+  - '*sulfo-smcc*'
+  - '*sulfo-egs*'
+  - '*sulfo-dst*'
+  - '*sulfo-sbed*'
+  - '*sulfo-spdp*'
+  - '*sulfo-lc-smcc*'
+  - '*sulfo-mbs*'
+  - '*lc-smcc*'
+  - '*bm(peg)*'
+  - '*sm(peg)*'
+  - '*sm-(peg)*'
+  - '*bm-(peg)*'
+  - '*disuccinimidyl*'
+  - '*pimelimidate*'
+  - '*pimelimid*'
+  - '*ethylene glycol bis*'
+  - '*immobilized cdi*'
+  - '*phosphine-biotin*'
+  - '*phosphine biotin*'
+  - '*phosphinebiotin*'
+  - '*crosslinker*'
+  - '*cross-linker*'
+  - '*crosslink*'
+  - '*cross-link*'
+  - '*cross link*'
+  none_of:
+  - '*primer*'
+  - '*oligo*'
+  - '*sirna*'
+  - '*antibod*'
+  - '*pcr*'
+  - '*sodium dodecyl*'
+  - '*sds-page*'
+  - '*resin*'
+  - '*agarose*'
+  - '*sepharose*'
+  - '*column*'
+  - '*conjugat*'
+  - '*alexa*'
+  - '*fluor*'
+# Short bare codes (DSP / DSS / DTBP / DMP / DMS) — these alone identify
+# real catalog crosslinkers (Pierce/Thermo) when isolated, but collide
+# with the disposable-item abbreviation "DSP" in SKUs like "PIPET SER DSP"
+# / "SYRINGE DSP".  Allow the code only when no disposable-item-context
+# token appears anywhere in the description.
 - name: crosslinking reagents
-  all_of:
-  - dgs
-- name: crosslinking reagents
-  all_of:
-  - glutaraldehyde
-  - '*sol*'
+  any_of:
+  - dsp
+  - dss
+  - dtbp
+  - dmp
+  - dms
+  - dst
+  none_of:
+  - '*pipet*'
+  - '*syringe*'
+  - '*syrnge*'
+  - '*syrng*'
+  - '*syr *'
+  - '*syr-*'
+  - '*bottle*'
+  - '*cuvts*'
+  - '*cuvette*'
+  - '*needle*'
+  - '*ndl *'
+  - '*flask*'
+  - '*tube*'
+  - '*filter*'
+  - '*filtr*'
+  - '*fltr*'
+  - '*membrane*'
+  - '*ser dsp*'
+  - '*pmt*'
+  - '*btm*'
+  - '*lt dsp*'
+  - '*dsp pgld*'
+  - '*disp *'
+  - '*spray*'
+  - '*mist*'
+  - '*wash*'
+  - '*plstc*'
+  - '*plastic*'
+  - '*locktip*'
+  - '*stripette*'
+  - '*stripet*'
+  - '*pap/plas*'
+  - '*pip*'
+  - '*resin*'
+  - '*agarose*'
+  - '*sepharose*'
+  - '*column*'
+  - '*conjugat*'
+  - '*alexa*'
+  - '*fluor*'
+  - '*antibod*'
+  - '*primer*'
+  - '*oligo*'
+  - '*pcr*'
+# Glutaraldehyde is intentionally NOT routed to crosslinking reagents here:
+# the ground truth labels 57/57 bulk glutaraldehyde products as "tissue
+# fixatives" and only 6 as "crosslinking reagents".  Force-routing all
+# glutaraldehyde to crosslinking blows tissue-fixative precision without
+# meaningfully improving crosslinking recall (6 examples).
 - name: solid-phase peptide-synthesis (spps) resins
   all_of:
   - rink
@@ -5450,6 +6407,27 @@ market_rules:
   all_of:
   - pes
   - concentrator
+# Spin-X UF, Amicon Ultra, Vivaspin, Microcon — molecular-weight cutoff
+# spin filters.  "SPIN X UF" / "Amicon Ultra-15" / "Vivaspin 6" are the
+# common SKUs; UF + MWCO size (3K/5K/10K/30K/50K/100K) is the signature.
+- name: centrifugal ultrafiltration devices
+  any_of:
+  - '*spin*x*uf*'
+  - '*spinx*uf*'
+  - '*spin-x*uf*'
+  - '*amicon*ultra*'
+  - '*amicon ultra*'
+  - '*vivaspin*'
+  - '*microcon*'
+  - '*ultracel*'
+  - '*pall nanosep*'
+  - '*nanosep*'
+  - '*ultrafilt*device*'
+  - '*ultrafiltration*device*'
+  none_of:
+  - '*primer*'
+  - '*oligo*'
+  - '*antibod*'
 - name: bottle top filters
   all_of:
   - steritop
@@ -5747,6 +6725,7 @@ market_rules:
   - '*criterion*tbe*'
   - '*tbe precast*'
   - '*tbe pre-cast*'
+  - 'dna retardation gel'
 # ----------------------------------------------------------------------------
 # 'TBE' / 'TB' as a "tube" abbreviation (NOT TBE buffer/gel).  Supplier
 # descriptions like "15M TBE PP/FLT/ST/GRD RK500CS" or "5ML TBE PS\STR" use
@@ -5886,23 +6865,38 @@ market_rules:
   - '*100ul*'
   - '*1000ul*'
   - '*10ul*'
-# Conical centrifuge tubes packaged with their own rack: "TUBE CONIC 50ML
-# W/RACK 500/CS", "TUBE CONICAL PP15ML RACK CS500".  The size-based conical
-# rule below excludes '*rack*' to avoid catching standalone tube racks; this
-# rule re-admits the bundled-rack format using the strong "conic" signal.
-- name: centrifuge tubes
+# Conical centrifuge tubes: "conical vials", "conical centrifuge tube", and
+# the abbreviated "tube conic ..." pattern (e.g. "TUBE CONIC 50ML 500/CS")
+# all denote 15/50 mL conical centrifuge tubes and override the Non-Lab
+# tubing rule below.  When a rack is part of the phrase ("TUBE CONIC 50ML
+# W/RACK", "CONICAL CENTRIFUGE TUBE RACK"), route to microtube racks — the
+# rack-keyword bundle ships a holder, not just tubes.  The microtube racks
+# rule must precede centrifuge tubes so first-match-wins picks rack first.
+- name: microtube racks
   all_of:
-  - '*tube*'
-  - '*conic*'
+  - '*rack*'
   any_of:
-  - '*15ml*'
-  - '*15 ml*'
-  - '*50ml*'
-  - '*50 ml*'
-  - '*30ml*'
-  - '*30 ml*'
-  - '*pp15ml*'
-  - '*pp50ml*'
+  - '*conical vial*'
+  - '*conical centrifuge tube*'
+  - '*tube conic*'
+  none_of:
+  - '*microcent*'
+  - '*microfuge*'
+  - '*microfg*'
+  - '*configurationid*'
+  - '*oligo*'
+  - '*sequence*'
+  - '*pcr*'
+  - '*adapter*'
+  - '*adaptor*'
+  - '*storag*'
+  - '*closur*'
+  - '*insert*'
+- name: centrifuge tubes
+  any_of:
+  - '*conical vial*'
+  - '*conical centrifuge tube*'
+  - '*tube conic*'
   none_of:
   - '*microcent*'
   - '*microfuge*'
@@ -6298,13 +7292,42 @@ market_rules:
   any_of:
   - '*boat*'
   - '*dish*'
-- name: gel blotting papers 
+- name: gel blotting papers
   all_of:
   - '*blot*'
   any_of:
   - '*ppr*'
   - '*paper*'
   - "*papr*"
+# Whatman GB003 / GB002 / 3MM Chr filter / blot paper SKU codes used
+# without the literal word "paper".  Also Extra-Thick / Thick Blot
+# Filter Paper precut sheets and HyBlot/Western blot filter paper.
+- name: gel blotting papers
+  any_of:
+  - '*gb003*'
+  - '*gb002*'
+  - '*gb001*'
+  - '*gb004*'
+  - '*gb005*'
+  - '*3mm chr*'
+  - '*3mmchr*'
+  - '*extra thick blot*'
+  - '*extra-thick blot*'
+  - '*thick blot filter*'
+  - '*hyblot*'
+  - '*western blot*filter*'
+  - '*western blotting filter*'
+  - '*nitrocellulose filter*'  # ambiguous, but commonly blot
+  - '*blot pad*'
+  - '*blotting pad*'
+  - '*blotting paper*'
+  - '*blot paper*'
+  none_of:
+  - '*membrane*'
+  - '*sealing*'
+  - '*tape*'
+  - '*precut nitrocellulose transfer*'
+  - '*precut pvdf transfer*'
 - name: filter papers 
   all_of:
   - '*gls fbr*'
@@ -7702,12 +8725,53 @@ market_rules:
   - '*bio-rad protein assay*'
   - '*bradford protein*'
   - '*bradford assay*'
+  - '*bradford reagent*'
   - '*bca protein assay*'
+  - '*bca protein kit*'
+  - '*bca reagent*'
+  - '*bca kit*'
   - '*pierce bca*'
+  - '*bca*assay kit*'
+  - '*coomassie plus*'
+  - '*coomassie reagent*'
+  - '*coomassie*reagent*'
+  - '*coomassie*200*prot*'
   - '*modified lowry*'
+  - '*modfied lowry*'
+  - '*lowry protein*'
+  - '*lowry*assay*'
   - '*qubit protein*'
   - '*nanodrop protein*'
   - '*protein assay dye*'
+  - '*coomassie*bradford*'
+  - '*coomassie*assay*'
+  - '*coomassie*protein*'
+  - '*bradford*coomassie*'
+  - '*quant*protein*assay*'
+  - '*quantitative*protein*assay*'
+  - '*total protein assay*'
+  - '*totl protn assy*'
+  - '*pierce quantitative colorimetr*'
+  - '*pierce 660*'
+  - '*pierce 660 nm*'
+  - '*epoch protein*'
+  - '*nanoorange*'
+  - '*nano orange*'
+  - '*cbqca*'
+  - '*biuret protein*'
+  - '*bcg albumin*'
+  - '*albumin*assay kit*'
+  - '*albumin kit 96*'
+  - '*total protein quantitation*'
+  - '*micro bca*'
+  - '*ezq*protein*'
+  - '*ez-q*protein*'
+  - '*qpro*assay*'
+  none_of:
+  - '*albumin standard*'  # standards are not assay kits
+  - '*membrane*'
+  - '*primer*'
+  - '*oligo*'
 - name: seamless cloning kits
   any_of:
   - '*gibson assembly*'
@@ -7716,6 +8780,40 @@ market_rules:
   - '*nebuilder*'
   none_of:
   - '*competent*'
+# Invitrogen TOPO TA kits — must precede the generic "ta cloning kits" rule
+# below (which also catches "*topo ta*").  pCR2.1 / pCR-II / pEXP5 are
+# Invitrogen TOPO vector backbones; "TA Cloning Kit with pCR 2 1" reads as
+# plain TA but is actually a TOPO TA product.  TOPO Blunt and Zero Blunt
+# TOPO are distinct (→ blunt-end cloning kits) so they're excluded here.
+- name: topo ta cloning kits
+  any_of:
+  - '*topo ta*'
+  - '*topo-ta*'
+  - '*ta topo*'
+  - '*pcrii topo*'
+  - '*pcrii-topo*'
+  - '*pcr ii topo*'
+  - '*pcr-ii topo*'
+  - '*pcr2.1*'
+  - '*pcr 2.1*'
+  - '*pcr-2.1*'
+  - '*pcr 2 1*'
+  - '*pcr2 1*'
+  - '*pexp5*'
+  none_of:
+  - '*blunt*'
+  - '*zero blunt*'
+  # Veto primer/oligo names that REFERENCE the TOPO vector ("PKSCON4-PEXP5-FOR",
+  # "pCR2.1TOPO - Fwd").  Without this, ~40 DNA oligos get mis-routed.
+  - '*-fwd*'
+  - '*-rev*'
+  - '* fwd*'
+  - '* rev*'
+  - '*sequence:*'
+  - '*nmole*'
+  - '*umole*'
+  - '*primer*'
+  - '*oligo*'
 - name: ta cloning kits
   any_of:
   - '*pgem*t*easy*'
@@ -7936,6 +9034,7 @@ market_rules:
   - '*matrigel*'
   - '*geltrex*'
   - '*cultrex*'
+  - '*ecm gel*'
   none_of:
   - '*organ*'
 - name: blocking buffers
@@ -8712,6 +9811,9 @@ market_rules:
   - '*h minus*'
   - '*qpcr*'
   - '*clone*'
+  - 'umo'
+  - 'name'
+  - 'primer'
 - name: probe-based qpcr systems
   any_of:
   - '*ssoadvanced universal probe*'
@@ -8855,30 +9957,6 @@ market_rules:
   - '*ufc*'            # centrifugal ultrafiltration devices
   - '*amicon*'
   - '*vivaspin*'
-
-# Transfection reagents — common brand names beyond what the existing rule
-# covers (TransIT variants, Dharmafect, DNAfectin, YeastMaker, PEI).
-# `*dharmafect*` is intentionally NOT in this list — an earlier rule
-# correctly routes dharmafect into `sirna transfection reagents` (it's a
-# siRNA-specific lipid-based transfection reagent).
-- name: transfection reagents
-  any_of:
-  - '*transit*lt*'
-  - '*transit*2020*'
-  - '*transit*x2*'
-  - '*lipofectamine*'
-  - '*dnafectin*'
-  - '*yeastmaker*'
-  - '*polyethyleneimine*'
-  none_of:
-  - '*sirna*'
-  - '*shrna*'
-  - '*rnai*'
-  - '*rnaimax*'
-  - '*dharmafect*'
-  - '*electropor*'
-  - '*nucleofect*'
-  - '*nucleofactor*'
 
 # Specialty cell culture media — plant (Murashige & Skoog), adipocyte
 # differentiation, Williams' Medium E, EpiLife, SILAC DMEM variants.
@@ -9334,10 +10412,6 @@ market_rules:
   - '*safe green*dye*'
   - '*greenglo*'
   - '*green glo*'
-  - '*picogreen*'
-  - '*pico green*'
-  - '*quantifluor*'
-  - '*quant-it*'
   - '*yoyo*iodide*'
   - '*yopro*iodide*'
   - '*yoyo-1*'
@@ -9358,13 +10432,45 @@ market_rules:
   - '*antibod*'
   - '*protease*'
   - '*plasmid kit*'
+  # SYBR-Green / EvaGreen also appear in pre-designed qpcr primers and
+  # qPCR master mixes / instrument-part droplet-generation oil for
+  # ddPCR.  These siblings have their own rules; veto here so we don't
+  # steal them.
+  - '*predesigned sybr*'
+  - '*pre-designed*sybr*'
+  - '*pre designed sybr*'
+  - '*sybr green primer*'
+  - '*sybr green*master*'
+  - '*sybr green*supermix*'
+  - '*evagreen*master*'
+  - '*evagreen*supermix*'
+  - '*droplet generation*'
+  - '*qx200*'
+  - '*qx100*'
+  - '*configurationid*'
+  - '*primer*sequence*'
+  - '*primetime*'
+  # Quant-iT / PicoGreen / RiboGreen are nucleic-acid quantitation kits,
+  # not gel stains — they read fluorescence in a plate / fluorometer.
+  - '*quant-it*'
+  - '*quant it*'
+  - '*quantit *'
+  - '*picogreen*'
+  - '*pico green*'
+  - '*pico-green*'
+  - '*ribogreen*'
+  - '*ribo green*'
+  - '*ribo-green*'
+  - '*assay kit*'
 
 # ---------------------------------------------------------------------------
 # Recall-rescue batch 6 — dissociation / ladders / yeast / BME / taq / sodium.
 # ---------------------------------------------------------------------------
 
 # Cell culture dissociation reagents — TrypLE, Accutase, cell detachment /
-# recovery solutions (non-trypsin dissociation agents).
+# recovery solutions (non-trypsin dissociation agents).  Collagenase is
+# vetoed so "collagenase/dispase" and "collagenase + dispase" products
+# fall through to the collagenase rule below instead of being mis-claimed.
 - name: cell culture dissociation reagents
   any_of:
   - '*tryple express*'
@@ -9379,6 +10485,7 @@ market_rules:
   none_of:
   - '*kit*'                # recovery kits that aren't dissociation
   - '*antibod*'
+  - '*collagenase*'        # collagenase+dispase combos belong to `collagenase`
 - name: unstained protein molecular-weight ladder
   all_of:
   - protein
@@ -9536,9 +10643,11 @@ market_rules:
   - '*shuttle*'
   - '*transformation*'
 
-# 2-Mercaptoethanol / β-ME — reducing agent, same bucket as DTT/TCEP family.
-# UMich labels all reducing agents (including BME) under "reducing agents - dtt".
-- name: reducing agents - dtt
+# 2-Mercaptoethanol / β-ME — routed to its own "reducing agents - bme"
+# category.  UMich/UTD truth labels distinguish BME from DTT (~39 vs ~329
+# examples), so the prior conflation into "reducing agents - dtt" destroyed
+# precision/recall on BME.  Place before any DTT rule that aliased BME in.
+- name: reducing agents - bme
   any_of:
   - '*2-mercaptoethanol*'
   - '*2 mercaptoethanol*'
@@ -9548,8 +10657,13 @@ market_rules:
   - '*beta mercaptoethanol*'
   - '*mercaptoethanol*'
   - '*β-mercaptoethanol*'
+  - '*bme*'
   none_of:
   - '*mercaptoacet*'       # different compound family
+  - '*antibod*'
+  - '*elisa*'
+  - '*kit*'
+  - '*reaction*'
 
 # Sodium phosphate — require BOTH sodium and phosphate tokens (mono / di /
 # hepta variants all qualify).  Prevents the rule from firing on "sodium
@@ -9723,6 +10837,27 @@ market_rules:
   any_of:
   - '*glutamax*'
   - '*gluta max*'
+
+# --- Cell culture nutritional supplements - sugars ---
+# Mannitol / trehalose / raffinose are dominantly labeled in this category
+# (80-90% of occurrences).  Fructose / galactose / mannose / sorbitol /
+# arabinose / ribose are intentionally NOT included — truth labels split
+# them between this category, "irrelevant chemicals - carbohydrates and
+# sugars", and "irrelevant chemicals - organic reagents".
+- name: cell culture nutritional supplements - sugars
+  any_of:
+  - '*d-mannitol*'
+  - '*d(-)-mannitol*'
+  - '*d (-) - mannitol*'
+  - '*mannitol*'
+  - '*trehalose*'
+  - '*raffinose*'
+  none_of:
+  - '*phosph*'
+  - '*conjug*'
+  - '*polyethylene*'
+  - '*pegylated*'
+  - '*-cl*'
 
 # --- Collagenase ---
 # Re-add collagenase type IV catch (removed in precision session for
@@ -10146,19 +11281,9 @@ market_rules:
   - '*12ph test strip*'
 
 # --- Reducing agents - dtt ---
-# UMich uses "reducing agents - dtt" for ALL reducing agents including BME.
-# Add mercaptoethanol and cleland's reagent to this category.
-- name: reducing agents - dtt
-  any_of:
-  - '*mercaptoethanol*'
-  - '*beta-mercaptoethanol*'
-  - '*β-mercaptoethanol*'
-  - '*bme*'
-  none_of:
-  - '*antibod*'
-  - '*elisa*'
-  - '*kit*'
-  - '*reaction*'
+# BME is captured by the "reducing agents - bme" rule earlier; this rule
+# only handles cleland's reagent and other DTT synonyms.  Do not re-add
+# mercaptoethanol/bme here — that conflation broke BME precision/recall.
 - name: reducing agents - dtt
   any_of:
   - '*cleland*'
@@ -10236,6 +11361,31 @@ market_rules:
   none_of:
   - '*transfect*'
   - '*reagent*'
+# OriGene / IDT / generic siRNA products — "27mer siRNA duplexes",
+# "siRNA in Tubes", "Trilencer-27", and plain "siRNA" / "sirna" /
+# "srna" descriptions.  These miss the existing rules above because
+# they don't contain *oligo* / configurationid / stealth markers.
+- name: synthetic sirna
+  any_of:
+  - '*27mer sirna*'
+  - '*27 mer sirna*'
+  - '*sirna duplex*'
+  - '*sirna in tubes*'
+  - '*custom sirna*'
+  - '*trilencer*'
+  - '*srina*'
+  - '*sirna*'
+  - '*sirna*'
+  - '*sirnas*'
+  none_of:
+  - '*transfection*'
+  - '*transfect reagent*'
+  - '*screen*'
+  - '*library*'
+  - '*lentivir*'
+  - '*adenovir*'
+  - '*-vector*'
+  - '*antibod*'
 - name: synthetic sirna
   all_of:
   - '*sirna*'

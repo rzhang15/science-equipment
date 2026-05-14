@@ -84,7 +84,34 @@ def main(embedding_name: str):
         C=10.0, class_weight='balanced', max_iter=1000,
         solver='liblinear', random_state=42, n_jobs=None,
     )
-    clf.fit(X_train, y_train)
+
+    # Per-source sample weights (composes multiplicatively with
+    # class_weight='balanced').  Tune config.SOURCE_WEIGHTS to experiment.
+    sample_weight = None
+    if (getattr(config, 'SOURCE_WEIGHTS', None)
+            and 'data_source' in df_train.columns
+            and any(float(v) != 1.0 for v in config.SOURCE_WEIGHTS.values()
+                    if not isinstance(v, dict))):
+        sample_weight = config.get_sample_weights(
+            df_train['data_source'].values, y_train.values
+        )
+        # Diagnostic: show raw vs. weighted mass per (source, label).
+        import numpy as np
+        ds = df_train['data_source'].astype(str).values
+        lab = y_train.astype(int).values
+        print("  - Sample weights applied (config.SOURCE_WEIGHTS):")
+        print(f"      {'source':<18}{'label':>6}{'rows':>10}{'weighted':>12}{'share%':>9}")
+        for L in (0, 1):
+            total_w = sample_weight[lab == L].sum()
+            for s in sorted(set(ds)):
+                m = (ds == s) & (lab == L)
+                if m.any():
+                    n = int(m.sum())
+                    w = float(sample_weight[m].sum())
+                    pct = 100.0 * w / total_w if total_w else 0.0
+                    print(f"      {s:<18}{L:>6}{n:>10}{w:>12.0f}{pct:>9.1f}")
+
+    clf.fit(X_train, y_train, sample_weight=sample_weight)
     print("  - ML component training complete.")
 
     # 2. Build the complete HybridClassifier

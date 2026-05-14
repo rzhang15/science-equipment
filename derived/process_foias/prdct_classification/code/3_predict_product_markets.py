@@ -500,6 +500,7 @@ def main(gatekeeper_name: str, expert_choice: str, source_abbrev: str = None):
 
         # Assign final predictions
         df_new['predicted_market'] = y_pred
+        df_new['nonlab_bucket'] = config.assign_nonlab_bucket_series(df_new['predicted_market'])
         # --- End of Pipeline ---
 
         # Step G: Save the results
