@@ -19,27 +19,27 @@ program main
     rename id purchase_id
     *rename suppliername supplier
     rename purchasedate date
-    keep agencyname product_desc clean_desc supplier price qty spend purchase_id date prediction_source similarity_score category 
+    keep agencyname product_desc clean_desc supplier price qty spend purchase_id date prediction_source similarity_score category  nonlab_bucket
     save ../temp/govspend_`embed', replace
     
     // dallas+oregon+michigan
     import delimited  ../external/samp/umich_merged_clean_classified_with_`embed'.csv,clear 
     drop predicted_market
-    keep product_desc clean_desc supplier price qty spend purchase_id date prediction_source similarity_score category
+    keep product_desc clean_desc supplier price qty spend purchase_id date prediction_source similarity_score category nonlab_bucket
     cap tostring purchase_id, replace force
     gen agencyname = "university of michigan at ann arbor"
     save ../temp/umich_`embed', replace
 
     import delimited  ../external/samp/utdallas_merged_clean_classified_with_`embed'.csv,clear 
     drop predicted_market
-    keep product_desc clean_desc supplier price qty spend purchase_id date prediction_source similarity_score category 
+    keep product_desc clean_desc supplier price qty spend purchase_id date prediction_source similarity_score category nonlab_bucket
     gen agencyname = "university of texas at dallas"
     cap tostring purchase_id, replace force
     save ../temp/utdallas_`embed', replace
     
     import delimited  ../external/samp/oregonstate_2010_2019_standardized_clean_classified_with_`embed'.csv,clear 
     rename predicted_market category
-    keep product_desc clean_desc supplier price qty spend purchase_id date prediction_source similarity_score category 
+    keep product_desc clean_desc supplier price qty spend purchase_id date prediction_source similarity_score category nonlab_bucket
     gen agencyname = "oregon state university"
     replace spend = price * qty
     cap tostring purchase_id, replace force
@@ -52,45 +52,85 @@ program main
     }
     rename supplier suppliername
 
-    // === Category consolidation (mirrors prdct_classification step 0 / 1c) ===
-    // UMich and UT Dallas use raw vendor categories (kept as ground truth);
-    // these passes ensure all four sources end up in a consistent taxonomy
-    // and that non-lab labels are dropped before downstream pipelines.
+    replace category = "centrifuge tubes" if category == "centrifuge conical tubes"
+    replace category = "funnels" if inlist(category, ///
+        "filtering funnels", "filling funnels", "separatory funnels", ///
+        "addition funnels", "funnel stems")
+    replace category = "metabolism assay kits" if category == "cellular metabolism assay kits"
+    replace category = "cell lines" if inlist(category, ///
+        "human cell lines", "mouse cell lines", "mice cell lines", ///
+        "rat cell line", "insect cell lines")
+    replace category = "lab-grade water" if inlist(category, ///
+        "dnase/rnase-free & molecular-biology-grade water", ///
+        "general-lab & specialty water", ///
+        "cell culture grade life science water - distilled")
+    replace category = "disposable pipettes" if inlist(category, ///
+        "pasteur pipettes", "transfer pipettes", "aspirating pipettes", ///
+        "mohr pipettes", "volumetric pipettes")
+    replace category = "manual pipettors" if inlist(category, ///
+        "manual single channel pipettes", "manual multichannel pipettes", ///
+        "electronic multichannel pipettes", "pipette kits", "pipettors", ///
+        "positive displacement pipettes")
+    replace category = "beakers" if inlist(category, ///
+        "glass beakers", "plastic beakers", "steel beakers", "stainless steel beakers")
+    replace category = "graduated cylinders" if inlist(category, ///
+        "glass graduated cylinders", "plastic graduated cylinders")
+    replace category = "other flasks" if inlist(category, ///
+        "fernbach flasks", "volumetric flasks", "recovery flasks", ///
+        "freeze drying flasks", "kjeldahl flasks", "distilling flasks", ///
+        "stainless steel flasks", "serum bottles")
+    replace category = "specialty gloves" if inlist(category, ///
+        "heat resistant gloves", "cold resistant gloves", "neoprene gloves", ///
+        "cotton gloves", "chemical resistant gloves", "glove box gloves", ///
+        "cut resistant gloves", "vinyl gloves", "rubber gloves")
+    replace category = "specialty gloves" if inlist(category, ///
+        "glove liners", "chloroprene gloves", "gloves")
+    replace category = "specialty membrane filters" if inlist(category, ///
+        "nylon membrane filters", "polycarbonate membrane filters", ///
+        "pes membrane filters", "mce membrane filters", "membrane filters", ///
+        "ptfe membrane filters", "cellulose acetate membrane filters")
+    replace category = "specialty needles" if inlist(category, ///
+        "dispensing needles", "needles", "blood collection needles", ///
+        "pipetting needles", "double-tipped needles")
+    replace category = "pcr tube accessories" if inlist(category, ///
+        "caps and closures - pcr tube strips", "pcr strip tubes", ///
+        "pcr tube strip caps", "caps and closures - pcr tubes")
+    replace category = "caps and closures - vials" if inlist(category, ///
+        "caps and closures - cryovial", "autosampler vial caps")
+    replace category = "cuvettes" if inlist(category, ///
+        "spectrophotometer cuvettes", "fluorescence cuvettes", "electroporation cuvettes")
+    replace category = "primary antibodies" if inlist(category, ///
+        "polyclonal primary antibodies", "monoclonal primary antibodies", ///
+        "polyclonal primary antibody", "monoclonal primary antibody", ///
+        "other-host primary antibody")
+    replace category = "recombinant proteins" if inlist(category, ///
+        "recombinant human protein", "recombinant mouse protein", ///
+        "recombinant human/mouse/rat protein", "recombinant human/mouse protein", ///
+        "recombinant human/murine/rat protein", "recombinant cas9 protein")
+    replace category = "expression plasmids" if inlist(category, ///
+        "synthetic mammalian expression plasmids", ///
+        "synthetic bacterial expression plasmids", ///
+        "synthetic plasmids", "aav plasmids", "non-viral expression plasmids")
+    replace category = "synthetic dna oligonucleotide - desalted" ///
+        if category == "synthetic dna oligonucleotide - purified"
+    replace category = "pcr tube strips" if category == "pcr tubes"
+    replace category = "nucleotides" if category == "radiolabeled nucleotides"
+    replace category = "small molecule inhibitors" if category == "drug - other"
+    replace category = "vials" if inlist(category, ///
+        "sample vials", "scintillation vials", "autosampler vials", ///
+        "drosophila vials", "screw cap vials")
+    save ../temp/merged_price_data_`embed', replace
 
-    // Lump all antibody variants into a single "primary antibodies" bucket.
-    qui count if strpos(category, "antibod") > 0
-    di "Antibody consolidation: collapsing " r(N) " obs to 'primary antibodies'"
-    replace category = "primary antibodies" if strpos(category, "antibod") > 0
+    import delimited ../external/samp/nonlab_bucket_assignments.csv, varnames(1) stringcols(_all) clear
+    save ../temp/nl_map, replace 
 
-    // Drop non-lab categories (mirrors NONLAB_PREFIXES in
-    // derived/process_foias/prdct_classification/code/config.py).
-    // Prefix match: drops "electronics", "electronics - cables", etc.
-    foreach v in "fees" "electronics" "instrument" "office" "lab furniture" ///
-        "waste disposal" "equipment" "furniture" "software" "animal" ///
-        "toolkit" "nonlab" "non-lab" "sequencing" "unclear" {
-        qui count if strpos(category, "`v'") == 1
-        di "  dropping prefix '`v'': " r(N) " obs"
-        drop if strpos(category, "`v'") == 1
-    }
-    // Whole-word keyword match (mirrors NONLAB_KEYWORDS).
-    foreach v in "clamp" "clamps" "tool" "random" "unclear" "tubing" "wire" ///
-        "towel" "oring" "caps" "gas" "desk" "chair" "brushes" "trash" ///
-        "cleaner" "tape" "miscellaneous" "clips" "flint" "accessories" ///
-        "stands" "batteries" "apron" "pots" "pans" "stoppers" "closures" ///
-        "rings" "mortar" "pestle" "supports" "trays" {
-        qui count if ustrregexm(category, "\b`v'\b")
-        di "  dropping keyword '`v'': " r(N) " obs"
-        drop if ustrregexm(category, "\b`v'\b")
-    }
-    // Multi-word non-lab phrases (substring match — no word-boundary issues).
-    foreach v in "irrelevant chemicals" "first-aid" "first aid" "cotton ball" ///
-        "bundle of products" "ear protection" "applicators and swabs" ///
-        "bundle of items" {
-        qui count if strpos(category, "`v'") > 0
-        di "  dropping phrase '`v'': " r(N) " obs"
-        drop if strpos(category, "`v'") > 0
-    }
-
+    use ../temp/merged_price_data_`embed', clear
+    merge m:1 category using ../temp/nl_map, assert(1 2 3) keep(1 3)
+    rename _merge has_nl_bucket
+    replace has_nl_bucket = 1 if has_nl_bucket == 3
+    replace category = "Non-Lab" if inlist("university of michigan at ann arbor", "university of texas at dallas") & has_nl_bucket == 1
+    replace nonlab_bucket = bucket if inlist("university of michigan at ann arbor", "university of texas at dallas") & has_nl_bucket == 1
+    drop has_nl_bucket bucket
     save ../output/first_stage_data_`embed', replace
 
 end
