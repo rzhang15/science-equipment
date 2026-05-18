@@ -11,12 +11,12 @@ program main
 end
 
 program indiv_did_placebo
-    // per-(iter, placebo-treated category) DiD on log_raw_price
+    // per-(iter, placebo-treated category) DiD on log_raw_price AND log_raw_spend
     use ../external/placebo/placebo_matched_mkts, clear
     qui sum iter
     local n_iter = r(max)
 
-    tempfile results pairs_i panel_i
+    tempfile results_price results_spend pairs_i panel_i this_price this_spend
     local first_iter = 1
 
     forvalues i = 1/`n_iter' {
@@ -53,18 +53,26 @@ program indiv_did_placebo
             keep if keep == 1
             cap noi reghdfe log_raw_price posttreat [aw=spend_2013], cluster(mkt) absorb(year uni_id mkt)
             if _rc == 0 {
-                mat coef = nullmat(coef) \ (_b[posttreat], _se[posttreat])
+                mat coef_price = nullmat(coef_price) \ (_b[posttreat], _se[posttreat])
             }
             else {
-                mat coef = nullmat(coef) \ (., .)
+                mat coef_price = nullmat(coef_price) \ (., .)
+            }
+            cap noi reghdfe log_raw_spend posttreat [aw=spend_2013], cluster(mkt) absorb(year uni_id mkt)
+            if _rc == 0 {
+                mat coef_spend = nullmat(coef_spend) \ (_b[posttreat], _se[posttreat])
+            }
+            else {
+                mat coef_spend = nullmat(coef_spend) \ (., .)
             }
             restore
         }
 
+        // price
         clear
-        svmat coef
-        rename coef1 b
-        rename coef2 se
+        svmat coef_price
+        rename coef_price1 b
+        rename coef_price2 se
         gen iter = `i'
         gen category = ""
         local counter = 1
@@ -74,18 +82,40 @@ program indiv_did_placebo
         }
         keep iter category b se
         drop if mi(b)
+        save `this_price', replace
+
+        // spend
+        clear
+        svmat coef_spend
+        rename coef_spend1 b
+        rename coef_spend2 se
+        gen iter = `i'
+        gen category = ""
+        local counter = 1
+        foreach m in `categories' {
+            replace category = "`m'" if _n == `counter'
+            local counter = `counter' + 1
+        }
+        keep iter category b se
+        drop if mi(b)
+        save `this_spend', replace
 
         if `first_iter' == 1 {
-            save `results', replace
+            use `this_price', clear
+            save `results_price', replace
+            use `this_spend', clear
+            save `results_spend', replace
             local first_iter = 0
         }
         else {
-            append using `results'
-            save `results', replace
+            use `results_price', clear
+            append using `this_price'
+            save `results_price', replace
+            use `results_spend', clear
+            append using `this_spend'
+            save `results_spend', replace
         }
     }
-
-    use `results', clear
 
     // spend_2013 lookup -- category-level constant, dedupe across iters
     preserve
@@ -97,28 +127,40 @@ program indiv_did_placebo
     tempfile placebo_spend_xw
     save `placebo_spend_xw'
     restore
-    merge m:1 category using `placebo_spend_xw', keep(1 3) nogen
+
+    make_placebo_plots, results(`results_price') xw(`placebo_spend_xw') ///
+        outcome("price") ylabel("Placebo DiD coefficient (log price)") suf("")
+    make_placebo_plots, results(`results_spend') xw(`placebo_spend_xw') ///
+        outcome("spend") ylabel("Placebo DiD coefficient (log spend)") suf("_spend")
+end
+
+program make_placebo_plots
+    syntax, results(str) xw(str) outcome(str) ylabel(str) [suf(str)]
+
+    use `results', clear
+    merge m:1 category using `xw', keep(1 3) nogen
 
     gen lb = b - 1.96*se
     gen ub = b + 1.96*se
-    save ../output/did_coefs_placebo, replace
+    save ../output/did_coefs_placebo`suf', replace
+
+    qui sum iter
+    local n_iter = r(max)
 
     // rank of coef within each iter (1 = highest b); label top categories per iter
     preserve
     gsort iter -b
     by iter: gen coef_rank = _n
     gen toplab = category if coef_rank <= 3
-    qui sum iter
-    local n_iter = r(max)
     tw scatter b iter, msize(vsmall) mcolor(gs10) ///
        || scatter b iter if coef_rank <= 3, msize(small) mcolor(cranberry) ///
             mlabel(toplab) mlabsize(tiny) mlabcolor(cranberry) mlabposition(3) ///
        yline(0, lcolor(gs6) lpattern(dash)) ///
-       ytitle("Placebo DiD coefficient") ///
+       ytitle("`ylabel'") ///
        xtitle("Iteration") ///
        xlab(1(1)`n_iter') ///
        legend(off)
-    graph export ../output/figures/did_coefs_placebo_top_cats.pdf, replace
+    graph export ../output/figures/did_coefs_placebo`suf'_top_cats.pdf, replace
     restore
 
     // coef-rank profile: x = within-iter rank, y = b, one line per iter
@@ -126,10 +168,10 @@ program indiv_did_placebo
     gsort iter -b
     by iter: gen coef_rank = _n
     tw line b coef_rank, by(iter, note("") legend(off)) ///
-       ytitle("Placebo DiD coefficient") ///
+       ytitle("`ylabel'") ///
        xtitle("Within-iter rank (1 = highest)") ///
        yline(0, lcolor(gs6) lpattern(dash))
-    graph export ../output/figures/did_coefs_placebo_rank_profile.pdf, replace
+    graph export ../output/figures/did_coefs_placebo`suf'_rank_profile.pdf, replace
     restore
 
     // distribution of point estimates across all (iter, market) pairs
@@ -144,22 +186,22 @@ program indiv_did_placebo
     local maxv : di %6.3f r(max)
 
     tw hist b, freq bin(40) color(lavender%70) ///
-        xtitle("Placebo DiD Coefficient") ///
+        xtitle("`ylabel'") ///
         ytitle("# of (iter, market) pairs") ///
         xline(0, lcolor(gs6) lpattern(dash)) ///
         legend(on order(- "N = `N'" "iters = `n_iter'" "mean = `mean'" "sd = `sd'" ///
                           "p25 = `p25'" "p50 = `p50'" "p75 = `p75'" ///
                           "min = `minv'" "max = `maxv'") ///
                pos(1) ring(0) region(fcolor(none)) size(small))
-    graph export ../output/figures/did_coefs_placebo_hist.pdf, replace
+    graph export ../output/figures/did_coefs_placebo`suf'_hist.pdf, replace
 
     tw kdensity b, color(lavender) ///
-        xtitle("Placebo DiD Coefficient") ///
+        xtitle("`ylabel'") ///
         ytitle("Density") ///
         xline(0, lcolor(gs6) lpattern(dash)) ///
         legend(on order(- "N = `N'" "iters = `n_iter'" "mean = `mean'" "sd = `sd'") ///
                pos(1) ring(0) region(fcolor(none)) size(small))
-    graph export ../output/figures/did_coefs_placebo_kdens.pdf, replace
+    graph export ../output/figures/did_coefs_placebo`suf'_kdens.pdf, replace
 
     // per-iter mean coefficient (one point per placebo replication)
     preserve
@@ -172,10 +214,10 @@ program indiv_did_placebo
     local nr = r(N)
     tw rcap ub lb rank, msize(vsmall) || ///
        scatter b_mean rank, msize(small) mcolor(lavender) ///
-       yline(0) ytitle("Mean placebo DiD (per iter)") ///
+       yline(0) ytitle("Mean `ylabel' (per iter)") ///
        xlab(1(1)`nr') xtitle("Placebo iteration (ranked)") ///
        legend(off)
-    graph export ../output/figures/did_coefs_placebo_by_iter.pdf, replace
+    graph export ../output/figures/did_coefs_placebo`suf'_by_iter.pdf, replace
     restore
 end
 

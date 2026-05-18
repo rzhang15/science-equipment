@@ -152,6 +152,18 @@ REGEXES_NORMALIZE = {
     "primer_suffix_rev": (
         re.compile(r"\b(\w{3,}?)_(?:r|rev|reverse)(\d*)(?=$|[\s\-_])", re.I),
         _primer_suffix_repl("rev")),
+    # Space-separated direction marker: "fabp4 r primer", "myc f primer", or
+    # the spelled-out "fabp4 forward primer".  The bare "r" / "f" token gets
+    # dropped later by the `len(t) > 1` filter, destroying the direction
+    # signal; fuse it into `<slug> revprimer` / `<slug> fwdprimer` so the
+    # market-rules structural-primer rescue (\brevprimer\b / \bfwdprimer\b)
+    # can still fire on order sheets that use whitespace instead of `_`.
+    "primer_space_suffix_fwd": (
+        re.compile(r"\b(\w{3,}?)\s+(?:f|fwd|forward)\s+primer(\d*)\b", re.I),
+        _primer_suffix_repl("fwd")),
+    "primer_space_suffix_rev": (
+        re.compile(r"\b(\w{3,}?)\s+(?:r|rev|reverse)\s+primer(\d*)\b", re.I),
+        _primer_suffix_repl("rev")),
     "remove_hash_enclosed": (
         re.compile(rf"#({_TAG_CONTENT_PATTERN})#", re.I), " "),
     "remove_hash_prefix": (
@@ -207,8 +219,14 @@ REGEXES_NORMALIZE = {
         re.compile(
             r"\b(?:configurationid|typecode|purification|format|tubes|scale|umo)"
             r"\s*:\s*\S+", re.I), " "),
+    # The `sequence:` marker in IDT/Twist/Sigma order rows is itself a strong
+    # "this is a custom oligo" signal.  The companion `dna_sequence` rule
+    # above already strips the ATCG/N bases that follow, so all we need to
+    # preserve here is a sentinel.  `oligoseq` survives `nonalp`, isn't a
+    # stopword, and is matched by the structural-primer rescue's bare
+    # `\boligo\w*` trigger downstream in market_rules.yml.
     "sequence_field": (
-        re.compile(r"\bsequence\s*:\s*\S+", re.I), " "),
+        re.compile(r"\bsequence\s*:", re.I), " oligoseq "),
     # Short catalog/part numbers like "AB-1234" or "cat#12345".  The longer
     # SKU rules below don't catch this shape (1-4 letter prefix + separator +
     # 3+ digits).

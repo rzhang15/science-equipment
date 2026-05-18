@@ -45,10 +45,10 @@ program clean_raw
     di "[Supplier Cut]  N: `total_obs' Total Spend: `total_spend'"
 
     qui {
-        replace category = "cryovials" if strpos(clean_desc, "cryo") >0 & strpos(clean_desc, "vial") >0 
-        replace category = "us fbs" if strpos(clean_desc, "fetal")>0& strpos(clean_desc, "bovine")>0 & strpos(clean_desc, "serum")>0
-        replace category = "us fbs" if strpos(clean_desc, "calf")>0& strpos(clean_desc, "bovine")>0 & strpos(clean_desc, "serum")>0
-        replace category = "elisa kits" if strpos(clean_desc, "duoset") >0 
+*        replace category = "cryovials" if strpos(clean_desc, "cryo") >0 & strpos(clean_desc, "vial") >0 
+*        replace category = "us fbs" if strpos(clean_desc, "fetal")>0& strpos(clean_desc, "bovine")>0 & strpos(clean_desc, "serum")>0
+*        replace category = "us fbs" if strpos(clean_desc, "calf")>0& strpos(clean_desc, "bovine")>0 & strpos(clean_desc, "serum")>0
+*        replace category = "elisa kits" if strpos(clean_desc, "duoset") >0 
         // drop nonsense negatives
         drop if price <= 0 | qty < 1 | spend <= 0
         // filter to consumables
@@ -196,7 +196,6 @@ program clean_raw
     qui sum raw_spend, d
     local total_spend : di %16.0f r(sum)
     di "[bad ml categories] N: `total_obs' Total Spend: `total_spend'"
-    
     qui {
         gen obs_cnt = 1
         bys suppliername year: gen supplier_yr = _n == 1
@@ -207,17 +206,8 @@ program clean_raw
         gegen uni_id = group(agencyname)
         gegen supplier_id = group(suppliername)
         bys supplier_id category year: gegen total_sup_spend = total(raw_spend)
-        bys uni_id year: gen cnt = _n == 1
-        bys uni_id : egen num_years = total(cnt)
-        bys uni_id : egen min_year = min(year)
-        keep if num_years == 10 | (num_years == 9 & min_year == 2011)
         gegen mkt = group(category)
-        drop num_years min_year cnt 
         bys category year: gen yr_cnt = _n == 1
-        cap drop num_years
-        bys category : egen num_years = total(yr_cnt)
-        drop yr_cnt
-        drop if num_years != 10
         bys category year: gegen cat_spend = total(raw_spend) 
         bys category year: gegen tot_obs = total(obs_cnt)
         gen obs_2013 = tot_obs if year == 2013
@@ -238,6 +228,20 @@ program clean_raw
         bys uni_mkt : egen min_year = min(year)
         bys uni_mkt : egen max_year = max(year)
         keep if min_year < 2014 & max_year > 2014
+        drop min_year
+        bys uni_id year: gen cnt = _n == 1
+        bys uni_id : egen num_years = total(cnt)
+        bys uni_id : egen min_year = min(year)
+        keep if num_years == 10 | (num_years == 9 & min_year == 2011)
+       bys category uni_id: gen uni_cat_cnt = _n == 1
+        bys category: egen num_uni = total(uni_cat_cnt)
+        drop if num_uni < 5 
+        drop num_uni uni_cat_cnt
+        drop num_years min_year cnt 
+        drop yr_cnt
+        bys category year: gen yr_cnt = _n == 1
+        bys category : egen num_years = total(yr_cnt)
+        drop if num_years != 10
     }
 
     qui count
@@ -257,6 +261,8 @@ program clean_raw
     bys category year: egen max_raw_price = max(raw_price)
     bys category year: egen sd_raw_price = sd(raw_price)
     gen range_raw_price = max_raw_price - min_raw_price
+    gunique category
+    gunique category if treated == 1
     save ../output/full_item_level_`embed', replace
 end
 
@@ -280,7 +286,8 @@ program make_panels
 
     use ../output/full_item_level_`embed', clear
     keep if keep == 1  
-    cap drop uni_mkt min_year max_year
+    drop uni_mkt 
+    cap drop max_year
     gegen uni_mkt = group(uni_id mkt)
     bys uni_mkt : egen min_year = min(year)
     bys uni_mkt : egen max_year = max(year)
@@ -332,6 +339,28 @@ program make_panels
     gen log_raw_qty = ln(raw_qty)
     gen log_raw_price = ln(raw_price)
     save "../output/category_yr_`embed'", replace 
+
+    preserve
+    keep if treated == 1
+    gen avg_log_price_2013 = avg_log_price if year == 2013
+    hashsort category avg_log_price_2013
+    by category: replace avg_log_price_2013 = avg_log_price_2013[_n-1] if mi(avg_log_price_2013)
+    replace avg_log_price = avg_log_price-avg_log_price_2013
+    hashsort category year
+    tw line avg_log_price year , by(category)
+    graph export ../output/figures/treated_trends.pdf, replace
+    restore
+    
+    preserve
+    keep if treated == 0
+    gen avg_log_price_2013 = avg_log_price if year == 2013
+    hashsort category avg_log_price_2013
+    by category: replace avg_log_price_2013 = avg_log_price_2013[_n-1] if mi(avg_log_price_2013)
+    replace avg_log_price = avg_log_price-avg_log_price_2013
+    hashsort category year
+    tw line avg_log_price year , by(category)
+    graph export ../output/figures/ctrl_trends.pdf, replace
+    restore
 end
 
 **

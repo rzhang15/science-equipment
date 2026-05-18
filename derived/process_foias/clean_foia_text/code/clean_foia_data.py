@@ -111,8 +111,11 @@ CLEAN_REGEX_ORDER = [
     # Stage 1 -- spacing & symbol normalization
     "comma_space_to_space",
     "percent_ge_symbols", "simple_percent", "stray_math_symbols",
-    # Stage 2 -- protect structural primer suffixes
+    # Stage 2 -- protect structural primer suffixes (underscore form first,
+    # then the space-separated form so "<slug>_F" -> "<slug> fwdprimer"
+    # doesn't get re-matched by the space rule).
     "primer_suffix_fwd", "primer_suffix_rev",
+    "primer_space_suffix_fwd", "primer_space_suffix_rev",
     # Stage 3 -- hash-enclosed admin tags
     "remove_hash_enclosed", "remove_hash_prefix", "remove_hash_suffix",
     # Stage 4 -- named admin / metadata patterns (BEFORE SKU rules)
@@ -241,6 +244,7 @@ _FILENAME_DESC_COL = {
     "non_lab.dta":       lambda: config.CA_DESC_COL.lower(),
     "fisher_lab.xlsx":   lambda: config.FISHER_DESC_COL.lower(),
     "fisher_nonlab.xlsx": lambda: config.FISHER_DESC_COL.lower(),
+    "fisher_chemical.xlsx": lambda: config.FISHER_DESC_COL.lower(),
 }
 
 

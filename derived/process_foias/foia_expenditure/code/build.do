@@ -10,6 +10,28 @@ program main
     boe
 end
 
+program expenditure_by_athr
+    use ../external/samp/merged_foias_with_pis,  clear
+    keep if inlist(uni , "utdallas", "umich")
+    drop if mi(athr_id)
+    gen year = year(date(date, "YMD"))
+    merge m:1 category using ../external/categories/categories_tfidf, assert(1 2 3) keep(1 3) 
+    gen nonlab = 1 if _merge == 1
+    replace nonlab = 0 if mi(nonlab)
+    drop if nonlab == 1
+     sum spend, d
+    gcollapse (sum) spend, by(athr_id uni year)
+    merge m:1 athr_id using  ../external/real_exposure/athr_exposure, assert(1 2 3) keep(3) nogen
+    gen post = year >= 2014
+    gen Z_it = exposure*post
+    replace spend = ln(spend)
+    reghdfe spend Z_it , absorb(athr_id year) vce(cluster athr_id)
+    binscatter2 spend Z_it , absorb(athr_id year)
+    graph export ../output/bs_spend_by_exposure.pdf, replace
+    xtset athr_id year
+end
+
+
 program boe
     use ../external/samp/merged_foias_with_pis,  clear
     keep if inlist(uni , "utdallas", "umich")
@@ -69,3 +91,4 @@ program boe
 end
 
 main
+

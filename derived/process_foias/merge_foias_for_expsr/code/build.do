@@ -132,7 +132,90 @@ program merge_ids_foia
     merge m:1 fund_id using ../output/utdallas_pi, assert(1 2 3 4) keep(1 3 4) nogen update 
     merge m:1 fund_id using ../output/ecu_pi, assert(1 2 3 4) keep(1 3 4) nogen update
     merge m:1 fund_id using ../output/umich_pi, assert(1 2 3 4) keep(1 3 4) nogen update
+    replace category = predicted_market if mi(category)
+    drop predicted_market
+
+    replace category = "centrifuge tubes" if category == "centrifuge conical tubes"
+    replace category = "funnels" if inlist(category, ///
+        "filtering funnels", "filling funnels", "separatory funnels", ///
+        "addition funnels", "funnel stems")
+    replace category = "metabolism assay kits" if category == "cellular metabolism assay kits"
+    replace category = "cell lines" if inlist(category, ///
+        "human cell lines", "mouse cell lines", "mice cell lines", ///
+        "rat cell line", "insect cell lines")
+    replace category = "lab-grade water" if inlist(category, ///
+        "dnase/rnase-free & molecular-biology-grade water", ///
+        "general-lab & specialty water", ///
+        "cell culture grade life science water - distilled")
+    replace category = "disposable pipettes" if inlist(category, ///
+        "pasteur pipettes", "transfer pipettes", "aspirating pipettes", ///
+        "mohr pipettes", "volumetric pipettes")
+    replace category = "manual pipettors" if inlist(category, ///
+        "manual single channel pipettes", "manual multichannel pipettes", ///
+        "electronic multichannel pipettes", "pipette kits", "pipettors", ///
+        "positive displacement pipettes")
+    replace category = "beakers" if inlist(category, ///
+        "glass beakers", "plastic beakers", "steel beakers", "stainless steel beakers")
+    replace category = "graduated cylinders" if inlist(category, ///
+        "glass graduated cylinders", "plastic graduated cylinders")
+    replace category = "other flasks" if inlist(category, ///
+        "fernbach flasks", "volumetric flasks", "recovery flasks", ///
+        "freeze drying flasks", "kjeldahl flasks", "distilling flasks", ///
+        "stainless steel flasks", "serum bottles")
+    replace category = "specialty gloves" if inlist(category, ///
+        "heat resistant gloves", "cold resistant gloves", "neoprene gloves", ///
+        "cotton gloves", "chemical resistant gloves", "glove box gloves", ///
+        "cut resistant gloves", "vinyl gloves", "rubber gloves")
+    replace category = "specialty gloves" if inlist(category, ///
+        "glove liners", "chloroprene gloves", "gloves")
+    replace category = "specialty membrane filters" if inlist(category, ///
+        "nylon membrane filters", "polycarbonate membrane filters", ///
+        "pes membrane filters", "mce membrane filters", "membrane filters", ///
+        "ptfe membrane filters", "cellulose acetate membrane filters")
+    replace category = "specialty needles" if inlist(category, ///
+        "dispensing needles", "needles", "blood collection needles", ///
+        "pipetting needles", "double-tipped needles")
+    replace category = "pcr tube accessories" if inlist(category, ///
+        "caps and closures - pcr tube strips", "pcr strip tubes", ///
+        "pcr tube strip caps", "caps and closures - pcr tubes")
+    replace category = "caps and closures - vials" if inlist(category, ///
+        "caps and closures - cryovial", "autosampler vial caps")
+    replace category = "cuvettes" if inlist(category, ///
+        "spectrophotometer cuvettes", "fluorescence cuvettes", "electroporation cuvettes")
+    replace category = "primary antibodies" if inlist(category, ///
+        "polyclonal primary antibodies", "monoclonal primary antibodies", ///
+        "polyclonal primary antibody", "monoclonal primary antibody", ///
+        "other-host primary antibody")
+    replace category = "recombinant proteins" if inlist(category, ///
+        "recombinant human protein", "recombinant mouse protein", ///
+        "recombinant human/mouse/rat protein", "recombinant human/mouse protein", ///
+        "recombinant human/murine/rat protein", "recombinant cas9 protein")
+    replace category = "expression plasmids" if inlist(category, ///
+        "synthetic mammalian expression plasmids", ///
+        "synthetic bacterial expression plasmids", ///
+        "synthetic plasmids", "aav plasmids", "non-viral expression plasmids")
+    replace category = "synthetic dna oligonucleotide - desalted" ///
+        if category == "synthetic dna oligonucleotide - purified"
+    replace category = "pcr tube strips" if category == "pcr tubes"
+    replace category = "nucleotides" if category == "radiolabeled nucleotides"
+    replace category = "small molecule inhibitors" if category == "drug - other"
+    replace category = "vials" if inlist(category, ///
+        "sample vials", "scintillation vials", "autosampler vials", ///
+        "drosophila vials", "screw cap vials")
+    save ../temp/merged_foias_with_pis, replace
+   
+    import delimited ../external/samp/nonlab_bucket_assignments.csv, varnames(1) stringcols(_all) clear
+    save ../temp/nl_map, replace 
+
+    use ../temp/merged_foias_with_pis, clear
+    merge m:1 category using ../temp/nl_map, assert(1 2 3) keep(1 3)
+    gen has_nl_bucket = _merge == 3
+    drop _merge
+    replace category = "Non-Lab" if inlist(uni,"umich", "utdallas") & has_nl_bucket == 1
+    replace nonlab_bucket = bucket if inlist(uni,"umich", "utdallas") & has_nl_bucket == 1
+    drop has_nl_bucket bucket
     save ../output/merged_foias_with_pis, replace
+    
     contract athr_id
     drop _freq
     drop if mi(athr_id)

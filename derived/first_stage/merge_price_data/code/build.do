@@ -126,10 +126,10 @@ program main
 
     use ../temp/merged_price_data_`embed', clear
     merge m:1 category using ../temp/nl_map, assert(1 2 3) keep(1 3)
-    rename _merge has_nl_bucket
-    replace has_nl_bucket = 1 if has_nl_bucket == 3
-    replace category = "Non-Lab" if inlist("university of michigan at ann arbor", "university of texas at dallas") & has_nl_bucket == 1
-    replace nonlab_bucket = bucket if inlist("university of michigan at ann arbor", "university of texas at dallas") & has_nl_bucket == 1
+    gen has_nl_bucket = _merge == 3
+    drop _merge
+    replace category = "Non-Lab" if inlist(agencyname, "university of michigan at ann arbor", "university of texas at dallas") & has_nl_bucket == 1
+    replace nonlab_bucket = bucket if inlist(agencyname, "university of michigan at ann arbor", "university of texas at dallas") & has_nl_bucket == 1
     drop has_nl_bucket bucket
     save ../output/first_stage_data_`embed', replace
 

@@ -413,21 +413,14 @@ tab treated_strict
 tab treated_1and2
 tab treated
 
-*===============================================================================
-* BAD CONTROL CATEGORIES
-* Categories that pass quality filters and are NOT treated by the merger, but
-* nonetheless experienced their own price/supply "action" during the analysis
-* window (~2010-2018) or are workflow-bundled with treated categories. These
-* contaminate the control group, so we drop them (keep=0) and record the
-* reason in bad_control_reason.
-*-------------------------------------------------------------------------------
-* Window screen: shocks limited to roughly 2010-2018 around the Feb 2014 TFL
-* merger. COVID-19 (2020-22), acetonitrile crisis (2008-09), and earlier
-* helium shortage (2011-13, no helium category in data) are NOT used.
-*===============================================================================
-
 gen bad_control = 0
 gen bad_control_reason = ""
+
+* Rule: bad_control = US-based exogenous shock to price/spending during
+* 2010-2018, OR a product where Thermo and Life Tech had genuine
+* horizontal overlap pre-merger (so bundling/portfolio effects bias the
+* control), OR classification ambiguity. Bundling alone (without horizontal
+* overlap) is NOT sufficient -- those belong in Tier 3.
 
 * --- Antibody market shocks: reproducibility crisis 2014-16 + Sigma-Aldrich
 *     -> MilliporeSigma merger Nov 2015 absorbed one of the largest antibody
@@ -436,38 +429,69 @@ replace bad_control = 1 if inlist(category, "primary antibodies", "secondary ant
 replace bad_control_reason = "antibody reproducibility crisis 2014-16; Sigma-Aldrich/MilliporeSigma merger Nov 2015 affected major antibody supplier" ///
     if inlist(category, "primary antibodies", "secondary antibodies")
 
-* --- Antibody-adjacent and probe/hybridization reagents that co-move with the
-*     antibody and reactive-dye markets (latter is Tier 2) ---
-replace bad_control = 1 if inlist(category, "avidin products", "phalloidin conjugates", "dna-salmon sperm")
-replace bad_control_reason = "biotin-avidin/probe/hybridization reagent; co-moves with antibody and reactive-dye markets" ///
-    if inlist(category, "avidin products", "phalloidin conjugates", "dna-salmon sperm")
+* --- Avidin products: Thermo (Pierce NeutrAvidin) AND Life (Molecular Probes
+*     streptavidin conjugates) both had strong franchises -> horizontal
+*     overlap from the merger ---
+replace bad_control = 1 if category == "avidin products"
+replace bad_control_reason = "horizontal overlap pre-merger: Pierce biotin-avidin franchise + Molecular Probes streptavidin-fluor conjugates" ///
+    if category == "avidin products"
 
-* --- Stain/dye family bundling: reactive dyes are Tier 2; general cell stains
-*     and viability stains co-move within the dye/probe market ---
-replace bad_control = 1 if inlist(category, "viability stains", "histology & cell stains")
-replace bad_control_reason = "stain/probe family bundled with reactive dyes (Tier 2)" ///
-    if inlist(category, "viability stains", "histology & cell stains")
-
-* --- Western blot workflow consumables: chemiluminescent substrates and
-*     membranes are Tier 2; stripping buffers and protein denaturants are
-*     consumed in the same workflow ---
-replace bad_control = 1 if inlist(category, "western blot stripping buffers", "protein denaturants")
-replace bad_control_reason = "WB workflow consumable - bundled with Tier 2 chemilum substrates and membranes" ///
-    if inlist(category, "western blot stripping buffers", "protein denaturants")
-
-* --- Cloning/expression cofactors bundled with cloning kits and restriction
-*     enzymes (Tier 2): IPTG induces, gene expression inducers similar,
-*     spermidine is a restriction-enzyme reaction cofactor ---
-replace bad_control = 1 if inlist(category, "iptg", "gene expression inducers", "spermidine")
-replace bad_control_reason = "cloning/expression cofactor bundled with Tier 2 cloning enzymes/kits" ///
-    if inlist(category, "iptg", "gene expression inducers", "spermidine")
-
-* --- Phosphoprotein electrophoresis reagents: changelog notes ambiguous
-*     classification (Tier 2 -> control); flag as bad control instead of
-*     contaminating either group ---
+* --- Phosphoprotein electrophoresis reagents: ambiguous classification
+*     (Tier 2 -> control in changelog); flag rather than contaminate either group ---
 replace bad_control = 1 if category == "phosphoprotein electrophoresis reagents"
-replace bad_control_reason = "ambiguous classification - specialty SDS-PAGE reagent overlapping with Tier 2 protein workflow" ///
+replace bad_control_reason = "classification uncertainty - not shock-based; specialty SDS-PAGE reagent overlapping with Tier 2 protein workflow" ///
     if category == "phosphoprotein electrophoresis reagents"
+
+*-------------------------------------------------------------------------------
+* US-based exogenous shocks during 2010-2018 window
+*-------------------------------------------------------------------------------
+
+* --- Acetonitrile: Hurricane Ike (Sep 2008) hit BP/INEOS Texas Gulf plant,
+*     one of few US producers; global ACN shortage with lingering US price
+*     effects through 2010-2011 ---
+replace bad_control = 1 if category == "acetonitrile"
+replace bad_control_reason = "US shock: Hurricane Ike (2008) hit Texas Gulf ACN production; global shortage with lingering US price effects 2010-2011" ///
+    if category == "acetonitrile"
+
+* --- Nitrile gloves: 2017-2018 NBR (nitrile butadiene rubber) feedstock
+*     shortage drove ~20-40% US lab glove price hikes; Malaysian production
+*     consolidation ---
+replace bad_control = 1 if category == "nitrile gloves"
+replace bad_control_reason = "US-relevant shock: 2017-2018 NBR feedstock shortage drove 20-40% lab glove price increases" ///
+    if category == "nitrile gloves"
+
+* --- Synthetic DNA oligonucleotides + dual-labeled probes: US-driven secular
+*     price collapse from Twist Bioscience entry (founded 2013, SF) and IDT
+*     (Coralville IA) scale-up; per-base costs fell ~10x in window ---
+replace bad_control = 1 if inlist(category, "synthetic dna oligonucleotide - desalted", "synthetic dual-labeled probe")
+replace bad_control_reason = "US-driven secular price collapse: Twist Bioscience entry 2013 + IDT scale-up dropped per-base costs ~10x in window" ///
+    if inlist(category, "synthetic dna oligonucleotide - desalted", "synthetic dual-labeled probe")
+
+* --- Filtration (bottle top, syringe, centrifugal ultrafiltration): Pall Corp
+*     (Port Washington NY) -> Danaher (closed Aug 2015), US M&A overlapping
+*     the TF/Life window ---
+replace bad_control = 1 if inlist(category, "bottle top filters", "syringe filters", "centrifugal ultrafiltration devices")
+replace bad_control_reason = "US M&A in window: Pall Corp -> Danaher (closed Aug 2015) reshuffled US lab filtration market" ///
+    if inlist(category, "bottle top filters", "syringe filters", "centrifugal ultrafiltration devices")
+
+* --- Needles and syringes: Becton Dickinson (Franklin Lakes NJ) + CareFusion
+*     (San Diego CA) closed Mar 2015; BD dominates US needle/syringe ---
+replace bad_control = 1 if inlist(category, "hypodermic needles", "syringes")
+replace bad_control_reason = "US M&A in window: Becton Dickinson + CareFusion closed Mar 2015; BD dominates US needle/syringe" ///
+    if inlist(category, "hypodermic needles", "syringes")
+
+* --- Formaldehyde / paraformaldehyde: US-specific regulatory tightening -
+*     EPA IRIS draft assessment 2010, NTP 12th Report on Carcinogens (Jun 2011)
+*     listed as known human carcinogen, OSHA exposure tightening ---
+replace bad_control = 1 if category == "formaldehydes and paraformaldehydes"
+replace bad_control_reason = "US regulatory shock: EPA IRIS 2010, NTP 12th RoC 2011 listed as known human carcinogen, OSHA tightening" ///
+    if category == "formaldehydes and paraformaldehydes"
+
+* --- Ethanol: US corn ethanol commodity exposure - 2012 Midwest drought,
+*     RFS waiver fights 2012-2014, EPA RFS proposal Nov 2013 ---
+replace bad_control = 1 if category == "ethanol"
+replace bad_control_reason = "US commodity shock: 2012 Midwest drought + RFS volatility 2012-2014 moved corn-ethanol prices" ///
+    if category == "ethanol"
 
 count if bad_control == 1
 tab bad_control
@@ -476,8 +500,10 @@ label var bad_control        "Drop from controls: action/shock/bundling in 2010-
 label var bad_control_reason "Reason category was flagged as bad control"
 
 gen keep = (support >= 25 & precision >= 0.8 & recall >= 0.8) //| (inrange(support, 10, 25) & precision >= 0.9 & recall >=0.90)
-replace keep = 0 if category == "synthetic shrna"  // ambiguous RNAi category; placed conservatively in Tier 2 but fails defensive checks
-replace keep = 0 if inlist(category, "slide mounting medium", "collagenase", "catalase", "dextrose", "egta solution", "pipes buffers")
+*replace keep = 0 if category == "synthetic shrna"  // ambiguous RNAi category; placed conservatively in Tier 2 but fails defensive checks
+replace bad_control = 1 if category == "pipes buffers"  
+replace bad_control = 1 if category == "synthetic shrna"  
+replace bad_control =1 if inlist(category, "slide mounting medium", "collagenase", "catalase", "dextrose", "egta solution", "pipes buffers", "bacterial selection antibiotics - rifampicin")
 replace keep = 0 if bad_control == 1  // drop bad controls from analysis sample
 
 * --- Export bad_control documentation CSV ---

@@ -148,6 +148,27 @@ def clean_category_series(s):
     return out
 
 
+def save_nonlab_bucket_assignments(category_counts, output_path):
+    """Map each non-lab category to its coarse spending bucket and save as CSV.
+
+    Reads from a `category, count` DataFrame, applies
+    config.assign_nonlab_bucket_series to assign each category to a bucket,
+    drops lab categories (empty bucket), and writes a `bucket, category,
+    count` CSV sorted by bucket then count desc.
+    """
+    df = category_counts.copy()
+    df['bucket'] = config.assign_nonlab_bucket_series(df['category'])
+    df = df[df['bucket'] != ''][['bucket', 'category', 'count']]
+    df = df.sort_values(['bucket', 'count'], ascending=[True, False])
+    df.to_csv(output_path, index=False)
+    print(f"  Non-lab bucket assignments saved to: {output_path}")
+    print(f"  {len(df)} non-lab categories across {df['bucket'].nunique()} buckets")
+    n_misc = (df['bucket'] == 'other_misc').sum()
+    if n_misc:
+        print(f"  ({n_misc} categories fell through to 'other_misc' — "
+              f"consider adding explicit bucket rules in config.NONLAB_BUCKET_RULES)")
+
+
 def apply_sibling_consolidation(df, cat_col):
     """Apply config.CATEGORY_CONSOLIDATION in-place: rename sibling categories
     whose distinction isn't reliably carried by the description (e.g. centrifuge
@@ -422,6 +443,11 @@ def main():
     print(f"  Category counts saved to: {counts_output_path}")
     print(f"  Final unique categories: {df_merged[config.UT_CAT_COL].nunique()}")
 
+    save_nonlab_bucket_assignments(
+        category_counts,
+        os.path.join(config.OUTPUT_DIR, 'nonlab_bucket_assignments.csv'),
+    )
+
     # 8. Save the final, clean, merged file
     df_merged.to_parquet(config.UT_DALLAS_MERGED_CLEAN_PATH, index=False)
     print(f"\nFinal clean and merged data saved to: {config.UT_DALLAS_MERGED_CLEAN_PATH}")
@@ -571,6 +597,11 @@ def main_umich():
     category_counts.to_csv(counts_output_path, index=False)
     print(f"  Category counts saved to: {counts_output_path}")
     print(f"  Final unique categories: {df_merged[config.UT_CAT_COL].nunique()}")
+
+    save_nonlab_bucket_assignments(
+        category_counts,
+        os.path.join(config.OUTPUT_DIR, 'nonlab_bucket_assignments.csv'),
+    )
 
     df_merged.to_parquet(config.UMICH_MERGED_CLEAN_PATH, index=False)
     print(f"\nFinal clean and merged data saved to: {config.UMICH_MERGED_CLEAN_PATH}")
@@ -742,6 +773,11 @@ def main_combined():
     print(f"  Row breakdown: "
           f"utdallas={(df_merged['uni']=='utdallas').sum()}, "
           f"umich={(df_merged['uni']=='umich').sum()}")
+
+    save_nonlab_bucket_assignments(
+        category_counts,
+        os.path.join(config.OUTPUT_DIR, 'nonlab_bucket_assignments.csv'),
+    )
 
     # UT Dallas and UMich CSVs load some shared columns (e.g. purchase_id) with
     # different dtypes — one as int, one as str — which pandas keeps as object

@@ -1,0 +1,267 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 120,000; see help set_maxvar.
+
+. do diagnose_extremes.do 
+
+. set more off
+
+. clear all
+
+. capture log close
+
+. program drop _all
+
+. set scheme modern
+
+. preliminaries
+
+. version 17
+
+. 
+. program main
+  1.     build_diagnostics
+  2. end
+
+. 
+. program build_diagnostics
+  1.     // Build per-category diagnostics for the 20 most extreme placebo coefficients.
+.     // Output: ../output/extreme_placebo_diagnostics.csv
+. 
+.     // 1. Collapse placebo coefs to one row per category (mean, sd, n_iters)
+.     use ../output/did_coefs_placebo, clear
+  2.     gcollapse (mean) mean_b = b (sd) sd_b = b (count) n_iters_treated = b, by(category)
+  3. 
+.     // 2. Tag the 20 categories of interest (top 10 + bottom 10 by mean_b)
+.     gsort -mean_b
+  4.     gen rank_high = _n
+  5.     gsort mean_b
+  6.     gen rank_low = _n
+  7.     gen flagged_top = rank_high <= 10
+  8.     gen flagged_bottom = rank_low <= 10
+  9.     gen flagged = flagged_top | flagged_bottom
+ 10. 
+.     tempfile coefs
+ 11.     save `coefs'
+ 12. 
+.     // 3. Compute pre-trend slope and post-trend delta from the AGGREGATE panel
+.     //    (category × year, weighted across unis). Mirrors match_placebo.R:49-59.
+.     use ../../../derived/first_stage/make_mkt_panel/output/category_yr_tfidf.dta, clear
+ 13. 
+.     // Pre-trend slope: regression of avg_log_price on year, 2010-2013
+.     preserve
+ 14.     keep if year <= 2013
+ 15.     gen year_c = year - 2012
+ 16.     statsby pretrend_slope = _b[year_c], by(category) clear: regress avg_log_price year_c
+ 17.     tempfile slopes
+ 18.     save `slopes'
+ 19.     restore
+ 20. 
+.     // Post-2014 delta: mean log_raw_price 2015-2017 minus mean 2011-2013
+.     preserve
+ 21.     gen pre_block  = inrange(year, 2011, 2013)
+ 22.     gen post_block = inrange(year, 2015, 2017)
+ 23.     keep if pre_block | post_block
+ 24.     gcollapse (mean) log_raw_price [aw=spend_2013], by(category pre_block post_block)
+ 25.     gen which = "pre" if pre_block == 1
+ 26.     replace which = "post" if post_block == 1
+ 27.     keep category log_raw_price which
+ 28.     greshape wide log_raw_price, i(category) j(which) string
+ 29.     gen posttrend_delta = log_raw_pricepost - log_raw_pricepre
+ 30.     keep category posttrend_delta
+ 31.     tempfile deltas
+ 32.     save `deltas'
+ 33.     restore
+ 34. 
+.     // Category-level metadata: support/precision/recall, total spend, treated, bad_control
+.     use ../../../derived/first_stage/make_mkt_panel/output/category_yr_tfidf.dta, clear
+ 35.     gcollapse (firstnm) support precision recall treated tier1 tier2 tier3 spend_2013 ///
+>               (sum) total_spend = raw_spend total_obs_cnt = obs_cnt, by(category)
+ 36.     merge 1:1 category using `slopes',  nogen
+ 37.     merge 1:1 category using `deltas',  nogen
+ 38. 
+.     // 4. Per-category n_unis from the uni panel
+.     preserve
+ 39.     use ../../../derived/first_stage/make_mkt_panel/output/uni_category_yr_tfidf.dta, clear
+ 40.     gcollapse (firstnm) anything = treated, by(category uni_id)
+ 41.     gcollapse (count) n_unis = anything, by(category)
+ 42.     tempfile unicount
+ 43.     save `unicount'
+ 44.     restore
+ 45.     merge 1:1 category using `unicount', nogen
+ 46. 
+.     // 5. Bad-control flag from the documentation CSV
+.     preserve
+ 47.     import delimited using ../../../derived/first_stage/select_categories/output/bad_control_documentation.csv, clear stringcols(_all) varnames(1)
+ 48.     keep category bad_control bad_control_reason
+ 49.     tempfile bc
+ 50.     save `bc'
+ 51.     restore
+ 52.     merge 1:1 category using `bc', nogen keep(1 3)
+ 53.     replace bad_control = "0" if bad_control == ""
+ 54. 
+.     // 6. Sibling flag: count of OTHER categories sharing same " - " prefix
+.     gen has_dash = strpos(category, " - ") > 0
+ 55.     gen prefix = ""
+ 56.     qui replace prefix = substr(category, 1, strpos(category, " - ") - 1) if has_dash == 1
+ 57.     bys prefix: gen n_in_prefix = _N if prefix != ""
+ 58.     gen sibling_within_pool = (n_in_prefix - 1) if prefix != ""
+ 59.     replace sibling_within_pool = 0 if mi(sibling_within_pool)
+ 60.     drop has_dash n_in_prefix prefix
+ 61. 
+.     // 7. Merge placebo coefs back
+.     merge 1:1 category using `coefs', keep(2 3) nogen
+ 62.     keep if flagged == 1
+ 63. 
+.     // 8. Format and export
+.     gsort -mean_b
+ 64.     order category mean_b sd_b n_iters_treated total_spend total_obs_cnt n_unis ///
+>           support precision recall treated bad_control bad_control_reason ///
+>           pretrend_slope posttrend_delta sibling_within_pool flagged_top flagged_bottom
+ 65. 
+.     label var mean_b           "Mean placebo DiD coef across iters"
+ 66.     label var sd_b             "SD of placebo DiD coef across iters"
+ 67.     label var n_iters_treated  "# placebo iters this cat drew treatment"
+ 68.     label var total_spend      "Total raw spend across all years/unis"
+ 69.     label var total_obs_cnt    "Total transaction count"
+ 70.     label var n_unis           "# distinct universities ever observing cat"
+ 71.     label var support          "Classifier training support"
+ 72.     label var precision        "Classifier precision"
+ 73.     label var recall           "Classifier recall"
+ 74.     label var treated          "Real-treated indicator (should be 0 for all)"
+ 75.     label var bad_control      "Already flagged as bad control (CSV)"
+ 76.     label var pretrend_slope   "Slope of avg_log_price on year, 2010-2013"
+ 77.     label var posttrend_delta  "Mean log_raw_price 2015-17 minus 2011-13"
+ 78.     label var sibling_within_pool "# other cats sharing same ' - ' prefix"
+ 79. 
+.     list category mean_b sd_b n_iters_treated support precision recall total_obs_cnt n_unis ///
+>          pretrend_slope posttrend_delta sibling_within_pool, sep(0) noobs abbrev(40)
+ 80. 
+.     export delimited using ../output/extreme_placebo_diagnostics.csv, replace
+ 81. end
+
+. 
+. main
+file /tmp/St3058172.000001 saved as .dta format
+(1,094 observations deleted)
+(running regress on estimation sample)
+
+      Command: regress avg_log_price year_c
+pretrend_sl~e: _b[year_c]
+           By: category
+
+Statsby groups
+----+--- 1 ---+--- 2 ---+--- 3 ---+--- 4 ---+--- 5 
+..................................................    50
+..................................................   100
+..................................................   150
+.................................
+file /tmp/St3058172.000003 saved as .dta format
+(729 observations deleted)
+(183 missing values generated)
+variable which was str3 now str4
+(183 real changes made)
+Option -string- ignored with greshape wide
+(note: j = post pre)
+
+Data                               long   ->   wide
+-----------------------------------------------------------------------------
+Number of obs.                      366   ->   183                  
+Number of variables                    3  ->   3                    
+j (2 values)                      which   ->   (dropped)
+xij variables:
+                          log_raw_price   ->   log_raw_pricepost log_raw_pricepre
+-----------------------------------------------------------------------------
+file /tmp/St3058172.000005 saved as .dta format
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                               183  
+    -----------------------------------------
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                               183  
+    -----------------------------------------
+file /tmp/St3058172.000007 saved as .dta format
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                               183  
+    -----------------------------------------
+(encoding automatically selected: ISO-8859-1)
+(3 vars, 15 obs)
+file /tmp/St3058172.000009 saved as .dta format
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                           183
+        from master                       183  
+        from using                          0  
+
+    Matched                                 0  
+    -----------------------------------------
+(183 real changes made)
+(183 missing values generated)
+(156 missing values generated)
+(156 missing values generated)
+(156 real changes made)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                               134  
+    -----------------------------------------
+(114 observations deleted)
+
+  +-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+  |                                      category      mean_b       sd_b   n_iters_treated   support   precision     recall   total_obs_cnt   n_unis   pretrend_slope   posttrend_delta   sibling_within_pool |
+  |-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+  |                                 pipes buffers    1.024117   .1377277                35        26    .9565217   .8461539              26        2        -.0022044           1.17092                     0 |
+  |                                    spermidine    .6490064   .0314492                39        28    .8275862   .8571429              29        2         .0212609          .5016527                     0 |
+  | cell lysis detergents - np-40 (igepal ca-630)     .575258   .0975361                31        99    .9607843    .989899             255       13         .0834666           .286376                     4 |
+  |                                  storage jars     .389093   .0997826                43       105    .8636364   .9047619             175       11         .0309362          .2217324                     0 |
+  |                                      catalase    .3654704   .1608521                37        38    .8222222   .9736842              66        7         .2662305          .3138766                     0 |
+  |                 colorimetric substrates - tmb    .3390328   .0597373                31       108    .9818182          1             353       14         .0736036          .2998252                     3 |
+  |                                 spray bottles    .2398542   .0472913                42       173    .8092784   .9075145            2916       45         .1570174          .7118105                     0 |
+  |                           potassium phosphate    .2295013   .0224799                35       254    .9680365   .8346457            1187       35         .0160188           .046133                     0 |
+  |                         slide mounting medium    .2158331   .0529757                36       617    .9622951   .9513776            3221       27         .0158113           .144228                     0 |
+  |                          centrifugation media    .2100099   .0579867                32       204    .8962264   .9313725             455       15         .0811661          .1595378                     0 |
+  |                                      cuvettes   -.2135967    .047528                39       951    .9620536   .9064143            6214       51        -.0036839          .0387669                     0 |
+  |                           laboratory spatulas   -.2188331   .0246806                39       182    .8982036   .8241758            1398       35         .0594764         -.2192099                     0 |
+  |         cell culture antibiotics - ampicillin   -.2252316    .072662                33       215    .9811321   .9674419            1543       43         .0118775         -.2821598                     5 |
+  |              capillary blood collection tubes   -.2362229   .0824766                25       286    .9321429   .9125874             692       13         .0219319          .2566257                     0 |
+  |                                sodium sulfate   -.2947229   .0700047                35       120    .9633027       .875             143        8         .2352907         -.0801063                     0 |
+  |                               chelating resin   -.3380256   .0701742                50        35           1   .9714286              15        1         -.135482         -.1891723                     0 |
+  |             cell lysis detergents - digitonin   -.4504406    .036591                37        79    .9080459          1             183       10         -.303918         -.1096044                     4 |
+  |                           cylindrical carboys   -.5021201   .0426272                39        52    .9782609   .8653846             116       12         .0531912         -.2797723                     0 |
+  |                colorimetric substrates - onpg   -.5139721    .187055                37        35    .8974359          1              35        2         .0664587         -.4920511                     3 |
+  |                          square glass bottles    -.589399   .0187441                39       137    .8509317          1             314       11        -.0461737         -.2335901                     0 |
+  +-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+(file ../output/extreme_placebo_diagnostics.csv not found)
+file ../output/extreme_placebo_diagnostics.csv saved
+
+. 
+end of do-file

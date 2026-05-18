@@ -153,19 +153,19 @@ program did
         di "`name'"
         reghdfe `var' posttreat [aw=spend_2013], cluster(mkt) absorb(year mkt) 
     }
-    // indiv did
+    // indiv did -- run both log_raw_price and log_raw_spend per category
     use ../external/merged/matched_mkts, clear
     qui glevelsof category, local(categories)
-	foreach c in `categories' {
+    foreach c in `categories' {
         preserve
-        use ../external/merged/matched_pairs, clear 
-        qui glevelsof control_market if category == "`c'", local(match) 
-        use ../external/merged/matched_uni_category_panel, clear 
+        use ../external/merged/matched_pairs, clear
+        qui glevelsof control_market if category == "`c'", local(match)
+        use ../external/merged/matched_uni_category_panel, clear
         gegen uni_mkt = group(uni_id mkt)
         bys uni_mkt : egen min_year = min(year)
         bys uni_mkt : egen max_year = max(year)
         keep if min_year < 2014 & max_year > 2014
-        gen post = 0 
+        gen post = 0
         replace post = 1 if year >= 2014
         gen posttreat = treated * post
         gen keep = 1 if category == "`c'"
@@ -173,69 +173,92 @@ program did
             replace keep = 1 if category == "`m'"
         }
         keep if keep == 1
-        qui glevelsof delta_hhi if category == "`c'", local(del_hhi) 
-        qui glevelsof simulated_hhi if category == "`c'", local(sim_hhi) 
         glevelsof category if treated == 1, local(name)
         local name = strproper(`name')
-        foreach var in log_raw_price {
-            di "`name'"
-            reghdfe `var' posttreat [aw=spend_2013], cluster(mkt) absorb(year uni_id mkt) 
+        di "`name'"
+        cap noi reghdfe log_raw_price posttreat [aw=spend_2013], cluster(mkt) absorb(year uni_id mkt)
+        if _rc == 0 {
+            mat coef_price = nullmat(coef_price) \ (_b[posttreat], _se[posttreat])
         }
-        mat coef = nullmat(coef) \ ( _b[posttreat], _se[posttreat])
+        else {
+            mat coef_price = nullmat(coef_price) \ (., .)
+        }
+        cap noi reghdfe log_raw_spend posttreat [aw=spend_2013], cluster(mkt) absorb(year uni_id mkt)
+        if _rc == 0 {
+            mat coef_spend = nullmat(coef_spend) \ (_b[posttreat], _se[posttreat])
+        }
+        else {
+            mat coef_spend = nullmat(coef_spend) \ (., .)
+        }
         restore
     }
-     svmat coef
-     drop if mi(coef1)
-     keep coef1 coef2
-     rename coef1 b
-     rename coef2 se
-     gen category = ""
-     local counter = 1
-     foreach m in `categories' {
-        replace category = "`m'" if _n == `counter'
-        local counter = `counter' + 1
-     }
+
+    // build per-outcome category-labeled tempfiles, then post-process each
+    tempfile coefs_price coefs_spend
+    foreach yvar in price spend {
+        clear
+        svmat coef_`yvar'
+        rename coef_`yvar'1 b
+        rename coef_`yvar'2 se
+        gen category = ""
+        local counter = 1
+        foreach m in `categories' {
+            replace category = "`m'" if _n == `counter'
+            local counter = `counter' + 1
+        }
+        drop if mi(b)
+        save `coefs_`yvar'', replace
+    }
+
+    process_coefs, infile(`coefs_price') outcome("price")
+    process_coefs, infile(`coefs_spend') outcome("spend")
+end
+
+program process_coefs
+    syntax, infile(str) outcome(str)
+
+    use `infile', clear
     merge m:1 category using ../external/samp/category_hhi_tfidf, assert(1 2 3) keep(3) nogen
     drop if delta_hhi <= -2500
     merge m:1 category using ../external/merged/spend_xw, assert(2 3) keep(3) nogen
     gen lb = b - 1.96*se
     gen ub = b + 1.96*se
     hashsort b
-    save ../output/did_coefs, replace
+    save ../output/did_coefs_`outcome', replace
+
     sum b, d
     local N    = r(N)
     local mean = round(r(mean), 0.001)
     local sd   = round(r(sd), 0.001)
     tw kdensity b, color(lavender) ///
-        xtitle("DiD Coefficient", size(small)) ///
+        xtitle("DiD Coefficient (log `outcome')", size(small)) ///
         ytitle("Density", size(small)) ///
         xlab(, labsize(small)) ylab(, labsize(small)) ///
         xline(0, lcolor(gs6) lpattern(dash)) ///
         legend(on order(- "N = `N'" "mean = `mean'" "sd = `sd'") ///
                pos(1) ring(0) region(fcolor(none)))
-    graph export ../output/figures/did_coefs_kdens.pdf, replace
+    graph export ../output/figures/did_coefs_kdens_`outcome'.pdf, replace
     gen rank = _n
     labmask rank, values(category)
     count
     local n = r(N)
-    tw rcap ub lb rank, msize(vsmall) || scatter b rank, msize(tiny) mcolor(lavender) yline(0) ylab(-1(0.2)1, labsize(small)) ysc(titlegap(-6) outergap(0)) ytitle("DiD Estimate + 95% CI", size(small)) xlab(1(1)`n', angle(45) labsize(small) valuelabel) graphregion(margin(b+35 l+5)) xtitle("") legend(off)
-    graph export ../output/figures/coef_rank.pdf, replace
-    hashsort spend_2013 
+    tw rcap ub lb rank, msize(vsmall) || scatter b rank, msize(tiny) mcolor(lavender) yline(0) ylab(-1(0.2)1, labsize(small)) ysc(titlegap(-6) outergap(0)) ytitle("DiD Estimate (log `outcome') + 95% CI", size(small)) xlab(1(1)`n', angle(45) labsize(small) valuelabel) graphregion(margin(b+35 l+5)) xtitle("") legend(off)
+    graph export ../output/figures/coef_rank_`outcome'.pdf, replace
+    hashsort spend_2013
     gen rank_spend = _n
     labmask rank_spend, values(category)
     count
     local n = r(N)
-    tw rcap ub lb rank_spend, msize(vsmall) || scatter b rank_spend, msize(tiny) mcolor(lavender) yline(0) ylab(-1(0.2)1, labsize(small)) ysc(titlegap(-6) outergap(0)) ytitle("DiD Estimate + 95% CI", size(small)) xlab(1(1)`n', angle(45) labsize(small) valuelabel) graphregion(margin(b+35 l+5)) xtitle("") legend(off)
-    graph export ../output/figures/coef_spend_rank.pdf, replace
+    tw rcap ub lb rank_spend, msize(vsmall) || scatter b rank_spend, msize(tiny) mcolor(lavender) yline(0) ylab(-1(0.2)1, labsize(small)) ysc(titlegap(-6) outergap(0)) ytitle("DiD Estimate (log `outcome') + 95% CI", size(small)) xlab(1(1)`n', angle(45) labsize(small) valuelabel) graphregion(margin(b+35 l+5)) xtitle("") legend(off)
+    graph export ../output/figures/coef_spend_rank_`outcome'.pdf, replace
     corr b delta_hhi [aw=spend_2013]
-    local corr : di %4.3f r(rho) 
-    binscatter2 b delta_hhi [aw = spend_2013], legend(on order(- "corr: `corr'") ring(0) pos(1)) xtitle("Delta HHI") ytitle("Estimated Coefficient")
-
-    graph export ../output/figures/delta_hhi_corr.pdf, replace
+    local corr : di %4.3f r(rho)
+    binscatter2 b delta_hhi [aw = spend_2013], legend(on order(- "corr: `corr'") ring(0) pos(1)) xtitle("Delta HHI") ytitle("Estimated Coefficient (log `outcome')")
+    graph export ../output/figures/delta_hhi_corr_`outcome'.pdf, replace
     corr b simulated_hhi [aw=spend_2013]
     local corr : di %4.3f r(rho)
-    binscatter2 b simulated_hhi [aw = spend_2013], legend(on order(- "corr: `corr'") ring(0) pos(1)) xtitle("Simulated HHI") ytitle("Estimated Coefficient")
-    graph export ../output/figures/sim_hhi_corr.pdf, replace
+    binscatter2 b simulated_hhi [aw = spend_2013], legend(on order(- "corr: `corr'") ring(0) pos(1)) xtitle("Simulated HHI") ytitle("Estimated Coefficient (log `outcome')")
+    graph export ../output/figures/sim_hhi_corr_`outcome'.pdf, replace
 
     // ============================================================
     // Empirical Bayes shrinkage of per-market DiD coefficients
@@ -257,16 +280,15 @@ program did
     local tau2 = max(0, `sample_var' - `mean_var2')
     qui sum b [aw = 1/var_se]
     local mu_hat = r(mean)
-    di "EB shrinkage: mu_hat = `mu_hat', tau2 = `tau2', sample_var(b) = `sample_var', mean(se^2) = `mean_var2'"
+    di "EB shrinkage (`outcome'): mu_hat = `mu_hat', tau2 = `tau2', sample_var(b) = `sample_var', mean(se^2) = `mean_var2'"
     gen w_eb  = `tau2' / (`tau2' + var_se)
     gen b_eb  = w_eb * b + (1 - w_eb) * `mu_hat'
     gen se_eb = sqrt(w_eb * var_se)
     gen lb_eb = b_eb - 1.96 * se_eb
     gen ub_eb = b_eb + 1.96 * se_eb
     drop var_se
-    save ../output/did_coefs_eb, replace
+    save ../output/did_coefs_eb_`outcome', replace
 
-    // ----- EB-shrunk kdensity (mirror of did_coefs_kdens.pdf) -----
     qui sum b_eb, d
     local N_eb    = r(N)
     local mean_eb = round(r(mean), 0.001)
@@ -276,26 +298,24 @@ program did
     local tau2_lab = round(`tau2', 0.001)
     local mu_lab   = round(`mu_hat', 0.001)
     tw kdensity b_eb, color(lavender) ///
-        xtitle("DiD Coefficient (EB-shrunk)", size(small)) ///
+        xtitle("DiD Coefficient (log `outcome', EB-shrunk)", size(small)) ///
         ytitle("Density", size(small)) ///
         xlab(, labsize(small)) ylab(, labsize(small)) ///
         xline(0, lcolor(gs6) lpattern(dash)) ///
         legend(on order(- "N = `N_eb'" "mean = `mean_eb'" "sd = `sd_eb'" ///
                         "raw sd = `sd_raw'" "tau2 = `tau2_lab'" "mu_hat = `mu_lab'") ///
                pos(1) ring(0) region(fcolor(none)))
-    graph export ../output/figures/did_coefs_kdens_eb.pdf, replace
+    graph export ../output/figures/did_coefs_kdens_eb_`outcome'.pdf, replace
 
-    // ----- Overlay raw vs EB-shrunk densities -----
     tw kdensity b, color(gs10%70) lpattern(dash) || ///
        kdensity b_eb, color(lavender) ///
-        xtitle("DiD Coefficient", size(small)) ytitle("Density", size(small)) ///
+        xtitle("DiD Coefficient (log `outcome')", size(small)) ytitle("Density", size(small)) ///
         xlab(, labsize(small)) ylab(, labsize(small)) ///
         xline(0, lcolor(gs6) lpattern(dash)) ///
         legend(on order(1 "Raw (sd=`sd_raw')" 2 "EB-shrunk (sd=`sd_eb')") ///
                ring(0) pos(1) region(fcolor(none)))
-    graph export ../output/figures/did_coefs_kdens_overlay.pdf, replace
+    graph export ../output/figures/did_coefs_kdens_overlay_`outcome'.pdf, replace
 
-    // ----- EB-shrunk coef-by-rank plot (mirror of coef_rank.pdf) -----
     drop rank
     hashsort b_eb
     gen rank = _n
@@ -305,12 +325,11 @@ program did
     tw rcap ub_eb lb_eb rank, msize(vsmall) || ///
        scatter b_eb rank, msize(tiny) mcolor(lavender) ///
        yline(0) ylab(-1(0.2)1, labsize(small)) ysc(titlegap(-6) outergap(0)) ///
-       ytitle("EB DiD Estimate + 95% CI", size(small)) ///
+       ytitle("EB DiD Estimate (log `outcome') + 95% CI", size(small)) ///
        xlab(1(1)`n', angle(45) labsize(small) valuelabel) ///
        graphregion(margin(b+35 l+5)) xtitle("") legend(off)
-    graph export ../output/figures/coef_rank_eb.pdf, replace
+    graph export ../output/figures/coef_rank_eb_`outcome'.pdf, replace
 
-    // ----- EB-shrunk coef-by-spend-rank (mirror of coef_spend_rank.pdf) -----
     drop rank_spend
     hashsort spend_2013
     gen rank_spend = _n
@@ -320,26 +339,24 @@ program did
     tw rcap ub_eb lb_eb rank_spend, msize(vsmall) || ///
        scatter b_eb rank_spend, msize(tiny) mcolor(lavender) ///
        yline(0) ylab(-1(0.2)1, labsize(small)) ysc(titlegap(-6) outergap(0)) ///
-       ytitle("EB DiD Estimate + 95% CI", size(small)) ///
+       ytitle("EB DiD Estimate (log `outcome') + 95% CI", size(small)) ///
        xlab(1(1)`n', angle(45) labsize(small) valuelabel) ///
        graphregion(margin(b+35 l+5)) xtitle("") legend(off)
-    graph export ../output/figures/coef_spend_rank_eb.pdf, replace
+    graph export ../output/figures/coef_spend_rank_eb_`outcome'.pdf, replace
 
-    // ----- EB-shrunk vs delta_hhi (mirror of delta_hhi_corr.pdf) -----
     corr b_eb delta_hhi [aw=spend_2013]
     local corr_eb : di %4.3f r(rho)
     tw scatter b_eb delta_hhi [aw = spend_2013], ///
         legend(on order(- "corr: `corr_eb'") ring(0) pos(1)) ///
-        xtitle("Delta HHI") ytitle("EB DiD Coefficient")
-    graph export ../output/figures/delta_hhi_corr_eb.pdf, replace
+        xtitle("Delta HHI") ytitle("EB DiD Coefficient (log `outcome')")
+    graph export ../output/figures/delta_hhi_corr_eb_`outcome'.pdf, replace
 
-    // ----- EB-shrunk vs simulated_hhi (mirror of sim_hhi_corr.pdf) -----
     corr b_eb simulated_hhi [aw=spend_2013]
     local corr_eb : di %4.3f r(rho)
     tw scatter b_eb simulated_hhi [aw = spend_2013], ///
         legend(on order(- "corr: `corr_eb'") ring(0) pos(1)) ///
-        xtitle("Simulated HHI") ytitle("EB DiD Coefficient")
-    graph export ../output/figures/sim_hhi_corr_eb.pdf, replace
+        xtitle("Simulated HHI") ytitle("EB DiD Coefficient (log `outcome')")
+    graph export ../output/figures/sim_hhi_corr_eb_`outcome'.pdf, replace
 end
 
 program event_study

@@ -376,6 +376,14 @@ plot_event_study <- function(match_pairs, uni_panel, spec_name, match_ratio,
   ggsave(sprintf("../output/spec_search/spec_event_study/es_r%d_%s.png", match_ratio, spec_name),
          p, width = 10, height = 4, dpi = 150)
 
+  # Persist lead/lag coefficients so we can rank specs by actual pretrends.
+  out <- long %>%
+    mutate(spec = spec_name, match_ratio = match_ratio) %>%
+    select(spec, match_ratio, outcome, year, rel, estimate, std.error,
+           conf.low, conf.high)
+  dir.create("../output/spec_search/es_coefs", recursive = TRUE, showWarnings = FALSE)
+  write_csv(out, sprintf("../output/spec_search/es_coefs/es_r%d_%s.csv", match_ratio, spec_name))
+
   invisible(long)
 }
 
@@ -453,6 +461,39 @@ levels_wide <- panel %>%
 
 data_wide <- data_wide %>%
   left_join(levels_wide, by = "category")
+
+# ---------------------------
+# Pre-period summary stats (2011-2013): mean, SD, and 2-/3-year changes.
+# Complement slope/level specs: pre_mean smooths single-year noise; pre_chg is
+# a simpler alternative to a fitted slope; pre_sd captures within-cat volatility.
+# ---------------------------
+cat("Computing pre-period summary statistics (2011-2013)...\n")
+pre_summary <- pre_panel %>%
+  filter(year >= 2011, year <= 2013) %>%
+  group_by(category) %>%
+  summarise(
+    avg_log_price_pre_mean = mean(avg_log_price, na.rm = TRUE),
+    avg_log_price_pre_sd   = sd(avg_log_price,   na.rm = TRUE),
+    log_raw_qty_pre_mean   = mean(log_raw_qty,   na.rm = TRUE),
+    log_raw_qty_pre_sd     = sd(log_raw_qty,     na.rm = TRUE),
+    log_raw_spend_pre_mean = mean(log_raw_spend, na.rm = TRUE),
+    log_raw_spend_pre_sd   = sd(log_raw_spend,   na.rm = TRUE),
+    log_raw_price_pre_mean = mean(log_raw_price, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+data_wide <- data_wide %>%
+  left_join(pre_summary, by = "category") %>%
+  mutate(
+    # 2-year change: 2013 - 2011 (less noisy alternative to fitted slope)
+    avg_log_price_pre_chg = avg_log_price_2013 - avg_log_price_2011,
+    log_raw_qty_pre_chg   = log_raw_qty_2013   - log_raw_qty_2011,
+    log_raw_spend_pre_chg = log_raw_spend_2013 - log_raw_spend_2011,
+    log_raw_price_pre_chg = log_raw_price_2013 - log_raw_price_2011,
+    # 3-year change: 2013 - 2010 (where 2010 available)
+    avg_log_price_pre_chg3 = avg_log_price_2013 - avg_log_price_2010,
+    log_raw_qty_pre_chg3   = log_raw_qty_2013   - log_raw_qty_2010
+  )
 
 cat("\nWide data:", nrow(data_wide), "categories x", ncol(data_wide), "columns\n")
 
@@ -547,7 +588,63 @@ specs <- list(
                                "log_raw_qty_2013"),
 
   # === NEW 2-cov: price slope + 2013 spend level ===
-  n26_alp_slope_spend13    = c("avg_log_price_slope", "log_raw_spend_2013")
+  n26_alp_slope_spend13    = c("avg_log_price_slope", "log_raw_spend_2013"),
+
+  # === v2 pre-period means (3-yr avg of 2011-2013, smoother than 2013-only) ===
+  v01_alp_pre_mean              = c("avg_log_price_pre_mean"),
+  v02_alp_qty_pre_means         = c("avg_log_price_pre_mean", "log_raw_qty_pre_mean"),
+  v03_three_pre_means           = c("avg_log_price_pre_mean", "log_raw_qty_pre_mean",
+                                    "log_raw_spend_pre_mean"),
+
+  # === v2: 2-year pre-period change (2013-2011) as simpler alternative to slope ===
+  v10_alp_pre_chg               = c("avg_log_price_pre_chg"),
+  v11_alp_qty_pre_chg           = c("avg_log_price_pre_chg", "log_raw_qty_pre_chg"),
+  v12_alp_pre_chg_alp13         = c("avg_log_price_pre_chg", "avg_log_price_2013"),
+  v13_qty_pre_chg_qty13         = c("log_raw_qty_pre_chg", "log_raw_qty_2013"),
+  v14_three_pre_chg             = c("avg_log_price_pre_chg", "log_raw_qty_pre_chg",
+                                    "log_raw_spend_pre_chg"),
+
+  # === v2: 3-year pre-period change (2013-2010) ===
+  v15_alp_pre_chg3              = c("avg_log_price_pre_chg3"),
+  v16_alp_qty_pre_chg3          = c("avg_log_price_pre_chg3", "log_raw_qty_pre_chg3"),
+
+  # === v2: pre-period SD (within-cat volatility) + 2013 anchor ===
+  v20_alp_pre_sd_alp13          = c("avg_log_price_pre_sd", "avg_log_price_2013"),
+  v21_qty_pre_sd_qty13          = c("log_raw_qty_pre_sd", "log_raw_qty_2013"),
+
+  # === v2: 2010 + 2013 anchors (no slope, early/late level pin) ===
+  v30_alp_2010_2013             = c("avg_log_price_2010", "avg_log_price_2013"),
+  v31_qty_2010_2013             = c("log_raw_qty_2010", "log_raw_qty_2013"),
+  v32_alp_qty_2010_2013         = c("avg_log_price_2010", "avg_log_price_2013",
+                                    "log_raw_qty_2010", "log_raw_qty_2013"),
+
+  # === v2: full annual levels 2010-2013 (max info, no slope smoothing) ===
+  v40_alp_annual_10_13          = c("avg_log_price_2010", "avg_log_price_2011",
+                                    "avg_log_price_2012", "avg_log_price_2013"),
+  v41_qty_annual_10_13          = c("log_raw_qty_2010", "log_raw_qty_2011",
+                                    "log_raw_qty_2012", "log_raw_qty_2013"),
+
+  # === v2: log_raw_price (different aggregation than avg_log_price) ===
+  v50_lrp_slope_lrp13           = c("log_raw_price_slope", "log_raw_price_2013"),
+  v51_lrp_qty_slopes            = c("log_raw_price_slope", "log_raw_qty_slope"),
+  v52_lrp_pre_mean              = c("log_raw_price_pre_mean"),
+
+  # === v2: size control (log_spend_2013) added ===
+  v60_alp_pre_mean_size         = c("avg_log_price_pre_mean", "log_spend_2013"),
+  v61_alp_qty_slopes_size       = c("avg_log_price_slope", "log_raw_qty_slope",
+                                    "log_spend_2013"),
+  v62_three_pre_means_size      = c("avg_log_price_pre_mean", "log_raw_qty_pre_mean",
+                                    "log_raw_spend_pre_mean", "log_spend_2013"),
+
+  # === v2: cross-variable level mixes (early-of-one + late-of-other) ===
+  v70_alp10_qty13               = c("avg_log_price_2010", "log_raw_qty_2013"),
+  v71_alp13_qty10               = c("avg_log_price_2013", "log_raw_qty_2010"),
+
+  # === v2: pre_mean + slope (level pin + direction) ===
+  v80_alp_pre_mean_alp_slope    = c("avg_log_price_pre_mean", "avg_log_price_slope"),
+  v81_qty_pre_mean_qty_slope    = c("log_raw_qty_pre_mean", "log_raw_qty_slope"),
+  v82_two_pre_means_two_slopes  = c("avg_log_price_pre_mean", "log_raw_qty_pre_mean",
+                                    "avg_log_price_slope", "log_raw_qty_slope")
 )
 
 cat("\nTesting", length(specs), "specifications\n\n")

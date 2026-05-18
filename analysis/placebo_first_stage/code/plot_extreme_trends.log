@@ -1,0 +1,186 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 120,000; see help set_maxvar.
+
+. do plot_extreme_trends.do 
+
+. set more off
+
+. clear all
+
+. capture log close
+
+. program drop _all
+
+. set scheme modern
+
+. preliminaries
+
+. version 17
+
+. 
+. program main
+  1.     make_benchmark
+  2.     plot_panels
+  3. end
+
+. 
+. program make_benchmark
+  1.     // Build a "control universe" line: spend-weighted mean log_raw_price by year,
+.     // pooled across all non-treated categories in the panel.
+.     // (Panel already filtered to keep==1 in make_mkt_panel build.do.)
+.     use ../../../derived/first_stage/make_mkt_panel/output/category_yr_tfidf.dta, clear
+  2.     keep if treated == 0
+  3.     gcollapse (mean) bench_log_raw_price = log_raw_price [aw=spend_2013], by(year)
+  4.     // Center benchmark to 0 at 2013
+.     qui sum bench_log_raw_price if year == 2013
+  5.     qui replace bench_log_raw_price = bench_log_raw_price - r(mean)
+  6.     tempfile bench
+  7.     save `bench'
+  8. 
+.     // Per-category centered trend
+.     use ../../../derived/first_stage/make_mkt_panel/output/category_yr_tfidf.dta, clear
+  9.     keep category year log_raw_price
+ 10.     bys category (year): gen log_2013 = log_raw_price if year == 2013
+ 11.     bys category (year): egen base = mean(log_2013)
+ 12.     gen cat_log_raw_price = log_raw_price - base
+ 13.     drop log_raw_price log_2013 base
+ 14.     merge m:1 year using `bench', nogen keep(3)
+ 15. 
+.     // Filter to our 20 flagged categories using diagnostics CSV
+.     preserve
+ 16.     import delimited using ../output/extreme_placebo_diagnostics.csv, clear stringcols(_all) varnames(1)
+ 17.     keep category mean_b flagged_top flagged_bottom
+ 18.     destring mean_b flagged_top flagged_bottom, replace
+ 19.     tempfile flag
+ 20.     save `flag'
+ 21.     restore
+ 22.     merge m:1 category using `flag', keep(3) nogen
+ 23. 
+.     save ../temp/plot_data, replace
+ 24. end
+
+. 
+. program plot_panels
+  1.     // Two PDFs: top 10 (positive b) and bottom 10 (negative b)
+.     use ../temp/plot_data, clear
+  2.     cap mkdir ../temp
+  3.     cap mkdir ../output/figures
+  4. 
+.     // For a clean panel title, prepend the mean_b to the category name
+.     gen cat_label = category + " (b=" + string(mean_b, "%5.2f") + ")"
+  5.     encode cat_label, gen(cat_id)
+  6. 
+.     // Order panels by mean_b within each group (biggest extreme first)
+.     gsort -mean_b
+  7.     gen ord_top = .
+  8.     qui levelsof cat_label if flagged_top == 1, local(toplbls)
+  9.     local i = 1
+ 10.     foreach l of local toplbls {
+ 11.         qui replace ord_top = `i' if cat_label == "`l'"
+ 12.         local ++i
+ 13.     }
+ 14.     gsort mean_b
+ 15.     gen ord_bot = .
+ 16.     qui levelsof cat_label if flagged_bottom == 1, local(botlbls)
+ 17.     local i = 1
+ 18.     foreach l of local botlbls {
+ 19.         qui replace ord_bot = `i' if cat_label == "`l'"
+ 20.         local ++i
+ 21.     }
+ 22. 
+.     // ---- Top 10 (positive b)
+.     preserve
+ 23.     keep if flagged_top == 1
+ 24.     drop cat_id
+ 25.     sort ord_top year
+ 26.     egen cat_id = group(ord_top)
+ 27.     labmask cat_id, values(cat_label)
+ 28.     tw (line cat_log_raw_price year, lcolor(cranberry) lwidth(medthick)) ///
+>        (line bench_log_raw_price year, lcolor(navy) lwidth(medium) lpattern(dash)), ///
+>        by(cat_id, cols(5) note("") ///
+>           title("Placebo extremes: top 10 (positive mean DiD)", size(small)) ///
+>           subtitle("Category (red) vs. non-treated benchmark (blue dashed) - centered to 0 at 2013") ///
+>           legend(off)) ///
+>        subtitle(, size(tiny) bcolor(none)) ///
+>        xline(2014, lcolor(gs10) lpattern(dot)) ///
+>        yline(0, lcolor(gs12)) ///
+>        xtitle("year", size(small)) ytitle("log price (centered at 2013)", size(small)) ///
+>        xlab(2010(2)2019, labsize(vsmall)) ylab(, labsize(vsmall))
+ 29.     graph export ../output/figures/extreme_trends_top10.pdf, replace
+ 30.     restore
+ 31. 
+.     // ---- Bottom 10 (negative b)
+.     preserve
+ 32.     keep if flagged_bottom == 1
+ 33.     drop cat_id
+ 34.     sort ord_bot year
+ 35.     egen cat_id = group(ord_bot)
+ 36.     labmask cat_id, values(cat_label)
+ 37.     tw (line cat_log_raw_price year, lcolor(cranberry) lwidth(medthick)) ///
+>        (line bench_log_raw_price year, lcolor(navy) lwidth(medium) lpattern(dash)), ///
+>        by(cat_id, cols(5) note("") ///
+>           title("Placebo extremes: bottom 10 (negative mean DiD)", size(small)) ///
+>           subtitle("Category (red) vs. non-treated benchmark (blue dashed) - centered to 0 at 2013") ///
+>           legend(off)) ///
+>        subtitle(, size(tiny) bcolor(none)) ///
+>        xline(2014, lcolor(gs10) lpattern(dot)) ///
+>        yline(0, lcolor(gs12)) ///
+>        xtitle("year", size(small)) ytitle("log price (centered at 2013)", size(small)) ///
+>        xlab(2010(2)2019, labsize(vsmall)) ylab(, labsize(vsmall))
+ 38.     graph export ../output/figures/extreme_trends_bottom10.pdf, replace
+ 39.     restore
+ 40. end
+
+. 
+. main
+(489 observations deleted)
+file /tmp/St3062327.000001 saved as .dta format
+(1,639 missing values generated)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                             1,822  
+    -----------------------------------------
+(encoding automatically selected: ISO-8859-1)
+(25 vars, 20 obs)
+mean_b: all characters numeric; replaced as double
+flagged_top: all characters numeric; replaced as byte
+flagged_bottom: all characters numeric; replaced as byte
+file /tmp/St3062327.000003 saved as .dta format
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                               194  
+    -----------------------------------------
+file ../temp/plot_data.dta saved
+(194 missing values generated)
+(194 missing values generated)
+(96 observations deleted)
+file ../output/figures/extreme_trends_top10.pdf saved as PDF format
+(98 observations deleted)
+file ../output/figures/extreme_trends_bottom10.pdf saved as PDF format
+
+. 
+end of do-file

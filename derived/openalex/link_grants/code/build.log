@@ -1,0 +1,470 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 120,000; see help set_maxvar.
+
+. do "/n/holylabs/pakes_lab/Lab/sci_eq/derived/openalex/link_grants/code/build.
+> do" 
+
+. set more off
+
+. clear all
+
+. capture log close
+
+. program drop _all
+
+. set scheme modern
+
+. preliminaries
+
+. version 17
+
+. 
+. program main  
+  1.     use ../external/panel/cleaned_last20yrs_all_jrnls.dta, clear
+  2.     gcontract athr_id year
+  3.     save ../temp/exposure, replace
+  4. 
+.     foreach s in all_jrnls top_jrnls {
+  5.         cap mkdir "../output/figures/`s'" 
+  6.         // r1 + r2 + public
+.         restrict_samp, samp(`s') r1r2(1) public(1)
+  7.         desc_stats, samp(`s') r1r2(1) public(1)
+  8.         event_study, samp(`s') r1r2(1) public(1)
+  9.         combine_es_graphs, samp(`s')
+ 10.     /*    // r1 + r2
+>         restrict_samp, samp(`s') r1r2(1) public(0)
+>         event_study, samp(`s') r1r2(1) public(0)
+>         // everyone
+>         restrict_samp, samp(`s') r1r2(0) public(0)
+>         event_study, samp(`s') r1r2(0) public(0)*/
+.     }
+ 11. end
+
+. 
+. program restrict_samp 
+  1.     syntax, samp(string) [, r1r2(int 0) public(int 0)]
+  2.     local suf ""
+  3.     if (`r1r2' == 1 & `public' == 0) local suf "_r1_r2"
+  4.     if (`r1r2' == 1 & `public' == 1) local suf "_r1_r2_public"
+  5.     use ../external/samp/athr_panel_full_year_last_`samp'`suf',clear 
+  6.     bys athr_id: egen tot_pprs = total(ppr_cnt)
+  7.     keep if tot_pprs >= 10
+  8.     drop tot_pprs
+  9.     bys athr_id: egen min_year = min(year)
+ 10.     keep if min_year < 2013
+ 11.     bys athr_id: egen max_year = max(year)
+ 12.     keep if max_year >= 2014
+ 13.     keep if inrange(year, 2010, 2019)
+ 14.     merge m:1 athr_id using ../temp/exposure, assert(1 2 3) keep(3) nogen
+ 15.     merge m:1 athr_id using ../external/real_exposure/athr_exposure, assert(1 2 3) keep(1 3) nogen
+ 16.     gen foia_athr = 1 if !mi(exposure)
+ 17.     replace imputed = exposure if !mi(exposure)
+ 18.     drop if exposure <= 0
+ 19.     drop if imputed <= 0
+ 20.     sum exposure , d 
+ 21.     local mean : di %4.3f r(mean) 
+ 22.     local sd: di %4.3f r(sd) 
+ 23.     local p25: di %4.3f r(p25) 
+ 24.     local p50: di %4.3f r(p50) 
+ 25.     local p75: di %4.3f r(p75)
+ 26.     local max: di %4.3f  r(max) 
+ 27.     local min: di %4.3f r(min) 
+ 28.     sum imputed, d 
+ 29.     local imputed_mean : di %4.3f r(mean) 
+ 30.     local imputed_sd: di %4.3f r(sd) 
+ 31.     local imputed_p25: di %4.3f r(p25) 
+ 32.     local imputed_p50: di %4.3f r(p50) 
+ 33.     local imputed_p75: di %4.3f r(p75)
+ 34.     local imputed_max: di %4.3f  r(max) 
+ 35.     local imputed_min: di %4.3f r(min) 
+ 36.     tw kdensity exposure || kdensity imputed, xtitle("Exposure Measure") ytitle("Density") ///
+>         xlab(#15) ///
+>         legend(on label(1 "FOIA PI Observed Exposure (mean = `mean', sd = `sd')") label(2 "Imputed Exposure (mean = `imputed_mean', sd = `imputed_sd')") pos(1) ring(0) size(small))
+ 37.     graph export ../output/figures/`samp'/exposure_dist`suf'.pdf, replace
+ 38.     drop exposure
+ 39.     rename imputed exposure
+ 40.     gen q1 = exposure < `imputed_p25'
+ 41.     gen q2 = inrange(exposure , `imputed_p25', `imputed_p50')
+ 42.     gen q3 = inrange(exposure , `imputed_p50', `imputed_p75')
+ 43.     gen q4 = exposure >= `imputed_p75'
+ 44.     gen median = exposure >= `imputed_p50'
+ 45.     bys athr_id: gen num_yrs = _N
+ 46.     bys athr_id inst_id: gen plc_cntr = _n == 1
+ 47.     bys athr_id : egen num_place = total(plc_cntr)
+ 48.     keep if num_yrs > 1
+ 49.    * keep if num_place==1
+.     *drop if exposure <= 0
+.     gegen athr = group(athr_id)
+ 50.     xtset athr year
+ 51.     tsfill
+ 52.     hashsort athr year
+ 53.     foreach var in athr_id exposure q1 q2 q3 q4 median  inst_id inst msa_comb msa_c_world min_year {
+ 54.         by athr: replace `var' = `var'[_n-1] if mi(`var')    
+ 55.     }
+ 56.     foreach var in cite_affl_wt ppr_cnt affl_wt body_adj_wt  {
+ 57.         replace `var' = 0 if mi(`var')    
+ 58.     }
+ 59.     bys athr_id: egen tot_pprs = total(ppr_cnt)
+ 60.     drop if tot_pprs < 7 
+ 61.     gen age = 2026-min_year + 30 
+ 62.     gen age_2014 = 2014 - min_year + 30
+ 63.     gen above_median = exposure >= `imputed_p50'
+ 64.     gen below_median = exposure < `imputed_p50'
+ 65.     sum age_2014, d
+ 66.     local med = r(p50)
+ 67.     gen young = age_2014 < `med'
+ 68.     gen old = age_2014 >= `med'
+ 69.     gen r1 = type == "r1" 
+ 70.     gen r2 = type == "r2" 
+ 71.     merge 1:1 athr_id year using ../external/coathrs/avg_coathrs, keep(1 3) assert(1 2 3) nogen
+ 72.     replace avg_num_coathrs = 0 if mi(avg_num_coathrs)
+ 73.     save ../temp/es_`samp'`suf', replace
+ 74. end
+
+. 
+. program desc_stats
+  1.     syntax, samp(string) [, r1r2(int 0) public(int 0)]
+  2.     local fes athr_id year  
+  3.     local suf ""
+  4.     if (`r1r2' == 1 & `public' == 0) local suf "_r1_r2"
+  5.     if (`r1r2' == 1 & `public' == 1) local suf "_r1_r2_public"
+  6.     use ../temp/es_`samp'`suf', clear 
+  7.     gen quartile = "q1" if q1 ==1
+  8.     replace quartile = "q2" if q2 ==1
+  9.     replace quartile = "q3" if q3 ==1
+ 10.     replace quartile = "q4" if q4 ==1
+ 11.     gcollapse (mean) ppr_cnt cite_affl_wt affl_wt body_adj_wt avg_num_coathrs r1 age (count) athr, by(quartile year)
+ 12.     foreach var in ppr_cnt cite_affl_wt affl_wt body_adj_wt avg_num_coathrs r1 age {
+ 13.         tw line `var' year if quartile == "q1", lcolor(lavender) || ///
+>         line `var' year if quartile == "q2" , lcolor(dkorange) || ///
+>         line `var' year if quartile == "q3" , lcolor(ebblue) || ///
+>         line `var' year if quartile == "q4", lcolor(dkemerald) ///
+>         ,  legend(on pos(1) ring(0) size(small)) xtitle("Year") ytitle("`var'") plotregion(margin(sides))
+ 14.         graph export ../output/figures/`samp'/desc_`var'`suf'.pdf, replace
+ 15.     }
+ 16. end
+
+. 
+. program event_study
+  1.     syntax, samp(string) [, r1r2(int 0) public(int 0)]
+  2.     local fes athr_id year  
+  3.     local suf ""
+  4.     if (`r1r2' == 1 & `public' == 0) local suf "_r1_r2"
+  5.     if (`r1r2' == 1 & `public' == 1) local suf "_r1_r2_public"
+  6.     use ../temp/es_`samp'`suf', replace
+  7. 
+.     gen rel = year - 2014 
+  8.     qui sum rel, d
+  9.     local abs_lag = abs(r(max))
+ 10.     qui sum rel, d
+ 11.     local abs_lead = abs(r(min))
+ 12.     local timeframe = max(`abs_lag', `abs_lead')
+ 13.     forval i = 1/`timeframe' {
+ 14.         gen int_lag`i' = exposure if rel == `i'
+ 15.         gen int_lead`i' = exposure if rel == -`i'
+ 16.         gen lag`i' = 1 if rel == `i'
+ 17.         gen lead`i' = 1 if rel == -`i'
+ 18.     }
+ 19.     gen int_lag0 = exposure if rel == 0
+ 20.     gen lag0 = 1 if rel == 0
+ 21.     ds lead* lag* int_lead* int_lag*
+ 22.     foreach var in `r(varlist)' {
+ 23.         replace `var' = 0 if mi(`var')
+ 24.     }
+ 25.     local leads
+ 26.     local int_leads
+ 27.     local lags
+ 28.     local int_lags
+ 29.     forval i = 2/`abs_lead' {
+ 30.         local leads lead`i' `leads'
+ 31.         local int_leads int_lead`i' `int_leads'
+ 32.     }
+ 33.     forval i = 0/`abs_lag' {
+ 34.         local lags `lags' lag`i'
+ 35.         local int_lags `int_lags' int_lag`i'
+ 36.     }
+ 37.     foreach v in cite_affl_wt ppr_cnt {
+ 38.         gen ln_`v' = ln(1+`v')
+ 39.     }
+ 40.     foreach yvar in cite_affl_wt ppr_cnt ln_cite_affl_wt ln_ppr_cnt affl_wt body_adj_wt avg_num_coathrs {
+ 41.         if "`yvar'" == "cite_affl_wt" local var_name = "Citation Weighted Output" 
+ 42.         if "`yvar'" == "cite_affl_wt" local gap  1 
+ 43.         if "`yvar'" == "ppr_cnt" local var_name = "Publication Count" 
+ 44.         if "`yvar'" == "ppr_cnt" local gap 0.5 
+ 45.         if "`yvar'" == "avg_coathrs" local var_name = "Average Team Size" 
+ 46.         if "`yvar'" == "acg_coathrs" local gap 0.5 
+ 47. 
+.         preserve
+ 48.         mat drop _all 
+ 49.         sum `yvar' if rel <= -1 & exposure > 0, d
+ 50.         local pre_mean : dis %4.3f r(mean)
+ 51.         reghdfe `yvar' `int_leads' `int_lags' int_lead1, absorb(`fes') vce(cluster athr_id)
+ 52.         foreach var in `int_leads' `int_lags' int_lead1 {
+ 53.             mat row = _b[`var'], _se[`var']
+ 54.             if "`var'" == "int_lead1" {
+ 55.                 mat row = 0,0
+ 56.             }
+ 57.             mat es = nullmat(es) \ row
+ 58.         }
+ 59.         svmat es
+ 60.         keep es1 es2
+ 61.         drop if mi(es1)
+ 62.         rename (es1 es2) (b se)
+ 63.         gen ub = b + 1.96*se
+ 64.         sum ub, d
+ 65.         local ymax =round(r(max),`gap')
+ 66.         gen lb = b - 1.96*se
+ 67.         sum lb, d
+ 68.         local ymin = min(-2.5,round(r(min),`gap'))
+ 69.         gen rel = -4 if _n == 1
+ 70.         replace rel = rel[_n-1]+1 if _n > 1
+ 71.         replace rel = rel + 1 if rel >= -1 
+ 72.         replace rel = -1 if rel == `abs_lag' + 1
+ 73.         gen year = rel + 2014
+ 74.         hashsort rel
+ 75.         tw rcap ub lb rel if rel != -1 , lcolor(ebblue%70) msize(vsmall) || ///
+>           scatter b rel, mcolor(ebblue) || ///
+>           scatteri `ymax' -0.25 `ymax' 0.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
+>           xlab(-4(1)5) xtitle("Relative Year") ///
+>           ytitle("`var_name'") ylab(`ymin'(`gap')`ymax') ///
+>           yline(0, lcolor(gs10) lpattern(solid)) ///
+>           legend(on order(- "Pre-Period Avg : `pre_mean'") pos(7) ring(1) rows(2) bmargin(zero) size(small)) plotregion(margin(sides))
+ 76.         graph export ../output/figures/`samp'/es_`yvar'`suf'.pdf, replace
+ 77.         save ../temp/es_`yvar', replace
+ 78.         restore
+ 79. /*
+>         preserve
+>         mat drop _all 
+>         *ppmlhdfe `yvar' `int_leads' `int_lags' int_lead1, absorb(`fes') vce(cluster athr_id)
+>         reghdfe ln_`yvar' `int_leads' `int_lags' int_lead1, absorb(`fes') vce(cluster athr_id)
+>         foreach var in `int_leads' `int_lags' int_lead1 {
+>             mat row = _b[`var'], _se[`var']
+>             if "`var'" == "int_lead1" {
+>                 mat row = 0,0
+>             }
+>             mat es = nullmat(es) \ row
+>         }
+>          svmat es
+>         keep es1 es2
+>         drop if mi(es1)
+>         rename (es1 es2) (b se)
+>         gen ub = b + 1.96*se
+>         sum ub, d
+>         local ymax = round(r(max),.1)
+>         gen lb = b - 1.96*se
+>         sum lb, d
+>         local ymin = round(r(min),.1)
+>         gen rel = -5 if _n == 1
+>         replace rel = rel[_n-1]+1 if _n > 1
+>         replace rel = rel + 1 if rel >= -1 
+>         replace rel = -1 if rel == `abs_lag' + 1
+>         gen year = rel + 2014
+>         hashsort rel
+>         tw rcap ub lb rel if rel != -1 , lcolor(ebblue%70) msize(vsmall) || ///
+>           scatter b rel, mcolor(ebblue) || ///
+>         scatteri 1 -0.25 1 0.25 , bcolor(gs12%10) recast(area) base(-1) ///
+>           xlab(-5(1)5) xtitle("Relative Year") ///
+>           ytitle("`var_name'") ylab(-1(.2)1, labsize(vsmall)) ///
+>           yline(0, lcolor(gs10) lpattern(solid))  legend(off) plotregion(margin(sides))
+>         graph export ../output/figures/`samp'/es_ln_`yvar'`suf'.pdf, replace
+>         save ../temp/es_ln_`yvar', replace
+>         restore*/
+. 
+.         // heterogeneity by author & inst characteristics        
+.         foreach cond in young old r1 r2 above_median below_median {
+ 80.             sum `yvar' if rel <= -1 & exposure > 0 & `cond' == 1, d
+ 81.             local pre_mean : dis %4.3f r(mean)
+ 82.             preserve
+ 83.             mat drop _all 
+ 84.             reghdfe `yvar' `int_leads' `int_lags' int_lead1 if `cond' == 1, absorb(`fes') vce(cluster athr_id)
+ 85.             foreach var in `int_leads' `int_lags' int_lead1 {
+ 86.                 mat row = _b[`var'], _se[`var']
+ 87.                 if "`var'" == "int_lead1" {
+ 88.                     mat row = 0,0
+ 89.                 }
+ 90.                 mat es = nullmat(es) \ row
+ 91.             }
+ 92.             svmat es
+ 93.             keep es1 es2
+ 94.             drop if mi(es1)
+ 95.             rename (es1 es2) (b se)
+ 96.             gen ub = b + 1.96*se
+ 97.             sum ub, d
+ 98.             local ymax = round(r(max),`gap')
+ 99.             gen lb = b - 1.96*se
+100.             sum lb, d
+101.             local ymin =  round(r(min),`gap')
+102.             gen rel = -4 if _n == 1
+103.             replace rel = rel[_n-1]+1 if _n > 1
+104.             replace rel = rel + 1 if rel >= -1 
+105.             replace rel = -1 if rel == `abs_lag' + 1
+106.             gen year = rel + 2014
+107.             hashsort rel
+108.             tw rcap ub lb rel if rel != -1 , lcolor(ebblue%70) msize(vsmall) || ///
+>               scatter b rel, mcolor(ebblue) || ///
+>             scatteri `ymax' -0.25 `ymax' 0.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
+>               xlab(-4(1)5) xtitle("Relative Year") ///
+>               ytitle("`var_name'") ylab(`ymin'(`gap')`ymax') ///
+>               legend(on order(- "Pre-Period Avg : `pre_mean'") pos(7) ring(1) rows(2) bmargin(zero) size(small)) /// 
+>               yline(0, lcolor(gs10) lpattern(solid)) plotregion(margin(sides))
+109.             graph export ../output/figures/`samp'/es_`yvar'`suf'_`cond'.pdf, replace
+110.             save ../temp/es_`yvar'`suf'_`cond', replace
+111.             restore
+112.         } 
+113.        
+.         // hetoregeneity by exposure quartiles
+.         forval i = 1/4 {
+114.             preserve
+115.             mat drop _all 
+116.             reghdfe `yvar' `int_leads' `int_lags' int_lead1 if q`i' == 1, absorb(`fes') vce(cluster athr_id)
+117.             foreach var in `int_leads' `int_lags' int_lead1 {
+118.                 mat row = _b[`var'], _se[`var']
+119.                 if "`var'" == "int_lead1" {
+120.                     mat row = 0,0
+121.                 }
+122.                 mat es = nullmat(es) \ row
+123.             }
+124.             svmat es
+125.             keep es1 es2
+126.             drop if mi(es1)
+127.             rename (es1 es2) (b se)
+128.             gen ub = b + 1.96*se
+129.             sum ub, d
+130.             local ymax = round(r(max),`gap')
+131.             gen lb = b - 1.96*se
+132.             sum lb, d
+133.             local ymin =  round(r(min),`gap')
+134.             gen rel = -4 if _n == 1
+135.             replace rel = rel[_n-1]+1 if _n > 1
+136.             replace rel = rel + 1 if rel >= -1 
+137.             replace rel = -1 if rel == `abs_lag' + 1
+138.             gen year = rel + 2014
+139.             hashsort rel
+140.             tw rcap ub lb rel if rel != -1 , lcolor(ebblue%70) msize(vsmall) || ///
+>               scatter b rel, mcolor(ebblue) || ///
+>             scatteri `ymax' -0.25 `ymax' 0.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
+>               xlab(-4(1)5) xtitle("Relative Year") ///
+>               ytitle("`var_name'") ylab(`ymin'(`gap')`ymax') ///
+>               yline(0, lcolor(gs10) lpattern(solid)) legend(off) plotregion(margin(sides))
+141.             graph export ../output/figures/`samp'/es_`yvar'_q`i'`suf'.pdf, replace
+142.             save ../temp/es_`yvar'_q`i', replace
+143.             restore
+144.         } 
+145.     }
+146. end
+
+. 
+. program combine_es_graphs
+  1.     syntax, samp(str)
+  2.     foreach yvar in cite_affl_wt ppr_cnt ln_cite_affl_wt ln_ppr_cnt body_adj_wt avg_num_coathrs {
+  3.         if "`yvar'" == "cite_affl_wt" local var_name = "Citation Weighted Output" 
+  4.         if "`yvar'" == "cite_affl_wt" local gap  1 
+  5.         if "`yvar'" == "ppr_cnt" local var_name = "Publication Count" 
+  6.         if "`yvar'" == "ppr_cnt" local gap 0.5 
+  7.         if "`yvar'" == "avg_coathrs" local var_name = "Average Team Size" 
+  8.         if "`yvar'" == "acg_coathrs" local gap 0.5 
+  9.          if "`yvar'" == "cite_affl_wt" local var_name = "Citation Weighted Output"
+ 10.         use "../temp/es_`yvar'_q1", replace                                         
+ 11.         gen group = "q1"                                                                             
+ 12.         replace rel = rel - 0.4                                                                         
+ 13.         sum b if group == "q1" & rel > 0                                                             
+ 14.         local q1_mean : dis %4.3f r(mean)                                                            
+ 15.         append using ../temp/es_`yvar'_q2
+ 16.         replace group = "q2" if mi(group)                                                            
+ 17.         replace rel = rel - 0.25 if group == "q2"                                                                         
+ 18.         sum b if group == "q2" & rel > 0                                                             
+ 19.         local q2_mean : dis %4.3f r(mean)                                                            
+ 20.         append using ../temp/es_`yvar'_q3
+ 21.         replace group = "q3" if mi(group)                                                            
+ 22.         replace rel = rel - 0.1 if group == "q3"                                                                         
+ 23.         sum b if group == "q3" & rel > 0                                                             
+ 24.         local q3_mean : dis %4.3f r(mean)                                                            
+ 25.         append using ../temp/es_`yvar'_q4
+ 26.         replace group = "q4" if mi(group)
+ 27.         replace rel = rel + 0.05 if group == "q4"                                                                         
+ 28.         sum b if group == "q4" & rel > 0                                                             
+ 29.         local q4_mean : dis %4.3f r(mean)                                                            
+ 30.         tw rcap ub lb rel if rel != -1.4 & group == "q1",  lcolor(lavender%70) msize(small) || ///   
+>            scatter b rel if group == "q1", mcolor(lavender%70) msize(small) || ///                   
+>            rcap ub lb rel if rel != -1.25 & group == "q2",  lcolor(orange%70) msize(small) || ///     
+>            scatter b rel if group == "q2", mcolor(orange%70) msymbol(smdiamond) msize(small) ||  ///  
+>            rcap ub lb rel if rel != -1.1 & group == "q3",  lcolor(dkgreen%70) msize(small) || ///     
+>            scatter b rel if group == "q3", mcolor(green%70) msymbol(smdiamond) msize(small)|| ///  
+>            rcap ub lb rel if rel != -.95 & group == "q4",  lcolor(cranberry%70) msize(small) || ///     
+>            scatter b rel if group == "q4", mcolor(red%70) msymbol(smdiamond) msize(small)  ///  
+>            xlab(-4(1)5) ylab(#8) ///                         
+>               yline(0, lcolor(black) lpattern(solid)) ///                                               
+>               legend(on order(2 "Q1 Exposed (Post Period Avg: `q1_mean')" 4 "Q2 Exposed (Post Period Avg: `q2_mean')" 6 "Q3 Exposed (Post Period Avg: `q3_mean')" 8 "Q4 Exposed (Post Period Avg: `q4_mean')") pos(7) ring(1) size(small) region(fcolor(none)
+> )) xtitle("Relative Year") ytitle("`var_name'") plotregion(margin(sides))
+ 31.         graph export ../output/figures/`samp'/es_`yvar'_split`suf'_`samp'.pdf, replace     
+ 32. 
+.         use "../temp/es_`yvar'_r1_r2_public_below_median", replace                                         
+ 33.         gen group = "below"                                                                             
+ 34.         replace rel = rel - 0.1                                                                         
+ 35.         sum b if group == "below" & rel > 0                                                             
+ 36.         local below_mean : dis %4.3f r(mean)                                                            
+ 37.         append using ../temp/es_`yvar'_r1_r2_public_above_median
+ 38.         replace group = "above" if mi(group)                                                            
+ 39.         sum b if group == "above" & rel > 0                                                             
+ 40.         local above_mean : dis %4.3f r(mean)                                                            
+ 41.         tw rcap ub lb rel if rel != -1.1 & group == "below",  lcolor(lavender%60) msize(small) || ///   
+>            scatter b rel if group == "below", mcolor(lavender%60) msize(small) || ///                   
+>            rcap ub lb rel if rel != -1 & group == "above",  lcolor(dkorange) msize(small) || ///     
+>            scatter b rel if group == "above", mcolor(dkorange) msymbol(smdiamond) msize(small)  ///  
+>            xlab(-4(1)5) ylab(#8) ///                         
+>               yline(0, lcolor(black) lpattern(solid)) ///                                               
+>               legend(on order(2 "Below Median Exposure (Post Period Avg: `below_mean')" 4 "Above Median Exposure (Post Period Avg: `above_mean')" ) pos(7) ring(1) size(small) region(fcolor(none))) xtitle("Relative Year") ytitle("`var_name'") plotregion(
+> margin(sides))
+ 42.         graph export ../output/figures/`samp'/es_`yvar'_split`suf'_`samp'.pdf, replace     
+ 43.         
+.         use "../temp/es_`yvar'_r1_r2_public_young", replace                                         
+ 44.         gen group = "young"                                                                             
+ 45.         replace rel = rel - 0.1                                                                         
+ 46.         sum b if group == "young" & rel > 0                                                             
+ 47.         local young_mean : dis %4.3f r(mean)                                                            
+ 48.         append using ../temp/es_`yvar'_r1_r2_public_old
+ 49.         replace group = "old" if mi(group)                                                            
+ 50. 
+.         sum b if group == "old" & rel > 0                                                             
+ 51.         local old_mean : dis %4.3f r(mean)                                                            
+ 52.         tw rcap ub lb rel if rel != -1.1 & group == "young",  lcolor(lavender%60) msize(small) || ///   
+>            scatter b rel if group == "young", mcolor(lavender%60) msize(small) || ///                   
+>            rcap ub lb rel if rel != -1 & group == "old",  lcolor(dkorange) msize(small) || ///     
+>            scatter b rel if group == "old", mcolor(dkorange) msymbol(smdiamond) msize(small)  ///  
+>            xlab(-4(1)5) ylab(#8) ///                         
+>               yline(0, lcolor(black) lpattern(solid)) ///                                               
+>               legend(on order(2 "Below Median Age (Post Period Avg: `young_mean')" 4 "Above Median Age (Post Period Avg: `old_mean')" ) pos(7) ring(1) size(small) region(fcolor(none))) xtitle("Relative Year") ytitle("`var_name'") plotregion(margin(sides
+> ))
+ 53.         graph export ../output/figures/`samp'/es_`yvar'_age_split`suf'_`samp'.pdf, replace     
+ 54.     }
+ 55. end
+
+. 
+. program output_tables
+  1.     foreach tab in did_impact_cite_affl_wt did_ppr_cnt {
+  2.     qui matrix_to_txt, saving("../output/tables/`tab'.txt") matrix(`tab') ///
+>        title(<tab:`tab'>) format(%20.4f) replace
+  3.     }
+  4. end
+
+. **

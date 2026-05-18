@@ -10,8 +10,9 @@ library(stringr)
 # ---------------------------
 PLACEBO_SEED      <- 8975
 N_PLACEBO_ITERS   <- 100
-MATCH_COVARIATES  <- c("log_raw_qty_2013", "log_raw_qty_2012", "log_raw_qty_slope")
-MATCH_RATIO       <- 3
+# v80 spec: pre-period 3-yr mean (2011-2013) + slope of avg_log_price.
+MATCH_COVARIATES  <- c("avg_log_price_pre_mean", "avg_log_price_slope")
+MATCH_RATIO       <- 2
 
 setwd("~/sci_eq/derived/first_stage/placebo_dist/code")
 dir.create("../output/figures", recursive = TRUE, showWarnings = FALSE)
@@ -58,7 +59,19 @@ pre_slopes <- panel %>%
     .groups = "drop"
   )
 
-data_wide_base <- data_wide_base %>% left_join(pre_slopes, by = "category")
+pre_means <- panel %>%
+  filter(year >= 2011, year <= 2013) %>%
+  group_by(category) %>%
+  summarise(
+    avg_log_price_pre_mean = mean(avg_log_price, na.rm = TRUE),
+    log_raw_qty_pre_mean   = mean(log_raw_qty,   na.rm = TRUE),
+    log_raw_spend_pre_mean = mean(log_raw_spend, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+data_wide_base <- data_wide_base %>%
+  left_join(pre_slopes, by = "category") %>%
+  left_join(pre_means,  by = "category")
 
 # ---------------------------
 # Placebo iterations

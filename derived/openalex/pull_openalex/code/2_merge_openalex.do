@@ -45,6 +45,14 @@ program main
 
     clear
     forval i = 1/6 {
+        append using ../output/grants_all_jrnls_merged_`i'
+    }
+    drop if mi(id)
+    compress, nocoalesce
+    save ../output/grants_all_jrnls_merged, replace
+
+    clear
+    forval i = 1/6 {
         append using ../output/openalex_all_jrnls_merged_`i'
     }
     compress, nocoalesce

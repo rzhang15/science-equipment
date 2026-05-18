@@ -1,0 +1,154 @@
+-------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  /n/holylabs/pakes_lab/Lab/sci_eq/analysis/first_stage/code/diag_pr
+> eperiod_qty_spend3.log
+  log type:  text
+ opened on:  17 May 2026, 21:19:25
+
+. 
+. * ------------------------------------------------------------------
+. * Third pass: drill into us fbs (and nitrocellulose) item-level data
+. * to find the specific items / suppliers driving the 2010-2011
+. * qty / spend bump.
+. * ------------------------------------------------------------------
+. 
+. local susp_cats `" "us fbs" "nitrocellulose blotting membranes" "column-based
+>  dna plasmid miniprep" "nucleic acid gel stains" "phosphate-buffered saline (
+> pbs) buffer" "'
+
+. 
+. use ../external/samp/full_item_level_tfidf, clear
+
+. keep if treated == 1
+(803,196 observations deleted)
+
+. 
+. foreach c of local susp_cats {
+  2.     preserve
+  3.     keep if category == "`c'"
+  4.     di " "
+  5.     di "==================================================================
+> "
+  6.     di "CATEGORY: `c'"
+  7.     di "==================================================================
+> "
+  8. 
+.     * (a) qty distribution by year
+.     di "  -- (a) Year-level summary --"
+  9.     tabstat raw_qty raw_spend , by(year) stat(sum N) format(%12.1f)
+ 10.     di " "
+ 11. 
+.     * (b) supplier-level shares by year (top 10)
+.     di "  -- (b) Supplier x year qty totals --"
+ 12.     preserve
+ 13.     collapse (sum) raw_qty raw_spend obs = obs_cnt, by(suppliername year)
+ 14.     keep if inlist(year, 2010, 2011, 2013, 2017)
+ 15.     reshape wide raw_qty raw_spend obs, i(suppliername) j(year)
+ 16.     gen total = raw_qty2010 + raw_qty2011 + raw_qty2013 + raw_qty2017
+ 17.     gsort -raw_qty2010
+ 18.     list suppliername raw_qty2010 raw_qty2011 raw_qty2013 raw_qty2017 in 1
+> /15, noobs sep(0) ab(30)
+ 19.     restore
+ 20. 
+.     * (c) top 20 by raw_spend in 2010-2011
+.     di " "
+ 21.     di "  -- (c) Top 20 items by spend in 2010-2011 --"
+ 22.     preserve
+ 23.     keep if inlist(year, 2010, 2011)
+ 24.     gsort -raw_spend
+ 25.     list year suppliername agencyname clean_desc raw_qty raw_price raw_spe
+> nd similarity_score in 1/20, noobs sep(0) ab(40)
+ 26.     restore
+ 27. 
+.     * (d) top 20 by raw_qty in 2010-2011
+.     di " "
+ 28.     di "  -- (d) Top 20 items by qty in 2010-2011 --"
+ 29.     preserve
+ 30.     keep if inlist(year, 2010, 2011)
+ 31.     gsort -raw_qty
+ 32.     list year suppliername agencyname clean_desc raw_qty raw_price raw_spe
+> nd similarity_score in 1/20, noobs sep(0) ab(40)
+ 33.     restore
+ 34. 
+.     * (e) drop the single biggest qty observation in 2010 and check the impac
+> t on 2010-vs-2013 mean log_qty
+.     di " "
+ 35.     di "  -- (e) Effect of dropping top-N pre-period qty obs on mean log_q
+> ty[2010] - mean log_qty[2013] --"
+ 36.     preserve
+ 37.     gen ln_q = ln(raw_qty)
+ 38.     foreach n of numlist 0 1 5 10 20 50 100 {
+ 39.         qui {
+ 40.             * make a copy where we drop top-N items by raw_qty in pre peri
+> od
+.             preserve
+ 41.             gsort year -raw_qty
+ 42.             bys year: gen rk = _n
+ 43.             drop if inlist(year, 2010, 2011) & rk <= `n'
+ 44.             sum ln_q if year == 2013
+ 45.             local m2013 = r(mean)
+ 46.             sum ln_q if year == 2010
+ 47.             local d2010 = r(mean) - `m2013'
+ 48.             sum ln_q if year == 2011
+ 49.             local d2011 = r(mean) - `m2013'
+ 50.             restore
+ 51.         }
+ 52.         di as txt "    n_dropped = " %3.0f `n' "   d_log_qty[2010] = " %7.
+> 4f `d2010' "   d_log_qty[2011] = " %7.4f `d2011'
+ 53.     }
+ 54.     restore
+ 55. 
+.     restore
+ 56. }
+(123,957 observations deleted)
+ 
+==================================================================
+CATEGORY: us fbs
+==================================================================
+  -- (a) Year-level summary --
+
+Summary statistics: Sum, N
+Group variable: year 
+
+    year |      raw_qty     raw_sp~d
+---------+--------------------------
+    2010 |       1769.0     275637.5
+         |        374.0        374.0
+---------+--------------------------
+    2011 |       1462.7     254150.4
+         |        310.0        310.0
+---------+--------------------------
+    2012 |       1936.2     332274.5
+         |        438.0        438.0
+---------+--------------------------
+    2013 |       1642.0     349920.8
+         |        468.0        468.0
+---------+--------------------------
+    2014 |       1708.2     412677.4
+         |        498.0        498.0
+---------+--------------------------
+    2015 |       1486.0     531229.9
+         |        569.0        569.0
+---------+--------------------------
+    2016 |       1869.2     726490.2
+         |        615.0        615.0
+---------+--------------------------
+    2017 |       2451.5    1074041.9
+         |        912.0        912.0
+---------+--------------------------
+    2018 |       2381.0     992266.8
+         |        834.0        834.0
+---------+--------------------------
+    2019 |       2103.0     861716.3
+         |        763.0        763.0
+---------+--------------------------
+   Total |      18808.7    5810405.6
+         |       5781.0       5781.0
+------------------------------------
+ 
+  -- (b) Supplier x year qty totals --
+already preserved
+r(621);
+
+end of do-file
+r(621);

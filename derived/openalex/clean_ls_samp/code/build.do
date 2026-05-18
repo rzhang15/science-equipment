@@ -191,7 +191,7 @@ program clean_samps
     *gen impact_affl_wt = impact_wt * affl_wt  
     *gen impact_cite_wt = reweight_N * cite_wt / tot_cite_N * `articles' 
     *gen impact_cite_affl_wt = impact_cite_wt * affl_wt 
-    foreach wt in affl_wt cite_affl_wt pat_adj_wt { // frnt_adj_wt body_adj_wt { // impact_affl_wt impact_cite_affl_wt 
+    foreach wt in affl_wt cite_affl_wt pat_adj_wt frnt_adj_wt body_adj_wt { // impact_affl_wt impact_cite_affl_wt 
         sum `wt'
         assert round(r(sum)-`articles') == 0
     }

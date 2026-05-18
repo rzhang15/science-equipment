@@ -1353,6 +1353,24 @@ market_rules:
 - name: synthetic dna oligonucleotide - desalted
   regex_any_of:
   - '(?i)\b(?:EBS|IBS)\d+[a-z]?\b'
+# Oligo-order-metadata rescue: catches primer rows that lack the word "dna"
+# but carry strong custom-oligo signals — "desalt(ed/ing)", sub-1 µmol
+# synthesis scales (0.025/0.1/0.25 µmol — sub-1 µmol always starts "0."), or
+# the `oligoseq` sentinel left behind by clean_foia_data's `sequence_field`
+# rewrite.  Gated on $OLIGO_WORD so generic chemistry "desalting columns"
+# rows don't trip it.  Defaults to desalted — sub-µmol is the standard
+# small-scale tier, and the explicit modifier/purified/large-scale rules
+# above already win when their stronger signals are present.
+- name: synthetic dna oligonucleotide - desalted
+  all_of:
+  - $OLIGO_WORD
+  regex_any_of:
+  - '(?i)\bdesalt\w*'
+  - '(?i)\b0\.\d+\s*[un]?mol\b'
+  - '(?i)\boligoseq\b'
+  none_of:
+  - '*sirna*'
+  - '*shrna*'
 # Structural-name primer rule: catches oligos whose descriptions don't
 # include the word "oligo" but carry tell-tale primer markers —
 # _F / _R / _fwd / _rev / _forward / _reverse suffixes, forward/reverse

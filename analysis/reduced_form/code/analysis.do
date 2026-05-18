@@ -7,17 +7,15 @@ preliminaries
 version 17
 
 program main  
-    import delimited ../external/exposure/final_imputed_exposure, clear
-    rename exposure imputed
-    save ../temp/exposure, replace
-
+    gather_external_data
     foreach s in all_jrnls top_jrnls {
         cap mkdir "../output/figures/`s'" 
         // r1 + r2 + public
         restrict_samp, samp(`s') r1r2(1) public(1)
+        desc_stats, samp(`s') r1r2(1) public(1)
         event_study, samp(`s') r1r2(1) public(1)
         combine_es_graphs, samp(`s')
-      /*  // r1 + r2
+    /*    // r1 + r2
         restrict_samp, samp(`s') r1r2(1) public(0)
         event_study, samp(`s') r1r2(1) public(0)
         // everyone
@@ -26,18 +24,56 @@ program main
     }
 end
 
+program gather_external_data
+    import delimited ../external/exposure/final_imputed_exposure, clear
+    rename exposure imputed
+    save ../temp/exposure, replace
+
+    use ../external/grants/pi_grants, clear
+    bys athr_id year: gen num_grants = _N
+    contract athr_id year num_grants
+    drop _freq
+    save ../temp/athr_yr_grnt_cnt, replace
+
+    use ../external/grants/pi_grants, clear
+    keep if funder_name == "National Institutes of Health"
+    bys athr_id year: gen num_nih_grants = _N
+    contract athr_id year num_nih_grants
+    drop _freq
+    save ../temp/athr_yr_nih_grnt_cnt, replace
+
+    use ../external/foias/merged_foias_with_pis,  clear
+    drop if mi(athr_id)
+    gen year = year(date(date, "YMD"))
+    merge m:1 category using ../external/categories/categories_tfidf, assert(1 2 3) keep(1 3) 
+    gen nonlab = 1 if _merge == 1
+    replace nonlab = 0 if mi(nonlab)
+    drop if nonlab == 0
+    gcollapse (sum) spend, by(athr_id uni year)
+    save ../temp/foia_spend, replace
+/*    merge m:1 athr_id using  ../external/real_exposure/athr_exposure, assert(1 2 3) keep(3) nogen
+    gen post = year >= 2014
+    gen Z_it = exposure*post
+    xtset athr_id year*/
+end
+
 program restrict_samp 
     syntax, samp(string) [, r1r2(int 0) public(int 0)]
     local suf ""
     if (`r1r2' == 1 & `public' == 0) local suf "_r1_r2"
     if (`r1r2' == 1 & `public' == 1) local suf "_r1_r2_public"
     use ../external/samp/athr_panel_full_year_last_`samp'`suf',clear 
-
+    bys athr_id: egen tot_pprs = total(ppr_cnt)
+    keep if tot_pprs >= 10
+    drop tot_pprs
     bys athr_id: egen min_year = min(year)
     keep if min_year < 2013
-    keep if inrange(year, 2009, 2019)
+    bys athr_id: egen max_year = max(year)
+    keep if max_year >= 2014
+    keep if inrange(year, 2010, 2019)
     merge m:1 athr_id using ../temp/exposure, assert(1 2 3) keep(3) nogen
     merge m:1 athr_id using ../external/real_exposure/athr_exposure, assert(1 2 3) keep(1 3) nogen
+    gen foia_athr = 1 if !mi(exposure)
     replace imputed = exposure if !mi(exposure)
     drop if exposure <= 0
     drop if imputed <= 0
@@ -72,7 +108,8 @@ program restrict_samp
     bys athr_id inst_id: gen plc_cntr = _n == 1
     bys athr_id : egen num_place = total(plc_cntr)
     keep if num_yrs > 1
-    drop if exposure <= 0
+   * keep if num_place==1
+    *drop if exposure <= 0
     gegen athr = group(athr_id)
     xtset athr year
     tsfill
@@ -80,29 +117,56 @@ program restrict_samp
     foreach var in athr_id exposure q1 q2 q3 q4 median  inst_id inst msa_comb msa_c_world min_year {
         by athr: replace `var' = `var'[_n-1] if mi(`var')    
     }
-    foreach var in cite_affl_wt ppr_cnt body_affl_wt  {
+    foreach var in cite_affl_wt ppr_cnt affl_wt body_adj_wt  {
         replace `var' = 0 if mi(`var')    
     }
     bys athr_id: egen tot_pprs = total(ppr_cnt)
     drop if tot_pprs < 7 
     gen age = 2026-min_year + 30 
+    gen age_2014 = 2014 - min_year + 30
     gen above_median = exposure >= `imputed_p50'
     gen below_median = exposure < `imputed_p50'
-    sum age, d
+    sum age_2014, d
     local med = r(p50)
-    gen young = age < `med'
-    gen old = age >= `med'
+    gen young = age_2014 < `med'
+    gen old = age_2014 >= `med'
     gen r1 = type == "r1" 
     gen r2 = type == "r2" 
     merge 1:1 athr_id year using ../external/coathrs/avg_coathrs, keep(1 3) assert(1 2 3) nogen
     replace avg_num_coathrs = 0 if mi(avg_num_coathrs)
+    merge 1:1 athr_id year using ../temp/athr_yr_grnt_cnt, keep(1 3) assert(1 2 3) nogen
+    replace num_grants = 0 if mi(num_grants)
+    merge 1:1 athr_id year using ../temp/athr_yr_nih_grnt_cnt, keep(1 3) assert(1 2 3) nogen
+    replace num_nih_grants = 0 if mi(num_nih_grants)
     save ../temp/es_`samp'`suf', replace
+end
 
+program desc_stats
+    syntax, samp(string) [, r1r2(int 0) public(int 0)]
+    local fes athr_id year  
+    local suf ""
+    if (`r1r2' == 1 & `public' == 0) local suf "_r1_r2"
+    if (`r1r2' == 1 & `public' == 1) local suf "_r1_r2_public"
+    use ../temp/es_`samp'`suf', clear 
+    gen quartile = "q1" if q1 ==1
+    replace quartile = "q2" if q2 ==1
+    replace quartile = "q3" if q3 ==1
+    replace quartile = "q4" if q4 ==1
+    collapse (mean) ppr_cnt cite_affl_wt affl_wt body_adj_wt avg_num_coathrs r1 age num_grants num_nih_grants (firstnm) quartile, by(athr_id year)
+    gcollapse (mean) ppr_cnt cite_affl_wt affl_wt body_adj_wt avg_num_coathrs r1 age num_grants num_nih_grants ,  by(quartile year)
+    foreach var in ppr_cnt cite_affl_wt affl_wt body_adj_wt avg_num_coathrs r1 age num_grants num_nih_grants {
+        tw line `var' year if quartile == "q1", lcolor(lavender) || ///
+        line `var' year if quartile == "q2" , lcolor(dkorange) || ///
+        line `var' year if quartile == "q3" , lcolor(ebblue) || ///
+        line `var' year if quartile == "q4", lcolor(dkemerald) ///
+        ,  legend(on pos(1) ring(0) size(small)) xtitle("Year") ytitle("`var'") plotregion(margin(sides))
+        graph export ../output/figures/`samp'/desc_`var'`suf'.pdf, replace
+    }
 end
 
 program event_study
     syntax, samp(string) [, r1r2(int 0) public(int 0)]
-    local fes athr_id year 
+    local fes athr_id year  
     local suf ""
     if (`r1r2' == 1 & `public' == 0) local suf "_r1_r2"
     if (`r1r2' == 1 & `public' == 1) local suf "_r1_r2_public"
@@ -141,13 +205,15 @@ program event_study
     foreach v in cite_affl_wt ppr_cnt {
         gen ln_`v' = ln(1+`v')
     }
-    foreach yvar in cite_affl_wt ppr_cnt ln_cite_affl_wt ln_ppr_cnt body_affl_wt avg_num_coathrs {
+    foreach yvar in cite_affl_wt ppr_cnt ln_cite_affl_wt ln_ppr_cnt affl_wt body_adj_wt avg_num_coathrs num_grants num_nih_grants {
+        if "`yvar'" == "ln_spend" local var_name = "Log Spending" 
+        if "`yvar'" == "ln_spend" local gap  0.5 
         if "`yvar'" == "cite_affl_wt" local var_name = "Citation Weighted Output" 
         if "`yvar'" == "cite_affl_wt" local gap  1 
         if "`yvar'" == "ppr_cnt" local var_name = "Publication Count" 
         if "`yvar'" == "ppr_cnt" local gap 0.5 
         if "`yvar'" == "avg_coathrs" local var_name = "Average Team Size" 
-        if "`yvar'" == "acg_coathrs" local gap 0.5 
+        if "`yvar'" == "avg_coathrs" local gap 0.5 
 
         preserve
         mat drop _all 
@@ -171,7 +237,7 @@ program event_study
         gen lb = b - 1.96*se
         sum lb, d
         local ymin = min(-2.5,round(r(min),`gap'))
-        gen rel = -5 if _n == 1
+        gen rel = -4 if _n == 1
         replace rel = rel[_n-1]+1 if _n > 1
         replace rel = rel + 1 if rel >= -1 
         replace rel = -1 if rel == `abs_lag' + 1
@@ -180,7 +246,7 @@ program event_study
         tw rcap ub lb rel if rel != -1 , lcolor(ebblue%70) msize(vsmall) || ///
           scatter b rel, mcolor(ebblue) || ///
           scatteri `ymax' -0.25 `ymax' 0.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
-          xlab(-5(1)5) xtitle("Relative Year") ///
+          xlab(-4(1)5) xtitle("Relative Year") ///
           ytitle("`var_name'") ylab(`ymin'(`gap')`ymax') ///
           yline(0, lcolor(gs10) lpattern(solid)) ///
           legend(on order(- "Pre-Period Avg : `pre_mean'") pos(7) ring(1) rows(2) bmargin(zero) size(small)) plotregion(margin(sides))
@@ -249,7 +315,7 @@ program event_study
             gen lb = b - 1.96*se
             sum lb, d
             local ymin =  round(r(min),`gap')
-            gen rel = -5 if _n == 1
+            gen rel = -4 if _n == 1
             replace rel = rel[_n-1]+1 if _n > 1
             replace rel = rel + 1 if rel >= -1 
             replace rel = -1 if rel == `abs_lag' + 1
@@ -258,7 +324,7 @@ program event_study
             tw rcap ub lb rel if rel != -1 , lcolor(ebblue%70) msize(vsmall) || ///
               scatter b rel, mcolor(ebblue) || ///
             scatteri `ymax' -0.25 `ymax' 0.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
-              xlab(-5(1)5) xtitle("Relative Year") ///
+              xlab(-4(1)5) xtitle("Relative Year") ///
               ytitle("`var_name'") ylab(`ymin'(`gap')`ymax') ///
               legend(on order(- "Pre-Period Avg : `pre_mean'") pos(7) ring(1) rows(2) bmargin(zero) size(small)) /// 
               yline(0, lcolor(gs10) lpattern(solid)) plotregion(margin(sides))
@@ -289,7 +355,7 @@ program event_study
             gen lb = b - 1.96*se
             sum lb, d
             local ymin =  round(r(min),`gap')
-            gen rel = -5 if _n == 1
+            gen rel = -4 if _n == 1
             replace rel = rel[_n-1]+1 if _n > 1
             replace rel = rel + 1 if rel >= -1 
             replace rel = -1 if rel == `abs_lag' + 1
@@ -298,7 +364,7 @@ program event_study
             tw rcap ub lb rel if rel != -1 , lcolor(ebblue%70) msize(vsmall) || ///
               scatter b rel, mcolor(ebblue) || ///
             scatteri `ymax' -0.25 `ymax' 0.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
-              xlab(-5(1)5) xtitle("Relative Year") ///
+              xlab(-4(1)5) xtitle("Relative Year") ///
               ytitle("`var_name'") ylab(`ymin'(`gap')`ymax') ///
               yline(0, lcolor(gs10) lpattern(solid)) legend(off) plotregion(margin(sides))
             graph export ../output/figures/`samp'/es_`yvar'_q`i'`suf'.pdf, replace
@@ -310,7 +376,7 @@ end
 
 program combine_es_graphs
     syntax, samp(str)
-    foreach yvar in cite_affl_wt ppr_cnt ln_cite_affl_wt ln_ppr_cnt body_affl_wt avg_num_coathrs {
+    foreach yvar in cite_affl_wt ppr_cnt ln_cite_affl_wt ln_ppr_cnt body_adj_wt avg_num_coathrs {
         if "`yvar'" == "cite_affl_wt" local var_name = "Citation Weighted Output" 
         if "`yvar'" == "cite_affl_wt" local gap  1 
         if "`yvar'" == "ppr_cnt" local var_name = "Publication Count" 
@@ -346,7 +412,7 @@ program combine_es_graphs
            scatter b rel if group == "q3", mcolor(green%70) msymbol(smdiamond) msize(small)|| ///  
            rcap ub lb rel if rel != -.95 & group == "q4",  lcolor(cranberry%70) msize(small) || ///     
            scatter b rel if group == "q4", mcolor(red%70) msymbol(smdiamond) msize(small)  ///  
-           xlab(-5(1)5) ylab(#8) ///                         
+           xlab(-4(1)5) ylab(#8) ///                         
               yline(0, lcolor(black) lpattern(solid)) ///                                               
               legend(on order(2 "Q1 Exposed (Post Period Avg: `q1_mean')" 4 "Q2 Exposed (Post Period Avg: `q2_mean')" 6 "Q3 Exposed (Post Period Avg: `q3_mean')" 8 "Q4 Exposed (Post Period Avg: `q4_mean')") pos(7) ring(1) size(small) region(fcolor(none))) xtitle("Relative Year") ytitle("`var_name'") plotregion(margin(sides))
         graph export ../output/figures/`samp'/es_`yvar'_split`suf'_`samp'.pdf, replace     
@@ -364,7 +430,7 @@ program combine_es_graphs
            scatter b rel if group == "below", mcolor(lavender%60) msize(small) || ///                   
            rcap ub lb rel if rel != -1 & group == "above",  lcolor(dkorange) msize(small) || ///     
            scatter b rel if group == "above", mcolor(dkorange) msymbol(smdiamond) msize(small)  ///  
-           xlab(-5(1)5) ylab(#8) ///                         
+           xlab(-4(1)5) ylab(#8) ///                         
               yline(0, lcolor(black) lpattern(solid)) ///                                               
               legend(on order(2 "Below Median Exposure (Post Period Avg: `below_mean')" 4 "Above Median Exposure (Post Period Avg: `above_mean')" ) pos(7) ring(1) size(small) region(fcolor(none))) xtitle("Relative Year") ytitle("`var_name'") plotregion(margin(sides))
         graph export ../output/figures/`samp'/es_`yvar'_split`suf'_`samp'.pdf, replace     
@@ -383,7 +449,7 @@ program combine_es_graphs
            scatter b rel if group == "young", mcolor(lavender%60) msize(small) || ///                   
            rcap ub lb rel if rel != -1 & group == "old",  lcolor(dkorange) msize(small) || ///     
            scatter b rel if group == "old", mcolor(dkorange) msymbol(smdiamond) msize(small)  ///  
-           xlab(-5(1)5) ylab(#8) ///                         
+           xlab(-4(1)5) ylab(#8) ///                         
               yline(0, lcolor(black) lpattern(solid)) ///                                               
               legend(on order(2 "Below Median Age (Post Period Avg: `young_mean')" 4 "Above Median Age (Post Period Avg: `old_mean')" ) pos(7) ring(1) size(small) region(fcolor(none))) xtitle("Relative Year") ytitle("`var_name'") plotregion(margin(sides))
         graph export ../output/figures/`samp'/es_`yvar'_age_split`suf'_`samp'.pdf, replace     

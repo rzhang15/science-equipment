@@ -7,14 +7,21 @@ preliminaries
 version 17
 
 program main
-    overlay_hist
+    overlay_hist, real_file("../external/real/did_coefs_price") ///
+        placebo_file("../external/placebo/did_coefs_placebo") ///
+        outcome("price") suf("")
+    overlay_hist, real_file("../external/real/did_coefs_spend") ///
+        placebo_file("../external/placebo/did_coefs_placebo_spend") ///
+        outcome("spend") suf("_spend")
 end
 
 program overlay_hist
-    use ../external/real/did_coefs, clear
+    syntax, real_file(str) placebo_file(str) outcome(str) [suf(str)]
+
+    use `real_file', clear
     keep b spend_2013
     gen sample = 1
-    append using ../external/placebo/did_coefs_placebo, keep(b spend_2013 iter)
+    append using `placebo_file', keep(b spend_2013 iter)
     replace sample = 2 if mi(sample)
 
     // unweighted summaries
@@ -54,31 +61,31 @@ program overlay_hist
 
     tw kdensity b if sample == 1, color(lavender%70) lwidth(medthick) || ///
        kdensity b if sample == 2, color(gs10%80) lwidth(medthick) lpattern(dash) ///
-       xtitle("DiD Coefficient") ///
+       xtitle("DiD Coefficient (log `outcome')") ///
        ytitle("Density") ///
        xlab(-0.6(0.1)0.6) ///
        xline(0, lcolor(gs6) lpattern(dash)) ///
        xline(`mean_r_raw', lcolor(purple) lpattern(solid) lwidth(medthin)) ///
        legend(on order(1 "Actual Treatment Effects (N=`N_r', mean=`mean_r', sd=`sd_r')" ///
                        2 "Placebo Treatment Effects (N=`N_p', mean=`mean_p', sd=`sd_p')") ///
-              pos(7) ring(1) region(fcolor(none)) size(small)) 
-    graph export ../output/figures/did_coefs_overlay_kdens_uw.pdf, replace
+              pos(7) ring(1) region(fcolor(none)) size(small))
+    graph export ../output/figures/did_coefs_overlay_kdens_uw`suf'.pdf, replace
 
-    // Companion figure: histogram of the 100 placebo iteration means with the
+    // Companion figure: histogram of the placebo iteration means with the
     // observed mean overlaid -- this is the actual reference distribution for
     // the RI p-value above.
     preserve
         keep if sample == 2
         collapse (mean) iter_mean = b, by(iter)
         tw histogram iter_mean, color(gs10%80) width(0.005) ///
-           xtitle("Mean DiD coefficient within placebo iteration") ///
+           xtitle("Mean DiD coefficient within placebo iteration (log `outcome')") ///
            ytitle("Density") ///
            xline(`mean_r_raw', lcolor(purple) lwidth(medthick)) ///
            xline(0, lcolor(gs6) lpattern(dash)) ///
            legend(off) ///
            title("Placebo iteration means (N=`n_iter'); purple = observed mean (`mean_r')", size(small)) ///
            note("One-sided RI p = `p_one'; two-sided RI p = `p_two'; KS D = `ks_d', p = `ks_p'", size(vsmall))
-        graph export ../output/figures/placebo_iter_means_ri.pdf, replace
+        graph export ../output/figures/placebo_iter_means_ri`suf'.pdf, replace
     restore
 
 end

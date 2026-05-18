@@ -14,29 +14,15 @@ dir.create("../output/balance_plots", recursive = TRUE, showWarnings = FALSE)
 # ---------------------------
 # Configuration
 # ---------------------------
-# Matching covariates. Picked via explore_specs.R: spend-weighted across-outcome
-# (price/qty/spend) pretrend search at ratio=3.
+# Matching covariates. Picked via explore_specs.R.
 #
-# t13 (current pick): price slope + qty slope.
-#   Composite target_rank=5.1 — best balance of pretrend across price/qty/spend
-#   and post-period gap among the 2-covariate specs. Also strong on individual
-#   covariate balance (mean SMD=0.033). Preferred for parsimony + multi-outcome
-#   pretrend coverage.
-#
-# t11 (alternative): price slope + spend slope + price intercept.
-#   Lowest worst-outcome pretrend (max=0.199). Preferred when balancing the
-#   price level (intercept) explicitly matters.
-#
-# t27 (alternative): annual pre-period prices + spend slope.
-#   Best price-only pretrend (0.095). Preferred when price is the headline
-#   outcome and qty/spend pretrends are secondary.
- MATCH_COVARIATES <- c("log_raw_qty_2013", "log_raw_qty_2012", "log_raw_qty_slope")
- #MATCH_COVARIATES <- c("avg_log_price_2010", "avg_log_price_2011",
- #                      "avg_log_price_2012", "avg_log_price_2013",
- #                      "log_raw_spend_slope")
+# v80 (current pick): avg_log_price_pre_mean + avg_log_price_slope.
+#   Pre-period price level (3-yr mean of 2011-2013) anchors the level, slope
+#   anchors the trend direction. Two-covariate price-focused spec.
+MATCH_COVARIATES <- c("avg_log_price_pre_mean", "avg_log_price_slope")
 
-# Number of controls per treated unit (specs evaluated at ratio=3)
-MATCH_RATIO <- 3
+# Number of controls per treated unit
+MATCH_RATIO <- 2
 
 # Outcome variables to plot
 OUTCOME_VARS <- c("avg_log_price")
@@ -69,8 +55,9 @@ data_wide <- all_data_pre %>%
     # Log-transform spend to reduce skew — huge markets won't dominate distance
     log_spend_2013 = log(spend_2013 + 1)
   )
-# Pre-period regression: slope on year and intercept centered at 2012 (year-2012),
-# computed for price, spend, and qty so t13/t27/t11 specs work without code changes.
+# Pre-period regressions (slope/intercept, year centered at 2012) plus the
+# 3-year pre-period mean (2011-2013) used by v80. Computed for price/spend/qty
+# so multiple specs can be swapped in without code changes.
 pre_slopes <- panel %>%
   filter(year <= 2013) %>%
   mutate(year_c = year - 2012) %>%
@@ -83,8 +70,19 @@ pre_slopes <- panel %>%
     .groups = "drop"
   )
 
+pre_means <- panel %>%
+  filter(year >= 2011, year <= 2013) %>%
+  group_by(category) %>%
+  summarise(
+    avg_log_price_pre_mean = mean(avg_log_price, na.rm = TRUE),
+    log_raw_qty_pre_mean   = mean(log_raw_qty,   na.rm = TRUE),
+    log_raw_spend_pre_mean = mean(log_raw_spend, na.rm = TRUE),
+    .groups = "drop"
+  )
+
 data_wide <- data_wide %>%
-  left_join(pre_slopes, by = "category")
+  left_join(pre_slopes, by = "category") %>%
+  left_join(pre_means,  by = "category")
 cat("Wide data dimensions:", dim(data_wide), "\n")
 
 # ---------------------------

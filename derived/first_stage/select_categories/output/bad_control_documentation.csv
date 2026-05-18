@@ -1,14 +1,24 @@
 category,bad_control,bad_control_reason
-avidin products,1,biotin-avidin/probe/hybridization reagent; co-moves with antibody and reactive-dye markets
-dna-salmon sperm,1,biotin-avidin/probe/hybridization reagent; co-moves with antibody and reactive-dye markets
-gene expression inducers,1,cloning/expression cofactor bundled with Tier 2 cloning enzymes/kits
-histology & cell stains,1,stain/probe family bundled with reactive dyes (Tier 2)
-iptg,1,cloning/expression cofactor bundled with Tier 2 cloning enzymes/kits
-phalloidin conjugates,1,biotin-avidin/probe/hybridization reagent; co-moves with antibody and reactive-dye markets
-phosphoprotein electrophoresis reagents,1,ambiguous classification - specialty SDS-PAGE reagent overlapping with Tier 2 protein workflow
+acetonitrile,1,US shock: Hurricane Ike (2008) hit Texas Gulf ACN production; global shortage with lingering US price effects 2010-2011
+avidin products,1,horizontal overlap pre-merger: Pierce biotin-avidin franchise + Molecular Probes streptavidin-fluor conjugates
+bacterial selection antibiotics - rifampicin,1,
+bottle top filters,1,US M&A in window: Pall Corp -> Danaher (closed Aug 2015) reshuffled US lab filtration market
+catalase,1,
+centrifugal ultrafiltration devices,1,US M&A in window: Pall Corp -> Danaher (closed Aug 2015) reshuffled US lab filtration market
+collagenase,1,
+dextrose,1,
+egta solution,1,
+ethanol,1,US commodity shock: 2012 Midwest drought + RFS volatility 2012-2014 moved corn-ethanol prices
+formaldehydes and paraformaldehydes,1,"US regulatory shock: EPA IRIS 2010, NTP 12th RoC 2011 listed as known human carcinogen, OSHA tightening"
+hypodermic needles,1,US M&A in window: Becton Dickinson + CareFusion closed Mar 2015; BD dominates US needle/syringe
+nitrile gloves,1,US-relevant shock: 2017-2018 NBR feedstock shortage drove 20-40% lab glove price increases
+phosphoprotein electrophoresis reagents,1,classification uncertainty - not shock-based; specialty SDS-PAGE reagent overlapping with Tier 2 protein workflow
+pipes buffers,1,
 primary antibodies,1,antibody reproducibility crisis 2014-16; Sigma-Aldrich/MilliporeSigma merger Nov 2015 affected major antibody supplier
-protein denaturants,1,WB workflow consumable - bundled with Tier 2 chemilum substrates and membranes
 secondary antibodies,1,antibody reproducibility crisis 2014-16; Sigma-Aldrich/MilliporeSigma merger Nov 2015 affected major antibody supplier
-spermidine,1,cloning/expression cofactor bundled with Tier 2 cloning enzymes/kits
-viability stains,1,stain/probe family bundled with reactive dyes (Tier 2)
-western blot stripping buffers,1,WB workflow consumable - bundled with Tier 2 chemilum substrates and membranes
+slide mounting medium,1,
+synthetic dna oligonucleotide - desalted,1,US-driven secular price collapse: Twist Bioscience entry 2013 + IDT scale-up dropped per-base costs ~10x in window
+synthetic dual-labeled probe,1,US-driven secular price collapse: Twist Bioscience entry 2013 + IDT scale-up dropped per-base costs ~10x in window
+synthetic shrna,1,
+syringe filters,1,US M&A in window: Pall Corp -> Danaher (closed Aug 2015) reshuffled US lab filtration market
+syringes,1,US M&A in window: Becton Dickinson + CareFusion closed Mar 2015; BD dominates US needle/syringe
