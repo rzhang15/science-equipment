@@ -1,4 +1,6 @@
 ./samp/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/process_foias/merge_foias_for_expsr/output/
 ./categories/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/first_stage/select_categories/output/
 ./real_exposure/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/exposure_msr/output
+./imputed/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/foia_similarity_wts/output
+./ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/foia_similarity_wts/output
 

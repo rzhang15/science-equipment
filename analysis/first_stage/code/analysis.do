@@ -219,7 +219,7 @@ program process_coefs
 
     use `infile', clear
     merge m:1 category using ../external/samp/category_hhi_tfidf, assert(1 2 3) keep(3) nogen
-    drop if delta_hhi <= -2500
+*    drop if delta_hhi <= -2500
     merge m:1 category using ../external/merged/spend_xw, assert(2 3) keep(3) nogen
     gen lb = b - 1.96*se
     gen ub = b + 1.96*se
@@ -353,9 +353,7 @@ program process_coefs
 
     corr b_eb simulated_hhi [aw=spend_2013]
     local corr_eb : di %4.3f r(rho)
-    tw scatter b_eb simulated_hhi [aw = spend_2013], ///
-        legend(on order(- "corr: `corr_eb'") ring(0) pos(1)) ///
-        xtitle("Simulated HHI") ytitle("EB DiD Coefficient (log `outcome')")
+    binscatter2 b_eb simulated_hhi [aw = spend_2013], legend(on order(- "corr: `corr_eb'") ring(0) pos(1)) xtitle("Simulated HHI") ytitle("EB DiD Coefficient (log `outcome')")
     graph export ../output/figures/sim_hhi_corr_eb_`outcome'.pdf, replace
 end
 
@@ -855,7 +853,7 @@ program manual_event_study
     gen year_fes_lb = year_fes - 1.96*year_fes_se
     gen trt_coef_ub = trt_coef + 1.96*trt_coef_se
     gen trt_coef_lb = trt_coef - 1.96*trt_coef_se 
-    gen rel_year_fes = rel + 0.1
+    gen rel_year_fes = year + 0.1
     
     hashsort rel
     sum ub , d
@@ -864,6 +862,9 @@ program manual_event_study
     local ymin = min(`ymin', round(r(min),0.1))
     export delimited using "../output/estimates/`suf'es_`yvar'_estimates`file_suf'.csv", replace
     save "../temp/`suf'es_`yvar'_estimates`file_suf'", replace
+    sum year , d
+    local year_min = r(min)
+    local year_max = r(max)
    /* if "`title'" == "" {
         tw rcap ub lb rel if rel != -1 & inrange(rel, `lead', `lag') , lcolor(ebblue%70) msize(vsmall) || ///
         scatter b rel if inrange(rel, `lead', `lag') , mcolor(ebblue) || ///
@@ -874,23 +875,23 @@ program manual_event_study
         plotregion(margin(sides))
         graph export "../output/figures/es/`suf'es_`yvar'_`file_suf'.pdf", replace
     }*/
-        tw rcap ub lb rel if rel != -1 & inrange(rel, `lead', `lag') , lcolor(ebblue%70) msize(vsmall) || ///
-        scatter b rel if inrange(rel, `lead', `lag') , mcolor(ebblue) || ///
-        scatteri `ymax' -0.25 `ymax' 0.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
-        xlab(`lead'(1)`lag') xtitle("Relative Year") ///
+        tw rcap ub lb year if rel != -1 & inrange(rel, `lead', `lag') , lcolor(ebblue%70) msize(vsmall) || ///
+        scatter b year if inrange(rel, `lead', `lag') , mcolor(ebblue) || ///
+        scatteri `ymax' 2013.75 `ymax' 2014.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
+        xlab(`year_min'(1)`year_max') xtitle("Year") ///
         ytitle("`name'") ylab(`ymin'(`ygap')`ymax') yline(0, lcolor(gs10) lpattern(solid)) ///
         legend(on order(- "Treatment Level Avg. in t = -1: `trt_mean'" "Control Level Avg. in t = -1: `ctrl_mean'") pos(7) rows(2) bmargin(zero) size(small)) ///
         title(`title', size(small)) plotregion(margin(sides))
         graph export "../output/figures/es/`suf'es_`yvar'_`file_suf'.pdf", replace
-        
-        tw rcap trt_coef_ub trt_coef_lb rel if rel != -1 & inrange(rel, `lead', `lag') , lcolor(ebblue%70) msize(vsmall) || ///
+
+        tw rcap trt_coef_ub trt_coef_lb year if rel != -1 & inrange(rel, `lead', `lag') , lcolor(ebblue%70) msize(vsmall) || ///
         rcap year_fes_ub year_fes_lb rel_year_fes if rel != -1 & inrange(rel, `lead', `lag') , lcolor(dkorange%70) lpattern(dash) msize(vsmall) || ///
-        scatter trt_coef rel if inrange(rel, `lead', `lag') , mcolor(ebblue) || ///
+        scatter trt_coef year if inrange(rel, `lead', `lag') , mcolor(ebblue) || ///
         scatter year_fes rel_year_fes if inrange(rel, `lead', `lag') , mcolor(dkorange) msymbol(diamond) || ///
-        scatteri `ymax' -0.25 `ymax' 0.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
-        xlab(`lead'(1)`lag') xtitle("Relative Year") ///
+        scatteri `ymax' 2013.75 `ymax' 2014.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
+        xlab(`year_min'(1)`year_max') xtitle("Year") ///
         ytitle("`name'") ylab(`ymin'(`ygap')`ymax') yline(0, lcolor(gs10) lpattern(solid)) ///
-        legend(on order(1 "Treatment Level Avg. in t = 1: `trt_mean'" 2 "Control Level Avg. in t = 1: `ctrl_mean'") pos(7) rows(2) bmargin(zero) size(small)) ///
+        legend(on order(1 "Treatment Level Avg. in t = -1: `trt_mean'" 2 "Control Level Avg. in t = -1: `ctrl_mean'") pos(7) rows(2) bmargin(zero) size(small)) ///
         title(`title', size(small)) plotregion(margin(sides))
         graph export "../output/figures/es/split_`suf'es_`yvar'_`file_suf'.pdf", replace
     restore

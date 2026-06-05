@@ -76,6 +76,13 @@ def embed_foia(model, out_emb: str, out_ids: str, foia_csv: str = FOIA_CSV) -> N
     print(f"Loading FOIA texts from {foia_csv}...")
     df = pd.read_csv(foia_csv)
     df[TEXT_COL] = df[TEXT_COL].fillna("").astype(str)
+    # Defensive: empty-text rows would embed as the model's blank-CLS
+    # token, then poison cosine sims and any LOOV-style validation.
+    text_len = df[TEXT_COL].str.len()
+    if (text_len < 50).any():
+        dropped = df.loc[text_len < 50, 'athr_id'].tolist()
+        print(f"  dropping {len(dropped)} rows with empty/short text: {dropped}")
+        df = df.loc[text_len >= 50].reset_index(drop=True)
     print(f"FOIA authors: {len(df)}")
 
     embs = encode_authors(model, df["athr_id"].tolist(), df[TEXT_COL].tolist())

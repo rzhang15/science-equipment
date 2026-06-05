@@ -1,0 +1,317 @@
+-------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  /n/holylabs/pakes_lab/Lab/sci_eq/analysis/reduced_form/code/diag_p
+> ostchange.log
+  log type:  text
+ opened on:   5 Jun 2026, 11:01:47
+
+. 
+. // ---------- FOIA flag ----------
+. use ../external/real_exposure/athr_exposure, clear
+
+. keep athr_id
+
+. gen byte foia_flag = 1
+
+. save ../temp/diag_pc_foia, replace
+(file ../temp/diag_pc_foia.dta not found)
+file ../temp/diag_pc_foia.dta saved
+
+. 
+. // ---------- imputed pool ----------
+. import delimited ../external/exposure/final_imputed_exposure_restricted, clea
+> r
+(encoding automatically selected: ISO-8859-2)
+(4 vars, 1,527,362 obs)
+
+. rename (exposure mkt_spend_shr) (imputed imputed_mkt_spend_shr)
+
+. keep athr_id imputed imputed_mkt_spend_shr
+
+. save ../temp/diag_pc_imp, replace
+(file ../temp/diag_pc_imp.dta not found)
+file ../temp/diag_pc_imp.dta saved
+
+. 
+. // ---------- mirror current restrict_samp ----------
+. use ../external/samp/athr_panel_full_year_last_all_jrnls_r1_r2_public, clear
+
+. merge m:1 athr_id using ../temp/diag_pc_foia, keep(1 3) nogen
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                     1,081,773
+        from master                 1,081,773  
+        from using                          0  
+
+    Matched                             2,965  
+    -----------------------------------------
+
+. replace foia_flag = 0 if mi(foia_flag)
+(1,081,773 real changes made)
+
+. 
+. di as result _newline "===== POST-CHANGE author sample funnel (all_jrnls_r1_r
+> 2_public) ====="
+
+===== POST-CHANGE author sample funnel (all_jrnls_r1_r2_public) =====
+
+. gunique athr_id
+N = 1,084,738; 334,200 unbalanced groups of sizes 1 to 60
+
+. di as result _newline "STEP 0 (raw panel): " r(unique) " PIs"
+
+STEP 0 (raw panel): 334200 PIs
+
+. gunique athr_id if foia_flag
+N = 2,965; 194 unbalanced groups of sizes 1 to 41
+
+. di as result "    FOIA:     " r(unique)
+    FOIA:     194
+
+. gunique athr_id if !foia_flag
+N = 1,081,773; 334,006 unbalanced groups of sizes 1 to 60
+
+. di as result "    non-FOIA: " r(unique)
+    non-FOIA: 334006
+
+. 
+. // line 70-72: tot_pprs >= 10  <-- NOW COMMENTED OUT, so skip
+. bys athr_id: egen tot_pprs = total(ppr_cnt)
+
+. drop tot_pprs
+
+. 
+. // line 73-74: max_year >= 2014
+. bys athr_id: egen max_year = max(year)
+
+. keep if max_year >= 2014
+(540,257 observations deleted)
+
+. gunique athr_id if foia_flag
+N = 2,754; 169 unbalanced groups of sizes 1 to 41
+
+. di as result _newline "STEP 1 (max_year >= 2014):    FOIA: " r(unique)
+
+STEP 1 (max_year >= 2014):    FOIA: 169
+
+. gunique athr_id if !foia_flag
+N = 541,727; 110,718 unbalanced groups of sizes 1 to 60
+
+. di as result "                             non-FOIA: " r(unique)
+                             non-FOIA: 110718
+
+. 
+. // line 75: year in [2010, 2019]
+. keep if inrange(year, 2010, 2019)
+(322,996 observations deleted)
+
+. gunique athr_id if foia_flag
+N = 1,066; 169 unbalanced groups of sizes 1 to 10
+
+. di as result _newline "STEP 2 (year in [2010,2019]): FOIA: " r(unique)
+
+STEP 2 (year in [2010,2019]): FOIA: 169
+
+. gunique athr_id if !foia_flag
+N = 220,419; 75,338 unbalanced groups of sizes 1 to 10
+
+. di as result "                             non-FOIA: " r(unique)
+                             non-FOIA: 75338
+
+. 
+. // line 76-77: min_year <= 2013  (changed from <)
+. bys athr_id: egen min_year = min(year)
+
+. keep if min_year <= 2013
+(63,328 observations deleted)
+
+. gunique athr_id if foia_flag
+N = 998; 148 unbalanced groups of sizes 1 to 10
+
+. di as result _newline "STEP 3 (min_year <= 2013):    FOIA: " r(unique)
+
+STEP 3 (min_year <= 2013):    FOIA: 148
+
+. gunique athr_id if !foia_flag
+N = 157,159; 32,954 unbalanced groups of sizes 1 to 10
+
+. di as result "                             non-FOIA: " r(unique)
+                             non-FOIA: 32954
+
+. 
+. // line 78: merge imputed keep(3)
+. merge m:1 athr_id using ../temp/diag_pc_imp, keep(3) nogen
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                           108,110  
+    -----------------------------------------
+
+. gunique athr_id if foia_flag
+N = 998; 148 unbalanced groups of sizes 1 to 10
+
+. di as result _newline "STEP 4 (merge imputed):       FOIA: " r(unique)
+
+STEP 4 (merge imputed):       FOIA: 148
+
+. gunique athr_id if !foia_flag
+N = 107,112; 21,624 unbalanced groups of sizes 1 to 10
+
+. di as result "                             non-FOIA: " r(unique)
+                             non-FOIA: 21624
+
+. 
+. // line 79: merge FOIA observed
+. merge m:1 athr_id using ../external/real_exposure/athr_exposure, keep(1 3) no
+> gen
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                       107,112
+        from master                   107,112  
+        from using                          0  
+
+    Matched                               998  
+    -----------------------------------------
+
+. gen foia_athr = 1 if !mi(exposure)
+(107,112 missing values generated)
+
+. replace imputed = exposure if !mi(exposure)
+(998 real changes made)
+
+. replace imputed_mkt_spend_shr = mkt_spend_shr if !mi(mkt_spend_shr)
+(998 real changes made)
+
+. // lines 83-85 commented out
+. 
+. drop exposure
+
+. rename imputed exposure
+
+. 
+. // line 113-116: num_yrs > 1
+. bys athr_id: gen num_yrs = _N
+
+. keep if num_yrs > 1
+(971 observations deleted)
+
+. gunique athr_id if foia_flag
+N = 997; 147 unbalanced groups of sizes 2 to 10
+
+. di as result _newline "STEP 5 (num_yrs > 1):         FOIA: " r(unique)
+
+STEP 5 (num_yrs > 1):         FOIA: 147
+
+. gunique athr_id if !foia_flag
+N = 106,142; 20,654 unbalanced groups of sizes 2 to 10
+
+. di as result "                             non-FOIA: " r(unique)
+                             non-FOIA: 20654
+
+. 
+. // line 114-117: num_place == 1
+. bys athr_id inst_id: gen plc_cntr = _n == 1
+
+. bys athr_id: egen num_place = total(plc_cntr)
+
+. keep if num_place == 1
+(8,555 observations deleted)
+
+. gunique athr_id if foia_flag
+N = 898; 134 unbalanced groups of sizes 2 to 10
+
+. di as result _newline "STEP 6 (num_place == 1):      FOIA: " r(unique)
+
+STEP 6 (num_place == 1):      FOIA: 134
+
+. gunique athr_id if !foia_flag
+N = 97,686; 19,042 unbalanced groups of sizes 2 to 10
+
+. di as result "                             non-FOIA: " r(unique)
+                             non-FOIA: 19042
+
+. 
+. // line 118: drop if exposure <= 0 -- REMOVED in current code
+. 
+. // tsfill + tot_pprs >= 5
+. gegen athr = group(athr_id)
+
+. xtset athr year
+
+Panel variable: athr (unbalanced)
+ Time variable: year, 2010 to 2019, but with gaps
+         Delta: 1 unit
+
+. tsfill
+
+. hashsort athr year
+(already sorted)
+
+. foreach var in athr_id exposure foia_flag min_year inst_id {
+  2.     bys athr (year): replace `var' = `var'[_n-1] if mi(`var')
+  3. }
+(44,899 real changes made)
+(44899 real changes made)
+(44,899 real changes made)
+(44899 real changes made)
+(44,899 real changes made)
+
+. replace ppr_cnt = 0 if mi(ppr_cnt)
+(44,899 real changes made)
+
+. bys athr_id: egen tot_pprs2 = total(ppr_cnt)
+
+. keep if tot_pprs2 >= 5
+(35,317 observations deleted)
+
+. gunique athr_id if foia_flag
+N = 1,070; 120 unbalanced groups of sizes 4 to 10
+
+. di as result _newline "STEP 8 (tsfill + tot_pprs2>=5): FOIA: " r(unique)
+
+STEP 8 (tsfill + tot_pprs2>=5): FOIA: 120
+
+. gunique athr_id if !foia_flag
+N = 107,096; 12,946 unbalanced groups of sizes 2 to 10
+
+. di as result "                              non-FOIA: " r(unique)
+                              non-FOIA: 12946
+
+. 
+. di as result _newline "===== DONE ====="
+
+===== DONE =====
+
+. 
+. // sanity check against the actual saved analysis dataset
+. preserve
+
+. use ../temp/es_all_jrnls_r1_r2_public, clear
+
+. gunique athr_id
+N = 108,166; 13,066 unbalanced groups of sizes 2 to 10
+
+. di as result _newline "Saved es_all_jrnls_r1_r2_public total athr_id: " r(uni
+> que)
+
+Saved es_all_jrnls_r1_r2_public total athr_id: 13066
+
+. gunique athr_id if foia_athr == 1
+N = 856; 120 unbalanced groups of sizes 3 to 10
+
+. di as result "  with foia_athr==1: " r(unique)
+  with foia_athr==1: 120
+
+. restore
+
+. 
+. log close
+      name:  <unnamed>
+       log:  /n/holylabs/pakes_lab/Lab/sci_eq/analysis/reduced_form/code/diag_p
+> ostchange.log
+  log type:  text
+ closed on:   5 Jun 2026, 11:02:51
+-------------------------------------------------------------------------------

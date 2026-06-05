@@ -1,0 +1,4 @@
+./ls_samp/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/clean_ls_samp/output 
+./samp/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/gather_athr_pprs/output 
+./foia_athr/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/exposure_msr/output/
+

@@ -18,11 +18,46 @@ end
 program overlay_hist
     syntax, real_file(str) placebo_file(str) outcome(str) [suf(str)]
 
+    // ============================================================
+    // Empirical Bayes shrinkage (applied separately to the real
+    // cross-section and to each placebo iter). Recipe from
+    // analysis/first_stage/code/analysis.do:
+    //   b_i ~ N(theta_i, se_i^2), theta_i ~ N(mu, tau^2)
+    //   b_eb = w*b + (1-w)*mu_hat, w = tau^2 / (tau^2 + se_i^2)
+    //   mu_hat = precision-weighted mean of b within group
+    //   tau^2  = max(0, var(b) - mean(se^2)) within group
+    // The real sample is one group; each placebo iter is its own group.
+    // ============================================================
     use `real_file', clear
-    keep b spend_2013
+    keep b se spend_2013
     gen sample = 1
-    append using `placebo_file', keep(b spend_2013 iter)
-    replace sample = 2 if mi(sample)
+    gen iter = 0
+    tempfile real_raw
+    save `real_raw'
+
+    use `placebo_file', clear
+    keep b se spend_2013 iter
+    gen sample = 2
+    append using `real_raw'
+
+    // group key: real = 0, placebo iters = 1..N
+    egen grp = group(sample iter)
+
+    gen var_se = se^2
+    bys grp: egen mean_var_se = mean(var_se)
+    bys grp: egen sample_var  = sd(b)
+    replace sample_var = sample_var^2
+    gen tau2 = max(0, sample_var - mean_var_se)
+    gen prec = 1 / var_se
+    bys grp: egen sum_prec    = total(prec)
+    bys grp: egen sum_prec_b  = total(prec * b)
+    gen mu_hat = sum_prec_b / sum_prec
+    gen w_eb = tau2 / (tau2 + var_se)
+    gen b_eb = w_eb * b + (1 - w_eb) * mu_hat
+
+    // replace b with the EB-shrunk version for all downstream stats/plots
+    replace b = b_eb
+    drop b_eb var_se mean_var_se sample_var tau2 prec sum_prec sum_prec_b mu_hat w_eb grp
 
     // unweighted summaries
     sum b if sample == 1, d
@@ -69,7 +104,7 @@ program overlay_hist
        legend(on order(1 "Actual Treatment Effects (N=`N_r', mean=`mean_r', sd=`sd_r')" ///
                        2 "Placebo Treatment Effects (N=`N_p', mean=`mean_p', sd=`sd_p')") ///
               pos(7) ring(1) region(fcolor(none)) size(small))
-    graph export ../output/figures/did_coefs_overlay_kdens_uw`suf'.pdf, replace
+    graph export ../output/figures/did_coefs_overlay_kdens_eb`suf'.pdf, replace
 
     // Companion figure: histogram of the placebo iteration means with the
     // observed mean overlaid -- this is the actual reference distribution for
@@ -85,7 +120,7 @@ program overlay_hist
            legend(off) ///
            title("Placebo iteration means (N=`n_iter'); purple = observed mean (`mean_r')", size(small)) ///
            note("One-sided RI p = `p_one'; two-sided RI p = `p_two'; KS D = `ks_d', p = `ks_p'", size(vsmall))
-        graph export ../output/figures/placebo_iter_means_ri`suf'.pdf, replace
+        graph export ../output/figures/placebo_iter_means_ri_eb`suf'.pdf, replace
     restore
 
 end

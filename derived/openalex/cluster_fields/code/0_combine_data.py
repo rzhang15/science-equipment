@@ -1,6 +1,7 @@
 import os
 import re
 import random
+import multiprocessing as mp
 import numpy as np
 import pandas as pd
 import polars as pl
@@ -111,23 +112,33 @@ q_static_corpus = (
 )
 
 df_lifetime = q_static_corpus.collect(streaming=True)
-print(f"Total Unique Authors to Cluster: {len(df_lifetime)}")
+print(f"Total Unique Authors to Cluster: {len(df_lifetime)}", flush=True)
+
+df_lifetime.write_parquet("../output/author_text_unstemmed.parquet")
 
 pdf = df_lifetime.to_pandas()
+del df_lifetime
 
-print("Applying Stemming (Single Core)...")
 def clean_and_stem(text):
     if not text or len(text) < 5: return ""
     tokens = text.split()
-    tokens = [
-        stemmer.stem(t) for t in tokens 
-        if len(t) > 2 and not t.isdigit() and t not in custom_stopwords_set
-    ]
-    return " ".join(tokens)
+    return " ".join(
+        stemmer.stem(t) for t in tokens
+        if len(t) > 2 and not t.isdigit() and t not in stopwords_set
+    )
 
-pdf['processed_text'] = pdf['full_text_lifetime'].apply(clean_and_stem)
+if __name__ == "__main__":
+    n_workers = int(os.environ.get("SLURM_CPUS_PER_TASK", mp.cpu_count()))
+    n_workers = max(1, n_workers - 1)
+    texts = pdf['full_text_lifetime'].tolist()
+    print(f"Applying Stemming ({n_workers} workers, {len(texts):,} authors)...", flush=True)
 
-pdf = pdf[pdf['processed_text'].str.len() > 50] 
+    chunksize = max(500, len(texts) // (n_workers * 16))
+    with mp.Pool(n_workers) as pool:
+        pdf['processed_text'] = pool.map(clean_and_stem, texts, chunksize=chunksize)
+    del texts
 
-print("Saving pre-clustered text data (Parquet)...")
-pdf[['athr_id', 'processed_text']].to_parquet("../output/cleaned_static_author_text_pre.parquet", index=False)
+    pdf = pdf[pdf['processed_text'].str.len() > 50]
+
+    print(f"Saving pre-clustered text data ({len(pdf):,} authors)...", flush=True)
+    pdf[['athr_id', 'processed_text']].to_parquet("../output/cleaned_static_author_text_pre.parquet", index=False)

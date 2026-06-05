@@ -388,6 +388,131 @@ plot_event_study <- function(match_pairs, uni_panel, spec_name, match_ratio,
 }
 
 # ---------------------------
+# Per-spec SPLIT EVENT STUDY: separate treated and control trajectories.
+# Mirrors the split plot in `manual_event_study` in analysis.do.
+# Regression (year as REGRESSOR, not absorbed):
+#   y ~ i(year, ref=2013) + i(year, treated, ref=2013) | uni_id + mkt
+# Then:
+#   Control trend  = year:: coefficients
+#   Treated trend  = year:: + year::treated  (linear combination; SE from vcov)
+# Both curves are linearly detrended by lm(control ~ rel) and re-centered at
+# rel = -1, matching Stata's `reg year_fes rel; predict control_trend, xb`.
+# Difference between the two curves equals the gap coefficient from
+# plot_event_study (detrending is symmetric so it cancels in the gap).
+# ---------------------------
+plot_event_study_split <- function(match_pairs, uni_panel, spec_name, match_ratio,
+                                   vars = c("avg_log_price", "log_raw_qty", "log_raw_spend")) {
+  cats <- unique(c(match_pairs$treated_market, match_pairs$control_market))
+
+  sub <- uni_panel %>%
+    filter(category %in% cats, year >= 2010, year <= 2019) %>%
+    group_by(uni_id, mkt) %>%
+    filter(min(year) < 2014, max(year) > 2014) %>%
+    ungroup()
+
+  if (nrow(sub) == 0) return(invisible(NULL))
+
+  n_uni   <- n_distinct(sub$uni_id)
+  n_mkt_t <- n_distinct(sub$mkt[sub$treated == 1])
+  n_mkt_c <- n_distinct(sub$mkt[sub$treated == 0])
+
+  out_list <- list()
+  for (v in vars) {
+    rows <- !is.na(sub[[v]]) & !is.na(sub$spend_2013)
+    if (sum(rows) < 100) next
+    d <- sub[rows, ]
+    fit <- tryCatch(
+      fixest::feols(
+        stats::as.formula(paste(v,
+          "~ i(year, ref = 2013) + i(year, treated, ref = 2013) | uni_id + mkt")),
+        data = d, weights = ~spend_2013, cluster = ~mkt,
+        notes = FALSE, warn = FALSE),
+      error = function(e) { cat("    split feols failed for", v, ":", e$message, "\n"); NULL }
+    )
+    if (is.null(fit)) next
+
+    coefs <- coef(fit)
+    vc    <- vcov(fit)
+
+    yr_terms <- grep("^year::[0-9]+$", names(coefs), value = TRUE)
+    yrs <- sort(as.integer(sub("^year::([0-9]+)$", "\\1", yr_terms)))
+
+    ctrl_rows <- dplyr::bind_rows(lapply(yrs, function(yr) {
+      tm <- paste0("year::", yr)
+      data.frame(year = yr,
+                 estimate  = unname(coefs[tm]),
+                 std.error = sqrt(unname(vc[tm, tm])),
+                 series = "Control")
+    }))
+    ctrl_rows <- dplyr::bind_rows(ctrl_rows,
+      data.frame(year = 2013L, estimate = 0, std.error = 0, series = "Control"))
+
+    trt_rows <- dplyr::bind_rows(lapply(yrs, function(yr) {
+      tm_yr <- paste0("year::", yr)
+      tm_di <- paste0("year::", yr, ":treated")
+      if (!(tm_di %in% names(coefs))) return(NULL)
+      est <- unname(coefs[tm_yr] + coefs[tm_di])
+      var_est <- unname(vc[tm_yr, tm_yr] + vc[tm_di, tm_di] +
+                          2 * vc[tm_yr, tm_di])
+      data.frame(year = yr, estimate = est,
+                 std.error = sqrt(pmax(var_est, 0)), series = "Treated")
+    }))
+    trt_rows <- dplyr::bind_rows(trt_rows,
+      data.frame(year = 2013L, estimate = 0, std.error = 0, series = "Treated"))
+
+    out <- dplyr::bind_rows(ctrl_rows, trt_rows) %>%
+      mutate(rel = year - 2014, outcome = v)
+
+    # Linear detrend on the control series across ALL years (matches Stata's
+    # `reg year_fes rel`), re-centered at rel = -1.
+    ctrl_only <- out %>% filter(series == "Control") %>% arrange(rel)
+    if (nrow(ctrl_only) >= 2 && diff(range(ctrl_only$rel)) > 0) {
+      fit_ctrl <- lm(estimate ~ rel, data = ctrl_only)
+      trend <- predict(fit_ctrl, newdata = data.frame(rel = out$rel))
+      base  <- predict(fit_ctrl, newdata = data.frame(rel = -1))
+      out$estimate <- out$estimate - trend + base
+    }
+    out$conf.low  <- out$estimate - 1.96 * out$std.error
+    out$conf.high <- out$estimate + 1.96 * out$std.error
+
+    out_list[[v]] <- out
+  }
+
+  if (length(out_list) == 0) return(invisible(NULL))
+
+  long <- dplyr::bind_rows(out_list) %>%
+    mutate(outcome = factor(outcome, levels = vars,
+                            labels = c("log price", "log qty", "log spend")))
+
+  p <- ggplot(long, aes(x = rel, y = estimate, color = series, group = series)) +
+    geom_hline(yintercept = 0, color = "grey60") +
+    geom_vline(xintercept = -0.5, linetype = "dashed", color = "grey40") +
+    geom_line(linewidth = 0.5, alpha = 0.7) +
+    geom_pointrange(aes(ymin = conf.low, ymax = conf.high), size = 0.3,
+                    position = position_dodge(width = 0.25)) +
+    facet_wrap(~ outcome, scales = "free_y") +
+    scale_color_manual(values = c("Control" = "#ff7f00", "Treated" = "#1f78b4")) +
+    scale_x_continuous(breaks = -4:5) +
+    labs(x = "Years from 2014",
+         y = "Event-study coefficient (linearly detrended, rel. to 2013)",
+         color = NULL,
+         title = sprintf("%s (ratio=%d) - split event study (treated vs control)",
+                         spec_name, match_ratio),
+         subtitle = sprintf("uni+mkt FE, w=spend_2013, cluster=mkt | n_uni=%d  trt mkts=%d  ctrl mkts=%d",
+                            n_uni, n_mkt_t, n_mkt_c)) +
+    theme_bw() +
+    theme(legend.position = "bottom")
+
+  dir.create("../output/spec_search/spec_event_study_split",
+             recursive = TRUE, showWarnings = FALSE)
+  ggsave(sprintf("../output/spec_search/spec_event_study_split/es_split_r%d_%s.png",
+                 match_ratio, spec_name),
+         p, width = 10, height = 4, dpi = 150)
+
+  invisible(long)
+}
+
+# ---------------------------
 # Compute pre-treatment trend coefficients per category
 # ---------------------------
 # Use pre-period only (up to 2013)
@@ -644,7 +769,63 @@ specs <- list(
   v80_alp_pre_mean_alp_slope    = c("avg_log_price_pre_mean", "avg_log_price_slope"),
   v81_qty_pre_mean_qty_slope    = c("log_raw_qty_pre_mean", "log_raw_qty_slope"),
   v82_two_pre_means_two_slopes  = c("avg_log_price_pre_mean", "log_raw_qty_pre_mean",
-                                    "avg_log_price_slope", "log_raw_qty_slope")
+                                    "avg_log_price_slope", "log_raw_qty_slope"),
+
+  # === w0: spend-focused mirrors of v01/v02/v12 patterns for log_raw_spend ===
+  w01_spend_pre_mean_only         = c("log_raw_spend_pre_mean"),
+  w02_spend_pre_chg_only          = c("log_raw_spend_pre_chg"),
+  w03_spend_pre_mean_spend13      = c("log_raw_spend_pre_mean", "log_raw_spend_2013"),
+  w04_spend_pre_chg_spend13       = c("log_raw_spend_pre_chg", "log_raw_spend_2013"),
+  w05_spend_alp_pre_means         = c("log_raw_spend_pre_mean", "avg_log_price_pre_mean"),
+
+  # === w1: annual spend levels (mirror v30/v31/v40/v41 for spend) ===
+  w10_spend_2010_2013             = c("log_raw_spend_2010", "log_raw_spend_2013"),
+  w11_spend_2012_2013             = c("log_raw_spend_2012", "log_raw_spend_2013"),
+  w12_spend_annual_10_13          = c("log_raw_spend_2010", "log_raw_spend_2011",
+                                      "log_raw_spend_2012", "log_raw_spend_2013"),
+
+  # === w2: 2011 mid-pre-period anchors (alternative to 2010 or 2013 single-yr) ===
+  w20_alp_2011_only               = c("avg_log_price_2011"),
+  w21_qty_2011_only               = c("log_raw_qty_2011"),
+  w22_alp_2011_2013               = c("avg_log_price_2011", "avg_log_price_2013"),
+  w23_qty_2011_2013               = c("log_raw_qty_2011", "log_raw_qty_2013"),
+
+  # === w3: cross-variable pre_chg (smoother proxies for slopes across outcomes) ===
+  w30_two_pre_chg_alp13           = c("avg_log_price_pre_chg", "log_raw_qty_pre_chg",
+                                      "avg_log_price_2013"),
+  w31_two_pre_chg_qty13           = c("avg_log_price_pre_chg", "log_raw_qty_pre_chg",
+                                      "log_raw_qty_2013"),
+  w32_three_pre_chg_size          = c("avg_log_price_pre_chg", "log_raw_qty_pre_chg",
+                                      "log_raw_spend_pre_chg", "log_spend_2013"),
+
+  # === w4: slope + pre_mean (smoothed level + fitted direction) ===
+  w40_alp_slope_alp_pre_mean      = c("avg_log_price_slope", "avg_log_price_pre_mean"),
+  w41_qty_slope_qty_pre_mean      = c("log_raw_qty_slope", "log_raw_qty_pre_mean"),
+
+  # === w5: size control (log_spend_2013) alone or paired with one level ===
+  w50_logspend13_only             = c("log_spend_2013"),
+  w51_alp13_logspend13            = c("avg_log_price_2013", "log_spend_2013"),
+  w52_qty13_logspend13            = c("log_raw_qty_2013", "log_spend_2013"),
+
+  # === w6: pre_chg + pre_mean (level + direction for same var, no fitted slope) ===
+  w60_alp_pre_chg_pre_mean        = c("avg_log_price_pre_chg", "avg_log_price_pre_mean"),
+  w61_qty_pre_chg_pre_mean        = c("log_raw_qty_pre_chg", "log_raw_qty_pre_mean"),
+
+  # === w7: cross-variable pre_mean + pre_chg ===
+  w70_alp_pre_mean_qty_pre_chg    = c("avg_log_price_pre_mean", "log_raw_qty_pre_chg"),
+  w71_alp_pre_chg_qty_pre_mean    = c("avg_log_price_pre_chg", "log_raw_qty_pre_mean"),
+
+  # === w8: log_raw_price (alternative price aggregation) variants ===
+  w80_lrp_pre_chg_only            = c("log_raw_price_pre_chg"),
+  w81_lrp_pre_mean_lrp13          = c("log_raw_price_pre_mean", "log_raw_price_2013"),
+  w82_lrp_qty_pre_chg             = c("log_raw_price_pre_chg", "log_raw_qty_pre_chg"),
+  w83_lrp_pre_chg_lrp13           = c("log_raw_price_pre_chg", "log_raw_price_2013"),
+
+  # === w9: "kitchen sink" within a single outcome (slope+chg+mean+2013) ===
+  w90_alp_kitchen_sink            = c("avg_log_price_slope", "avg_log_price_pre_chg",
+                                      "avg_log_price_pre_mean", "avg_log_price_2013"),
+  w91_qty_kitchen_sink            = c("log_raw_qty_slope", "log_raw_qty_pre_chg",
+                                      "log_raw_qty_pre_mean", "log_raw_qty_2013")
 )
 
 cat("\nTesting", length(specs), "specifications\n\n")
@@ -740,6 +921,13 @@ evaluate_spec <- function(spec_name, covariates, data_wide, panel, match_ratio) 
   tryCatch(
     plot_event_study(match_pairs, uni_panel, spec_name, match_ratio),
     error = function(e) cat("  ES PLOT (real) FAILED:", e$message, "\n")
+  )
+
+  # Same event study, but plotted as two curves (treated vs control trajectory).
+  # Mirrors the split plot in manual_event_study in analysis.do.
+  tryCatch(
+    plot_event_study_split(match_pairs, uni_panel, spec_name, match_ratio),
+    error = function(e) cat("  ES SPLIT PLOT FAILED:", e$message, "\n")
   )
 
   # Pre- AND post-trend alignment: compute gaps per outcome (price/qty/spend)

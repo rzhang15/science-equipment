@@ -1,0 +1,23 @@
+--- CLUSTER JOB: K=100  svd_dim=256 ---
+Loading TF-IDF matrix...
+  TF-IDF shape: (8569360, 30000)  nnz/row mean: 76.2
+Loading helper files...
+  rows with 0 nonzero features: 2,944
+  rows with <5 nonzero features: 220,196
+
+Reducing to 256 dims via TruncatedSVD...
+  cumulative explained variance: 0.176
+  dense shape: (8569360, 256)   mem: 8.78 GB
+  L2-normalized; ready for spherical K-means semantics.
+
+Clustering into 100 clusters with MiniBatchKMeans...
+
+--- CLUSTER SIZE DISTRIBUTION ---
+  largest cluster: 667,857 authors (7.79% of pool)
+  median size: 59,983    smallest: 22,405
+  size pctiles: 10%=35,666  25%=46,311  75%=88,709  90%=117,915
+
+Saving Results...
+Writing cluster top-term descriptions...
+Saved ../output/static_cluster_descriptions_100.txt
+Done.

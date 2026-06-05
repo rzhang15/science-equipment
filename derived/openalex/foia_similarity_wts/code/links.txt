@@ -6,3 +6,4 @@
 ./us_appended_text/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/us_cluster_fields/output
 ./exposure_wts/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/exposure_msr/output
 ./ls_athrs/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/clean_ls_samp/output
+./athr_panel/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/make_athr_yr_panel/output

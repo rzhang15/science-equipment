@@ -1,0 +1,251 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 120,000; see help set_maxvar.
+
+. do diag_211_vs_194.do 
+
+. // Goal: identify the 17 FOIA PIs missing from the all_jrnls_r1_r2_public pan
+> el.
+. 
+. use ../external/real_exposure/athr_exposure, clear
+
+. keep athr_id exposure
+
+. save ../temp/diag_a211, replace
+file ../temp/diag_a211.dta saved
+
+. 
+. // Pull a "present" flag from each candidate panel, using short var names.
+. local i = 0
+
+. foreach p in athr_panel_full_year_last_all_jrnls               ///
+>              athr_panel_full_year_last_all_jrnls_r1_r2         ///
+>              athr_panel_full_year_last_all_jrnls_r1_r2_public  ///
+>              athr_panel_full_year_last_top_jrnls               ///
+>              athr_panel_full_year_last_top_jrnls_r1_r2_public {
+  2.     local i = `i' + 1
+  3.     preserve
+  4.     use ../external/samp/`p', clear
+  5.     contract athr_id
+  6.     gen byte p`i' = 1
+  7.     keep athr_id p`i'
+  8.     save ../temp/diag_p`i', replace
+  9.     restore
+ 10. }
+(file ../temp/diag_p1.dta not found)
+file ../temp/diag_p1.dta saved
+(file ../temp/diag_p2.dta not found)
+file ../temp/diag_p2.dta saved
+(file ../temp/diag_p3.dta not found)
+file ../temp/diag_p3.dta saved
+(file ../temp/diag_p4.dta not found)
+file ../temp/diag_p4.dta saved
+(file ../temp/diag_p5.dta not found)
+file ../temp/diag_p5.dta saved
+
+. 
+. use ../temp/diag_a211, clear
+
+. forval i = 1/5 {
+  2.     merge 1:1 athr_id using ../temp/diag_p`i', keep(1 3) nogen
+  3.     replace p`i' = 0 if mi(p`i')
+  4. }
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                            14
+        from master                        14  
+        from using                          0  
+
+    Matched                               197  
+    -----------------------------------------
+(14 real changes made)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                            15
+        from master                        15  
+        from using                          0  
+
+    Matched                               196  
+    -----------------------------------------
+(15 real changes made)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                            17
+        from master                        17  
+        from using                          0  
+
+    Matched                               194  
+    -----------------------------------------
+(17 real changes made)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                            68
+        from master                        68  
+        from using                          0  
+
+    Matched                               143  
+    -----------------------------------------
+(68 real changes made)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                            75
+        from master                        75  
+        from using                          0  
+
+    Matched                               136  
+    -----------------------------------------
+(75 real changes made)
+
+. label var p1 "all_jrnls"
+
+. label var p2 "all_jrnls_r1_r2"
+
+. label var p3 "all_jrnls_r1_r2_public  (main analysis panel)"
+
+. label var p4 "top_jrnls"
+
+. label var p5 "top_jrnls_r1_r2_public"
+
+. 
+. di as result _newline "===== FOIA presence across panels (211 total) ====="
+
+===== FOIA presence across panels (211 total) =====
+
+. forval i = 1/5 {
+  2.     qui count if p`i' == 1
+  3.     di as result "  p`i' (`:var label p`i''): present = " r(N) "/211"
+  4. }
+  p1 (all_jrnls): present = 197/211
+  p2 (all_jrnls_r1_r2): present = 196/211
+  p3 (all_jrnls_r1_r2_public  (main analysis panel)): present = 194/211
+  p4 (top_jrnls): present = 143/211
+  p5 (top_jrnls_r1_r2_public): present = 136/211
+
+. 
+. di as result _newline "===== 17 FOIAs missing from main panel (p3 = all_jrnls
+> _r1_r2_public) ====="
+
+===== 17 FOIAs missing from main panel (p3 = all_jrnls_r1_r2_public) =====
+
+. keep if p3 == 0
+(194 observations deleted)
+
+. gunique athr_id
+N = 17; 17 balanced groups of size 1
+
+. di as result "  unique: " r(unique)
+  unique: 17
+
+. list athr_id exposure p1 p2 p3 p4 p5, sep(0) noobs
+
+  +--------------------------------------------------+
+  |     athr_id    exposure   p1   p2   p3   p4   p5 |
+  |--------------------------------------------------|
+  | A5002878507    .0714439    0    0    0    0    0 |
+  | A5006559011   -.1331384    0    0    0    0    0 |
+  | A5029348961    .0004815    1    1    0    0    0 |
+  | A5035388566   -.0081375    0    0    0    0    0 |
+  | A5037458020    .0285017    0    0    0    0    0 |
+  | A5040811912    .0431787    0    0    0    0    0 |
+  | A5049681206    .0123619    0    0    0    0    0 |
+  | A5060061551   -.0453951    0    0    0    0    0 |
+  | A5081111004   -.0017753    0    0    0    0    0 |
+  | A5091857595   -.0095843    0    0    0    0    0 |
+  | A5100418954    .0195987    1    1    0    1    0 |
+  | A5101434905    .0063982    1    0    0    0    0 |
+  | A5102853421   -.0221184    0    0    0    0    0 |
+  | A5109235622    .0125566    0    0    0    0    0 |
+  | A5110480876   -.0125084    0    0    0    0    0 |
+  | A5111607052    .0960518    0    0    0    0    0 |
+  | A5123507996   -.0046237    0    0    0    0    0 |
+  +--------------------------------------------------+
+
+. 
+. // Of these 17: how many are in NO panel at all?
+. gen any_present = p1 | p2 | p3 | p4 | p5
+
+. di as result _newline "  ... in NO panel at all (true OpenAlex gaps):"
+
+  ... in NO panel at all (true OpenAlex gaps):
+
+. list athr_id exposure if !any_present, sep(0) noobs
+
+  +-------------------------+
+  |     athr_id    exposure |
+  |-------------------------|
+  | A5002878507    .0714439 |
+  | A5006559011   -.1331384 |
+  | A5035388566   -.0081375 |
+  | A5037458020    .0285017 |
+  | A5040811912    .0431787 |
+  | A5049681206    .0123619 |
+  | A5060061551   -.0453951 |
+  | A5081111004   -.0017753 |
+  | A5091857595   -.0095843 |
+  | A5102853421   -.0221184 |
+  | A5109235622    .0125566 |
+  | A5110480876   -.0125084 |
+  | A5111607052    .0960518 |
+  | A5123507996   -.0046237 |
+  +-------------------------+
+
+. 
+. di as result _newline "  ... in at least one OTHER panel but excluded by r1_r
+> 2_public:"
+
+  ... in at least one OTHER panel but excluded by r1_r2_public:
+
+. list athr_id exposure p1 p2 p3 p4 p5 if any_present, sep(0) noobs
+
+  +-------------------------------------------------+
+  |     athr_id   exposure   p1   p2   p3   p4   p5 |
+  |-------------------------------------------------|
+  | A5029348961   .0004815    1    1    0    0    0 |
+  | A5100418954   .0195987    1    1    0    1    0 |
+  | A5101434905   .0063982    1    0    0    0    0 |
+  +-------------------------------------------------+
+
+. 
+. // Cross-check upstream: is there ANY pre-2013-publishing filter in the chain
+> ?
+. // build.do for exposure_msr merges with list_of_athrs. Let's see what list_o
+> f_athrs is.
+. preserve
+
+. use ../external/real_exposure/foia_athrs, clear
+
+. gunique athr_id
+N = 535; 535 balanced groups of size 1
+
+. di as result _newline "foia_athrs.dta (merged FOIA-to-OpenAlex): " r(unique)
+
+foia_athrs.dta (merged FOIA-to-OpenAlex): 535
+
+. restore
+
+. 
+end of do-file

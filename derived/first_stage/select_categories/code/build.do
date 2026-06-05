@@ -498,12 +498,13 @@ tab bad_control
 
 label var bad_control        "Drop from controls: action/shock/bundling in 2010-2018 window"
 label var bad_control_reason "Reason category was flagged as bad control"
-
 gen keep = (support >= 25 & precision >= 0.8 & recall >= 0.8) //| (inrange(support, 10, 25) & precision >= 0.9 & recall >=0.90)
-*replace keep = 0 if category == "synthetic shrna"  // ambiguous RNAi category; placed conservatively in Tier 2 but fails defensive checks
 replace bad_control = 1 if category == "pipes buffers"  
 replace bad_control = 1 if category == "synthetic shrna"  
 replace bad_control =1 if inlist(category, "slide mounting medium", "collagenase", "catalase", "dextrose", "egta solution", "pipes buffers", "bacterial selection antibiotics - rifampicin")
+replace bad_control =1 if inlist(category, "drug - anticoagulant", "sodium hydride", "crystallizing dishes", "citric acid", "formic acid", "gene expression inducers", "dna-salmon sperm")
+replace bad_control =1 if inlist(category, "sucrose", "cell lysis - tween detergents", "flash chromatography columns - silica gel", "cylindrical carboys", "cell culture antibiotics - blasticidin")
+replace bad_control =1 if inlist(category, "nitrogen", "centrifugation media", "ldh cytotoxicity assay", "cell lysis detergents - np-40 (igepal ca-630)", "cell lysis detergents" , "human serum", "colorimetric substrates - TMB", "capillary blood collection tubes")
 replace keep = 0 if bad_control == 1  // drop bad controls from analysis sample
 
 * --- Export bad_control documentation CSV ---

@@ -190,7 +190,7 @@ program clean_raw
         graph export ../output/figures/precision_support_`embed'.pdf, replace
         restore
     }
-    drop if support < 5  
+    drop if support <= 5  
     qui count
     local total_obs = r(N)
     qui sum raw_spend, d
@@ -235,7 +235,7 @@ program clean_raw
         keep if num_years == 10 | (num_years == 9 & min_year == 2011)
        bys category uni_id: gen uni_cat_cnt = _n == 1
         bys category: egen num_uni = total(uni_cat_cnt)
-        drop if num_uni < 5 
+        drop if num_uni <= 5 
         drop num_uni uni_cat_cnt
         drop num_years min_year cnt 
         drop yr_cnt
@@ -342,23 +342,28 @@ program make_panels
 
     preserve
     keep if treated == 1
-    gen avg_log_price_2013 = avg_log_price if year == 2013
-    hashsort category avg_log_price_2013
-    by category: replace avg_log_price_2013 = avg_log_price_2013[_n-1] if mi(avg_log_price_2013)
-    replace avg_log_price = avg_log_price-avg_log_price_2013
     hashsort category year
     tw line avg_log_price year , by(category)
+    by category: gen chg = avg_log_price - avg_log_price[_n-1] 
+    gen max_chg = chg
+    gcollapse (mean) chg (max) max_chg, by(category)
+    tw scatter chg max_chg, mlabel(category) xlab(, labsize(small)) ylab(, labsize(small)) ///
+        xtitle("Average Yearly Change in Log Price (2011-2017)", size(small)) ///
+        ytitle("Max Yearly Change in Log Price (2011-2017)", size(small)) ///
+        legend(off)
     graph export ../output/figures/treated_trends.pdf, replace
     restore
     
     preserve
     keep if treated == 0
-    gen avg_log_price_2013 = avg_log_price if year == 2013
-    hashsort category avg_log_price_2013
-    by category: replace avg_log_price_2013 = avg_log_price_2013[_n-1] if mi(avg_log_price_2013)
-    replace avg_log_price = avg_log_price-avg_log_price_2013
     hashsort category year
-    tw line avg_log_price year , by(category)
+    by category: gen chg = avg_log_price - avg_log_price[_n-1] 
+    gen max_chg = chg
+    gcollapse (mean) chg (max) max_chg, by(category)
+    tw scatter chg max_chg, mlabel(category) xlab(, labsize(small)) ylab(, labsize(small)) ///
+        xtitle("Average Yearly Change in Log Price (2011-2017)", size(small)) ///
+        ytitle("Max Yearly Change in Log Price (2011-2017)", size(small)) ///
+        legend(off)
     graph export ../output/figures/ctrl_trends.pdf, replace
     restore
 end

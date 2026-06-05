@@ -1,5 +1,5 @@
 --------------------------------------------------------------------------------
-Makelog started: 2026-05-17 20:54:13
+Makelog started: 2026-06-01 23:01:02
 Working directory: /n/holylabs/pakes_lab/Lab/sci_eq/derived/first_stage/select_categories/code
 --------------------------------------------------------------------------------
 External links successfully created!
@@ -537,24 +537,26 @@ Notes:
 285. 
 . label var bad_control        "Drop from controls: action/shock/bundling in 2010-2018 window"
 286. label var bad_control_reason "Reason category was flagged as bad control"
-287. 
-. gen keep = (support >= 25 & precision >= 0.8 & recall >= 0.8) //| (inrange(support, 10, 25) & precision >= 0.9 & recall >=0.90)
-288. *replace keep = 0 if category == "synthetic shrna"  // ambiguous RNAi category; placed conservatively in Tier 2 but fails defensive checks
-. replace bad_control = 1 if category == "pipes buffers"  
+287. gen keep = (support >= 25 & precision >= 0.8 & recall >= 0.8) //| (inrange(support, 10, 25) & precision >= 0.9 & recall >=0.90)
+288. replace bad_control = 1 if category == "pipes buffers"  
 289. replace bad_control = 1 if category == "synthetic shrna"  
 290. replace bad_control =1 if inlist(category, "slide mounting medium", "collagenase", "catalase", "dextrose", "egta solution", "pipes buffers", "bacterial selection antibiotics - rifampicin")
-291. replace keep = 0 if bad_control == 1  // drop bad controls from analysis sample
-292. 
+291. replace bad_control =1 if inlist(category, "drug - anticoagulant", "sodium hydride", "crystallizing dishes", "citric acid", "formic acid", "gene expression inducers", "dna-salmon sperm")
+292. replace bad_control =1 if inlist(category, "sucrose", "cell lysis - tween detergents", "flash chromatography columns - silica gel", "cylindrical carboys", "cell culture antibiotics - blasticidin")
+293. replace bad_control =1 if inlist(category, "nitrogen", "centrifugation media", "ldh cytotoxicity assay", "cell lysis detergents - np-40 (igepal ca-630)", "cell lysis detergents" , "human serum", "colorimetric substrates - TMB", "capillary blood colle
+> ction tubes")
+294. replace keep = 0 if bad_control == 1  // drop bad controls from analysis sample
+295. 
 . * --- Export bad_control documentation CSV ---
 . preserve
-293.     keep if bad_control == 1
-294.     keep category bad_control bad_control_reason
-295.     sort category
-296.     export delimited using ../output/bad_control_documentation.csv, replace
-297. restore
-298. 
+296.     keep if bad_control == 1
+297.     keep category bad_control bad_control_reason
+298.     sort category
+299.     export delimited using ../output/bad_control_documentation.csv, replace
+300. restore
+301. 
 . save ../output/categories_`embed', replace
-299. end
+302. end
 
 . main
 (encoding automatically selected: ISO-8859-1)
@@ -896,8 +898,11 @@ bad_control |      Freq.     Percent        Cum.
 (1 real change made)
 (1 real change made)
 (6 real changes made)
-(21 real changes made)
-(1,082 observations deleted)
+(7 real changes made)
+(4 real changes made)
+(6 real changes made)
+(38 real changes made)
+(1,065 observations deleted)
 (file ../output/bad_control_documentation.csv not found)
 file ../output/bad_control_documentation.csv saved
 (file ../output/categories_tfidf.dta not found)
@@ -907,6 +912,6 @@ file ../output/categories_tfidf.dta saved
 end of do-file
 
 --------------------------------------------------------------------------------
-Makelog ended: 2026-05-17 20:54:14
+Makelog ended: 2026-06-01 23:01:03
 Working directory: /n/holylabs/pakes_lab/Lab/sci_eq/derived/first_stage/select_categories/code
 --------------------------------------------------------------------------------

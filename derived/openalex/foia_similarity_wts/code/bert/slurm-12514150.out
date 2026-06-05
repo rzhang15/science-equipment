@@ -1,2 +1,0 @@
-Model: allenai-specter   Stage: validate   K: 5
-python: can't open file '/var/slurmd/spool/slurmd/job12514150/1_vectorize.py': [Errno 2] No such file or directory

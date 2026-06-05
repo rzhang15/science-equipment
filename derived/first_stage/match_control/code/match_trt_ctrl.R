@@ -20,10 +20,10 @@ dir.create("../output/balance_plots", recursive = TRUE, showWarnings = FALSE)
 #   Pre-period price level (3-yr mean of 2011-2013) anchors the level, slope
 #   anchors the trend direction. Two-covariate price-focused spec.
 MATCH_COVARIATES <- c("avg_log_price_pre_mean", "avg_log_price_slope")
+#MATCH_COVARIATES <- c("avg_log_price_2012", "avg_log_price_2013")
 
 # Number of controls per treated unit
 MATCH_RATIO <- 2
-
 # Outcome variables to plot
 OUTCOME_VARS <- c("avg_log_price")
 

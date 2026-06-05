@@ -1,0 +1,70 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 120,000; see help set_maxvar.
+
+. do diag_check_final.do 
+
+. use ../temp/es_all_jrnls_r1_r2_public, clear
+
+. gunique athr_id
+N = 81,846; 9,504 unbalanced groups of sizes 2 to 10
+
+. di as result "Total unique athr_id in es_all_jrnls_r1_r2_public: " r(unique)
+Total unique athr_id in es_all_jrnls_r1_r2_public: 9504
+
+. gunique athr_id if foia_athr == 1
+N = 678; 92 unbalanced groups of sizes 4 to 10
+
+. di as result "  with foia_athr == 1: " r(unique)
+  with foia_athr == 1: 92
+
+. gunique athr_id if foia_athr != 1
+N = 81,168; 9,485 unbalanced groups of sizes 1 to 10
+
+. di as result "  with foia_athr != 1 (non-FOIA): " r(unique)
+  with foia_athr != 1 (non-FOIA): 9485
+
+. count if mi(foia_athr)
+  81,168
+
+. di as result "  rows with mi(foia_athr): " r(N)
+  rows with mi(foia_athr): 81168
+
+. sum foia_athr, d
+
+                          foia_athr
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            1              1
+ 5%            1              1
+10%            1              1       Obs                 678
+25%            1              1       Sum of wgt.         678
+
+50%            1                      Mean                  1
+                        Largest       Std. dev.             0
+75%            1              1
+90%            1              1       Variance              0
+95%            1              1       Skewness              .
+99%            1              1       Kurtosis              .
+
+. 
+end of do-file

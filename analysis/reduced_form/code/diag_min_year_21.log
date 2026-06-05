@@ -1,0 +1,135 @@
+-------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  /n/holylabs/pakes_lab/Lab/sci_eq/analysis/reduced_form/code/diag_m
+> in_year_21.log
+  log type:  text
+ opened on:   5 Jun 2026, 11:22:28
+
+. 
+. use ../external/samp/athr_panel_full_year_last_all_jrnls_r1_r2_public, clear
+
+. merge m:1 athr_id using ../external/real_exposure/athr_exposure, keep(3) keep
+> using(exposure) nogen
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                             2,965  
+    -----------------------------------------
+
+. bys athr_id: egen max_year = max(year)
+
+. keep if max_year >= 2014
+(211 observations deleted)
+
+. 
+. // pre-window full year range
+. preserve
+
+. bys athr_id: egen min_full = min(year)
+
+. bys athr_id: egen max_full = max(year)
+
+. bys athr_id: egen tot_full = total(ppr_cnt)
+
+. keep athr_id min_full max_full tot_full
+
+. duplicates drop athr_id, force
+
+Duplicates in terms of athr_id
+
+(2,585 observations deleted)
+
+. save ../temp/diag_full_window, replace
+(file ../temp/diag_full_window.dta not found)
+file ../temp/diag_full_window.dta saved
+
+. restore
+
+. 
+. keep if inrange(year, 2010, 2019)
+(1,688 observations deleted)
+
+. bys athr_id: egen min_year = min(year)
+
+. keep if min_year > 2013   // these are the 21 dropped
+(998 observations deleted)
+
+. contract athr_id min_year exposure
+
+. merge 1:1 athr_id using ../temp/diag_full_window, keep(1 3) nogen keepusing(m
+> in_full max_full tot_full)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                                21  
+    -----------------------------------------
+
+. gen byte zero_or_neg_exp = exposure <= 0
+
+. sort min_year athr_id
+
+. di as result _newline "===== 21 FOIA PIs dropped at min_year <= 2013 ====="
+
+===== 21 FOIA PIs dropped at min_year <= 2013 =====
+
+. di as result "  (min_year = first panel year within [2010,2019])"
+  (min_year = first panel year within [2010,2019])
+
+. di as result "  (min_full = first panel year EVER, no window restriction)"
+  (min_full = first panel year EVER, no window restriction)
+
+. list athr_id min_year min_full max_full tot_full exposure, sep(0) noobs ab(12
+> )
+
+  +---------------------------------------------------------------------+
+  |     athr_id   min_year   min_full   max_full   tot_full    exposure |
+  |---------------------------------------------------------------------|
+  | A5010051226       2014       2014       2023         13   -.0004132 |
+  | A5029591124       2014       2008       2014          2    .1839594 |
+  | A5039136921       2014       2002       2024         23    .0595454 |
+  | A5057951318       2014       2014       2022          5    .0239217 |
+  | A5060877343       2014       2014       2022         12    .0028716 |
+  | A5064892746       2014       2014       2024          9    .0298836 |
+  | A5091177547       2014       2014       2025         15    .0495912 |
+  | A5100767723       2014       2014       2022         10    .2866556 |
+  | A5014945614       2015       2015       2023         18    .2885202 |
+  | A5023125790       2015       1974       2016         51    .0316086 |
+  | A5050835243       2015       2015       2025         15   -.0033222 |
+  | A5051244336       2015       2015       2025         24   -.0098938 |
+  | A5061970781       2015       2015       2025         11    .0141361 |
+  | A5089103469       2015       2015       2024         12    .1712042 |
+  | A5062698300       2016       2016       2016          1    .0275975 |
+  | A5070177847       2016       2016       2016          1    .0048801 |
+  | A5001952573       2017       2017       2025          5    .0231036 |
+  | A5008234108       2017       2017       2025         12    .0050103 |
+  | A5029773307       2017       2017       2018          3    .0219483 |
+  | A5108213808       2017       2017       2023          8   -.0060491 |
+  | A5089879988       2019       2019       2025          9    .0360177 |
+  +---------------------------------------------------------------------+
+
+. 
+. di as result _newline "  ===== summary by first panel-year =====:"
+
+  ===== summary by first panel-year =====:
+
+. tab min_year
+
+   min_year |      Freq.     Percent        Cum.
+------------+-----------------------------------
+       2014 |          8       38.10       38.10
+       2015 |          6       28.57       66.67
+       2016 |          2        9.52       76.19
+       2017 |          4       19.05       95.24
+       2019 |          1        4.76      100.00
+------------+-----------------------------------
+      Total |         21      100.00
+
+. log close
+      name:  <unnamed>
+       log:  /n/holylabs/pakes_lab/Lab/sci_eq/analysis/reduced_form/code/diag_m
+> in_year_21.log
+  log type:  text
+ closed on:   5 Jun 2026, 11:22:37
+-------------------------------------------------------------------------------

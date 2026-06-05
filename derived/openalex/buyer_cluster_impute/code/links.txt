@@ -1,0 +1,2 @@
+./spend/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/exposure_msr/output
+./foia_bert/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/foia_similarity_wts/output

@@ -10,6 +10,7 @@ library(stringr)
 # ---------------------------
 PLACEBO_SEED      <- 8975
 N_PLACEBO_ITERS   <- 100
+N_PLACEBO_TREATED <- 46
 # v80 spec: pre-period 3-yr mean (2011-2013) + slope of avg_log_price.
 MATCH_COVARIATES  <- c("avg_log_price_pre_mean", "avg_log_price_slope")
 MATCH_RATIO       <- 2
@@ -29,9 +30,10 @@ real_treated_cats <- panel %>%
   filter(treated == 1) %>%
   distinct(category) %>%
   pull(category)
-n_placebo <- length(real_treated_cats)
+n_placebo <- N_PLACEBO_TREATED
 
-cat("Real treated markets (excluded from placebo pool):", n_placebo, "\n")
+cat("Real treated markets (excluded from placebo pool):", length(real_treated_cats), "\n")
+cat("Placebo treated markets per iter:", n_placebo, "\n")
 panel <- panel %>% filter(!category %in% real_treated_cats)
 
 all_cats <- unique(panel$category)
