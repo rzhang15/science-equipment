@@ -32,6 +32,13 @@ def main():
                          "'confidence': multiply by per-author max-similarity from "
                          "the diagnostics file — preserves cross-PI variance by "
                          "shrinking low-confidence imputations toward zero.")
+    ap.add_argument("--cluster-filter", default="",
+                    help="Path to author_static_clusters_K.csv from "
+                         "openalex/cluster_fields. After imputation, drop universe "
+                         "authors whose K-cluster contains zero FOIA PIs — those "
+                         "imputations rest on out-of-domain TF-IDF vocabulary "
+                         "overlap, not real topical similarity. Also drops authors "
+                         "with no cluster assignment.")
     args = ap.parse_args()
 
     tag = args.tag
@@ -42,7 +49,8 @@ def main():
     universe_ids_file = f"{OUT_DIR}/universe_ids{tag}.parquet"
     foia_ids_file     = f"{OUT_DIR}/foia_ids_ordered{tag}.csv"
     diag_file         = f"{OUT_DIR}/match_diagnostics{tag}.parquet"
-    output_file       = f"{OUT_DIR}/final_imputed_exposure{tag}.csv"
+    out_suffix = "_cf" if args.cluster_filter else ""
+    output_file       = f"{OUT_DIR}/final_imputed_exposure{tag}{out_suffix}.csv"
 
     if not os.path.exists(USER_EXPOSURE_FILE):
         raise SystemExit("Please create your exposure CSV first!")
@@ -89,6 +97,35 @@ def main():
         nz = (imputed != 0).sum()
         print(f"  {var}: mean={imputed.mean():.5f}  sd={imputed.std():.5f}  "
               f"nonzero={nz:,}/{len(imputed):,}")
+
+    if args.cluster_filter:
+        cl = pd.read_csv(args.cluster_filter)
+        if "cluster_label" not in cl.columns or "athr_id" not in cl.columns:
+            raise SystemExit(
+                f"--cluster-filter file must have columns [athr_id, cluster_label]: "
+                f"got {list(cl.columns)}"
+            )
+        foia_in_cl = pd.read_csv(foia_ids_file).merge(cl, on="athr_id", how="inner")
+        foia_clusters = set(foia_in_cl["cluster_label"].unique())
+        empty_clusters = set(cl["cluster_label"].unique()) - foia_clusters
+        print(f"\nCluster filter: {args.cluster_filter}")
+        print(f"  total clusters: {cl['cluster_label'].nunique()}  "
+              f"with FOIA: {len(foia_clusters)}  empty: {len(empty_clusters)}")
+
+        n_before = len(df_univ_ids)
+        df_univ_ids = df_univ_ids.merge(cl, on="athr_id", how="left")
+        n_no_cluster = df_univ_ids["cluster_label"].isna().sum()
+        keep_mask = (
+            df_univ_ids["cluster_label"].notna()
+            & ~df_univ_ids["cluster_label"].isin(empty_clusters)
+        )
+        n_in_empty = (~keep_mask).sum() - n_no_cluster
+        df_univ_ids = df_univ_ids.loc[keep_mask].drop(columns=["cluster_label"])
+        print(f"  authors dropped: {n_before - len(df_univ_ids):,} of {n_before:,}  "
+              f"({100*(n_before-len(df_univ_ids))/n_before:.2f}%)")
+        print(f"    in 0-FOIA clusters: {n_in_empty:,}")
+        print(f"    no cluster assigned: {n_no_cluster:,}")
+        print(f"  authors kept:    {len(df_univ_ids):,}")
 
     df_univ_ids.to_csv(output_file, index=False)
     print(f"Done! Saved to {output_file}")

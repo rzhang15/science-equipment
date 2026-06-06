@@ -7,6 +7,8 @@ preliminaries
 version 17
 
 program main
+    boe 
+
     // Run the observed (FOIA) first stage once -- it doesn't depend on
     // imputation tag. Save its estimates so we can stack them next to the
     // imputed columns inside imputed_expenditure_fd.
@@ -468,8 +470,13 @@ end
 
 
 program boe
+    use ../external/rf_athrs/es_all_jrnls_r1_r2_public, clear
+    contract athr_id exposure
+    drop _freq
+    save ../temp/rf_athrs, replace
     use ../external/samp/merged_foias_with_pis,  clear
     keep if inlist(uni , "utdallas", "umich")
+    merge m:1 athr_id using ../temp/rf_athrs, keep(3) nogen
     drop if mi(athr_id)
     gen year = year(date(date, "YMD"))
     drop if year > 2013
@@ -488,15 +495,15 @@ program boe
     gen nonlab_spend = spend if nonlab == 1
     gen lab_spend = spend if nonlab == 0
     gen hq = keep == 1 | (bad_control == 1 & support >= 25 & precision >= 0.8 & recall >= 0.8)
-    collapse (sum) spend nonlab_spend lab_spend , by(athr_id year hq)
+    collapse (sum) spend nonlab_spend lab_spend (mean) exposure, by(athr_id year hq)
     gen hq_labspend = lab_spend if hq == 1
     gen lq_labspend = lab_spend if hq == 0
-    collapse (sum) tot_spend = spend nonlab_spend lab_spend hq_labspend lq_labspend  , by(athr_id year)
+    collapse (sum) tot_spend = spend nonlab_spend lab_spend hq_labspend lq_labspend  (mean) exposure, by(athr_id year)
     gen perc_lab_spend = lab_spend/tot_spend* 100
     gen perc_nonlab_spend = nonlab_spend/tot_spend* 100
-    collapse (mean) tot_spend nonlab_spend lab_spend hq_labspend lq_labspend perc_lab_spend perc_nonlab_spend, by(athr_id)
+    collapse (mean) tot_spend nonlab_spend lab_spend hq_labspend lq_labspend perc_lab_spend perc_nonlab_spend exposure, by(athr_id)
     graph bar lab_spend nonlab_spend, over(athr_id ,sort((mean) tot_spend) descending) stack bar(1, color(lavender%70)) bar(2, color(dkorange%70)) legend(on order(- "Lab Spend" - "Non-Lab Spend") pos(1) ring(0) size(small) region(fcolor(none))) ytitle("Average Annual Spend ($)") plotregion(margin(sides))
-    graph export ../output/figures/avg_spend_by_athr.pdf, replace
+    graph export ../output/avg_spend_by_athr.pdf, replace
     sum lab_spend if lab_spend >0, d
     local mean_lab_spend : di %6.2f r(mean)
     local sd_lab_spend : di %6.2f r(sd)
@@ -506,7 +513,7 @@ program boe
     local q1_lab_spend : di %6.2f r(p25)
     local q3_lab_spend : di %6.2f r(p75)
     local median_lab_spend : di %6.2f r(p50)
-   tw hist lab_spend if lab_spend >0, color(edkblue) frac width(5000) xlab(0(7500)150000, angle(45)) ///
+   tw hist lab_spend if lab_spend >0, color(edkblue) frac width(5000) xlab(0(7500)100000, angle(45)) ///
        xtitle("Consumables Expenditure ($)") ytitle("Fraction of PI-Years") legend(on order(- "Mean = `mean_lab_spend'" "SD = `sd_lab_spend'" "Min = `min_lab_spend'" "Q1 = `q1_lab_spend'" "Median = `median_lab_spend'" "Q3 = `q3_lab_spend'" "Max = `max_lab_spend'") pos(1) ring(0) region(fcolor(none)) size(small))
    graph export ../output/lab_spend.pdf, replace
    kdensity perc_lab_spend
