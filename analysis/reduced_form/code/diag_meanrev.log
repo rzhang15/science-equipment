@@ -1,0 +1,895 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 120,000; see help set_maxvar.
+
+. do diag_meanrev.do 
+
+. set more off
+
+. clear all
+
+. capture log close
+
+. log using ../temp/diag_meanrev.log, replace text
+-------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  /n/holylabs/pakes_lab/Lab/sci_eq/analysis/reduced_form/code/../tem
+> p/diag_meanrev.log
+  log type:  text
+ opened on:  11 Jun 2026, 21:36:09
+
+. 
+. local samp all_jrnls
+
+. local suf  _r1_r2_public
+
+. local fes  athr_id year
+
+. 
+. program summ_grp
+  1.     syntax, hi(string) lo(string) tag(string)
+  2.     foreach grp in `hi' `lo' {
+  3.         local b_post = 0
+  4.         local n_post = 0
+  5.         local b_pre  = 0
+  6.         local n_pre  = 0
+  7.         forval k = 0/5 {
+  8.             local b = _b[int_lag`k'_`grp']
+  9.             local b_post = `b_post' + `b'
+ 10.             local n_post = `n_post' + 1
+ 11.         }
+ 12.         forval k = 2/4 {
+ 13.             local b = _b[int_lead`k'_`grp']
+ 14.             local b_pre = `b_pre' + `b'
+ 15.             local n_pre = `n_pre' + 1
+ 16.         }
+ 17.         local post_mean = `b_post' / `n_post'
+ 18.         local pre_mean = `b_pre' / `n_pre'
+ 19.         di as text "`tag' `grp': pre_mean=" %6.3f `pre_mean' " post_mean="
+>  %6.3f `post_mean'
+ 20.     }
+ 21. end
+
+. 
+. foreach yvar in ppr_cnt cite_affl_wt {
+  2.     di as text "============================================"
+  3.     di as text "==== `yvar' ===="
+  4.     di as text "============================================"
+  5. 
+.     foreach pair in "high_pre_ppr low_pre_ppr" "high_grants low_grants" {
+  6.         local hi : word 1 of `pair'
+  7.         local lo : word 2 of `pair'
+  8. 
+.         di as text "---- heterogeneous ES (base specification): `hi' vs `lo' 
+> ----"
+  9.         use ../temp/es_`samp'`suf', clear
+ 10.         cap drop rel int_lead* int_lag*
+ 11.         gen rel = year - 2014
+ 12.         qui sum rel
+ 13.         local abs_lag  = abs(r(max))
+ 14.         local abs_lead = abs(r(min))
+ 15.         forval i = 1/`abs_lead' {
+ 16.             gen int_lead`i' = exposure if rel == -`i'
+ 17.         }
+ 18.         forval i = 1/`abs_lag' {
+ 19.             gen int_lag`i'  = exposure if rel == `i'
+ 20.         }
+ 21.         gen int_lag0 = exposure if rel == 0
+ 22.         ds int_lead* int_lag*
+ 23.         foreach var in `r(varlist)' {
+ 24.             replace `var' = 0 if mi(`var')
+ 25.         }
+ 26.         foreach grp in `hi' `lo' {
+ 27.             forval i = 1/`abs_lead' {
+ 28.                 gen int_lead`i'_`grp' = int_lead`i' * `grp'
+ 29.             }
+ 30.             forval i = 0/`abs_lag' {
+ 31.                 gen int_lag`i'_`grp' = int_lag`i' * `grp'
+ 32.             }
+ 33.         }
+ 34.         local leads_hi
+ 35.         local lags_hi
+ 36.         local leads_lo
+ 37.         local lags_lo
+ 38.         forval i = 2/`abs_lead' {
+ 39.             local leads_hi `leads_hi' int_lead`i'_`hi'
+ 40.             local leads_lo `leads_lo' int_lead`i'_`lo'
+ 41.         }
+ 42.         forval i = 0/`abs_lag' {
+ 43.             local lags_hi `lags_hi' int_lag`i'_`hi'
+ 44.             local lags_lo `lags_lo' int_lag`i'_`lo'
+ 45.         }
+ 46.         cap noi reghdfe `yvar' `leads_hi' `lags_hi' `leads_lo' `lags_lo' /
+> //
+>                 int_lead1_`hi' int_lead1_`lo', absorb(`fes') vce(cluster athr
+> _id)
+ 47.         summ_grp, hi(`hi') lo(`lo') tag("HET")
+ 48. 
+.         di as text "---- group-absorbed ES (within-group exposure only): `hi'
+>  vs `lo' ----"
+ 49.         forval i = 2/`abs_lead' {
+ 50.             cap drop g1rel_lead`i'
+ 51.             gen g1rel_lead`i' = (rel == -`i') * `hi'
+ 52.         }
+ 53.         forval i = 0/`abs_lag' {
+ 54.             cap drop g1rel_lag`i'
+ 55.             gen g1rel_lag`i'  = (rel == `i')  * `hi'
+ 56.         }
+ 57.         local g1rel_leads
+ 58.         local g1rel_lags
+ 59.         forval i = 2/`abs_lead' {
+ 60.             local g1rel_leads `g1rel_leads' g1rel_lead`i'
+ 61.         }
+ 62.         forval i = 0/`abs_lag' {
+ 63.             local g1rel_lags `g1rel_lags' g1rel_lag`i'
+ 64.         }
+ 65.         cap noi reghdfe `yvar' `leads_hi' `lags_hi' `leads_lo' `lags_lo' /
+> //
+>                 int_lead1_`hi' int_lead1_`lo' `g1rel_leads' `g1rel_lags', ///
+>                 absorb(`fes') vce(cluster athr_id)
+ 66.         summ_grp, hi(`hi') lo(`lo') tag("ABS")
+ 67. 
+.         // also print the absorbed-trend (g1's common trend relative to g2)
+.         local b_post = 0
+ 68.         forval k = 0/5 {
+ 69.             local b_post = `b_post' + _b[g1rel_lag`k']
+ 70.         }
+ 71.         local b_pre = 0
+ 72.         forval k = 2/4 {
+ 73.             local b_pre = `b_pre' + _b[g1rel_lead`k']
+ 74.         }
+ 75.         local post_mean = `b_post' / 6
+ 76.         local pre_mean  = `b_pre' / 3
+ 77.         di as text "    --> absorbed common trend (`hi' minus `lo'): pre_m
+> ean=" %6.3f `pre_mean' " post_mean=" %6.3f `post_mean'
+ 78.     }
+ 79. }
+============================================
+==== ppr_cnt ====
+============================================
+---- heterogeneous ES (base specification): high_pre_ppr vs low_pre_ppr ----
+(77,841 missing values generated)
+(77,841 missing values generated)
+(77,841 missing values generated)
+(77,841 missing values generated)
+(77,841 missing values generated)
+(77,841 missing values generated)
+(77,841 missing values generated)
+(77,841 missing values generated)
+(77,841 missing values generated)
+(77,841 missing values generated)
+int_lead1  int_lead3  int_lag1   int_lag3   int_lag5
+int_lead2  int_lead4  int_lag2   int_lag4   int_lag0
+(MWFE estimator converged in 2 iterations)
+(77,841 real changes made)
+(77,841 real changes made)
+(77,841 real changes made)
+(77,841 real changes made)
+(77,841 real changes made)
+(77,841 real changes made)
+(77,841 real changes made)
+(77,841 real changes made)
+(77,841 real changes made)
+(77,841 real changes made)
+note: int_lead1_high_pre_ppr omitted because of collinearity
+note: int_lead1_low_pre_ppr omitted because of collinearity
+
+HDFE Linear regression                            Number of obs   =     86,490
+Absorbing 2 HDFE groups                           F(  27,   8648) =      18.86
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.3366
+                                                  Adj R-squared   =     0.2626
+                                                  Within R-sq.    =     0.0050
+Number of clusters (athr_id) =      8,649         Root MSE        =     7.8576
+
+                            (Std. err. adjusted for 8,649 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+cite_affl_wt | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+int_lead2_h~ |  -8.202561   3.812116    -2.15   0.031    -15.67522    -.729904
+int_lead3_h~ |  -4.167262   3.655545    -1.14   0.254      -11.333    2.998478
+int_lead4_h~ |  -9.549405   4.617504    -2.07   0.039    -18.60081   -.4979958
+int_lag0_h~r |  -6.444947    3.59279    -1.79   0.073    -13.48767    .5977781
+int_lag1_h~r |  -7.166436    3.94421    -1.82   0.069    -14.89803    .5651565
+int_lag2_h~r |  -11.99422   5.487546    -2.19   0.029    -22.75112   -1.237324
+int_lag3_h~r |  -4.186524   3.923688    -1.07   0.286    -11.87789    3.504839
+int_lag4_h~r |  -6.669871   3.929305    -1.70   0.090    -14.37225    1.032503
+int_lag5_h~r |   -6.89656   3.992111    -1.73   0.084    -14.72205     .928929
+int_lead2_l~ |   1.444826   3.199368     0.45   0.652    -4.826698    7.716351
+int_lead3_l~ |   1.922534   2.867632     0.67   0.503    -3.698709    7.543777
+int_lead4_l~ |   -1.42765   2.798027    -0.51   0.610     -6.91245     4.05715
+int_lag0_l~r |   1.073126   2.838735     0.38   0.705     -4.49147    6.637723
+int_lag1_l~r |   2.196443   2.942826     0.75   0.455    -3.572198    7.965084
+int_lag2_l~r |   4.940983   5.890148     0.84   0.402    -6.605111    16.48708
+int_lag3_l~r |   .5348887   3.157846     0.17   0.865    -5.655243     6.72502
+int_lag4_l~r |  -.4424626   2.883383    -0.15   0.878    -6.094581    5.209656
+int_lag5_l~r |   3.491599   3.143108     1.11   0.267    -2.669642    9.652839
+int_lead1_h~ |          0  (omitted)
+int_lead1_l~ |          0  (omitted)
+ g1rel_lead2 |   .7469331   .3298134     2.26   0.024     .1004202    1.393446
+ g1rel_lead3 |   .6343535   .2828325     2.24   0.025     .0799344    1.188773
+ g1rel_lead4 |   .8984122   .3338125     2.69   0.007     .2440601    1.552764
+  g1rel_lag0 |  -1.013846   .2702214    -3.75   0.000    -1.543544   -.4841476
+  g1rel_lag1 |  -1.099598   .2795798    -3.93   0.000    -1.647641    -.551555
+  g1rel_lag2 |  -.9831943   .5224845    -1.88   0.060    -2.007389    .0409999
+  g1rel_lag3 |  -1.636941   .2869714    -5.70   0.000    -2.199473   -1.074408
+  g1rel_lag4 |  -1.691421   .3041536    -5.56   0.000    -2.287634   -1.095207
+  g1rel_lag5 |  -1.812492   .3043554    -5.96   0.000    -2.409102   -1.215883
+       _cons |   3.950927   .1347992    29.31   0.000     3.686689    4.215166
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      8649        8649           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+ABS high_pre_ppr: pre_mean=-7.306 post_mean=-7.226
+ABS low_pre_ppr: pre_mean= 0.647 post_mean= 1.966
+    --> absorbed common trend (high_pre_ppr minus low_pre_ppr): pre_mean= 0.760
+>  post_mean=-1.373
+---- heterogeneous ES (base specification): high_grants vs low_grants ----
+(77,841 missing values generated)
+(77,841 missing values generated)
+(77,841 missing values generated)
+(77,841 missing values generated)
+(77,841 missing values generated)
+(77,841 missing values generated)
+(77,841 missing values generated)
+(77,841 missing values generated)
+(77,841 missing values generated)
+(77,841 missing values generated)
+int_lead1  int_lead3  int_lag1   int_lag3   int_lag5
+int_lead2  int_lead4  int_lag2   int_lag4   int_lag0
+(77,841 real changes made)
+(77,841 real changes made)
+(77,841 real changes made)
+(77,841 real changes made)
+(77,841 real changes made)
+(77,841 real changes made)
+(77,841 real changes made)
+(77,841 real changes made)
+(77,841 real changes made)
+(77,841 real changes made)
+(MWFE estimator converged in 2 iterations)
+note: int_lead1_high_pre_ppr omitted because of collinearity
+note: int_lead1_low_pre_ppr omitted because of collinearity
+
+HDFE Linear regression                            Number of obs   =     86,490
+Absorbing 2 HDFE groups                           F(  18,   8648) =      76.12
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.4164
+                                                  Adj R-squared   =     0.3513
+                                                  Within R-sq.    =     0.0275
+Number of clusters (athr_id) =      8,649         Root MSE        =     1.5138
+
+(MWFE estimator converged in 2 iterations)
+note: int_lead1_high_grants omitted because of collinearity
+note: int_lead1_low_grants omitted because of collinearity
+
+HDFE Linear regression                            Number of obs   =     86,490
+Absorbing 2 HDFE groups                           F(  18,   8648) =       6.67
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.3343
+                                                  Adj R-squared   =     0.2601
+                                                  Within R-sq.    =     0.0014
+Number of clusters (athr_id) =      8,649         Root MSE        =     7.8713
+
+                            (Std. err. adjusted for 8,649 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+cite_affl_wt | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+int_lead2_h~ |  -.9435254   4.069367    -0.23   0.817    -8.920455    7.033404
+int_lead3_h~ |   2.579083   3.514926     0.73   0.463    -4.311009    9.469175
+int_lead4_h~ |  -1.658182   4.295974    -0.39   0.700    -10.07931     6.76295
+int_lag0_h~s |  -8.414215   3.496068    -2.41   0.016    -15.26734   -1.561088
+int_lag1_h~s |  -13.56933   3.891439    -3.49   0.000    -21.19748   -5.941183
+int_lag2_h~s |   -15.1496     3.8866    -3.90   0.000    -22.76826   -7.530936
+int_lag3_h~s |  -11.67552   3.829952    -3.05   0.002    -19.18314   -4.167898
+int_lag4_h~s |   -14.1751   3.675059    -3.86   0.000    -21.37909   -6.971113
+int_lag5_h~s |  -13.72706   3.771441    -3.64   0.000    -21.11998   -6.334136
+int_lead2_l~ |  -7.277078   2.886263    -2.52   0.012    -12.93484   -1.619315
+int_lead3_l~ |  -5.140427   2.655011    -1.94   0.053    -10.34488    .0640274
+int_lead4_l~ |  -9.767668   3.065948    -3.19   0.001    -15.77766   -3.757679
+int_lag0_l~s |  -2.372888   2.504291    -0.95   0.343    -7.281896     2.53612
+int_lag1_l~s |   1.710093   2.680797     0.64   0.524    -3.544908    6.965093
+int_lag2_l~s |  -1.225045   4.909435    -0.25   0.803    -10.84871    8.398618
+int_lag3_l~s |   1.762336   2.821962     0.62   0.532    -3.769382    7.294053
+int_lag4_l~s |   .0737277   2.865521     0.03   0.979    -5.543377    5.690832
+int_lag5_l~s |   1.473239   2.821608     0.52   0.602    -4.057784    7.004263
+int_lead1_h~ |          0  (omitted)
+int_lead1_l~ |          0  (omitted)
+       _cons |   3.655372   .0819839    44.59   0.000     3.494664     3.81608
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      8649        8649           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+HET high_grants: pre_mean=-0.008 post_mean=-12.785
+HET low_grants: pre_mean=-7.395 post_mean= 0.237
+---- group-absorbed ES (within-group exposure only): high_grants vs low_grants 
+> ----
+                            (Std. err. adjusted for 8,649 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+int_lead2_h~ |   .0646624   .7843889     0.08   0.934    -1.472927    1.602252
+int_lead3_h~ |   .2208996   .8605421     0.26   0.797    -1.465968    1.907767
+int_lead4_h~ |  -.5747434   .8901078    -0.65   0.518    -2.319567     1.17008
+int_lag0_h~r |  -5.177065   .7688693    -6.73   0.000    -6.684232   -3.669898
+int_lag1_h~r |  -6.748262   .8113242    -8.32   0.000    -8.338651   -5.157873
+int_lag2_h~r |  -7.041147   .8275057    -8.51   0.000    -8.663255   -5.419038
+int_lag3_h~r |  -8.562609    .821754   -10.42   0.000    -10.17344   -6.951775
+int_lag4_h~r |  -8.454489    .834861   -10.13   0.000    -10.09102   -6.817963
+int_lag5_h~r |  -9.122073   .8098967   -11.26   0.000    -10.70966   -7.534483
+int_lead2_l~ |  -1.779559   .6982967    -2.55   0.011    -3.148387    -.410731
+int_lead3_l~ |  -2.775489   .7467488    -3.72   0.000    -4.239294   -1.311683
+int_lead4_l~ |  -2.800872   .7471161    -3.75   0.000    -4.265398   -1.336346
+int_lag0_l~r |   6.203281   .7332803     8.46   0.000     4.765877    7.640685
+int_lag1_l~r |   7.115767   .7657826     9.29   0.000      5.61465    8.616883
+int_lag2_l~r |   9.006604   .7457435    12.08   0.000     7.544769    10.46844
+int_lag3_l~r |   8.574227   .7854733    10.92   0.000     7.034512    10.11394
+int_lag4_l~r |   9.600758   .8379368    11.46   0.000     7.958202    11.24331
+int_lag5_l~r |   10.87166   .8438913    12.88   0.000      9.21743    12.52589
+int_lead1_h~ |          0  (omitted)
+int_lead1_l~ |          0  (omitted)
+       _cons |    1.78548   .0207771    85.94   0.000     1.744752    1.826208
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      8649        8649           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+HET high_pre_ppr: pre_mean=-0.096 post_mean=-7.518
+HET low_pre_ppr: pre_mean=-2.452 post_mean= 8.562
+---- group-absorbed ES (within-group exposure only): high_pre_ppr vs low_pre_pp
+> r ----
+(MWFE estimator converged in 2 iterations)
+(MWFE estimator converged in 2 iterations)
+note: int_lead1_high_pre_ppr omitted because of collinearity
+note: int_lead1_low_pre_ppr omitted because of collinearity
+note: int_lead1_high_grants omitted because of collinearity
+note: int_lead1_low_grants omitted because of collinearity
+
+HDFE Linear regression                            Number of obs   =     86,490
+Absorbing 2 HDFE groups                           F(  27,   8648) =       6.43
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+
+                                                 R-squared       =     0.3346
+                                                  Adj R-squared   =     0.2604
+                                                  Within R-sq.    =     0.0019
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+
+                                                 R-squared       =     0.4252
+                                                  Adj R-squared   =     0.3611
+                                                  Within R-sq.    =     0.0423
+Number of clusters (athr_id) =      8,649         Root MSE        =     1.5024
+
+                            (Std. err. adjusted for 8,649 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+cite_affl_wt | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+int_lead2_h~ |  -3.420066   5.006579    -0.68   0.495    -13.23415    6.394023
+                            (Std. err. adjusted for 8,649 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+int_lead2_h~ |  -.7373366   .9776909    -0.75   0.451    -2.653844    1.179171
+int_lead3_h~ |  -1.393907   1.072668    -1.30   0.194    -3.496592    .7087781
+int_lag1_h~s |  -7.855783   5.104484    -1.54   0.124    -17.86179    2.150222
+int_lag0_h~r |  -1.049137   .9341671    -1.12   0.261    -2.880327    .7820536
+int_lag2_h~s |  -12.55301   6.785486    -1.85   0.064    -25.85418    .7481614
+int_lag3_h~s |  -4.602143    5.02532    -0.92   0.360    -14.45297    5.248683
+int_lag4_h~s |  -8.526082   4.951464    -1.72   0.085    -18.23213    1.179968
+int_lag5_h~s |  -3.220268   5.126083    -0.63   0.530    -13.26861    6.828076
+int_lead2_l~ |  -5.036204   2.434173    -2.07   0.039    -9.807763   -.2646453
+int_lead3_l~ |  -4.260816   2.477364    -1.72   0.085    -9.117039    .5954077
+int_lead4_l~ |  -8.908563   2.652776    -3.36   0.001    -14.10864    -3.70849
+int_lag0_l~s |  -8.925992   2.475137    -3.61   0.000    -13.77785   -4.074134
+int_lag1_l~s |  -3.459757   2.584443    -1.34   0.181    -8.525881    1.606367
+int_lag2_l~s |  -3.574545   4.258909    -0.84   0.401    -11.92302    4.773933
+int_lag3_l~s |   -4.63794   2.771321    -1.67   0.094    -10.07039    .7945093
+int_lag4_l~s |  -5.037736   2.639954    -1.91   0.056    -10.21268    .1372031
+int_lag5_l~s |  -8.033731   2.684513    -2.99   0.003    -13.29602   -2.771445
+int_lead1_h~ |          0  (omitted)
+    0.62   0.538    -1.209698    2.317192
+int_lead1_l~ |          0  (omitted)
+ g1rel_lead2 |   .3338604   .3513639     0.95   0.342    -.3548965    1.022617
+ g1rel_lead3 |   .1310503   .2979064     0.44   0.660    -.4529172    .7150177
+ g1rel_lead4 |   .1279952   .3649664     0.35   0.726    -.5874259    .8434162
+  g1rel_lag0 |  -.9763252    .287464    -3.40   0.001    -1.539823   -.4128272
+  g1rel_lag0 |  -.7261589   .0657423   -11.05   0.000    -.8550295   -.5972883
+  g1rel_lag1 |  -.7817761   .0699405   -11.18   0.000    -.9188761    -.644676
+  g1rel_lag2 |  -1.015703   .0696605   -14.58   0.000    -1.152254   -.8791515
+  g1rel_lag3 |  -1.105721   .0705402   -15.68   0.000    -1.243997   -.9674456
+  g1rel_lag4 |  -1.123325   .0722127   -15.56   0.000    -1.264879    -.981771
+       _cons |   3.881075    .100643    38.56   0.000      3.68379    4.078359
+------------------------------------------------------------------------------
+       _cons |   2.096174    .025972    80.71   0.000     2.045262    2.147085
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      8649        8649           0    *|
+        year |        10           1           9     |
+        year |        10           1           9     |
+-----------------------------------------------------+
+DoF computation
+ABS high_grants: pre_mean=-1.474 post_mean=-6.322
+ for DoF computation
+ABS high_pre_ppr: pre_mean=-1.216 post_mean=-1.899
+ABS low_pre_ppr: pre_mean=-0.727 post_mean=-0.097
+ow_grants): pre_mean= 0.198 p
+> ost_mean=-0.871
+    --> absorbed common trend (high_pre_ppr minus low_pre_ppr): pre_mean= 0.197
+>  post_mean=-0.988
+---- heterogeneous ES (base specification): high_grants vs low_grants ----
+. log close
+      name:  <unnamed>
+       log:  /n/holylabs/pakes_lab/Lab/sci_eq/analysis/reduced_form/code/../tem
+> p/diag_meanrev.log
+  log type:  text
+ closed on:  11 Jun 2026, 21:45:21
+-------------------------------------------------------------------------------
+
+. 
+end of do-file
+(77,841 missing values generated)
+(77,841 missing values generated)
+(77,841 missing values generated)
+(77,841 missing values generated)
+(77,841 missing values generated)
+(77,841 missing values generated)
+(77,841 missing values generated)
+(77,841 missing values generated)
+(77,841 missing values generated)
+(77,841 missing values generated)
+int_lead1  int_lead3  int_lag1   int_lag3   int_lag5
+int_lead2  int_lead4  int_lag2   int_lag4   int_lag0
+(77,841 real changes made)
+(77,841 real changes made)
+(77,841 real changes made)
+(77,841 real changes made)
+(77,841 real changes made)
+(77,841 real changes made)
+(77,841 real changes made)
+(77,841 real changes made)
+(77,841 real changes made)
+(77,841 real changes made)
+(MWFE estimator converged in 2 iterations)
+note: int_lead1_high_grants omitted because of collinearity
+note: int_lead1_low_grants omitted because of collinearity
+
+HDFE Linear regression                            Number of obs   =     86,490
+Absorbing 2 HDFE groups                           F(  18,   8648) =      18.73
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.4051
+                                                  Adj R-squared   =     0.3388
+                                                  Within R-sq.    =     0.0088
+Number of clusters (athr_id) =      8,649         Root MSE        =     1.5283
+
+                            (Std. err. adjusted for 8,649 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+int_lead2_h~ |   .4790897   .8571414     0.56   0.576    -1.201112    2.159291
+int_lead3_h~ |   .7701065   .9574574     0.80   0.421    -1.106738    2.646951
+int_lead4_h~ |   .0048786   .9819642     0.00   0.996    -1.920005    1.929763
+int_lag0_h~s |  -3.948516   .8434003    -4.68   0.000    -5.601782    -2.29525
+int_lag1_h~s |  -6.137773   .8908585    -6.89   0.000    -7.884068   -4.391478
+int_lag2_h~s |  -5.956737   .8982264    -6.63   0.000    -7.717475   -4.195999
+int_lag3_h~s |  -7.512501   .8839182    -8.50   0.000    -9.245191    -5.77981
+int_lag4_h~s |  -7.348497   .9146796    -8.03   0.000    -9.141488   -5.555507
+int_lag5_h~s |  -7.777201    .886345    -8.77   0.000    -9.514649   -6.039754
+int_lead2_l~ |  -1.394063   .7351039    -1.90   0.058    -2.835041    .0469164
+int_lead3_l~ |  -2.040296   .7810775    -2.61   0.009    -3.571394   -.5091984
+int_lead4_l~ |  -2.405154   .8059242    -2.98   0.003    -3.984957   -.8253503
+int_lag0_l~s |   .5043456   .7443937     0.68   0.498    -.9548434    1.963535
+int_lag1_l~s |   .9502291   .7746009     1.23   0.220    -.5681733    2.468632
+int_lag2_l~s |   1.538649   .7865812     1.96   0.050    -.0032379    3.080535
+int_lag3_l~s |   .6940772   .8072755     0.86   0.390    -.8883753     2.27653
+int_lag4_l~s |   1.298635   .8344612     1.56   0.120    -.3371081    2.934377
+int_lag5_l~s |    1.57283   .8311773     1.89   0.058    -.0564756    3.202136
+int_lead1_h~ |          0  (omitted)
+int_lead1_l~ |          0  (omitted)
+       _cons |   1.814205   .0214993    84.38   0.000     1.772061    1.856349
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      8649        8649           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+HET high_grants: pre_mean= 0.418 post_mean=-6.447
+HET low_grants: pre_mean=-1.947 post_mean= 1.093
+---- group-absorbed ES (within-group exposure only): high_grants vs low_grants 
+> ----
+(MWFE estimator converged in 2 iterations)
+note: int_lead1_high_grants omitted because of collinearity
+note: int_lead1_low_grants omitted because of collinearity
+
+HDFE Linear regression                            Number of obs   =     86,490
+Absorbing 2 HDFE groups                           F(  27,   8648) =      17.71
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.4067
+                                                  Adj R-squared   =     0.3404
+                                                  Within R-sq.    =     0.0113
+Number of clusters (athr_id) =      8,649         Root MSE        =     1.5264
+
+                            (Std. err. adjusted for 8,649 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+int_lead2_h~ |  -.3285071   1.061243    -0.31   0.757    -2.408797    1.751783
+int_lead3_h~ |  -.3902364   1.195366    -0.33   0.744    -2.733438    1.952966
+int_lead4_h~ |  -.4051431   1.221599    -0.33   0.740    -2.799768    1.989481
+int_lag0_h~s |  -1.315698   1.044987    -1.26   0.208    -3.364123    .7327262
+int_lag1_h~s |  -4.420143   1.109072    -3.99   0.000    -6.594188   -2.246097
+int_lag2_h~s |   -3.22221   1.116213    -2.89   0.004    -5.410253   -1.034167
+int_lag3_h~s |  -4.349505   1.086662    -4.00   0.000    -6.479622   -2.219389
+int_lag4_h~s |  -4.436855   1.130732    -3.92   0.000    -6.653359   -2.220351
+int_lag5_h~s |    -4.1497   1.094765    -3.79   0.000      -6.2957     -2.0037
+int_lead2_l~ |  -.6633161   .8512171    -0.78   0.436    -2.331905    1.005272
+int_lead3_l~ |  -.9903711    .889744    -1.11   0.266    -2.734481    .7537393
+int_lead4_l~ |   -2.03415   .9275441    -2.19   0.028    -3.852357   -.2159422
+int_lag0_l~s |  -1.877935   .8624098    -2.18   0.029    -3.568464    -.187406
+int_lag1_l~s |  -.6039523   .8982241    -0.67   0.501    -2.364686    1.156781
+int_lag2_l~s |  -.9356621   .9233104    -1.01   0.311    -2.745571    .8742463
+int_lag3_l~s |  -2.167929   .9536796    -2.27   0.023    -4.037369     -.29849
+int_lag4_l~s |  -1.335937   .9785174    -1.37   0.172    -3.254065      .58219
+int_lag5_l~s |   -1.70948    .972833    -1.76   0.079    -3.616465    .1975041
+int_lead1_h~ |          0  (omitted)
+int_lead1_l~ |          0  (omitted)
+ g1rel_lead2 |   .1088715   .0718698     1.51   0.130    -.0320105    .2497535
+ g1rel_lead3 |   .1564249   .0773209     2.02   0.043     .0048574    .3079923
+ g1rel_lead4 |   .0552747   .0800126     0.69   0.490     -.101569    .2121184
+  g1rel_lag0 |   -.354928   .0704172    -5.04   0.000    -.4929625   -.2168935
+  g1rel_lag1 |  -.2315523   .0748748    -3.09   0.002    -.3783248   -.0847799
+  g1rel_lag2 |  -.3686393   .0754583    -4.89   0.000    -.5165556   -.2207231
+  g1rel_lag3 |  -.4264008   .0768044    -5.55   0.000    -.5769557   -.2758459
+  g1rel_lag4 |  -.3925161   .0786042    -4.99   0.000     -.546599   -.2384332
+  g1rel_lag5 |  -.4890205   .0764025    -6.40   0.000    -.6387877   -.3392534
+       _cons |   1.908791   .0310466    61.48   0.000     1.847932    1.969649
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      8649        8649           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+ABS high_grants: pre_mean=-0.375 post_mean=-3.649
+ABS low_grants: pre_mean=-1.229 post_mean=-1.438
+    --> absorbed common trend (high_grants minus low_grants): pre_mean= 0.107 p
+> ost_mean=-0.377
+============================================
+==== cite_affl_wt ====
+============================================
+---- heterogeneous ES (base specification): high_pre_ppr vs low_pre_ppr ----
+(77,841 missing values generated)
+(77,841 missing values generated)
+(77,841 missing values generated)
+(77,841 missing values generated)
+(77,841 missing values generated)
+(77,841 missing values generated)
+(77,841 missing values generated)
+(77,841 missing values generated)
+(77,841 missing values generated)
+(77,841 missing values generated)
+int_lead1  int_lead3  int_lag1   int_lag3   int_lag5
+int_lead2  int_lead4  int_lag2   int_lag4   int_lag0
+(77,841 real changes made)
+(77,841 real changes made)
+(77,841 real changes made)
+(77,841 real changes made)
+(77,841 real changes made)
+(77,841 real changes made)
+(77,841 real changes made)
+(77,841 real changes made)
+(77,841 real changes made)
+(77,841 real changes made)
+(MWFE estimator converged in 2 iterations)
+note: int_lead1_high_pre_ppr omitted because of collinearity
+note: int_lead1_low_pre_ppr omitted because of collinearity
+
+HDFE Linear regression                            Number of obs   =     86,490
+Absorbing 2 HDFE groups                           F(  18,   8648) =      22.08
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.3355
+                                                  Adj R-squared   =     0.2614
+                                                  Within R-sq.    =     0.0032
+Number of clusters (athr_id) =      8,649         Root MSE        =     7.8640
+
+                            (Std. err. adjusted for 8,649 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+cite_affl_wt | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+int_lead2_h~ |  -3.956539   3.219277    -1.23   0.219    -10.26709     2.35401
+int_lead3_h~ |  -.5612114   3.051963    -0.18   0.854    -6.543786    5.421364
+int_lead4_h~ |  -4.442285   3.680619    -1.21   0.227    -11.65718    2.772606
+int_lag0_h~r |  -12.20826   2.947402    -4.14   0.000    -17.98587   -6.430653
+int_lag1_h~r |  -13.41722   3.334955    -4.02   0.000    -19.95453   -6.879912
+int_lag2_h~r |   -17.5833   3.656368    -4.81   0.000    -24.75065   -10.41594
+int_lag3_h~r |  -13.49189   3.320453    -4.06   0.000    -20.00077   -6.983009
+int_lag4_h~r |  -16.28493   3.173409    -5.13   0.000    -22.50557   -10.06429
+int_lag5_h~r |  -17.19987   3.237546    -5.31   0.000    -23.54623    -10.8535
+int_lead2_l~ |  -5.098525   3.324196    -1.53   0.125    -11.61474    1.417691
+int_lead3_l~ |  -3.634587   2.553728    -1.42   0.155    -8.640503    1.371329
+int_lead4_l~ |  -9.298002   2.940665    -3.16   0.002    -15.06241   -3.533598
+int_lag0_l~r |   9.954711   2.609662     3.81   0.000     4.839152    15.07027
+int_lag1_l~r |   11.82924   2.506806     4.72   0.000     6.915304    16.74318
+int_lag2_l~r |   13.55405   5.735842     2.36   0.018     2.310433    24.79767
+int_lag3_l~r |   14.87497     2.7126     5.48   0.000     9.557623    20.19231
+int_lag4_l~r |   14.37487   2.839249     5.06   0.000      8.80927    19.94048
+int_lag5_l~r |   19.36956   2.902979     6.67   0.000     13.67903    25.06009
+int_lead1_h~ |          0  (omitted)
+int_lead1_l~ |          0  (omitted)
+       _cons |   3.604266   .0788836    45.69   0.000     3.449636    3.758897
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      8649        8649           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+HET high_pre_ppr: pre_mean=-2.987 post_mean=-15.031
+HET low_pre_ppr: pre_mean=-6.010 post_mean=13.993
+---- group-absorbed ES (within-group exposure only): high_pre_ppr vs low_pre_pp
+> r ----
+(MWFE estimator converged in 2 iterations)
+note: int_lead1_high_pre_ppr omitted because of collinearity
+note: int_lead1_low_pre_ppr omitted because of collinearity
+
+HDFE Linear regression                            Number of obs   =     86,490
+Absorbing 2 HDFE groups                           F(  27,   8648) =      18.86
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.3366
+                                                  Adj R-squared   =     0.2626
+                                                  Within R-sq.    =     0.0050
+Number of clusters (athr_id) =      8,649         Root MSE        =     7.8576
+
+                            (Std. err. adjusted for 8,649 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+cite_affl_wt | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+int_lead2_h~ |  -8.202561   3.812116    -2.15   0.031    -15.67522    -.729904
+int_lead3_h~ |  -4.167262   3.655545    -1.14   0.254      -11.333    2.998478
+int_lead4_h~ |  -9.549405   4.617504    -2.07   0.039    -18.60081   -.4979958
+int_lag0_h~r |  -6.444947    3.59279    -1.79   0.073    -13.48767    .5977781
+int_lag1_h~r |  -7.166436    3.94421    -1.82   0.069    -14.89803    .5651565
+int_lag2_h~r |  -11.99422   5.487546    -2.19   0.029    -22.75112   -1.237324
+int_lag3_h~r |  -4.186524   3.923688    -1.07   0.286    -11.87789    3.504839
+int_lag4_h~r |  -6.669871   3.929305    -1.70   0.090    -14.37225    1.032503
+int_lag5_h~r |   -6.89656   3.992111    -1.73   0.084    -14.72205     .928929
+int_lead2_l~ |   1.444826   3.199368     0.45   0.652    -4.826698    7.716351
+int_lead3_l~ |   1.922534   2.867632     0.67   0.503    -3.698709    7.543777
+int_lead4_l~ |   -1.42765   2.798027    -0.51   0.610     -6.91245     4.05715
+int_lag0_l~r |   1.073126   2.838735     0.38   0.705     -4.49147    6.637723
+int_lag1_l~r |   2.196443   2.942826     0.75   0.455    -3.572198    7.965084
+int_lag2_l~r |   4.940983   5.890148     0.84   0.402    -6.605111    16.48708
+int_lag3_l~r |   .5348887   3.157846     0.17   0.865    -5.655243     6.72502
+int_lag4_l~r |  -.4424626   2.883383    -0.15   0.878    -6.094581    5.209656
+int_lag5_l~r |   3.491599   3.143108     1.11   0.267    -2.669642    9.652839
+int_lead1_h~ |          0  (omitted)
+int_lead1_l~ |          0  (omitted)
+ g1rel_lead2 |   .7469331   .3298134     2.26   0.024     .1004202    1.393446
+ g1rel_lead3 |   .6343535   .2828325     2.24   0.025     .0799344    1.188773
+ g1rel_lead4 |   .8984122   .3338125     2.69   0.007     .2440601    1.552764
+  g1rel_lag0 |  -1.013846   .2702214    -3.75   0.000    -1.543544   -.4841476
+  g1rel_lag1 |  -1.099598   .2795798    -3.93   0.000    -1.647641    -.551555
+  g1rel_lag2 |  -.9831943   .5224845    -1.88   0.060    -2.007389    .0409999
+  g1rel_lag3 |  -1.636941   .2869714    -5.70   0.000    -2.199473   -1.074408
+  g1rel_lag4 |  -1.691421   .3041536    -5.56   0.000    -2.287634   -1.095207
+  g1rel_lag5 |  -1.812492   .3043554    -5.96   0.000    -2.409102   -1.215883
+       _cons |   3.950927   .1347992    29.31   0.000     3.686689    4.215166
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      8649        8649           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+ABS high_pre_ppr: pre_mean=-7.306 post_mean=-7.226
+ABS low_pre_ppr: pre_mean= 0.647 post_mean= 1.966
+    --> absorbed common trend (high_pre_ppr minus low_pre_ppr): pre_mean= 0.760
+>  post_mean=-1.373
+---- heterogeneous ES (base specification): high_grants vs low_grants ----
+(77,841 missing values generated)
+(77,841 missing values generated)
+(77,841 missing values generated)
+(77,841 missing values generated)
+(77,841 missing values generated)
+(77,841 missing values generated)
+(77,841 missing values generated)
+(77,841 missing values generated)
+(77,841 missing values generated)
+(77,841 missing values generated)
+int_lead1  int_lead3  int_lag1   int_lag3   int_lag5
+int_lead2  int_lead4  int_lag2   int_lag4   int_lag0
+(77,841 real changes made)
+(77,841 real changes made)
+(77,841 real changes made)
+(77,841 real changes made)
+(77,841 real changes made)
+(77,841 real changes made)
+(77,841 real changes made)
+(77,841 real changes made)
+(77,841 real changes made)
+(77,841 real changes made)
+(MWFE estimator converged in 2 iterations)
+note: int_lead1_high_grants omitted because of collinearity
+note: int_lead1_low_grants omitted because of collinearity
+
+HDFE Linear regression                            Number of obs   =     86,490
+Absorbing 2 HDFE groups                           F(  18,   8648) =       6.67
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.3343
+                                                  Adj R-squared   =     0.2601
+                                                  Within R-sq.    =     0.0014
+Number of clusters (athr_id) =      8,649         Root MSE        =     7.8713
+
+                            (Std. err. adjusted for 8,649 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+cite_affl_wt | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+int_lead2_h~ |  -.9435254   4.069367    -0.23   0.817    -8.920455    7.033404
+int_lead3_h~ |   2.579083   3.514926     0.73   0.463    -4.311009    9.469175
+int_lead4_h~ |  -1.658182   4.295974    -0.39   0.700    -10.07931     6.76295
+int_lag0_h~s |  -8.414215   3.496068    -2.41   0.016    -15.26734   -1.561088
+int_lag1_h~s |  -13.56933   3.891439    -3.49   0.000    -21.19748   -5.941183
+int_lag2_h~s |   -15.1496     3.8866    -3.90   0.000    -22.76826   -7.530936
+int_lag3_h~s |  -11.67552   3.829952    -3.05   0.002    -19.18314   -4.167898
+int_lag4_h~s |   -14.1751   3.675059    -3.86   0.000    -21.37909   -6.971113
+int_lag5_h~s |  -13.72706   3.771441    -3.64   0.000    -21.11998   -6.334136
+int_lead2_l~ |  -7.277078   2.886263    -2.52   0.012    -12.93484   -1.619315
+int_lead3_l~ |  -5.140427   2.655011    -1.94   0.053    -10.34488    .0640274
+int_lead4_l~ |  -9.767668   3.065948    -3.19   0.001    -15.77766   -3.757679
+int_lag0_l~s |  -2.372888   2.504291    -0.95   0.343    -7.281896     2.53612
+int_lag1_l~s |   1.710093   2.680797     0.64   0.524    -3.544908    6.965093
+int_lag2_l~s |  -1.225045   4.909435    -0.25   0.803    -10.84871    8.398618
+int_lag3_l~s |   1.762336   2.821962     0.62   0.532    -3.769382    7.294053
+int_lag4_l~s |   .0737277   2.865521     0.03   0.979    -5.543377    5.690832
+int_lag5_l~s |   1.473239   2.821608     0.52   0.602    -4.057784    7.004263
+int_lead1_h~ |          0  (omitted)
+int_lead1_l~ |          0  (omitted)
+       _cons |   3.655372   .0819839    44.59   0.000     3.494664     3.81608
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      8649        8649           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+HET high_grants: pre_mean=-0.008 post_mean=-12.785
+HET low_grants: pre_mean=-7.395 post_mean= 0.237
+---- group-absorbed ES (within-group exposure only): high_grants vs low_grants 
+> ----
+(MWFE estimator converged in 2 iterations)
+note: int_lead1_high_grants omitted because of collinearity
+note: int_lead1_low_grants omitted because of collinearity
+
+HDFE Linear regression                            Number of obs   =     86,490
+Absorbing 2 HDFE groups                           F(  27,   8648) =       6.43
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.3346
+                                                  Adj R-squared   =     0.2604
+                                                  Within R-sq.    =     0.0019
+Number of clusters (athr_id) =      8,649         Root MSE        =     7.8695
+
+                            (Std. err. adjusted for 8,649 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+cite_affl_wt | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+int_lead2_h~ |  -3.420066   5.006579    -0.68   0.495    -13.23415    6.394023
+int_lead3_h~ |   1.606966   4.679999     0.34   0.731    -7.566947    10.78088
+int_lead4_h~ |  -2.607637   5.886476    -0.44   0.658    -14.14653    8.931259
+int_lag0_h~s |   -1.17194   4.564932    -0.26   0.797    -10.12029    7.776415
+int_lag1_h~s |  -7.855783   5.104484    -1.54   0.124    -17.86179    2.150222
+int_lag2_h~s |  -12.55301   6.785486    -1.85   0.064    -25.85418    .7481614
+int_lag3_h~s |  -4.602143    5.02532    -0.92   0.360    -14.45297    5.248683
+int_lag4_h~s |  -8.526082   4.951464    -1.72   0.085    -18.23213    1.179968
+int_lag5_h~s |  -3.220268   5.126083    -0.63   0.530    -13.26861    6.828076
+int_lead2_l~ |  -5.036204   2.434173    -2.07   0.039    -9.807763   -.2646453
+int_lead3_l~ |  -4.260816   2.477364    -1.72   0.085    -9.117039    .5954077
+int_lead4_l~ |  -8.908563   2.652776    -3.36   0.001    -14.10864    -3.70849
+int_lag0_l~s |  -8.925992   2.475137    -3.61   0.000    -13.77785   -4.074134
+int_lag1_l~s |  -3.459757   2.584443    -1.34   0.181    -8.525881    1.606367
+int_lag2_l~s |  -3.574545   4.258909    -0.84   0.401    -11.92302    4.773933
+int_lag3_l~s |   -4.63794   2.771321    -1.67   0.094    -10.07039    .7945093
+int_lag4_l~s |  -5.037736   2.639954    -1.91   0.056    -10.21268    .1372031
+int_lag5_l~s |  -8.033731   2.684513    -2.99   0.003    -13.29602   -2.771445
+int_lead1_h~ |          0  (omitted)
+int_lead1_l~ |          0  (omitted)
+ g1rel_lead2 |   .3338604   .3513639     0.95   0.342    -.3548965    1.022617
+ g1rel_lead3 |   .1310503   .2979064     0.44   0.660    -.4529172    .7150177
+ g1rel_lead4 |   .1279952   .3649664     0.35   0.726    -.5874259    .8434162
+  g1rel_lag0 |  -.9763252    .287464    -3.40   0.001    -1.539823   -.4128272
+  g1rel_lag1 |  -.7702387   .2942701    -2.62   0.009    -1.347078   -.1933993
+  g1rel_lag2 |  -.3500442   .5699518    -0.61   0.539    -1.467286    .7671971
+  g1rel_lag3 |  -.9535558   .3015125    -3.16   0.002    -1.544592   -.3625194
+  g1rel_lag4 |    -.76154   .3283298    -2.32   0.020    -1.405145   -.1179353
+  g1rel_lag5 |  -1.416412   .3247369    -4.36   0.000    -2.052974     -.77985
+       _cons |   3.881075    .100643    38.56   0.000      3.68379    4.078359
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      8649        8649           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+ABS high_grants: pre_mean=-1.474 post_mean=-6.322
+ABS low_grants: pre_mean=-6.069 post_mean=-5.612
+    --> absorbed common trend (high_grants minus low_grants): pre_mean= 0.198 p
+> ost_mean=-0.871
+
+. 
+. log close
+      name:  <unnamed>
+       log:  /n/holylabs/pakes_lab/Lab/sci_eq/analysis/reduced_form/code/../tem
+> p/diag_meanrev.log
+  log type:  text
+ closed on:  11 Jun 2026, 21:59:20
+-------------------------------------------------------------------------------
+
+. 
+end of do-file

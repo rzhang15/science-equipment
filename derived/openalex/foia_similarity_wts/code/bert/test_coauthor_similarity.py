@@ -155,12 +155,12 @@ def main():
     print()
     print(summary_str)
 
-    out_pairs = f"{OUT_DIR}/coauthor_validation_pairs.csv"
+    out_pairs = f"{OUT_DIR}/coauthor_validation_pairs_bert_{model_tag}{args.foia_suffix}.csv"
     df[["athr_id", "coauthor_id", "e_foia_true", "e_co_imputed",
         "sim_to_partner", "partner_rank", "abs_err"]].to_csv(out_pairs, index=False)
     print(f"\nSaved per-pair diagnostics: {out_pairs}")
 
-    out_summary = f"{OUT_DIR}/coauthor_validation_summary.txt"
+    out_summary = f"{OUT_DIR}/coauthor_validation_summary_bert_{model_tag}{args.foia_suffix}.txt"
     with open(out_summary, "w") as f:
         f.write(summary_str + "\n")
     print(f"Saved summary: {out_summary}")

@@ -1,0 +1,627 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 120,000; see help set_maxvar.
+
+. do /tmp/smoke.do 
+
+. set more off
+
+. clear all
+
+. capture log close
+
+. program drop _all
+
+. version 17
+
+. include analysis.do
+
+.  set more off
+
+. clear all
+
+. capture log close
+
+. program drop _all
+
+. set scheme modern
+
+. preliminaries
+
+. version 17
+
+. 
+. program main
+  1.    build_panel
+  2.    did
+  3.    event_study
+  4. end
+
+. 
+. // -----------------------------------------------------------------------------
+. // build_panel: construct the university-by-year analysis panel.
+. //   - exposure_j = sum_{m in treated, high-conf} s_jm * b_eb_m
+. //   - s_treat_j  = sum_{m in treated, high-conf} s_jm  (overall treated share)
+. //   - s_jm: uni j's pre-2013 spend in market m as share of pre-2013 spend
+. //           across all high-confidence markets (treated + control).
+. //   - outcomes summed over high-confidence markets only:
+. //       ctrl_spend_jt, ctrl_qty_jt, treat_spend_jt, tot_spend_jt
+. //   - sample: unis with positive pre-2013 spend in both treated and control
+. //             high-conf markets, observed both before and after 2014.
+. // -----------------------------------------------------------------------------
+. program build_panel
+  1.     use ../external/samp/full_uni_category_yr_tfidf, clear
+  2.     keep if keep == 1                           // high-confidence markets only
+  3.     keep category year uni_id treated raw_spend raw_qty
+  4. 
+.     // --- pre-2013 shares and exposure -----------------------------------------
+.     preserve
+  5.     keep if year <= 2013
+  6.     gcollapse (sum) raw_spend, by(uni_id category treated)
+  7.     bys uni_id: egen tot_pre_spend = total(raw_spend)
+  8.     gen s_jm = raw_spend / tot_pre_spend
+  9.     // pre-period treated and control totals (for sample restriction)
+.     by uni_id: egen pre_treat_spend = total(raw_spend * (treated == 1))
+ 10.     by uni_id: egen pre_ctrl_spend  = total(raw_spend * (treated == 0))
+ 11.     // merge EB-shrunk price betas (only present for treated markets)
+.     merge m:1 category using ../external/betas/did_coefs_eb_price, ///
+>         keepusing(b_eb) keep(1 3) nogen
+ 12.     gen exp_contrib    = cond(treated == 1, s_jm * b_eb, 0)
+ 13.     gen s_treat_contrib = cond(treated == 1, s_jm, 0)
+ 14.     gcollapse (sum) exposure = exp_contrib s_treat = s_treat_contrib ///
+>               (first) pre_treat_spend pre_ctrl_spend tot_pre_spend, by(uni_id)
+ 15.     // sample restriction: positive pre-2013 spend in both treated and control
+.     keep if pre_treat_spend > 0 & pre_ctrl_spend > 0 & !mi(exposure) & !mi(s_treat)
+ 16.     keep uni_id exposure s_treat tot_pre_spend
+ 17.     tempfile exposure_xw
+ 18.     save `exposure_xw'
+ 19.     restore
+ 20. 
+.     // --- aggregate outcomes to uni-year ---------------------------------------
+.     gen ctrl_spend  = raw_spend * (treated == 0)
+ 21.     gen treat_spend = raw_spend * (treated == 1)
+ 22.     gen ctrl_qty    = raw_qty   * (treated == 0)
+ 23.     gcollapse (sum) ctrl_spend treat_spend ctrl_qty raw_spend raw_qty, by(uni_id year)
+ 24.     rename raw_spend tot_spend
+ 25.     rename raw_qty   tot_qty
+ 26. 
+.     // --- merge to exposure crosswalk (restricts sample) -----------------------
+.     merge m:1 uni_id using `exposure_xw', assert(1 3) keep(3) nogen
+ 27. 
+.     // require uni observed both pre and post 2014
+.     bys uni_id: egen min_year = min(year)
+ 28.     bys uni_id: egen max_year = max(year)
+ 29.     keep if min_year < 2014 & max_year >= 2014
+ 30.     drop min_year max_year
+ 31. 
+.     // outcomes (log(1+x) per spec discussion: keeps zero-spend uni-years)
+.     foreach v in ctrl_spend ctrl_qty treat_spend tot_spend {
+ 32.         gen log1_`v' = ln(1 + `v')
+ 33.     }
+ 34. 
+.     // pre-2013 uni spending for weighted regressions
+.     gen wt_spend = tot_pre_spend
+ 35. 
+.     label var exposure     "University exposure: sum_m s_jm * b_eb_m (treated mkts)"
+ 36.     label var s_treat      "Pre-2013 treated-market spending share"
+ 37.     label var ctrl_spend   "Spend in high-conf control markets (level)"
+ 38.     label var treat_spend  "Spend in high-conf treated markets (level)"
+ 39.     label var tot_spend    "Spend in all high-conf markets (level)"
+ 40.     label var ctrl_qty     "Quantity in high-conf control markets (level)"
+ 41.     save ../temp/uni_yr_panel, replace
+ 42. end
+
+. 
+. // -----------------------------------------------------------------------------
+. // did: pooled difference-in-differences (single Post coefficient).
+. //   y_jt = mu_j + lambda_t + beta * Post_t * Exposure_j
+. //                          + gamma * Post_t * S_j  (optional)
+. //   Cluster SEs at uni_id.
+. // -----------------------------------------------------------------------------
+. program did
+  1.     use ../temp/uni_yr_panel, clear
+  2.     gen post = year >= 2014
+  3.     gen post_exp = post * exposure
+  4.     gen post_s   = post * s_treat
+  5. 
+.     tempname memhold
+  6.     tempfile didres
+  7.     postfile `memhold' str40 outcome str20 spec str40 rhs ///
+>         double b se str10 stars int N using `didres', replace
+  8. 
+.     foreach yvar in log1_ctrl_spend log1_ctrl_qty log1_tot_spend log1_treat_spend {
+  9.         // raw (no S control)
+.         reghdfe `yvar' post_exp, absorb(uni_id year) cluster(uni_id)
+ 10.         local N = e(N)
+ 11.         local b  = _b[post_exp]
+ 12.         local se = _se[post_exp]
+ 13.         local p  = 2*(1 - normal(abs(`b'/`se')))
+ 14.         local stars = cond(`p'<.01,"***",cond(`p'<.05,"**",cond(`p'<.1,"*","")))
+ 15.         post `memhold' ("`yvar'") ("raw") ("post_exp") (`b') (`se') ("`stars'") (`N')
+ 16. 
+.         // identified (S control)
+.         reghdfe `yvar' post_exp post_s, absorb(uni_id year) cluster(uni_id)
+ 17.         local N = e(N)
+ 18.         local b  = _b[post_exp]
+ 19.         local se = _se[post_exp]
+ 20.         local p  = 2*(1 - normal(abs(`b'/`se')))
+ 21.         local stars = cond(`p'<.01,"***",cond(`p'<.05,"**",cond(`p'<.1,"*","")))
+ 22.         post `memhold' ("`yvar'") ("with_S") ("post_exp") (`b') (`se') ("`stars'") (`N')
+ 23. 
+.         // also save Post×S coefficient from the identified spec
+.         local b  = _b[post_s]
+ 24.         local se = _se[post_s]
+ 25.         local p  = 2*(1 - normal(abs(`b'/`se')))
+ 26.         local stars = cond(`p'<.01,"***",cond(`p'<.05,"**",cond(`p'<.1,"*","")))
+ 27.         post `memhold' ("`yvar'") ("with_S") ("post_s") (`b') (`se') ("`stars'") (`N')
+ 28.     }
+ 29.     postclose `memhold'
+ 30. 
+.     use `didres', clear
+ 31.     save ../output/estimates/uniyr_did, replace
+ 32.     export delimited using ../output/estimates/uniyr_did.csv, replace
+ 33.     list, sepby(outcome) noobs
+ 34. end
+
+. 
+. // -----------------------------------------------------------------------------
+. // event_study: continuous-treatment event study.
+. //   y_jt = mu_j + lambda_t + sum_n beta_n [1{rel=n} * Exposure_j]
+. //                          + sum_n gamma_n [1{rel=n} * S_j]   (optional)
+. //   rel = year - 2014, base period rel = -1 (year 2013).
+. //   Cluster SEs at uni_id.
+. // -----------------------------------------------------------------------------
+. program event_study
+  1.     foreach yvar in log1_ctrl_spend log1_ctrl_qty log1_tot_spend log1_treat_spend {
+  2.         foreach spec in raw with_S {
+  3.             cont_es, yvar(`yvar') spec(`spec')
+  4.         }
+  5.     }
+  6. end
+
+. 
+. program cont_es
+  1.     syntax, yvar(str) spec(str)
+  2.     use ../temp/uni_yr_panel, clear
+  3.     gen rel = year - 2014
+  4.     qui sum rel
+  5.     local rmin = r(min)
+  6.     local rmax = r(max)
+  7. 
+.     // build event-time interactions; base = rel == -1
+.     forval k = `rmin'/`rmax' {
+  8.         if `k' == -1 continue
+  9.         local tag = cond(`k' < 0, "n" + string(abs(`k')), string(`k'))
+ 10.         gen exp_`tag' = exposure * (rel == `k')
+ 11.         gen str_`tag' = s_treat * (rel == `k')
+ 12.     }
+ 13.     ds exp_*
+ 14.     local exp_terms `r(varlist)'
+ 15.     ds str_*
+ 16.     local str_terms `r(varlist)'
+ 17. 
+.     if "`spec'" == "raw" {
+ 18.         reghdfe `yvar' `exp_terms', absorb(uni_id year) cluster(uni_id)
+ 19.     }
+ 20.     else {
+ 21.         reghdfe `yvar' `exp_terms' `str_terms', absorb(uni_id year) cluster(uni_id)
+ 22.     }
+ 23.     local Nobs = e(N)
+ 24. 
+.     // collect coefficients
+.     mat drop _all
+ 25.     forval k = `rmin'/`rmax' {
+ 26.         if `k' == -1 {
+ 27.             mat row = `k', 0, 0
+ 28.         }
+ 29.         else {
+ 30.             local tag = cond(`k' < 0, "n" + string(abs(`k')), string(`k'))
+ 31.             mat row = `k', _b[exp_`tag'], _se[exp_`tag']
+ 32.         }
+ 33.         mat es = nullmat(es) \ row
+ 34.     }
+ 35. 
+.     preserve
+ 36.     clear
+ 37.     svmat es
+ 38.     rename (es1 es2 es3) (rel b se)
+ 39.     gen ub = b + 1.96*se
+ 40.     gen lb = b - 1.96*se
+ 41.     gen year = rel + 2014
+ 42.     gen yvar = "`yvar'"
+ 43.     gen spec = "`spec'"
+ 44.     export delimited using ///
+>         ../output/estimates/es_`yvar'_`spec'.csv, replace
+ 45.     save ../temp/es_`yvar'_`spec', replace
+ 46. 
+.     sum ub, d
+ 47.     local ymax = round(r(max), 0.01) + 0.01
+ 48.     sum lb, d
+ 49.     local ymin = round(r(min), 0.01) - 0.01
+ 50.     qui sum rel
+ 51.     local xmin = r(min)
+ 52.     local xmax = r(max)
+ 53. 
+.     tw rcap ub lb rel if rel != -1, lcolor(ebblue%70) msize(vsmall) ///
+>        || scatter b rel, mcolor(ebblue) msize(small) ///
+>        || scatteri `ymax' -0.25 `ymax' 0.25, bcolor(gs12%30) recast(area) base(`ymin') ///
+>        , xlab(`xmin'(1)`xmax', labsize(small)) ///
+>          xtitle("Years relative to 2014", size(small)) ///
+>          ytitle("Coef on rel x Exposure", size(small)) ///
+>          ylab(, labsize(small)) ///
+>          yline(0, lcolor(gs10) lpattern(solid)) ///
+>          title("`yvar' (`spec', N=`Nobs')", size(small)) ///
+>          legend(off) plotregion(margin(sides))
+ 54.     graph export ../output/figures/es/es_`yvar'_`spec'.pdf, replace
+ 55.     restore
+ 56. end
+
+. 
+. **
+. main
+(51,377 observations deleted)
+(20,759 observations deleted)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                         3,621
+        from master                     3,621  
+        from using                          0  
+
+    Matched                             1,183  
+    -----------------------------------------
+(9 observations deleted)
+file /tmp/St917849.000002 saved as .dta format
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                               628  
+    -----------------------------------------
+(0 observations deleted)
+(file ../temp/uni_yr_panel.dta not found)
+file ../temp/uni_yr_panel.dta saved
+(file /tmp/St917849.000001 not found)
+(MWFE estimator converged in 4 iterations)
+
+HDFE Linear regression                            Number of obs   =        628
+Absorbing 2 HDFE groups                           F(   1,     63) =       2.51
+Statistics robust to heteroskedasticity           Prob > F        =     0.1180
+                                                  R-squared       =     0.8192
+                                                  Adj R-squared   =     0.7954
+                                                  Within R-sq.    =     0.0224
+Number of clusters (uni_id)  =         64         Root MSE        =     0.8990
+
+                                (Std. err. adjusted for 64 clusters in uni_id)
+------------------------------------------------------------------------------
+             |               Robust
+log1_ctrl_~d | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+    post_exp |  -8.862624   5.592264    -1.58   0.118    -20.03787    2.312624
+       _cons |   9.732478   .0848673   114.68   0.000     9.562884    9.902072
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+      uni_id |        64          64           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+(MWFE estimator converged in 5 iterations)
+
+HDFE Linear regression                            Number of obs   =        628
+Absorbing 2 HDFE groups                           F(   2,     63) =       2.15
+Statistics robust to heteroskedasticity           Prob > F        =     0.1255
+                                                  R-squared       =     0.8214
+                                                  Adj R-squared   =     0.7975
+                                                  Within R-sq.    =     0.0341
+Number of clusters (uni_id)  =         64         Root MSE        =     0.8944
+
+                                (Std. err. adjusted for 64 clusters in uni_id)
+------------------------------------------------------------------------------
+             |               Robust
+log1_ctrl_~d | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+    post_exp |  -14.69522   7.122868    -2.06   0.043    -28.92914    -.461305
+      post_s |   2.087924   1.394881     1.50   0.139    -.6995222    4.875371
+       _cons |   9.596337   .1134596    84.58   0.000     9.369606    9.823068
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+      uni_id |        64          64           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+(MWFE estimator converged in 4 iterations)
+
+HDFE Linear regression                            Number of obs   =        628
+Absorbing 2 HDFE groups                           F(   1,     63) =       1.72
+Statistics robust to heteroskedasticity           Prob > F        =     0.1942
+                                                  R-squared       =     0.8181
+                                                  Adj R-squared   =     0.7941
+                                                  Within R-sq.    =     0.0159
+Number of clusters (uni_id)  =         64         Root MSE        =     0.8793
+
+                                (Std. err. adjusted for 64 clusters in uni_id)
+------------------------------------------------------------------------------
+             |               Robust
+log1_ctrl_~y | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+    post_exp |  -7.288303   5.553674    -1.31   0.194    -18.38644    3.809829
+       _cons |   5.697871   .0842817    67.61   0.000     5.529447    5.866294
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+      uni_id |        64          64           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+(MWFE estimator converged in 5 iterations)
+
+HDFE Linear regression                            Number of obs   =        628
+Absorbing 2 HDFE groups                           F(   2,     63) =       2.91
+Statistics robust to heteroskedasticity           Prob > F        =     0.0618
+                                                  R-squared       =     0.8231
+                                                  Adj R-squared   =     0.7995
+                                                  Within R-sq.    =     0.0432
+Number of clusters (uni_id)  =         64         Root MSE        =     0.8678
+
+                                (Std. err. adjusted for 64 clusters in uni_id)
+------------------------------------------------------------------------------
+             |               Robust
+log1_ctrl_~y | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+    post_exp |  -15.96781    7.17369    -2.23   0.030    -30.30328   -1.632335
+      post_s |   3.107046   1.394539     2.23   0.029     .3202814    5.893811
+       _cons |   5.495279   .1066259    51.54   0.000     5.282205    5.708354
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+      uni_id |        64          64           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+(MWFE estimator converged in 4 iterations)
+
+HDFE Linear regression                            Number of obs   =        628
+Absorbing 2 HDFE groups                           F(   1,     63) =       2.42
+Statistics robust to heteroskedasticity           Prob > F        =     0.1252
+                                                  R-squared       =     0.8452
+                                                  Adj R-squared   =     0.8248
+                                                  Within R-sq.    =     0.0146
+Number of clusters (uni_id)  =         64         Root MSE        =     0.8582
+
+                                (Std. err. adjusted for 64 clusters in uni_id)
+------------------------------------------------------------------------------
+             |               Robust
+log1_tot_s~d | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+    post_exp |   -6.81774   4.386808    -1.55   0.125    -15.58408    1.948596
+       _cons |    9.95431   .0665735   149.52   0.000     9.821274    10.08735
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+      uni_id |        64          64           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+(MWFE estimator converged in 5 iterations)
+
+HDFE Linear regression                            Number of obs   =        628
+Absorbing 2 HDFE groups                           F(   2,     63) =       1.81
+Statistics robust to heteroskedasticity           Prob > F        =     0.1714
+                                                  R-squared       =     0.8461
+                                                  Adj R-squared   =     0.8255
+                                                  Within R-sq.    =     0.0207
+Number of clusters (uni_id)  =         64         Root MSE        =     0.8564
+
+                                (Std. err. adjusted for 64 clusters in uni_id)
+------------------------------------------------------------------------------
+             |               Robust
+log1_tot_s~d | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+    post_exp |   -10.7901   5.691351    -1.90   0.063    -22.16336    .5831532
+      post_s |   1.422007   1.306407     1.09   0.281    -1.188639    4.032653
+       _cons |    9.86159   .1071586    92.03   0.000     9.647451    10.07573
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+      uni_id |        64          64           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+(MWFE estimator converged in 4 iterations)
+
+HDFE Linear regression                            Number of obs   =        628
+Absorbing 2 HDFE groups                           F(   1,     63) =       1.12
+Statistics robust to heteroskedasticity           Prob > F        =     0.2932
+                                                  R-squared       =     0.7775
+                                                  Adj R-squared   =     0.7482
+                                                  Within R-sq.    =     0.0039
+Number of clusters (uni_id)  =         64         Root MSE        =     1.8270
+
+                                (Std. err. adjusted for 64 clusters in uni_id)
+------------------------------------------------------------------------------
+             |               Robust
+log1_treat~d | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+    post_exp |  -7.438159   7.017185    -1.06   0.293    -21.46088    6.584566
+       _cons |   7.402179   .1064917    69.51   0.000     7.189372    7.614985
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+      uni_id |        64          64           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+(MWFE estimator converged in 5 iterations)
+
+HDFE Linear regression                            Number of obs   =        628
+Absorbing 2 HDFE groups                           F(   2,     63) =       0.66
+Statistics robust to heteroskedasticity           Prob > F        =     0.5188
+                                                  R-squared       =     0.7776
+                                                  Adj R-squared   =     0.7479
+                                                  Within R-sq.    =     0.0043
+Number of clusters (uni_id)  =         64         Root MSE        =     1.8282
+
+                                (Std. err. adjusted for 64 clusters in uni_id)
+------------------------------------------------------------------------------
+             |               Robust
+log1_treat~d | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+    post_exp |  -5.220025   8.217579    -0.64   0.528    -21.64155     11.2015
+      post_s |  -.7940363   1.624602    -0.49   0.627    -4.040544    2.452472
+       _cons |   7.453953   .1529238    48.74   0.000     7.148359    7.759547
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+      uni_id |        64          64           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+(file ../output/estimates/uniyr_did.dta not found)
+file ../output/estimates/uniyr_did.dta saved
+(file ../output/estimates/uniyr_did.csv not found)
+file ../output/estimates/uniyr_did.csv saved
+
+  +----------------------------------------------------------------------------+
+  |          outcome     spec        rhs            b         se   stars     N |
+  |----------------------------------------------------------------------------|
+  |  log1_ctrl_spend      raw   post_exp   -8.8626236   5.592264           628 |
+  |  log1_ctrl_spend   with_S   post_exp   -14.695222   7.122869      **   628 |
+  |  log1_ctrl_spend   with_S     post_s    2.0879243   1.394881           628 |
+  |----------------------------------------------------------------------------|
+  |    log1_ctrl_qty      raw   post_exp   -7.2883032   5.553674           628 |
+  |    log1_ctrl_qty   with_S   post_exp   -15.967809   7.173689      **   628 |
+  |    log1_ctrl_qty   with_S     post_s     3.107046   1.394539      **   628 |
+  |----------------------------------------------------------------------------|
+  |   log1_tot_spend      raw   post_exp   -6.8177403   4.386808           628 |
+  |   log1_tot_spend   with_S   post_exp   -10.790105   5.691351       *   628 |
+  |   log1_tot_spend   with_S     post_s    1.4220071   1.306407           628 |
+  |----------------------------------------------------------------------------|
+  | log1_treat_spend      raw   post_exp   -7.4381587   7.017185           628 |
+  | log1_treat_spend   with_S   post_exp   -5.2200252   8.217579           628 |
+  | log1_treat_spend   with_S     post_s   -.79403629   1.624602           628 |
+  +----------------------------------------------------------------------------+
+exp_n4  exp_n3  exp_n2  exp_0   exp_1   exp_2   exp_3   exp_4   exp_5
+str_n4  str_n3  str_n2  str_0   str_1   str_2   str_3   str_4   str_5
+(MWFE estimator converged in 4 iterations)
+
+HDFE Linear regression                            Number of obs   =        628
+Absorbing 2 HDFE groups                           F(   9,     63) =       1.31
+Statistics robust to heteroskedasticity           Prob > F        =     0.2482
+                                                  R-squared       =     0.8209
+                                                  Adj R-squared   =     0.7943
+                                                  Within R-sq.    =     0.0314
+Number of clusters (uni_id)  =         64         Root MSE        =     0.9014
+
+                                (Std. err. adjusted for 64 clusters in uni_id)
+------------------------------------------------------------------------------
+             |               Robust
+log1_ctrl_~d | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+      exp_n4 |   9.010232   6.133749     1.47   0.147    -3.247088    21.26755
+      exp_n3 |   6.903468   3.918229     1.76   0.083    -.9264887    14.73342
+      exp_n2 |   5.062718   3.518533     1.44   0.155    -1.968509    12.09395
+       exp_0 |  -3.049321    2.81947    -1.08   0.284    -8.683582    2.584939
+       exp_1 |  -6.382062   5.770572    -1.11   0.273    -17.91363    5.149506
+       exp_2 |  -.2646964   5.557735    -0.05   0.962    -11.37094    10.84155
+       exp_3 |  -5.948443   8.157523    -0.73   0.469    -22.24995    10.35307
+       exp_4 |  -5.580036   8.808875    -0.63   0.529    -23.18317     12.0231
+       exp_5 |  -1.692066    11.1294    -0.15   0.880     -23.9324    20.54827
+       _cons |   9.605553   .1036456    92.68   0.000     9.398434    9.812672
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+      uni_id |        64          64           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+number of observations will be reset to 10
+Press any key to continue, or Break to abort
+Number of observations (_N) was 0, now 10.
+(file ../output/estimates/es_log1_ctrl_spend_raw.csv not found)
+file ../output/estimates/es_log1_ctrl_spend_raw.csv saved
+(file ../temp/es_log1_ctrl_spend_raw.dta not found)
+file ../temp/es_log1_ctrl_spend_raw.dta saved
+
+                             ub
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            0              0
+ 5%            0       2.476839
+10%     1.238419       4.928259       Obs                  10
+25%     4.928259        10.0403       Sum of wgt.          10
+
+50%     11.15691                      Mean           10.74554
+                        Largest       Std. dev.      6.904123
+75%      14.5832       11.95904
+90%     20.57697        14.5832       Variance       47.66692
+95%     21.03238       20.12157       Skewness      -.0111688
+99%     21.03238       21.03238       Kurtosis       2.080944
+
+                             lb
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%     -23.5057       -23.5057
+ 5%     -23.5057      -22.84543
+10%    -23.17556      -21.93719       Obs                  10
+25%    -21.93719      -17.69238       Sum of wgt.          10
+
+50%    -9.866669                      Mean          -11.13358
+                        Largest       Std. dev.       9.66206
+75%    -1.833606      -3.011916
+90%    -.3881307      -1.833606       Variance       93.35541
+95%            0      -.7762614       Skewness      -.1552216
+99%            0              0       Kurtosis         1.3665
+invalid 'recastas' 
+r(198);
+r(198);
+
+end of do-file
+r(198);

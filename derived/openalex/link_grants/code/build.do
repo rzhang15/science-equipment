@@ -6,17 +6,17 @@ set scheme modern
 preliminaries
 version 17
 
-program main  
+program main
     use ../external/panel/cleaned_all_jrnls.dta, clear
-    contract id athr_id year
+    contract pmid athr_id year
     drop _freq
     save ../temp/pi_ppr, replace
-    merge 1:m id using ../external/openalex/grants_all_jrnls_merged, assert(1 2 3) keep(1 3) 
+    merge 1:m pmid using ../external/pubmed/grants, assert(1 2 3) keep(1 3)
     tab _merge
     drop n _merge
-    contract athr_id year funder_id funder_name award_id
+    contract athr_id year grant_id acronym agency country
     drop _freq
-    drop if mi(award_id)
+    drop if mi(grant_id)
     save ../output/pi_grants, replace
 end
 **

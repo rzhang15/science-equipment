@@ -1,0 +1,29 @@
+FOIA authors: 207
+Scanning /n/home02/cxu75/sci_eq/derived/openalex/cluster_fields/output/author_text_unstemmed.parquet...
+  matched authors: 207 / 207
+  authors with text: 207
+
+Sample:
+  A5062698300: 'a microfluidic chip that allows for the continuous monitoring of cellular secretions from multiple independent living samples was developed performance of the device was characterized through the analysis of insulin secretion from islets of langerhans the chip contained four individual channel netwo'
+  A5101434905: 'dinitro and mononitrobenzo ghi perylenes and mononitrocoronene are highly mutagenic in the ames salmonella assay toxicity metabolism analogs _ derivatives toxicity benz_a_anthracenes mutagens perylene perylene anti glucocorticoids block the enhancement of mouse mammary tumor virus production by 12 o'
+
+Saved ../../output/foia_author_text_unstemmed.csv  (7.9s)
+FOIA papers (to exclude): 9,460
+Unique coauthors: 40,356
+Filtering coauthor edges (excluding FOIA papers)...
+/n/holylabs/pakes_lab/Lab/sci_eq/derived/openalex/foia_similarity_wts/code/bert/0c_build_coauthor_unstemmed.py:52: DeprecationWarning: the `streaming` parameter was deprecated in 1.25.0; use `engine` instead.
+  pl.scan_parquet(EDGES)
+  coauthor edges after exclusion: 1,050,512
+  coauthors with >=1 non-joint paper: 30,692
+Loading paper text for 817,335 papers...
+/n/holylabs/pakes_lab/Lab/sci_eq/derived/openalex/foia_similarity_wts/code/bert/0c_build_coauthor_unstemmed.py:67: DeprecationWarning: the `streaming` parameter was deprecated in 1.25.0; use `engine` instead.
+  pl.scan_parquet(PAPERS)
+  paper texts loaded: 812,948
+Joining and aggregating per coauthor...
+  authors with usable text: 30,613 (dropped 64)
+
+Sample:
+  A5011933633: 'mhc polymorphism and parasites. shared polymorphism between gorilla and human major histocompatibility complex drb loci. the molecular origin and consequences of escape from mirna regulation by hla-c '...
+  A5067704872: 'multifaceted regulation of translational readthrough by rna replication elements in a tombusvirus. context-influenced cap-independent translation of tombusvirus mrnas in vitro. a discontinuous rna pla'...
+
+Saved ../../output/coauthor_text_unstemmed.csv  (58.8s)

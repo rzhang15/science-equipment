@@ -1,0 +1,9 @@
+Model: pritamdeka/S-PubMedBert-MS-MARCO   CoauthorCSV: ../../output/coauthor_text_unstemmed.csv   TagSuffix: '_coauthors_unstemmed'
+Device: cuda
+Loading model: pritamdeka/S-PubMedBert-MS-MARCO
+/n/holylabs/LABS/pakes_lab/Lab/env/lib/python3.10/site-packages/transformers/tokenization_utils_base.py:1617: FutureWarning: `clean_up_tokenization_spaces` was not set. It will be set to `True` by default. This behavior will be deprecated in transformers v4.45, and will be then set to `False` by default. For more details check this issue: https://github.com/huggingface/transformers/issues/31884
+  warnings.warn(
+Loading FOIA texts from ../../output/coauthor_text_unstemmed.csv...
+FOIA authors: 30613
+FOIA embedding shape: (30613, 768)
+Saved ../../output/bert_foia_pritamdeka_S-PubMedBert-MS-MARCO_coauthors_unstemmed.npy and ../../output/bert_foia_ids_pritamdeka_S-PubMedBert-MS-MARCO_coauthors_unstemmed.csv

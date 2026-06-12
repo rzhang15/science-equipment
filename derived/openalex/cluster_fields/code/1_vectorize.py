@@ -14,8 +14,12 @@ from nltk.stem import PorterStemmer
 from config import stopwords_list
 
 # --- LOAD PRE-SAVED DATA ---
+# Reads the cleaned (v2) corpus produced by 00_clean_corpus.py:
+#   - scraper-boilerplate authors dropped
+#   - authors with <200 chars of text dropped
+# Swap back to cleaned_static_author_text_pre.parquet to reproduce baseline.
 print("Loading Parquet data...")
-pdf = pd.read_parquet("../output/cleaned_static_author_text_pre.parquet")
+pdf = pd.read_parquet("../output/cleaned_static_author_text_pre_v2.parquet")
 pdf = pdf.reset_index(drop=True)
 
 print("Stemming Stopwords to match input data...")

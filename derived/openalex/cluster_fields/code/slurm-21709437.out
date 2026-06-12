@@ -1,0 +1,16 @@
+=== Step 0: clean corpus ===
+Reading ../output/cleaned_static_author_text_pre.parquet ...
+Loaded: 8,569,360 authors
+  scraper-boilerplate authors:      58,796 (0.69%)
+  short text (<200 chars):      3,222,894 (37.61%)
+  non-English (<2 anchor hits):  4,868,336 (56.81%)
+  overlap (boiler & short):            326
+  overlap (short & non-Eng):     3,177,893
+  keeping                        3,611,893 / 8,569,360 (42.1%)
+  anchor-hit pctiles: 1%=0  5%=0  10%=0  25%=0  50%=1  75%=4
+Writing ../output/cleaned_static_author_text_pre_v2.parquet ...
+Done. 3,611,893 rows.
+=== Step 1: vectorize ===
+Loading Parquet data...
+Stemming Stopwords to match input data...
+Vectorizing...

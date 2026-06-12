@@ -1,0 +1,300 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 120,000; see help set_maxvar.
+
+. do diag_robust_summary.do 
+
+. set more off
+
+. clear all
+
+. capture log close
+
+. log using ../temp/diag_robust_summary.log, replace text
+(file
+    /n/holylabs/pakes_lab/Lab/sci_eq/analysis/reduced_form/code/../temp/diag_
+    > robust_summary.log not found)
+-------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  /n/holylabs/pakes_lab/Lab/sci_eq/analysis/reduced_form/code/../tem
+> p/diag_robust_summary.log
+  log type:  text
+ opened on:  11 Jun 2026, 21:17:28
+
+. 
+. local samp all_jrnls
+
+. local suf  _r1_r2_public
+
+. 
+. program summ_es
+  1.     syntax, fpath(string) tag(string)
+  2.     use "`fpath'", clear
+  3.     qui sum rel
+  4.     if r(N) == 0 {
+  5.         di as text "`tag': (empty)"
+  6.         exit
+  7.     }
+  8.     qui sum b if rel < -1
+  9.     local pre_max_b = r(max)
+ 10.     local pre_min_b = r(min)
+ 11.     local pre_mean_b = r(mean)
+ 12.     qui sum b if rel >= 0 & rel <= 5
+ 13.     local post_mean_b = r(mean)
+ 14.     qui sum se if rel >= 0 & rel <= 5
+ 15.     local post_mean_se = r(mean)
+ 16.     qui count if rel >= 0 & (lb > 0 | ub < 0)
+ 17.     local n_post_signif = r(N)
+ 18.     qui count if rel < -1 & (lb > 0 | ub < 0)
+ 19.     local n_pre_signif = r(N)
+ 20.     di as text "`tag': pre_mean=" %5.3f `pre_mean_b' " pre_minmax=[" %5.3f
+>  `pre_min_b' "," %5.3f `pre_max_b' "] post_mean=" %5.3f `post_mean_b' " post_
+> mean_se=" %5.3f `post_mean_se' " n_pre_signif=`n_pre_signif' n_post_signif=`n
+> _post_signif'"
+ 21. end
+
+. 
+. di as text "================ MAIN ES (no heterogeneity) ================"
+================ MAIN ES (no heterogeneity) ================
+
+. foreach yvar in ppr_cnt cite_affl_wt {
+  2.     di as text "---- `yvar' ----"
+  3.     foreach spec in base ageCtrl noattrit unbal clusterYrFE {
+  4.         cap noi summ_es, fpath(../temp/robust_es_main_`yvar'_`spec'_`samp'
+> `suf'.dta) tag("main_`spec'")
+  5.         if _rc cap noi summ_es, fpath(../temp/robust_es_main_`spec'_`yvar'
+> _`samp'`suf'.dta) tag("main_`spec'")
+  6.     }
+  7. }
+---- ppr_cnt ----
+main_base: pre_mean=-0.842 pre_minmax=[-1.279,-0.519] post_mean=-2.430 post_mea
+> n_se=0.724 n_pre_signif=0 n_post_signif=6
+main_ageCtrl: pre_mean=-1.112 pre_minmax=[-1.719,-0.645] post_mean=-2.359 post_
+> mean_se=0.722 n_pre_signif=1 n_post_signif=6
+main_noattrit: pre_mean=-0.506 pre_minmax=[-0.784,-0.051] post_mean=-2.161 post
+> _mean_se=0.821 n_pre_signif=0 n_post_signif=5
+main_unbal: pre_mean=-0.266 pre_minmax=[-0.355,-0.203] post_mean=-1.641 post_me
+> an_se=0.606 n_pre_signif=0 n_post_signif=4
+file ../temp/robust_es_main_ppr_cnt_clusterYrFE_all_jrnls_r1_r2_public.dta
+    not found
+main_clusterYrFE: pre_mean=-0.271 pre_minmax=[-0.694,0.471] post_mean=-1.518 po
+> st_mean_se=0.878 n_pre_signif=0 n_post_signif=2
+---- cite_affl_wt ----
+main_base: pre_mean=-3.943 pre_minmax=[-5.979,-1.534] post_mean=-5.847 post_mea
+> n_se=2.930 n_pre_signif=0 n_post_signif=4
+main_ageCtrl: pre_mean=-4.435 pre_minmax=[-6.819,-1.973] post_mean=-5.740 post_
+> mean_se=2.934 n_pre_signif=1 n_post_signif=2
+main_noattrit: pre_mean=-2.013 pre_minmax=[-3.137,-1.281] post_mean=-6.126 post
+> _mean_se=3.421 n_pre_signif=0 n_post_signif=2
+main_unbal: pre_mean=-2.787 pre_minmax=[-4.352,-0.806] post_mean=-3.299 post_me
+> an_se=2.894 n_pre_signif=0 n_post_signif=0
+file
+    ../temp/robust_es_main_cite_affl_wt_clusterYrFE_all_jrnls_r1_r2_public.dt
+    > a not found
+main_clusterYrFE: pre_mean=-2.760 pre_minmax=[-4.303,-0.845] post_mean=-3.252 p
+> ost_mean_se=3.463 n_pre_signif=0 n_post_signif=1
+
+. 
+. di as text "================ AGE-CONTROL HETEROGENEITY (high/low pre_ppr, hig
+> h/low grants) ================"
+================ AGE-CONTROL HETEROGENEITY (high/low pre_ppr, high/low grants) 
+> ================
+
+. foreach yvar in ppr_cnt cite_affl_wt {
+  2.     di as text "---- `yvar' ----"
+  3.     foreach grp in high_pre_ppr low_pre_ppr high_grants low_grants {
+  4.         cap noi summ_es, fpath(../temp/robust_es_main_`yvar'_ageCtrl_`samp
+> '`suf'.dta) tag("ageCtrl_`grp'_skip")
+  5.     }
+  6. }
+---- ppr_cnt ----
+ageCtrl_high_pre_ppr_skip: pre_mean=-1.112 pre_minmax=[-1.719,-0.645] post_mean
+> =-2.359 post_mean_se=0.722 n_pre_signif=1 n_post_signif=6
+ageCtrl_low_pre_ppr_skip: pre_mean=-1.112 pre_minmax=[-1.719,-0.645] post_mean=
+> -2.359 post_mean_se=0.722 n_pre_signif=1 n_post_signif=6
+ageCtrl_high_grants_skip: pre_mean=-1.112 pre_minmax=[-1.719,-0.645] post_mean=
+> -2.359 post_mean_se=0.722 n_pre_signif=1 n_post_signif=6
+ageCtrl_low_grants_skip: pre_mean=-1.112 pre_minmax=[-1.719,-0.645] post_mean=-
+> 2.359 post_mean_se=0.722 n_pre_signif=1 n_post_signif=6
+---- cite_affl_wt ----
+ageCtrl_high_pre_ppr_skip: pre_mean=-4.435 pre_minmax=[-6.819,-1.973] post_mean
+> =-5.740 post_mean_se=2.934 n_pre_signif=1 n_post_signif=2
+ageCtrl_low_pre_ppr_skip: pre_mean=-4.435 pre_minmax=[-6.819,-1.973] post_mean=
+> -5.740 post_mean_se=2.934 n_pre_signif=1 n_post_signif=2
+ageCtrl_high_grants_skip: pre_mean=-4.435 pre_minmax=[-6.819,-1.973] post_mean=
+> -5.740 post_mean_se=2.934 n_pre_signif=1 n_post_signif=2
+ageCtrl_low_grants_skip: pre_mean=-4.435 pre_minmax=[-6.819,-1.973] post_mean=-
+> 5.740 post_mean_se=2.934 n_pre_signif=1 n_post_signif=2
+
+. 
+. di as text "================ GROUP-ABSORBED ES (within-group exposure only) =
+> ==============="
+================ GROUP-ABSORBED ES (within-group exposure only) ===============
+> =
+
+. foreach yvar in ppr_cnt cite_affl_wt {
+  2.     di as text "---- `yvar' ----"
+  3.     foreach grp in high_pre_ppr low_pre_ppr high_grants low_grants above_m
+> edian below_median young old {
+  4.         cap noi summ_es, fpath(../temp/robust_es_grpabsorb_`grp'_`samp'`su
+> f'.dta) tag("grpAbsorb_`grp'")
+  5.     }
+  6. }
+---- ppr_cnt ----
+b ambiguous abbreviation
+file ../temp/robust_es_grpabsorb_low_pre_ppr_all_jrnls_r1_r2_public.dta not
+    found
+b ambiguous abbreviation
+file ../temp/robust_es_grpabsorb_low_grants_all_jrnls_r1_r2_public.dta not
+    found
+b ambiguous abbreviation
+file ../temp/robust_es_grpabsorb_below_median_all_jrnls_r1_r2_public.dta not
+    found
+b ambiguous abbreviation
+file ../temp/robust_es_grpabsorb_old_all_jrnls_r1_r2_public.dta not found
+---- cite_affl_wt ----
+b ambiguous abbreviation
+file ../temp/robust_es_grpabsorb_low_pre_ppr_all_jrnls_r1_r2_public.dta not
+    found
+b ambiguous abbreviation
+file ../temp/robust_es_grpabsorb_low_grants_all_jrnls_r1_r2_public.dta not
+    found
+b ambiguous abbreviation
+file ../temp/robust_es_grpabsorb_below_median_all_jrnls_r1_r2_public.dta not
+    found
+b ambiguous abbreviation
+file ../temp/robust_es_grpabsorb_old_all_jrnls_r1_r2_public.dta not found
+
+. 
+. di as text "================ UNBALANCED PANEL ES ================"
+================ UNBALANCED PANEL ES ================
+
+. foreach yvar in ppr_cnt cite_affl_wt {
+  2.     di as text "---- `yvar' ----"
+  3.     foreach grp in high_pre_ppr low_pre_ppr high_grants low_grants {
+  4.         cap noi summ_es, fpath(../temp/robust_es_unbal_`grp'_`yvar'_`samp'
+> `suf'.dta) tag("unbal_`grp'")
+  5.     }
+  6. }
+---- ppr_cnt ----
+file ../temp/robust_es_unbal_high_pre_ppr_ppr_cnt_all_jrnls_r1_r2_public.dta
+    not found
+file ../temp/robust_es_unbal_low_pre_ppr_ppr_cnt_all_jrnls_r1_r2_public.dta
+    not found
+file ../temp/robust_es_unbal_high_grants_ppr_cnt_all_jrnls_r1_r2_public.dta
+    not found
+file ../temp/robust_es_unbal_low_grants_ppr_cnt_all_jrnls_r1_r2_public.dta
+    not found
+---- cite_affl_wt ----
+file
+    ../temp/robust_es_unbal_high_pre_ppr_cite_affl_wt_all_jrnls_r1_r2_public.
+    > dta not found
+file
+    ../temp/robust_es_unbal_low_pre_ppr_cite_affl_wt_all_jrnls_r1_r2_public.d
+    > ta not found
+file
+    ../temp/robust_es_unbal_high_grants_cite_affl_wt_all_jrnls_r1_r2_public.d
+    > ta not found
+file
+    ../temp/robust_es_unbal_low_grants_cite_affl_wt_all_jrnls_r1_r2_public.dt
+    > a not found
+
+. 
+. di as text "================ FIELD-CLUSTER ES (top-10 FOIA-containing cluster
+> s) ================"
+================ FIELD-CLUSTER ES (top-10 FOIA-containing clusters) ===========
+> =====
+
+. foreach yvar in ppr_cnt cite_affl_wt {
+  2.     di as text "---- `yvar' ----"
+  3.     foreach c in 0 6 14 36 43 45 49 55 62 68 {
+  4.         cap noi summ_es, fpath(../temp/robust_es_clusterTop_`c'_`yvar'_`sa
+> mp'`suf'.dta) tag("clusterTop_`c'")
+  5.     }
+  6. }
+---- ppr_cnt ----
+clusterTop_0: pre_mean=-2.296 pre_minmax=[-4.384,-1.030] post_mean=-1.679 post_
+> mean_se=4.080 n_pre_signif=0 n_post_signif=0
+clusterTop_6: pre_mean=-3.352 pre_minmax=[-6.346,-0.118] post_mean=-1.867 post_
+> mean_se=5.946 n_pre_signif=0 n_post_signif=0
+clusterTop_14: pre_mean=-1.411 pre_minmax=[-3.305,-0.438] post_mean=1.800 post_
+> mean_se=5.254 n_pre_signif=0 n_post_signif=0
+clusterTop_36: pre_mean=11.405 pre_minmax=[3.434,17.323] post_mean=17.353 post_
+> mean_se=10.733 n_pre_signif=0 n_post_signif=2
+clusterTop_43: pre_mean=-0.772 pre_minmax=[-1.111,-0.171] post_mean=-1.085 post
+> _mean_se=2.655 n_pre_signif=0 n_post_signif=0
+clusterTop_45: pre_mean=-3.132 pre_minmax=[-7.049,-0.937] post_mean=-0.710 post
+> _mean_se=4.383 n_pre_signif=1 n_post_signif=0
+clusterTop_49: pre_mean=-9.795 pre_minmax=[-11.035,-8.739] post_mean=-9.289 pos
+> t_mean_se=4.122 n_pre_signif=3 n_post_signif=5
+clusterTop_55: pre_mean=-3.863 pre_minmax=[-7.417,0.922] post_mean=-0.308 post_
+> mean_se=6.188 n_pre_signif=0 n_post_signif=0
+clusterTop_62: pre_mean=-5.007 pre_minmax=[-7.952,-2.308] post_mean=1.043 post_
+> mean_se=6.877 n_pre_signif=0 n_post_signif=0
+clusterTop_68: pre_mean=-4.311 pre_minmax=[-6.501,-0.586] post_mean=-2.280 post
+> _mean_se=5.664 n_pre_signif=0 n_post_signif=0
+---- cite_affl_wt ----
+clusterTop_0: pre_mean=-15.882 pre_minmax=[-26.189,-8.340] post_mean=-0.751 pos
+> t_mean_se=14.945 n_pre_signif=0 n_post_signif=0
+clusterTop_6: pre_mean=10.881 pre_minmax=[9.112,12.934] post_mean=20.998 post_m
+> ean_se=22.734 n_pre_signif=0 n_post_signif=0
+clusterTop_14: pre_mean=-11.537 pre_minmax=[-19.905,-4.456] post_mean=-10.021 p
+> ost_mean_se=14.894 n_pre_signif=0 n_post_signif=0
+clusterTop_36: pre_mean=11.447 pre_minmax=[-3.622,38.187] post_mean=20.710 post
+> _mean_se=24.892 n_pre_signif=0 n_post_signif=0
+clusterTop_43: pre_mean=2.213 pre_minmax=[-6.295,11.977] post_mean=-1.984 post_
+> mean_se=11.598 n_pre_signif=0 n_post_signif=0
+clusterTop_45: pre_mean=5.716 pre_minmax=[-1.806,10.432] post_mean=20.859 post_
+> mean_se=26.226 n_pre_signif=0 n_post_signif=0
+clusterTop_49: pre_mean=11.968 pre_minmax=[-7.703,28.821] post_mean=-8.228 post
+> _mean_se=15.308 n_pre_signif=0 n_post_signif=0
+clusterTop_55: pre_mean=5.025 pre_minmax=[-9.461,12.710] post_mean=7.179 post_m
+> ean_se=22.212 n_pre_signif=0 n_post_signif=0
+clusterTop_62: pre_mean=0.575 pre_minmax=[-8.809,7.554] post_mean=7.043 post_me
+> an_se=18.098 n_pre_signif=0 n_post_signif=0
+clusterTop_68: pre_mean=-23.104 pre_minmax=[-30.666,-17.616] post_mean=-17.713 
+> post_mean_se=12.553 n_pre_signif=1 n_post_signif=1
+
+. 
+. di as text "================ CLUSTER-YEAR-FE MAIN ES ================"
+================ CLUSTER-YEAR-FE MAIN ES ================
+
+. foreach yvar in ppr_cnt cite_affl_wt {
+  2.     cap noi summ_es, fpath(../temp/robust_es_main_clusterYrFE_`yvar'_`samp
+> '`suf'.dta) tag("`yvar'_clusterYrFE")
+  3. }
+ppr_cnt_clusterYrFE: pre_mean=-0.271 pre_minmax=[-0.694,0.471] post_mean=-1.518
+>  post_mean_se=0.878 n_pre_signif=0 n_post_signif=2
+cite_affl_wt_clusterYrFE: pre_mean=-2.760 pre_minmax=[-4.303,-0.845] post_mean=
+> -3.252 post_mean_se=3.463 n_pre_signif=0 n_post_signif=1
+
+. 
+. log close
+      name:  <unnamed>
+       log:  /n/holylabs/pakes_lab/Lab/sci_eq/analysis/reduced_form/code/../tem
+> p/diag_robust_summary.log
+  log type:  text
+ closed on:  11 Jun 2026, 21:17:33
+-------------------------------------------------------------------------------
+
+. 
+end of do-file

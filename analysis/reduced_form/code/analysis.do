@@ -34,18 +34,11 @@ program gather_external_data
     rename mkt_spend_shr imputed_mkt_spend_shr
     save ../temp/exposure, replace
 
-    use ../external/grants/pi_grants, clear
+    use ../external/grants/pi_grants_clean, clear
     bys athr_id year: gen num_grants = _N
     contract athr_id year num_grants
     drop _freq
     save ../temp/athr_yr_grnt_cnt, replace
-
-    use ../external/grants/pi_grants, clear
-    keep if funder_name == "National Institutes of Health"
-    bys athr_id year: gen num_nih_grants = _N
-    contract athr_id year num_nih_grants
-    drop _freq
-    save ../temp/athr_yr_nih_grnt_cnt, replace
 
     use ../external/foias/merged_foias_with_pis,  clear
     drop if mi(athr_id)
@@ -69,7 +62,7 @@ program restrict_samp
     if (`r1r2' == 1 & `public' == 1) local suf "_r1_r2_public"
     use ../external/samp/athr_panel_full_year_last_`samp'`suf',clear 
     bys athr_id: egen tot_pprs = total(ppr_cnt)
-    keep if tot_pprs >= 10
+    keep if tot_pprs >= 20
     drop tot_pprs
     bys athr_id: egen max_year = max(year)
     keep if max_year >= 2014
@@ -80,8 +73,8 @@ program restrict_samp
     merge m:1 athr_id using ../external/real_exposure/athr_exposure, assert(1 2 3) keep(1 3) nogen
     gen foia_athr = 1 if !mi(exposure)
     bys athr_id : gen athr_indicator = _n == 1
-    *drop if exposure <= 0
-    *drop if imputed <= 0
+    drop if exposure <= 0
+    drop if imputed <= 0
    * keep if foia_athr == 1
     sum exposure if athr_indicator == 1 , d 
     local mean : di %4.3f r(mean) 
@@ -120,12 +113,15 @@ program restrict_samp
     keep if num_yrs > 1
     keep if num_place==1
     gegen athr = group(athr_id)
+    preserve
+    contract athr athr_id exposure q1 q2 q3 q4 median inst_id inst msa_comb msa_c_world min_year type
+    drop _freq
+    save ../temp/athr_xw, replace
+    restore
     xtset athr year
-    tsfill
-    hashsort athr year
-    foreach var in athr_id exposure q1 q2 q3 q4 median  inst_id inst msa_comb msa_c_world min_year type {
-        by athr: replace `var' = `var'[_n-1] if mi(`var')    
-    }
+    tsfill, full
+    drop athr_id exposure q1 q2 q3 q4 median inst_id inst msa_comb msa_c_world min_year type
+    merge m:1 athr using ../temp/athr_xw, assert(3) keep(3) nogen
     foreach var in cite_affl_wt ppr_cnt affl_wt body_adj_wt  {
         replace `var' = 0 if mi(`var')    
     }
@@ -150,8 +146,15 @@ program restrict_samp
     replace avg_num_coathrs = 0 if mi(avg_num_coathrs)
     merge 1:1 athr_id year using ../temp/athr_yr_grnt_cnt, keep(1 3) assert(1 2 3) nogen
     replace num_grants = 0 if mi(num_grants)
-    merge 1:1 athr_id year using ../temp/athr_yr_nih_grnt_cnt, keep(1 3) assert(1 2 3) nogen
-    replace num_nih_grants = 0 if mi(num_nih_grants)
+    gen pre_grants_cnt = num_grants if year < 2014
+    bys athr_id: egen pre_grants_sum = total(pre_grants_cnt)
+    drop pre_grants_cnt
+    qui sum pre_grants_sum if athr_indicator == 1, d
+    local g_cut = r(p50)
+    if `g_cut' <= 0 local g_cut = 0.5
+    di as text "restrict_samp `samp'`suf' pre-grant median = `g_cut'"
+    gen high_grants = pre_grants_sum >= `g_cut'
+    gen low_grants  = pre_grants_sum <  `g_cut'
     save ../temp/es_`samp'`suf', replace
 end
 
@@ -166,9 +169,9 @@ program desc_stats
     replace quartile = "q2" if q2 ==1
     replace quartile = "q3" if q3 ==1
     replace quartile = "q4" if q4 ==1
-    collapse (mean) ppr_cnt cite_affl_wt affl_wt body_adj_wt avg_num_coathrs r1 age num_grants num_nih_grants (firstnm) quartile, by(athr_id year)
-    gcollapse (mean) ppr_cnt cite_affl_wt affl_wt body_adj_wt avg_num_coathrs r1 age num_grants num_nih_grants ,  by(quartile year)
-    foreach var in ppr_cnt cite_affl_wt affl_wt body_adj_wt avg_num_coathrs r1 age num_grants num_nih_grants {
+    collapse (mean) ppr_cnt cite_affl_wt affl_wt body_adj_wt avg_num_coathrs r1 age num_grants (firstnm) quartile, by(athr_id year)
+    gcollapse (mean) ppr_cnt cite_affl_wt affl_wt body_adj_wt avg_num_coathrs r1 age num_grants ,  by(quartile year)
+    foreach var in ppr_cnt cite_affl_wt affl_wt body_adj_wt avg_num_coathrs r1 age num_grants {
         tw line `var' year if quartile == "q1", lcolor(lavender) || ///
         line `var' year if quartile == "q2" , lcolor(dkorange) || ///
         line `var' year if quartile == "q3" , lcolor(ebblue) || ///
@@ -228,7 +231,7 @@ program event_study
     }
 
     // pre-build group-suffixed event-time interactions for heterogeneity (used in pooled-interaction regressions below)
-    foreach grp in young old r1 r2 above_median below_median high_pre_ppr low_pre_ppr q1 q2 q3 q4 {
+    foreach grp in young old r1 r2 above_median below_median high_pre_ppr low_pre_ppr high_grants low_grants q1 q2 q3 q4 {
         foreach v of local int_leads {
             gen `v'_`grp' = `v' * `grp'
         }
@@ -246,7 +249,7 @@ program event_study
         }
     }
 
-    foreach yvar in cite_affl_wt ppr_cnt ln_cite_affl_wt ln_ppr_cnt body_adj_wt avg_num_coathrs {
+    foreach yvar in cite_affl_wt ppr_cnt ln_cite_affl_wt ln_ppr_cnt body_adj_wt avg_num_coathrs num_grants {
         if "`yvar'" == "ln_spend" local var_name = "Log Spending" 
         if "`yvar'" == "ln_spend" local gap  0.5 
         if "`yvar'" == "cite_affl_wt" local var_name = "Citation Weighted Output" 
@@ -376,7 +379,7 @@ program event_study
         restore*/
 
         // heterogeneity by author & inst characteristics — one regression per dummy pair, split-interaction form
-        local dummy_pairs `" "young old" "r1 r2" "above_median below_median" "high_pre_ppr low_pre_ppr" "'
+        local dummy_pairs `" "young old" "r1 r2" "above_median below_median" "high_pre_ppr low_pre_ppr" "high_grants low_grants" "'
         foreach pair of local dummy_pairs {
             local g1: word 1 of `pair'
             local g2: word 2 of `pair'
@@ -481,7 +484,7 @@ program long_diff
         cap gen ln_`v' = ln(1+`v')
     }
 
-    local outcomes cite_affl_wt ppr_cnt ln_cite_affl_wt ln_ppr_cnt affl_wt body_adj_wt avg_num_coathrs num_grants num_nih_grants
+    local outcomes cite_affl_wt ppr_cnt ln_cite_affl_wt ln_ppr_cnt affl_wt body_adj_wt avg_num_coathrs num_grants
 
     gen pre  = year <  2014
     gen post = year >= 2014
@@ -516,7 +519,7 @@ program long_diff
 
     // collapse to PI-level cross-section: time-invariant chars
     gcollapse (firstnm) exposure q1 q2 q3 q4 above_median below_median ///
-                       young old r1 r2 high_pre_ppr low_pre_ppr age_2014, ///
+                       young old r1 r2 high_pre_ppr low_pre_ppr high_grants low_grants age_2014, ///
                        by(athr_id)
     merge 1:1 athr_id using ../temp/ld_pre_means_`samp'`suf',  assert(3) nogen
     merge 1:1 athr_id using ../temp/ld_post_means_`samp'`suf', assert(3) nogen
@@ -540,7 +543,6 @@ program long_diff
         if "`yvar'" == "body_adj_wt"     local var_name "Body-Adj Weighted Output"
         if "`yvar'" == "avg_num_coathrs" local var_name "Avg Coauthors"
         if "`yvar'" == "num_grants"      local var_name "Num Grants"
-        if "`yvar'" == "num_nih_grants"  local var_name "Num NIH Grants"
 
         eststo clear
         eststo m1: reg d_`yvar' exposure, vce(robust)
@@ -548,11 +550,12 @@ program long_diff
         eststo m3: reg d_`yvar' c.exposure##i.young, vce(robust)
         eststo m4: reg d_`yvar' c.exposure##i.r1, vce(robust)
         eststo m5: reg d_`yvar' c.exposure##i.high_pre_ppr, vce(robust)
+        eststo m6: reg d_`yvar' c.exposure##i.high_grants, vce(robust)
 
-        esttab m1 m2 m3 m4 m5 using ../output/tables/`samp'/ld_`yvar'`suf'.tex, ///
+        esttab m1 m2 m3 m4 m5 m6 using ../output/tables/`samp'/ld_`yvar'`suf'.tex, ///
             replace label se r2 ///
             title("Long Difference: `var_name'`suf'") ///
-            mtitles("Continuous" "Quartile" "x Young" "x R1" "x HighPre")
+            mtitles("Continuous" "Quartile" "x Young" "x R1" "x HighPrePub" "x HighGrants")
 
         binscatter d_`yvar' exposure, n(30) ///
             xtitle("Exposure") ytitle("{&Delta} `var_name' (post mean - pre mean)") ///
@@ -574,7 +577,7 @@ program first_diff
         cap gen ln_`v' = ln(1+`v')
     }
 
-    local outcomes cite_affl_wt ppr_cnt ln_cite_affl_wt ln_ppr_cnt affl_wt body_adj_wt avg_num_coathrs num_grants num_nih_grants
+    local outcomes cite_affl_wt ppr_cnt ln_cite_affl_wt ln_ppr_cnt affl_wt body_adj_wt avg_num_coathrs num_grants
 
     xtset athr year
     gen post = year >= 2014
@@ -601,18 +604,18 @@ program first_diff
         if "`yvar'" == "body_adj_wt"     local var_name "Body-Adj Weighted Output"
         if "`yvar'" == "avg_num_coathrs" local var_name "Avg Coauthors"
         if "`yvar'" == "num_grants"      local var_name "Num Grants"
-        if "`yvar'" == "num_nih_grants"  local var_name "Num NIH Grants"
 
         eststo clear
         eststo m1: reghdfe d_`yvar' d_treat,                          absorb(year) vce(cluster athr_id)
         eststo m2: reghdfe d_`yvar' c.d_treat##i.young,               absorb(year) vce(cluster athr_id)
         eststo m3: reghdfe d_`yvar' c.d_treat##i.r1,                  absorb(year) vce(cluster athr_id)
         eststo m4: reghdfe d_`yvar' c.d_treat##i.high_pre_ppr,        absorb(year) vce(cluster athr_id)
+        eststo m5: reghdfe d_`yvar' c.d_treat##i.high_grants,        absorb(year) vce(cluster athr_id)
 
-        esttab m1 m2 m3 m4 using ../output/tables/`samp'/fd_`yvar'`suf'.tex, ///
+        esttab m1 m2 m3 m4 m5 using ../output/tables/`samp'/fd_`yvar'`suf'.tex, ///
             replace label se r2 ///
             title("First Difference (D.y on exposure x 1[t=2014]): `var_name'`suf'") ///
-            mtitles("Continuous" "x Young" "x R1" "x HighPre")
+            mtitles("Continuous" "x Young" "x R1" "x HighPrePub" "x HighGrants")
 
         binscatter d_`yvar' d_treat if year == 2014, n(30) ///
             xtitle("Exposure (year-2014 jump only)") ///
@@ -639,7 +642,7 @@ program pooled_did
     gen post = year >= 2014
     gen Z_it = exposure * post
 
-    local outcomes cite_affl_wt ppr_cnt ln_cite_affl_wt ln_ppr_cnt body_adj_wt avg_num_coathrs num_grants num_nih_grants
+    local outcomes cite_affl_wt ppr_cnt ln_cite_affl_wt ln_ppr_cnt body_adj_wt avg_num_coathrs num_grants
 
     cap mkdir ../output/tables
     cap mkdir ../output/tables/`samp'
@@ -779,21 +782,33 @@ program robustness
     cap mkdir "../output/tables/`samp'/robustness"
 
     // (1) raw mean trajectories by pre-period group — no FE, no treatment
-    use ../temp/es_`samp'`suf', clear
-    preserve
-        gcollapse (mean) ppr_cnt cite_affl_wt body_adj_wt avg_num_coathrs num_grants num_nih_grants, by(year high_pre_ppr)
-        foreach var in ppr_cnt cite_affl_wt body_adj_wt avg_num_coathrs num_grants num_nih_grants {
-            tw line `var' year if high_pre_ppr == 1, lcolor(cranberry) lwidth(medium) || ///
-               line `var' year if high_pre_ppr == 0, lcolor(ebblue)    lwidth(medium) ///
-               , legend(on order(1 "High Pre-Pub (top 25%)" 2 "Low Pre-Pub (bottom 75%)") pos(7) ring(0) size(small)) ///
-                 xtitle("Year") ytitle("`var'") xline(2014, lpattern(dash) lcolor(gs10)) ///
-                 plotregion(margin(sides))
-            graph export ../output/figures/`samp'/robustness/raw_`var'_by_pre_ppr`suf'.pdf, replace
+    foreach split in pre_ppr grants {
+        if "`split'" == "pre_ppr" {
+            local hi high_pre_ppr
+            local lab_hi "High Pre-Pub"
+            local lab_lo "Low Pre-Pub"
         }
-    restore
+        else {
+            local hi high_grants
+            local lab_hi "High Pre-Grants"
+            local lab_lo "Low Pre-Grants"
+        }
+        use ../temp/es_`samp'`suf', clear
+        preserve
+            gcollapse (mean) ppr_cnt cite_affl_wt body_adj_wt avg_num_coathrs num_grants, by(year `hi')
+            foreach var in ppr_cnt cite_affl_wt body_adj_wt avg_num_coathrs num_grants {
+                tw line `var' year if `hi' == 1, lcolor(cranberry) lwidth(medium) || ///
+                   line `var' year if `hi' == 0, lcolor(ebblue)    lwidth(medium) ///
+                   , legend(on order(1 "`lab_hi'" 2 "`lab_lo'") pos(7) ring(0) size(small)) ///
+                     xtitle("Year") ytitle("`var'") xline(2014, lpattern(dash) lcolor(gs10)) ///
+                     plotregion(margin(sides))
+                graph export ../output/figures/`samp'/robustness/raw_`var'_by_`split'`suf'.pdf, replace
+            }
+        restore
+    }
 
     // (2) raw mean trajectories by exposure quartile WITHIN each pre-period group
-    foreach grp in high_pre_ppr low_pre_ppr {
+    foreach grp in high_pre_ppr low_pre_ppr high_grants low_grants {
         preserve
             keep if `grp' == 1
             gen qrtl = 1*q1 + 2*q2 + 3*q3 + 4*q4
@@ -816,13 +831,15 @@ program robustness
     preserve
         bys athr_id: keep if _n == 1
         eststo clear
-        eststo all : reg exposure age_2014, vce(robust)
-        eststo high: reg exposure age_2014 if high_pre_ppr == 1, vce(robust)
-        eststo low : reg exposure age_2014 if low_pre_ppr  == 1, vce(robust)
-        esttab all high low using ../output/tables/`samp'/robustness/exposure_age_corr`suf'.tex, ///
+        eststo all  : reg exposure age_2014, vce(robust)
+        eststo highp: reg exposure age_2014 if high_pre_ppr == 1, vce(robust)
+        eststo lowp : reg exposure age_2014 if low_pre_ppr  == 1, vce(robust)
+        eststo highg: reg exposure age_2014 if high_grants  == 1, vce(robust)
+        eststo lowg : reg exposure age_2014 if low_grants   == 1, vce(robust)
+        esttab all highp lowp highg lowg using ../output/tables/`samp'/robustness/exposure_age_corr`suf'.tex, ///
             replace label se r2 ///
             title("Exposure on Age (2014) by pre-period group") ///
-            mtitles("All" "High Pre-Pub" "Low Pre-Pub")
+            mtitles("All" "High Pre-Pub" "Low Pre-Pub" "High Pre-Grants" "Low Pre-Grants")
     restore
 
     // (4) high/low pre-period event study WITH c.age_2014 # i.year controls
@@ -851,7 +868,7 @@ program robustness
     forval i = 0/`abs_lag' {
         local int_lags `int_lags' int_lag`i'
     }
-    foreach grp in high_pre_ppr low_pre_ppr {
+    foreach grp in high_pre_ppr low_pre_ppr high_grants low_grants {
         foreach v of local int_leads {
             gen `v'_`grp' = `v' * `grp'
         }
@@ -877,45 +894,55 @@ program robustness
         if "`yvar'" == "cite_affl_wt" local gap 1
         if "`yvar'" == "ppr_cnt" & "`samp'" == "top_jrnls" local gap 1
 
-        use ../temp/robust_es_`samp'`suf', clear
-        reghdfe `yvar' `leads_high_pre_ppr' `lags_high_pre_ppr' ///
-                       `leads_low_pre_ppr'  `lags_low_pre_ppr' ///
-                       int_lead1_high_pre_ppr int_lead1_low_pre_ppr ///
-                       c.age_2014#i.year, ///
-                       absorb(`fes') vce(cluster athr_id)
-        foreach grp in high_pre_ppr low_pre_ppr {
-            local ref_b = _b[int_lead1_`grp']
-            di as text "robustness (4) `yvar' `grp': ref _b[int_lead1_`grp'] = `ref_b' (should be 0 if Stata dropped the reference)"
-            preserve
-            mat drop _all
-            foreach var in `leads_`grp'' `lags_`grp'' int_lead1_`grp' {
-                mat row = _b[`var'] - `ref_b', _se[`var']
-                if "`var'" == "int_lead1_`grp'" mat row = 0,0
-                mat es = nullmat(es) \ row
+        foreach split in pre_ppr grants {
+            if "`split'" == "pre_ppr" {
+                local hi high_pre_ppr
+                local lo low_pre_ppr
             }
-            svmat es
-            keep es1 es2
-            drop if mi(es1)
-            rename (es1 es2) (b se)
-            gen ub = b + 1.96*se
-            gen lb = b - 1.96*se
-            gen rel = -4 if _n == 1
-            replace rel = rel[_n-1]+1 if _n > 1
-            replace rel = rel + 1 if rel >= -1
-            replace rel = -1 if rel == `abs_lag' + 1
-            hashsort rel
-            sum ub, d
-            local ymax = round(r(max),`gap')
-            sum lb, d
-            local ymin = round(r(min),`gap')
-            tw rcap ub lb rel if rel != -1, lcolor(ebblue%70) msize(vsmall) || ///
-              scatter b rel, mcolor(ebblue) ///
-              , xlab(-4(1)5) xtitle("Relative Year") ytitle("`var_name'") ///
-                ylab(`ymin'(`gap')`ymax') yline(0, lcolor(gs10) lpattern(solid)) ///
-                title("With age x year controls: `grp'", size(small)) ///
-                legend(off) plotregion(margin(sides))
-            graph export ../output/figures/`samp'/robustness/es_`yvar'_ageCtrl_`grp'`suf'.pdf, replace
-            restore
+            else {
+                local hi high_grants
+                local lo low_grants
+            }
+            use ../temp/robust_es_`samp'`suf', clear
+            reghdfe `yvar' `leads_`hi'' `lags_`hi'' ///
+                           `leads_`lo''  `lags_`lo'' ///
+                           int_lead1_`hi' int_lead1_`lo' ///
+                           c.age_2014#i.year, ///
+                           absorb(`fes') vce(cluster athr_id)
+            foreach grp in `hi' `lo' {
+                local ref_b = _b[int_lead1_`grp']
+                di as text "robustness (4) `yvar' `grp': ref _b[int_lead1_`grp'] = `ref_b' (should be 0 if Stata dropped the reference)"
+                preserve
+                mat drop _all
+                foreach var in `leads_`grp'' `lags_`grp'' int_lead1_`grp' {
+                    mat row = _b[`var'] - `ref_b', _se[`var']
+                    if "`var'" == "int_lead1_`grp'" mat row = 0,0
+                    mat es = nullmat(es) \ row
+                }
+                svmat es
+                keep es1 es2
+                drop if mi(es1)
+                rename (es1 es2) (b se)
+                gen ub = b + 1.96*se
+                gen lb = b - 1.96*se
+                gen rel = -4 if _n == 1
+                replace rel = rel[_n-1]+1 if _n > 1
+                replace rel = rel + 1 if rel >= -1
+                replace rel = -1 if rel == `abs_lag' + 1
+                hashsort rel
+                sum ub, d
+                local ymax = round(r(max),`gap')
+                sum lb, d
+                local ymin = round(r(min),`gap')
+                tw rcap ub lb rel if rel != -1, lcolor(ebblue%70) msize(vsmall) || ///
+                  scatter b rel, mcolor(ebblue) ///
+                  , xlab(-4(1)5) xtitle("Relative Year") ytitle("`var_name'") ///
+                    ylab(`ymin'(`gap')`ymax') yline(0, lcolor(gs10) lpattern(solid)) ///
+                    title("With age x year controls: `grp'", size(small)) ///
+                    legend(off) plotregion(margin(sides))
+                graph export ../output/figures/`samp'/robustness/es_`yvar'_ageCtrl_`grp'`suf'.pdf, replace
+                restore
+            }
         }
     }
 
@@ -951,6 +978,19 @@ program robustness
     qui sum pre_ppr_cnt_sum, d
     gen high_pre_ppr = pre_ppr_cnt_sum >= r(p75)
     gen low_pre_ppr  = pre_ppr_cnt_sum <  r(p75)
+    merge 1:1 athr_id year using ../temp/athr_yr_grnt_cnt, keep(1 3) assert(1 2 3) nogen
+    replace num_grants = 0 if mi(num_grants)
+    gen pre_grants_cnt = num_grants if year < 2014
+    bys athr_id: egen pre_grants_sum = total(pre_grants_cnt)
+    drop pre_grants_cnt
+    bys athr_id: gen athr_indicator2 = _n == 1
+    qui sum pre_grants_sum if athr_indicator2 == 1, d
+    local g_cut = r(p50)
+    if `g_cut' <= 0 local g_cut = 0.5
+    di as text "robustness (5) `samp'`suf' unbal pre-grant median = `g_cut'"
+    gen high_grants = pre_grants_sum >= `g_cut'
+    gen low_grants  = pre_grants_sum <  `g_cut'
+    drop athr_indicator2
     gen rel = year - 2014
     qui sum rel
     local abs_lag  = abs(r(max))
@@ -973,7 +1013,7 @@ program robustness
     forval i = 0/`abs_lag' {
         local int_lags `int_lags' int_lag`i'
     }
-    foreach grp in high_pre_ppr low_pre_ppr {
+    foreach grp in high_pre_ppr low_pre_ppr high_grants low_grants {
         foreach v of local int_leads {
             gen `v'_`grp' = `v' * `grp'
         }
@@ -999,44 +1039,54 @@ program robustness
         if "`yvar'" == "cite_affl_wt" local gap 1
         if "`yvar'" == "ppr_cnt" & "`samp'" == "top_jrnls" local gap 1
 
-        use ../temp/robust_es_unbal_`samp'`suf', clear
-        reghdfe `yvar' `leads_high_pre_ppr' `lags_high_pre_ppr' ///
-                       `leads_low_pre_ppr'  `lags_low_pre_ppr' ///
-                       int_lead1_high_pre_ppr int_lead1_low_pre_ppr, ///
-                       absorb(`fes') vce(cluster athr_id)
-        foreach grp in high_pre_ppr low_pre_ppr {
-            local ref_b = _b[int_lead1_`grp']
-            di as text "robustness (5) `yvar' `grp': ref _b[int_lead1_`grp'] = `ref_b' (should be 0 if Stata dropped the reference)"
-            preserve
-            mat drop _all
-            foreach var in `leads_`grp'' `lags_`grp'' int_lead1_`grp' {
-                mat row = _b[`var'] - `ref_b', _se[`var']
-                if "`var'" == "int_lead1_`grp'" mat row = 0,0
-                mat es = nullmat(es) \ row
+        foreach split in pre_ppr grants {
+            if "`split'" == "pre_ppr" {
+                local hi high_pre_ppr
+                local lo low_pre_ppr
             }
-            svmat es
-            keep es1 es2
-            drop if mi(es1)
-            rename (es1 es2) (b se)
-            gen ub = b + 1.96*se
-            gen lb = b - 1.96*se
-            gen rel = -4 if _n == 1
-            replace rel = rel[_n-1]+1 if _n > 1
-            replace rel = rel + 1 if rel >= -1
-            replace rel = -1 if rel == `abs_lag' + 1
-            hashsort rel
-            sum ub, d
-            local ymax = round(r(max),`gap')
-            sum lb, d
-            local ymin = round(r(min),`gap')
-            tw rcap ub lb rel if rel != -1, lcolor(ebblue%70) msize(vsmall) || ///
-              scatter b rel, mcolor(ebblue) ///
-              , xlab(-4(1)5) xtitle("Relative Year") ytitle("`var_name'") ///
-                ylab(`ymin'(`gap')`ymax') yline(0, lcolor(gs10) lpattern(solid)) ///
-                title("Unbalanced panel (no tsfill): `grp'", size(small)) ///
-                legend(off) plotregion(margin(sides))
-            graph export ../output/figures/`samp'/robustness/es_`yvar'_unbal_`grp'`suf'.pdf, replace
-            restore
+            else {
+                local hi high_grants
+                local lo low_grants
+            }
+            use ../temp/robust_es_unbal_`samp'`suf', clear
+            reghdfe `yvar' `leads_`hi'' `lags_`hi'' ///
+                           `leads_`lo''  `lags_`lo'' ///
+                           int_lead1_`hi' int_lead1_`lo', ///
+                           absorb(`fes') vce(cluster athr_id)
+            foreach grp in `hi' `lo' {
+                local ref_b = _b[int_lead1_`grp']
+                di as text "robustness (5) `yvar' `grp': ref _b[int_lead1_`grp'] = `ref_b' (should be 0 if Stata dropped the reference)"
+                preserve
+                mat drop _all
+                foreach var in `leads_`grp'' `lags_`grp'' int_lead1_`grp' {
+                    mat row = _b[`var'] - `ref_b', _se[`var']
+                    if "`var'" == "int_lead1_`grp'" mat row = 0,0
+                    mat es = nullmat(es) \ row
+                }
+                svmat es
+                keep es1 es2
+                drop if mi(es1)
+                rename (es1 es2) (b se)
+                gen ub = b + 1.96*se
+                gen lb = b - 1.96*se
+                gen rel = -4 if _n == 1
+                replace rel = rel[_n-1]+1 if _n > 1
+                replace rel = rel + 1 if rel >= -1
+                replace rel = -1 if rel == `abs_lag' + 1
+                hashsort rel
+                sum ub, d
+                local ymax = round(r(max),`gap')
+                sum lb, d
+                local ymin = round(r(min),`gap')
+                tw rcap ub lb rel if rel != -1, lcolor(ebblue%70) msize(vsmall) || ///
+                  scatter b rel, mcolor(ebblue) ///
+                  , xlab(-4(1)5) xtitle("Relative Year") ytitle("`var_name'") ///
+                    ylab(`ymin'(`gap')`ymax') yline(0, lcolor(gs10) lpattern(solid)) ///
+                    title("Unbalanced panel (no tsfill): `grp'", size(small)) ///
+                    legend(off) plotregion(margin(sides))
+                graph export ../output/figures/`samp'/robustness/es_`yvar'_unbal_`grp'`suf'.pdf, replace
+                restore
+            }
         }
     }
 
@@ -1044,7 +1094,7 @@ program robustness
     //     for each pair, runs the heterogeneity regression with I(rel=k) x g1
     //     absorbed (uninteracted with exposure) so that exposure x group x time
     //     identifies only within-group exposure heterogeneity
-    local pair_list `" "high_pre_ppr low_pre_ppr" "young old" "above_median below_median" "'
+    local pair_list `" "high_pre_ppr low_pre_ppr" "high_grants low_grants" "young old" "above_median below_median" "'
     foreach pair of local pair_list {
         local g1: word 1 of `pair'
         local g2: word 2 of `pair'
@@ -1292,95 +1342,7 @@ program robustness
         }
     }
 
-    // (8) NIH heterogeneity: sample split on ever-NIH-funded pre-2014
-    use ../temp/es_`samp'`suf', clear
-    gen byte nih_yr = (num_nih_grants > 0) & (year < 2014)
-    bys athr_id: egen nih_pre = max(nih_yr)
-    drop nih_yr
-    save ../temp/robust_es_nih_`samp'`suf', replace
-
-    foreach grp in nih nonih {
-        if "`grp'" == "nih"   local label "NIH-funded pre-2014"
-        if "`grp'" == "nonih" local label "Not NIH-funded pre-2014"
-        if "`grp'" == "nih"   local subset nih_pre == 1
-        if "`grp'" == "nonih" local subset nih_pre == 0
-
-        foreach yvar in ppr_cnt cite_affl_wt {
-            if "`yvar'" == "ppr_cnt"      local var_name "Publication Count"
-            if "`yvar'" == "cite_affl_wt" local var_name "Citation Weighted Output"
-            if "`yvar'" == "ppr_cnt"      local gap 0.5
-            if "`yvar'" == "cite_affl_wt" local gap 1
-
-            use ../temp/robust_es_nih_`samp'`suf', clear
-            keep if `subset'
-            cap drop rel int_lead* int_lag*
-            gen rel = year - 2014
-            qui sum rel
-            local abs_lag  = abs(r(max))
-            local abs_lead = abs(r(min))
-            forval i = 1/`abs_lead' {
-                gen int_lead`i' = exposure if rel == -`i'
-            }
-            forval i = 1/`abs_lag' {
-                gen int_lag`i'  = exposure if rel == `i'
-            }
-            gen int_lag0 = exposure if rel == 0
-            ds int_lead* int_lag*
-            foreach var in `r(varlist)' {
-                replace `var' = 0 if mi(`var')
-            }
-            local int_leads
-            local int_lags
-            forval i = 2/`abs_lead' {
-                local int_leads int_lead`i' `int_leads'
-            }
-            forval i = 0/`abs_lag' {
-                local int_lags `int_lags' int_lag`i'
-            }
-
-            cap noi reghdfe `yvar' `int_leads' `int_lags' int_lead1, ///
-                    absorb(`fes') vce(cluster athr_id)
-            local ref_b = _b[int_lead1]
-            di as text "robustness (8) `yvar' `grp': ref _b[int_lead1] = `ref_b'"
-            gunique athr_id
-            local n_pi = r(unique)
-
-            preserve
-            mat drop _all
-            foreach var in `int_leads' `int_lags' int_lead1 {
-                mat row = _b[`var'] - `ref_b', _se[`var']
-                if "`var'" == "int_lead1" mat row = 0,0
-                mat es = nullmat(es) \ row
-            }
-            svmat es
-            keep es1 es2
-            drop if mi(es1)
-            rename (es1 es2) (b se)
-            gen ub = b + 1.96*se
-            gen lb = b - 1.96*se
-            gen rel = -4 if _n == 1
-            replace rel = rel[_n-1]+1 if _n > 1
-            replace rel = rel + 1 if rel >= -1
-            replace rel = -1 if rel == `abs_lag' + 1
-            hashsort rel
-            save ../temp/robust_es_nih_`grp'_`yvar'_`samp'`suf', replace
-            sum ub, d
-            local ymax = round(r(max),`gap')
-            sum lb, d
-            local ymin = round(r(min),`gap')
-            cap graph drop _all
-            cap noi tw rcap ub lb rel if rel != -1, lcolor(ebblue%70) msize(vsmall) || ///
-              scatter b rel, mcolor(ebblue) ///
-              , xlab(-4(1)5) xtitle("Relative Year") ytitle("`var_name'") ///
-                ylab(`ymin'(`gap')`ymax') yline(0, lcolor(gs10) lpattern(solid)) ///
-                title("Main ES: `label' (N PIs = `n_pi')", size(small)) ///
-                legend(off) plotregion(margin(sides))
-            cap noi graph export ../output/figures/`samp'/robustness/es_`yvar'_nih_`grp'`suf'.pdf, replace
-            restore
-        }
-    }
-
-    // (9) Field heterogeneity via openalex 100-cluster assignment
+    // (8) Field heterogeneity via openalex 100-cluster assignment
     //     build helper file once: PI -> cluster_100
     cap confirm file ../temp/athr_cluster100.dta
     if _rc {
@@ -1390,7 +1352,7 @@ program robustness
         save ../temp/athr_cluster100, replace
     }
 
-    // merge cluster into the analysis sample once, save for (9a) and (9b)
+    // merge cluster into the analysis sample once, save for (8a) and (8b)
     use ../temp/es_`samp'`suf', clear
     merge m:1 athr_id using ../temp/athr_cluster100, keep(1 3) nogen
     drop if mi(cluster_100)
@@ -1421,7 +1383,7 @@ program robustness
     egen cluster_year = group(cluster_100 year)
     save ../temp/robust_es_cluster_`samp'`suf', replace
 
-    // (9a) main pooled event study with cluster x year FE — does the effect
+    // (8a) main pooled event study with cluster x year FE — does the effect
     //      survive after stripping out field-specific year shocks?
     foreach yvar in ppr_cnt cite_affl_wt {
         if "`yvar'" == "ppr_cnt"      local var_name "Publication Count"
@@ -1434,7 +1396,7 @@ program robustness
         cap noi reghdfe `yvar' `int_leads' `int_lags' int_lead1, ///
                 absorb(athr_id cluster_year) vce(cluster athr_id)
         local ref_b = _b[int_lead1]
-        di as text "robustness (9a) `yvar' clusterYrFE: ref _b[int_lead1] = `ref_b'"
+        di as text "robustness (8a) `yvar' clusterYrFE: ref _b[int_lead1] = `ref_b'"
         gunique athr_id
         local n_pi = r(unique)
 
@@ -1472,7 +1434,7 @@ program robustness
         restore
     }
 
-    // (9b) top-10 FOIA-containing clusters: sample-split main event study
+    // (8b) top-10 FOIA-containing clusters: sample-split main event study
     use ../temp/robust_es_cluster_`samp'`suf', clear
     preserve
         // FOIA-containing clusters only (the ones we extrapolate exposure into)
@@ -1486,7 +1448,7 @@ program robustness
         gsort -n_pi_cluster
         keep if _n <= 10
         levelsof cluster_100, local(top_clusters)
-        di as text "robustness (9b) `samp' top-10 FOIA-containing clusters: `top_clusters'"
+        di as text "robustness (8b) `samp' top-10 FOIA-containing clusters: `top_clusters'"
     restore
 
     foreach c of local top_clusters {
@@ -1505,7 +1467,7 @@ program robustness
                     absorb(`fes') vce(cluster athr_id)
             if _rc continue
             local ref_b = _b[int_lead1]
-            di as text "robustness (9b) `yvar' cluster_100=`c': ref _b[int_lead1] = `ref_b'"
+            di as text "robustness (8b) `yvar' cluster_100=`c': ref _b[int_lead1] = `ref_b'"
             gunique athr_id
             local n_pi = r(unique)
 

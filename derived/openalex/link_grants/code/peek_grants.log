@@ -21,7 +21,9 @@ Notes:
       3. More than 2 billion observations are allowed; see help obs_advice.
       4. Maximum number of variables is set to 120,000; see help set_maxvar.
 
-. use ../external/real_exposure/foia_athrs, clear; describe; gunique athr_id; d
-> i r(unique); count if !mi(athr_id); count 
-option ; not allowed
-r(198);
+. do /tmp/peek_grants.do 
+
+. set more off
+
+. set linesize 200
+

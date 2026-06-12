@@ -7,7 +7,6 @@ preliminaries
 version 17
 
 program main
-    boe 
 
     // Run the observed (FOIA) first stage once -- it doesn't depend on
     // imputation tag. Save its estimates so we can stack them next to the
@@ -163,8 +162,12 @@ end
 
 program observed_expenditure_fd
     // First stage on directly observed FOIA expenditure, high-confidence
-    // consumables only (categories_tfidf.keep == 1). Saved estimates are
-    // picked up by imputed_expenditure_fd to build the side-by-side table.
+    // consumables only (categories_tfidf.keep == 1). Split into:
+    //   tot   = all keep==1 spend (matches imputed pipeline scope)
+    //   trt   = keep==1 & treated==1 (merger-affected categories)
+    //   ctrl  = keep==1 & treated==0 (clean control categories)
+    // Treated/control split = placebo: ctrl spend should not move with exposure.
+    // Saved estimates (.ster) are picked up by imputed_expenditure_fd.
     di _newline "=== Observed (FOIA, keep==1) first-difference ==="
 
     use ../external/samp/merged_foias_with_pis, clear
@@ -178,13 +181,18 @@ program observed_expenditure_fd
     // instruments (e.g. KPA/Gilson autosamplers tagged as cuvettes/vials)
     // that have a printed unit price but no recorded expenditure.
     drop if mi(spend)
-    gcollapse (sum) spend, by(athr_id year)
+    gen tot_spend  = spend
+    gen trt_spend  = spend if treated == 1
+    gen ctrl_spend = spend if treated == 0
+    gcollapse (sum) tot_spend trt_spend ctrl_spend, by(athr_id year)
     merge m:1 athr_id using ../external/real_exposure/athr_exposure, ///
         keep(3) nogen
     gegen athr = group(athr_id)
     xtset athr year
     tsfill
-    replace spend = 0 if mi(spend)
+    foreach v in tot_spend trt_spend ctrl_spend {
+        replace `v' = 0 if mi(`v')
+    }
     foreach v in exposure mkt_spend_shr {
         bys athr (year): replace `v' = `v'[_n-1] if mi(`v')
         gsort athr -year
@@ -193,29 +201,40 @@ program observed_expenditure_fd
     }
     drop if exposure <= 0
     keep if inrange(year, 2010, 2019)
-    gen ln_spend = ln(spend + 1)
+    foreach v in tot_spend trt_spend ctrl_spend {
+        gen ln_`v' = ln(`v' + 1)
+    }
     save ../temp/observed_panel.dta, replace
 
     // -------- Long difference --------
     use ../temp/observed_panel.dta, clear
     gen post = year >= 2014
-    gcollapse (mean) ln_spend exposure mkt_spend_shr, by(athr_id post)
-    reshape wide ln_spend, i(athr_id exposure mkt_spend_shr) j(post)
-    gen d_ln_spend = ln_spend1 - ln_spend0
+    gcollapse (mean) ln_tot_spend ln_trt_spend ln_ctrl_spend exposure mkt_spend_shr, by(athr_id post)
+    reshape wide ln_tot_spend ln_trt_spend ln_ctrl_spend, ///
+        i(athr_id exposure mkt_spend_shr) j(post)
+    foreach v in ln_tot_spend ln_trt_spend ln_ctrl_spend {
+        gen d_`v' = `v'1 - `v'0
+    }
 
-    reg d_ln_spend exposure mkt_spend_shr, vce(robust)
-    estimates save ../temp/observed_longdiff.ster, replace
     eststo clear
-    eststo m_observed
-    esttab m_observed using ../output/observed_longdiff.tex, replace ///
-        b(3) se(3) star(* 0.10 ** 0.05 *** 0.01) ///
-        mtitles("D.ln(keep==1 spend)") ///
-        keep(exposure mkt_spend_shr) ///
-        addnotes("Long difference. FOIA authors, keep==1 lab spend, exposure>0. Robust SE.")
+    foreach v in ln_tot_spend ln_trt_spend ln_ctrl_spend {
+        reg d_`v' exposure mkt_spend_shr, vce(robust)
+        eststo m_`v'
+        binscatter d_`v' exposure, controls(mkt_spend_shr) ///
+            ytitle("{&Delta}ln(observed `v' + 1)") xtitle("exposure")
+        graph export ../output/bs_observed_longdiff_`v'.pdf, replace
+    }
+    // Back-compat .ster for the total spend run (consumed by imputed_expenditure_fd)
+    estimates restore m_ln_tot_spend
+    estimates save ../temp/observed_longdiff.ster, replace
 
-    binscatter d_ln_spend exposure, controls(mkt_spend_shr) ///
-        ytitle("{&Delta}ln(observed keep==1 spend + 1)") xtitle("exposure")
-    graph export ../output/bs_observed_longdiff.pdf, replace
+    esttab m_ln_tot_spend m_ln_trt_spend m_ln_ctrl_spend ///
+        using ../output/observed_longdiff.tex, replace ///
+        b(3) se(3) star(* 0.10 ** 0.05 *** 0.01) ///
+        mtitles("D.ln(tot spend)" "D.ln(trt spend)" "D.ln(ctrl spend)") ///
+        keep(exposure mkt_spend_shr) ///
+        addnotes("Long difference. FOIA authors, exposure>0. Robust SE." ///
+                 "tot = keep==1; trt = keep==1 & treated==1; ctrl = keep==1 & treated==0.")
 
     // -------- Year-on-year FD --------
     use ../temp/observed_panel.dta, clear
@@ -223,32 +242,41 @@ program observed_expenditure_fd
     gen post = year >= 2014
     gen Z_it = exposure * post
     gen s_it = mkt_spend_shr * post
-    foreach v in ln_spend Z_it s_it {
+    foreach v in ln_tot_spend ln_trt_spend ln_ctrl_spend Z_it s_it {
         gen d_`v' = D.`v'
     }
 
-    reghdfe d_ln_spend d_Z_it d_s_it, absorb(year) vce(cluster athr)
-    estimates save ../temp/observed_yoyfd.ster, replace
     eststo clear
-    eststo m_observed
-    esttab m_observed using ../output/observed_yoyfd.tex, replace ///
-        b(3) se(3) star(* 0.10 ** 0.05 *** 0.01) ///
-        mtitles("D.ln(keep==1 spend)") ///
-        keep(d_Z_it d_s_it) ///
-        addnotes("Year-on-year FD. FOIA authors, keep==1 lab spend, exposure>0. Year FE, cluster athr.")
+    foreach v in ln_tot_spend ln_trt_spend ln_ctrl_spend {
+        reghdfe d_`v' d_Z_it d_s_it, absorb(year) vce(cluster athr)
+        eststo m_`v'
+        binscatter2 d_`v' d_Z_it, absorb(year) controls(d_s_it) ///
+            ytitle("D.ln(observed `v' + 1)") xtitle("D.Z_it = exposure x D.post")
+        graph export ../output/bs_observed_yoyfd_`v'.pdf, replace
+    }
+    estimates restore m_ln_tot_spend
+    estimates save ../temp/observed_yoyfd.ster, replace
 
-    binscatter2 d_ln_spend d_Z_it, absorb(year) controls(d_s_it) ///
-        ytitle("D.ln(observed keep==1 spend + 1)") xtitle("D.Z_it = exposure x D.post")
-    graph export ../output/bs_observed_yoyfd.pdf, replace
+    esttab m_ln_tot_spend m_ln_trt_spend m_ln_ctrl_spend ///
+        using ../output/observed_yoyfd.tex, replace ///
+        b(3) se(3) star(* 0.10 ** 0.05 *** 0.01) ///
+        mtitles("D.ln(tot spend)" "D.ln(trt spend)" "D.ln(ctrl spend)") ///
+        keep(d_Z_it d_s_it) ///
+        addnotes("Year-on-year FD. FOIA authors, exposure>0. Year FE, cluster athr." ///
+                 "tot = keep==1; trt = keep==1 & treated==1; ctrl = keep==1 & treated==0.")
 end
 
 program observed_qty_price_fd
-    // Observed-only first stages on quantity (headline) and price (robustness):
+    // Observed-only first stages on quantity (headline) and price (robustness),
+    // each split into total / treated / control:
     //   - qty: ln(qty+1), tsfill + zero-fill (no purchase = qty 0). Captures
-    //     extensive + intensive margin response.
+    //     extensive + intensive margin response. trt_qty = qty in treated==1
+    //     categories; ctrl_qty = qty in treated==0 categories. Both zero-filled.
     //   - price: ln(price), no zero fill (no purchase != price 0). Sample
-    //     restricted to athr-years with positive observed price. Long-diff
-    //     additionally requires both pre and post means to exist per athr.
+    //     restricted to athr-years with positive observed price (separately
+    //     for tot/trt/ctrl). Long-diff additionally requires both pre and post
+    //     means to exist per athr in that outcome's sample.
+    // ctrl regressions serve as a placebo: should not move with exposure.
     // No imputed counterpart -- imputation pipeline only produces spend.
     di _newline "=== Observed (FOIA, keep==1) qty & price first-difference ==="
 
@@ -261,13 +289,22 @@ program observed_qty_price_fd
     keep if keep == 1
     drop if mi(spend)  // see observed_expenditure_fd for rationale
 
-    gcollapse (sum) qty (mean) price, by(athr_id year)
+    gen tot_qty    = qty
+    gen trt_qty    = qty   if treated == 1
+    gen ctrl_qty   = qty   if treated == 0
+    gen tot_price  = price
+    gen trt_price  = price if treated == 1
+    gen ctrl_price = price if treated == 0
+    gcollapse (sum) tot_qty trt_qty ctrl_qty ///
+              (mean) tot_price trt_price ctrl_price, by(athr_id year)
     merge m:1 athr_id using ../external/real_exposure/athr_exposure, ///
         keep(3) nogen
     gegen athr = group(athr_id)
     xtset athr year
     tsfill
-    replace qty = 0 if mi(qty)
+    foreach v in tot_qty trt_qty ctrl_qty {
+        replace `v' = 0 if mi(`v')
+    }
     foreach v in exposure mkt_spend_shr {
         bys athr (year): replace `v' = `v'[_n-1] if mi(`v')
         gsort athr -year
@@ -276,30 +313,40 @@ program observed_qty_price_fd
     }
     drop if exposure <= 0
     keep if inrange(year, 2010, 2019)
-    gen ln_qty   = ln(qty + 1)
-    gen ln_price = ln(price)
+    foreach v in tot_qty trt_qty ctrl_qty {
+        gen ln_`v' = ln(`v' + 1)
+    }
+    foreach v in tot_price trt_price ctrl_price {
+        gen ln_`v' = ln(`v')
+    }
     save ../temp/observed_qty_price_panel.dta, replace
 
     // ============ Quantity (headline) ============
     // -------- long difference --------
     use ../temp/observed_qty_price_panel.dta, clear
     gen post = year >= 2014
-    gcollapse (mean) ln_qty exposure mkt_spend_shr, by(athr_id post)
-    reshape wide ln_qty, i(athr_id exposure mkt_spend_shr) j(post)
-    gen d_ln_qty = ln_qty1 - ln_qty0
+    gcollapse (mean) ln_tot_qty ln_trt_qty ln_ctrl_qty exposure mkt_spend_shr, by(athr_id post)
+    reshape wide ln_tot_qty ln_trt_qty ln_ctrl_qty, ///
+        i(athr_id exposure mkt_spend_shr) j(post)
+    foreach v in ln_tot_qty ln_trt_qty ln_ctrl_qty {
+        gen d_`v' = `v'1 - `v'0
+    }
 
     eststo clear
-    reg d_ln_qty exposure mkt_spend_shr, vce(robust)
-    eststo m_qty
-    esttab m_qty using ../output/firststage_qty_longdiff.tex, replace ///
+    foreach v in ln_tot_qty ln_trt_qty ln_ctrl_qty {
+        reg d_`v' exposure mkt_spend_shr, vce(robust)
+        eststo m_`v'
+        binscatter d_`v' exposure, controls(mkt_spend_shr) ///
+            ytitle("D.ln(observed `v' + 1)") xtitle("exposure")
+        graph export ../output/bs_obs_qty_longdiff_`v'.pdf, replace
+    }
+    esttab m_ln_tot_qty m_ln_trt_qty m_ln_ctrl_qty ///
+        using ../output/firststage_qty_longdiff.tex, replace ///
         b(3) se(3) star(* 0.10 ** 0.05 *** 0.01) ///
-        mtitles("D.ln(keep==1 qty)") ///
+        mtitles("D.ln(tot qty)" "D.ln(trt qty)" "D.ln(ctrl qty)") ///
         keep(exposure mkt_spend_shr) ///
-        addnotes("Long difference. FOIA authors, keep==1 qty, exposure>0. Robust SE.")
-
-    binscatter d_ln_qty exposure, controls(mkt_spend_shr) ///
-        ytitle("D.ln(observed keep==1 qty + 1)") xtitle("exposure")
-    graph export ../output/bs_obs_qty_longdiff.pdf, replace
+        addnotes("Long difference. FOIA authors, exposure>0. Robust SE." ///
+                 "tot = keep==1; trt = keep==1 & treated==1; ctrl = keep==1 & treated==0.")
 
     // -------- year-on-year FD --------
     use ../temp/observed_qty_price_panel.dta, clear
@@ -307,71 +354,83 @@ program observed_qty_price_fd
     gen post = year >= 2014
     gen Z_it = exposure * post
     gen s_it = mkt_spend_shr * post
-    foreach v in ln_qty Z_it s_it {
+    foreach v in ln_tot_qty ln_trt_qty ln_ctrl_qty Z_it s_it {
         gen d_`v' = D.`v'
     }
 
     eststo clear
-    reghdfe d_ln_qty d_Z_it d_s_it, absorb(year) vce(cluster athr)
-    eststo m_qty
-    esttab m_qty using ../output/firststage_qty_yoyfd.tex, replace ///
+    foreach v in ln_tot_qty ln_trt_qty ln_ctrl_qty {
+        reghdfe d_`v' d_Z_it d_s_it, absorb(year) vce(cluster athr)
+        eststo m_`v'
+        binscatter2 d_`v' d_Z_it, absorb(year) controls(d_s_it) ///
+            ytitle("D.ln(observed `v' + 1)") xtitle("D.Z_it = exposure x D.post")
+        graph export ../output/bs_obs_qty_yoyfd_`v'.pdf, replace
+    }
+    esttab m_ln_tot_qty m_ln_trt_qty m_ln_ctrl_qty ///
+        using ../output/firststage_qty_yoyfd.tex, replace ///
         b(3) se(3) star(* 0.10 ** 0.05 *** 0.01) ///
-        mtitles("D.ln(keep==1 qty)") ///
+        mtitles("D.ln(tot qty)" "D.ln(trt qty)" "D.ln(ctrl qty)") ///
         keep(d_Z_it d_s_it) ///
-        addnotes("Year-on-year FD. FOIA authors, keep==1 qty, exposure>0. Year FE, cluster athr.")
-
-    binscatter2 d_ln_qty d_Z_it, absorb(year) controls(d_s_it) ///
-        ytitle("D.ln(observed keep==1 qty + 1)") xtitle("D.Z_it = exposure x D.post")
-    graph export ../output/bs_obs_qty_yoyfd.pdf, replace
+        addnotes("Year-on-year FD. FOIA authors, exposure>0. Year FE, cluster athr." ///
+                 "tot = keep==1; trt = keep==1 & treated==1; ctrl = keep==1 & treated==0.")
 
     // ============ Price (robustness) ============
     // -------- long difference --------
-    use ../temp/observed_qty_price_panel.dta, clear
-    drop if mi(ln_price)
-    gen post = year >= 2014
-    gcollapse (mean) ln_price exposure mkt_spend_shr, by(athr_id post)
-    bys athr_id: gen n_periods = _N
-    keep if n_periods == 2
-    drop n_periods
-    reshape wide ln_price, i(athr_id exposure mkt_spend_shr) j(post)
-    gen d_ln_price = ln_price1 - ln_price0
-
+    // Sample drops + n_periods==2 filter applied per outcome (tot/trt/ctrl)
+    // since transacting pre AND post may differ across treated/control cats.
     eststo clear
-    reg d_ln_price exposure mkt_spend_shr, vce(robust)
-    eststo m_price
-    esttab m_price using ../output/robustness_price_longdiff.tex, replace ///
+    foreach v in ln_tot_price ln_trt_price ln_ctrl_price {
+        preserve
+        use ../temp/observed_qty_price_panel.dta, clear
+        drop if mi(`v')
+        gen post = year >= 2014
+        gcollapse (mean) `v' exposure mkt_spend_shr, by(athr_id post)
+        bys athr_id: gen n_periods = _N
+        keep if n_periods == 2
+        drop n_periods
+        reshape wide `v', i(athr_id exposure mkt_spend_shr) j(post)
+        gen d_`v' = `v'1 - `v'0
+        reg d_`v' exposure mkt_spend_shr, vce(robust)
+        eststo m_`v'
+        binscatter d_`v' exposure, controls(mkt_spend_shr) ///
+            ytitle("D.ln(observed `v')") xtitle("exposure")
+        graph export ../output/bs_obs_price_longdiff_`v'.pdf, replace
+        restore
+    }
+    esttab m_ln_tot_price m_ln_trt_price m_ln_ctrl_price ///
+        using ../output/robustness_price_longdiff.tex, replace ///
         b(3) se(3) star(* 0.10 ** 0.05 *** 0.01) ///
-        mtitles("D.ln(keep==1 price)") ///
+        mtitles("D.ln(tot price)" "D.ln(trt price)" "D.ln(ctrl price)") ///
         keep(exposure mkt_spend_shr) ///
-        addnotes("Long difference. FOIA authors, keep==1 mean price, conditional on transacting both pre and post, exposure>0. Robust SE.")
-
-    binscatter d_ln_price exposure, controls(mkt_spend_shr) ///
-        ytitle("D.ln(observed keep==1 mean price)") xtitle("exposure")
-    graph export ../output/bs_obs_price_longdiff.pdf, replace
+        addnotes("Long difference. FOIA authors, mean price conditional on transacting both pre and post, exposure>0. Robust SE." ///
+                 "tot = keep==1; trt = keep==1 & treated==1; ctrl = keep==1 & treated==0.")
 
     // -------- year-on-year FD --------
+    // D operator already conditions on consecutive non-missing years per outcome.
     use ../temp/observed_qty_price_panel.dta, clear
-    drop if mi(ln_price)
     xtset athr year
     gen post = year >= 2014
     gen Z_it = exposure * post
     gen s_it = mkt_spend_shr * post
-    foreach v in ln_price Z_it s_it {
+    foreach v in ln_tot_price ln_trt_price ln_ctrl_price Z_it s_it {
         gen d_`v' = D.`v'
     }
 
     eststo clear
-    reghdfe d_ln_price d_Z_it d_s_it, absorb(year) vce(cluster athr)
-    eststo m_price
-    esttab m_price using ../output/robustness_price_yoyfd.tex, replace ///
+    foreach v in ln_tot_price ln_trt_price ln_ctrl_price {
+        reghdfe d_`v' d_Z_it d_s_it, absorb(year) vce(cluster athr)
+        eststo m_`v'
+        binscatter2 d_`v' d_Z_it, absorb(year) controls(d_s_it) ///
+            ytitle("D.ln(observed `v')") xtitle("D.Z_it = exposure x D.post")
+        graph export ../output/bs_obs_price_yoyfd_`v'.pdf, replace
+    }
+    esttab m_ln_tot_price m_ln_trt_price m_ln_ctrl_price ///
+        using ../output/robustness_price_yoyfd.tex, replace ///
         b(3) se(3) star(* 0.10 ** 0.05 *** 0.01) ///
-        mtitles("D.ln(keep==1 price)") ///
+        mtitles("D.ln(tot price)" "D.ln(trt price)" "D.ln(ctrl price)") ///
         keep(d_Z_it d_s_it) ///
-        addnotes("Year-on-year FD. FOIA authors, keep==1 mean price, conditional on transacting, exposure>0. Year FE, cluster athr.")
-
-    binscatter2 d_ln_price d_Z_it, absorb(year) controls(d_s_it) ///
-        ytitle("D.ln(observed keep==1 mean price)") xtitle("D.Z_it = exposure x D.post")
-    graph export ../output/bs_obs_price_yoyfd.pdf, replace
+        addnotes("Year-on-year FD. FOIA authors, mean price conditional on transacting, exposure>0. Year FE, cluster athr." ///
+                 "tot = keep==1; trt = keep==1 & treated==1; ctrl = keep==1 & treated==0.")
 end
 
 program level_trajectories_by_exposure

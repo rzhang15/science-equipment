@@ -65,7 +65,7 @@ program gen_exposure
     bys athr_id: egen tot_hc_spend = total(lab_spend)
     gen hc_spend_shr = tot_hc_spend/tot_lab_spend
     gen mkt_spend_shr = spend / tot_hc_spend
-*    gen mkt_spend_shr = spend / tot_lab_spend
+   * gen mkt_spend_shr = spend / tot_lab_spend
     // align slash → hyphen so the two betas in did_coefs merge
     replace category = "acrylamide-bis solution" if category == "acrylamide/bis solution"
     replace category = "dmem-f-12" if category == "dmem/f-12"
@@ -73,9 +73,9 @@ program gen_exposure
     rename _merge has_beta
     replace has_beta = 0 if has_beta == 1
     replace has_beta = 1 if has_beta == 3
-    keep if has_beta == 1
+   * keep if has_beta == 1
     bys athr_id: egen tot_treated_spend = total(spend)
-*    gen mkt_spend_shr = spend / tot_treated_spend
+   * gen mkt_spend_shr = spend / tot_treated_spend
     * gen exposure = b*lab_spend_shr*mkt_spend_shr
     gen exposure = b*mkt_spend_shr
     gen treated_spend = spend if treated == 1

@@ -21,36 +21,19 @@ Notes:
       3. More than 2 billion observations are allowed; see help obs_advice.
       4. Maximum number of variables is set to 120,000; see help set_maxvar.
 
-. do "/n/holylabs/pakes_lab/Lab/sci_eq/derived/openalex/link_grants/code/build.
-> do" 
+. describe using ../external/pubmed/grants 
 
-. set more off
-
-. clear all
-
-. capture log close
-
-. program drop _all
-
-. set scheme modern
-
-. preliminaries
-
-. version 17
-
-. 
-. program main  
-  1.     use ../external/panel/cleaned_all_jrnls.dta, clear
-  2.     contract pmid athr_id year
-  3.     drop _freq
-  4.     save ../temp/pi_ppr, replace
-  5.     fmerge 1:m pmid using ../external/pubmed/grants, assert(1 2 3) keep(1 3) 
-  6.     tab _merge
-  7.     drop n _merge
-  8.     contract athr_id year funder_id funder_name award_id
-  9.     drop _freq
- 10.     drop if mi(award_id)
- 11.     save ../output/pi_grants, replace
- 12. end
-
-. **
+Contains data                                 
+ Observations:    11,327,893                  10 Jun 2026 10:25
+    Variables:             5                  
+-------------------------------------------------------------------------------
+Variable      Storage   Display    Value
+    name         type    format    label      Variable label
+-------------------------------------------------------------------------------
+pmid            long    %12.0g                
+grant_id        str1251 %1251s                
+acronym         str32   %32s                  
+agency          strL    %9s                   
+country         str24   %24s                  
+-------------------------------------------------------------------------------
+Sorted by: 

@@ -1,0 +1,39 @@
+=== Pulling grants from PubMed ===
+Total batches: 46915
+parse_grants.py: XML parse error: no element found: line 1, column 0
+  batch b_0000019 FAILED (will retry on next run)
+parse_grants.py: XML parse error: no element found: line 1, column 0
+  batch b_0000027 FAILED (will retry on next run)
+parse_grants.py: XML parse error: no element found: line 1, column 0
+  batch b_0000044 FAILED (will retry on next run)
+parse_grants.py: XML parse error: no element found: line 1, column 0
+  batch b_0000053 FAILED (will retry on next run)
+parse_grants.py: XML parse error: no element found: line 1, column 0
+  batch b_0000056 FAILED (will retry on next run)
+parse_grants.py: XML parse error: no element found: line 1, column 0
+  batch b_0000065 FAILED (will retry on next run)
+parse_grants.py: XML parse error: no element found: line 1, column 0
+  batch b_0000069 FAILED (will retry on next run)
+parse_grants.py: XML parse error: no element found: line 1, column 0
+  batch b_0000070 FAILED (will retry on next run)
+parse_grants.py: XML parse error: no element found: line 1, column 0
+  batch b_0000071 FAILED (will retry on next run)
+parse_grants.py: XML parse error: no element found: line 1, column 0
+  batch b_0000074 FAILED (will retry on next run)
+parse_grants.py: XML parse error: no element found: line 1, column 0
+  batch b_0000075 FAILED (will retry on next run)
+parse_grants.py: XML parse error: no element found: line 1, column 0
+  batch b_0000076 FAILED (will retry on next run)
+parse_grants.py: XML parse error: no element found: line 1, column 0
+  batch b_0000077 FAILED (will retry on next run)
+parse_grants.py: XML parse error: no element found: line 1, column 0
+  batch b_0000085 FAILED (will retry on next run)
+parse_grants.py: XML parse error: no element found: line 1, column 0
+  batch b_0000087 FAILED (will retry on next run)
+parse_grants.py: XML parse error: no element found: line 1, column 0
+  batch b_0000090 FAILED (will retry on next run)
+parse_grants.py: XML parse error: no element found: line 1, column 0
+  batch b_0000092 FAILED (will retry on next run)
+parse_grants.py: XML parse error: no element found: line 1, column 0
+  batch b_0000097 FAILED (will retry on next run)
+[2026-06-09T17:58:21.059] error: *** JOB 20597269 ON holy8a32608 CANCELLED AT 2026-06-09T17:58:21 DUE to SIGNAL Terminated ***
