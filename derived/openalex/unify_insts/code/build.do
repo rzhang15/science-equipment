@@ -147,7 +147,7 @@ program clean_insts
 	replace new_inst_id = "I170201317" if new_inst == "University of Pittsburgh" 
 
 	replace new_inst = "Vanderbilt University" if inst == "Vanderbilt Health"
-	replace new_inst_id = "I200719446" if new_inst == "Vanderbilt University"ll
+	replace new_inst_id = "I200719446" if new_inst == "Vanderbilt University"
 	
 	replace new_inst = "University of California, San Francisco" if strpos(inst, "UCSF")>0 | inst == "University of California San Francisco"
 	replace new_inst_id = "I180670191" if new_inst == "University of California, San Francisco"

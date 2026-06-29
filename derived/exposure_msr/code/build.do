@@ -47,6 +47,7 @@ program gen_exposure
     merge m:1 category using ../external/ml/categories_tfidf, assert(1 2 3)  keep(1 3) nogen
     gcollapse (sum) spend lab_spend (mean) keep, by(athr_id category year)
     save ../output/athr_category_spend, replace
+
     preserve
     gen spend_keep = spend if keep == 1
     replace spend_keep = 0 if mi(spend_keep)
@@ -55,6 +56,7 @@ program gen_exposure
     gcollapse (sum) spend lab_spend  spend_keep lab_spend_keep, by(athr_id year)
     save ../output/athr_spend, replace
     restore
+
     keep if year <= 2013
     gcollapse (mean) spend lab_spend keep, by(athr_id category)
     bys athr_id: egen tot_spend = total(spend)
@@ -62,7 +64,7 @@ program gen_exposure
     gen lab_spend_shr = tot_lab_spend / tot_spend
     drop if category == "Non-Lab"
     keep if keep == 1
-    bys athr_id: egen tot_hc_spend = total(lab_spend)
+    bys athr_id: egen tot_hc_spend = total(spend)
     gen hc_spend_shr = tot_hc_spend/tot_lab_spend
     gen mkt_spend_shr = spend / tot_hc_spend
    * gen mkt_spend_shr = spend / tot_lab_spend
@@ -73,13 +75,18 @@ program gen_exposure
     rename _merge has_beta
     replace has_beta = 0 if has_beta == 1
     replace has_beta = 1 if has_beta == 3
-   * keep if has_beta == 1
+    *keep if has_beta == 1
     bys athr_id: egen tot_treated_spend = total(spend)
-   * gen mkt_spend_shr = spend / tot_treated_spend
+    *gen mkt_spend_shr = spend / tot_treated_spend
     * gen exposure = b*lab_spend_shr*mkt_spend_shr
     gen exposure = b*mkt_spend_shr
     gen treated_spend = spend if treated == 1
-    replace mkt_spend_shr = . if mi(exposure)
+    replace mkt_spend_shr = . if has_beta == 0 
+    preserve
+    contract athr_id category mkt_spend_shr spend tot_hc_spend
+    save ../output/athr_exposure_by_category, replace
+    restore
+
     collapse (sum) exposure treated_spend mkt_spend_shr (mean) hc_spend_shr tot_hc_spend lab_spend_shr tot_lab_spend tot_spend, by(athr_id)
     drop if treated_spend == 0
     drop if mi(exposure)

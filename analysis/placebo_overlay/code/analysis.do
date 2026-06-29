@@ -94,13 +94,13 @@ program overlay_hist
         local sd_imean   : di %6.3f r(sd)
     restore
 
-    tw kdensity b if sample == 1, color(lavender%70) lwidth(medthick) || ///
+    tw kdensity b if sample == 1, color(ebblue%70) lwidth(medthick) || ///
        kdensity b if sample == 2, color(gs10%80) lwidth(medthick) lpattern(dash) ///
        xtitle("DiD Coefficient (log `outcome')") ///
        ytitle("Density") ///
        xlab(-0.6(0.1)0.6) ///
        xline(0, lcolor(gs6) lpattern(dash)) ///
-       xline(`mean_r_raw', lcolor(purple) lpattern(solid) lwidth(medthin)) ///
+       xline(`mean_r_raw', lcolor(edkblue) lpattern(solid) lwidth(medthin)) ///
        legend(on order(1 "Actual Treatment Effects (N=`N_r', mean=`mean_r', sd=`sd_r')" ///
                        2 "Placebo Treatment Effects (N=`N_p', mean=`mean_p', sd=`sd_p')") ///
               pos(7) ring(1) region(fcolor(none)) size(small))

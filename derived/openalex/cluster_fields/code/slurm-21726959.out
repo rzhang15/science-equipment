@@ -1,0 +1,39 @@
+=== Step 0: clean corpus ===
+Reading ../output/cleaned_static_author_text_pre.parquet ...
+Loaded: 8,569,360 authors
+  scraper-boilerplate authors:      58,796 (0.69%)
+  short text (<200 chars):      3,222,894 (37.61%)
+  overlap (both):                      326
+  keeping                        5,287,996 / 8,569,360 (61.7%)
+Writing ../output/cleaned_static_author_text_pre_v2.parquet ...
+Done. 5,287,996 rows.
+=== Step 1: vectorize ===
+Loading Parquet data...
+Stemming Stopwords to match input data...
+Vectorizing...
+Matrix Shape: (5287996, 30000)
+=== Step 2: cluster K=100 ===
+--- CLUSTER JOB: K=100  svd_dim=256 ---
+Loading TF-IDF matrix...
+  TF-IDF shape: (5287996, 30000)  nnz/row mean: 103.2
+Loading helper files...
+  rows with 0 nonzero features: 3
+  rows with <5 nonzero features: 462
+
+Reducing to 256 dims via TruncatedSVD...
+  cumulative explained variance: 0.182
+  dense shape: (5287996, 256)   mem: 5.41 GB
+  L2-normalized; ready for spherical K-means semantics.
+
+Clustering into 100 clusters with MiniBatchKMeans...
+
+--- CLUSTER SIZE DISTRIBUTION ---
+  largest cluster: 291,792 authors (5.52% of pool)
+  median size: 50,161    smallest: 16,454
+  size pctiles: 10%=24,886  25%=35,579  75%=59,944  90%=75,435
+
+Saving Results...
+Writing cluster top-term descriptions...
+Saved ../output/static_cluster_descriptions_100.txt
+Done.
+Done.

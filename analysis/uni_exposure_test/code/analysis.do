@@ -9,28 +9,22 @@ version 17
 program main
    build_panel
    did
+   binscatter_did
    event_study
    build_uc_panel
    uc_did
+   binscatter_uc_did
+   hi_ctrl_uc_es
+   output_tables
 end
 
-// -----------------------------------------------------------------------------
-// build_panel: construct the university-by-year analysis panel.
-//   - exposure_j = sum_{m in treated, high-conf} s_jm * b_eb_m
-//   - s_treat_j  = sum_{m in treated, high-conf} s_jm  (overall treated share)
-//   - s_jm: uni j's pre-2013 spend in market m as share of pre-2013 spend
-//           across all high-confidence markets (treated + control).
-//   - outcomes summed over high-confidence markets only:
-//       ctrl_spend_jt, ctrl_qty_jt, treat_spend_jt, tot_spend_jt
-//   - sample: unis with positive pre-2013 spend in both treated and control
-//             high-conf markets, observed both before and after 2014.
-// -----------------------------------------------------------------------------
 program build_panel
-    use ../external/samp/uni_category_yr_tfidf, clear
-    keep category year uni_id treated raw_spend raw_qty
-    // --- pre-2013 shares and exposure -----------------------------------------
+    use ../external/samp/full_uni_category_yr_tfidf, clear
+    keep category year uni_id treated keep raw_spend raw_qty
+    gen hi_conf = (keep == 1)
+    // --- pre-2013 shares and exposure (computed off hi-conf only) -------------
     preserve
-    keep if year <= 2013
+    keep if year <= 2013 & hi_conf == 1
     gcollapse (sum) raw_spend, by(uni_id category treated)
     bys uni_id: egen tot_pre_spend = total(raw_spend)
     gen s_jm = raw_spend / tot_pre_spend
@@ -40,28 +34,44 @@ program build_panel
     // merge EB-shrunk price betas (only present for treated markets)
     merge m:1 category using ../external/betas/did_coefs_eb_price, ///
         keepusing(b_eb) keep(1 3) nogen
-    gen exp_contrib    = cond(treated == 1, s_jm * b_eb, 0)
+    gen exp_contrib     = cond(treated == 1, s_jm * b_eb, 0)
     gen s_treat_contrib = cond(treated == 1, s_jm, 0)
     gcollapse (sum) exposure = exp_contrib s_treat = s_treat_contrib ///
               (first) pre_treat_spend pre_ctrl_spend tot_pre_spend, by(uni_id)
-    // sample restriction: positive pre-2013 spend in both treated and control
+    // sample restriction: positive pre-2013 spend in both hi-conf treated AND control
     keep if pre_treat_spend > 0 & pre_ctrl_spend > 0 & !mi(exposure) & !mi(s_treat)
     keep uni_id exposure s_treat tot_pre_spend
-    tempfile exposure_xw
-    save `exposure_xw'
+    save ../temp/exposure_xw, replace
     restore
 
-    // --- aggregate outcomes to uni-year ---------------------------------------
-    gen ctrl_spend  = raw_spend * (treated == 0)
-    gen treat_spend = raw_spend * (treated == 1)
-    gen ctrl_qty    = raw_qty   * (treated == 0)
-    gen treat_qty   = raw_qty   * (treated == 1)
-    gcollapse (sum) ctrl_spend treat_spend ctrl_qty treat_qty raw_spend raw_qty, by(uni_id year)
-    rename raw_spend tot_spend
-    rename raw_qty   tot_qty
+    // --- aggregate outcomes (full universe, split by treated x hi_conf) ------
+    gen hi_ctrl_spend  = raw_spend * (treated == 0 & hi_conf == 1)
+    gen hi_treat_spend = raw_spend * (treated == 1 & hi_conf == 1)
+    gen lo_ctrl_spend  = raw_spend * (treated == 0 & hi_conf == 0)
+    gen lo_treat_spend = raw_spend * (treated == 1 & hi_conf == 0)
+    gen hi_ctrl_qty    = raw_qty   * (treated == 0 & hi_conf == 1)
+    gen hi_treat_qty   = raw_qty   * (treated == 1 & hi_conf == 1)
+    gen lo_ctrl_qty    = raw_qty   * (treated == 0 & hi_conf == 0)
+    gen lo_treat_qty   = raw_qty   * (treated == 1 & hi_conf == 0)
+    gcollapse (sum) hi_ctrl_spend hi_treat_spend lo_ctrl_spend lo_treat_spend ///
+                    hi_ctrl_qty hi_treat_qty lo_ctrl_qty lo_treat_qty ///
+                    raw_spend raw_qty, by(uni_id year)
+    rename raw_spend total_full_spend
+    rename raw_qty   total_full_qty
+
+    // backward-compat aliases (old "ctrl"/"treat"/"tot" = hi-conf only)
+    gen ctrl_spend  = hi_ctrl_spend
+    gen treat_spend = hi_treat_spend
+    gen tot_spend   = hi_ctrl_spend + hi_treat_spend
+    gen ctrl_qty    = hi_ctrl_qty
+    gen treat_qty   = hi_treat_qty
+
+    // aggregates across confidence levels (all hi+lo conf, by treated status)
+    gen total_ctrl_full  = hi_ctrl_spend  + lo_ctrl_spend
+    gen total_treat_full = hi_treat_spend + lo_treat_spend
 
     // --- merge to exposure crosswalk (restricts sample) -----------------------
-    merge m:1 uni_id using `exposure_xw', assert(1 3) keep(3) nogen
+    merge m:1 uni_id using ../temp/exposure_xw, assert(1 3) keep(3) nogen
 
     // require uni observed both pre and post 2014
     bys uni_id: egen min_year = min(year)
@@ -69,21 +79,37 @@ program build_panel
     keep if min_year < 2014 & max_year >= 2014
     drop min_year max_year
 
-    // outcomes (log(1+x) per spec discussion: keeps zero-spend uni-years)
-    foreach v in ctrl_spend ctrl_qty treat_spend treat_qty tot_spend {
+    // outcomes (log(1+x) keeps zero-spend uni-years)
+    foreach v in ctrl_spend ctrl_qty treat_spend treat_qty tot_spend ///
+                 hi_ctrl_spend hi_ctrl_qty hi_treat_spend hi_treat_qty ///
+                 lo_ctrl_spend lo_ctrl_qty lo_treat_spend lo_treat_qty ///
+                 total_ctrl_full total_treat_full ///
+                 total_full_spend total_full_qty {
         gen log1_`v' = ln(1 + `v')
     }
 
     // pre-2013 uni spending for weighted regressions
     gen wt_spend = tot_pre_spend
 
-    label var exposure     "University exposure: sum_m s_jm * b_eb_m (treated mkts)"
-    label var s_treat      "Pre-2013 treated-market spending share"
-    label var ctrl_spend   "Spend in high-conf control markets (level)"
-    label var treat_spend  "Spend in high-conf treated markets (level)"
-    label var tot_spend    "Spend in all high-conf markets (level)"
-    label var ctrl_qty     "Quantity in high-conf control markets (level)"
-    label var treat_qty    "Quantity in high-conf treated markets (level)"
+    label var exposure          "Uni exposure: sum_m s_jm * b_eb_m (hi-conf treated)"
+    label var s_treat           "Pre-2013 hi-conf treated-mkt share"
+    label var ctrl_spend        "Spend in hi-conf control mkts (= hi_ctrl_spend)"
+    label var treat_spend       "Spend in hi-conf treated mkts (= hi_treat_spend)"
+    label var tot_spend         "Spend in hi-conf treated+control mkts"
+    label var ctrl_qty          "Qty in hi-conf control mkts"
+    label var treat_qty         "Qty in hi-conf treated mkts"
+    label var hi_ctrl_spend     "Spend in hi-conf control mkts"
+    label var hi_treat_spend    "Spend in hi-conf treated mkts"
+    label var lo_ctrl_spend     "Spend in lo-conf control mkts (substitution target)"
+    label var lo_treat_spend    "Spend in lo-conf treated mkts"
+    label var hi_ctrl_qty       "Qty in hi-conf control mkts"
+    label var hi_treat_qty      "Qty in hi-conf treated mkts"
+    label var lo_ctrl_qty       "Qty in lo-conf control mkts"
+    label var lo_treat_qty      "Qty in lo-conf treated mkts"
+    label var total_ctrl_full   "Spend in all control mkts (hi+lo conf)"
+    label var total_treat_full  "Spend in all treated mkts (hi+lo conf)"
+    label var total_full_spend  "Spend across full sample (headline budget test)"
+    label var total_full_qty    "Qty across full sample"
     save ../temp/uni_yr_panel, replace
 end
 
@@ -104,7 +130,10 @@ program did
     postfile `memhold' str40 outcome str20 spec str40 rhs ///
         double b se str10 stars int N using `didres', replace
 
-    foreach yvar in log1_ctrl_spend log1_ctrl_qty log1_tot_spend log1_treat_spend log1_treat_qty {
+    foreach yvar in log1_ctrl_spend log1_ctrl_qty log1_tot_spend log1_treat_spend log1_treat_qty ///
+                    log1_lo_ctrl_spend log1_lo_ctrl_qty log1_lo_treat_spend log1_lo_treat_qty ///
+                    log1_total_ctrl_full log1_total_treat_full ///
+                    log1_total_full_spend log1_total_full_qty {
         // raw (no S control)
         reghdfe `yvar' post_exp, absorb(uni_id year) cluster(uni_id)
         local N = e(N)
@@ -146,7 +175,10 @@ end
 //   Cluster SEs at uni_id.
 // -----------------------------------------------------------------------------
 program event_study
-    foreach yvar in log1_ctrl_spend log1_ctrl_qty log1_tot_spend log1_treat_spend log1_treat_qty {
+    foreach yvar in log1_ctrl_spend log1_ctrl_qty log1_tot_spend log1_treat_spend log1_treat_qty ///
+                    log1_lo_ctrl_spend log1_lo_ctrl_qty log1_lo_treat_spend log1_lo_treat_qty ///
+                    log1_total_ctrl_full log1_total_treat_full ///
+                    log1_total_full_spend log1_total_full_qty {
         foreach spec in raw with_S {
             cont_es, yvar(`yvar') spec(`spec')
         }
@@ -215,15 +247,18 @@ program cont_es
     local xmin = r(min)
     local xmax = r(max)
 
+    _pretty_label, name(`yvar')
+    local ytit "`r(label)'"
+
     tw rcap ub lb rel if rel != -1, lcolor(ebblue%70) msize(vsmall) || ///
        scatter b rel, mcolor(ebblue) msize(small) || ///
        scatteri `ymax' -0.25 `ymax' 0.25, bcolor(gs12%30) recast(area) base(`ymin') ///
        xlab(`xmin'(1)`xmax', labsize(small)) ///
-       xtitle("Years relative to 2014", size(small)) ///
-       ytitle("Coef on rel x Exposure", size(small)) ///
+       xtitle("Years Relative to 2014", size(small)) ///
+       ytitle("Coefficient on Year {&times} Exposure", size(small)) ///
        ylab(, labsize(small)) ///
        yline(0, lcolor(gs10) lpattern(solid)) ///
-       title("`yvar' (`spec', N=`Nobs')", size(small)) ///
+       title("`ytit'", size(small)) ///
        legend(off) plotregion(margin(sides))
     graph export ../output/figures/es/es_`yvar'_`spec'.pdf, replace
     restore
@@ -405,24 +440,358 @@ program uc_es
             local xmin = r(min)
             local xmax = r(max)
 
-            local ytitle = cond("`series'"=="exp", "Post x Exposure (control)", ///
-                          cond("`series'"=="tr",  "Post x Treated (avg treated)", ///
-                                                  "Post x Exposure x Treated (diff)"))
+            local ytitle = cond("`series'"=="exp", "Coefficient on Year {&times} Exposure (Control Cells)", ///
+                          cond("`series'"=="tr",  "Coefficient on Year {&times} Treated", ///
+                                                  "Coefficient on Year {&times} Exposure {&times} Treated"))
+
+            _pretty_label, name(`yvar')
+            local ttit "`r(label)'"
 
             tw rcap ub lb rel if rel != -1, lcolor(ebblue%70) msize(vsmall) || ///
                scatter b rel, mcolor(ebblue) msize(small) || ///
                scatteri `ymax' -0.25 `ymax' 0.25, bcolor(gs12%30) recast(area) base(`ymin') ///
                xlab(`xmin'(1)`xmax', labsize(small)) ///
-               xtitle("Years relative to 2014", size(small)) ///
+               xtitle("Years Relative to 2014", size(small)) ///
                ytitle("`ytitle'", size(small)) ///
                ylab(, labsize(small)) ///
                yline(0, lcolor(gs10) lpattern(solid)) ///
-               title("`yvar' (`spec', N=`Nobs')", size(small)) ///
+               title("`ttit'", size(small)) ///
                legend(off) plotregion(margin(sides))
             graph export ../output/figures/es/es_uc_`yvar'_`series'_`spec'.pdf, replace
         }
         restore
     }
+end
+
+// -----------------------------------------------------------------------------
+// _pretty_label: outcome/regressor name -> human-readable label for figures.
+//   Centralizes the variable->label mapping so binscatter and event-study
+//   programs share one source of truth. Returns r(label).
+// -----------------------------------------------------------------------------
+program _pretty_label, rclass
+    syntax, name(str)
+    local L = "`name'"
+    // uni-yr outcomes (figure caption / filename carries the segment qualifier)
+    if "`name'" == "log1_ctrl_spend"        local L "Log Spend"
+    if "`name'" == "log1_ctrl_qty"          local L "Log Quantity"
+    if "`name'" == "log1_hi_ctrl_spend"     local L "Log Spend"
+    if "`name'" == "log1_hi_ctrl_qty"       local L "Log Quantity"
+    if "`name'" == "log1_tot_spend"         local L "Log Spend"
+    if "`name'" == "log1_treat_spend"       local L "Log Spend"
+    if "`name'" == "log1_treat_qty"         local L "Log Quantity"
+    if "`name'" == "log1_hi_treat_spend"    local L "Log Spend"
+    if "`name'" == "log1_hi_treat_qty"      local L "Log Quantity"
+    if "`name'" == "log1_lo_ctrl_spend"     local L "Log Spend"
+    if "`name'" == "log1_lo_ctrl_qty"       local L "Log Quantity"
+    if "`name'" == "log1_lo_treat_spend"    local L "Log Spend"
+    if "`name'" == "log1_lo_treat_qty"      local L "Log Quantity"
+    if "`name'" == "log1_total_ctrl_full"   local L "Log Spend"
+    if "`name'" == "log1_total_treat_full"  local L "Log Spend"
+    if "`name'" == "log1_total_full_spend"  local L "Log Spend"
+    if "`name'" == "log1_total_full_qty"    local L "Log Quantity"
+    // uc-level outcomes
+    if "`name'" == "log_raw_spend"          local L "Log Spend"
+    if "`name'" == "log_raw_qty"            local L "Log Quantity"
+    if "`name'" == "avg_log_price"          local L "Average Log Price"
+    // focal regressors
+    if "`name'" == "post_exp"               local L "Post x Exposure"
+    if "`name'" == "post_tr"                local L "Post x Treated"
+    if "`name'" == "post_exp_tr"            local L "Post x Exposure x Treated"
+    return local label "`L'"
+end
+
+// -----------------------------------------------------------------------------
+// _bin_did: Frisch-Waugh partial-regression binscatter helper.
+//   Residualize y and the focal regressor z on the same FE set (and any
+//   controls), refit the static DiD to grab b/SE matching the regression
+//   tables, and binscatter the residuals with the beta/SE in a pos(7) legend.
+//   uc_panel = 1 uses uc/year FE, aw=w_pre, two-way cluster on uni_id/category;
+//   uc_panel = 0 uses uni_id/year FE, no weights, cluster on uni_id.
+// -----------------------------------------------------------------------------
+program _bin_did
+    syntax, yvar(str) zvar(str) outfile(str) xtit(str) ytit(str) ///
+            uc_panel(int) [ctrl(str asis) nbins(int 20)]
+    preserve
+    cap drop _y_r _Z_r
+    if `uc_panel' == 1 {
+        qui reghdfe `yvar' `ctrl' [aw=w_pre], absorb(uc year) residuals(_y_r)
+        qui reghdfe `zvar' `ctrl' [aw=w_pre], absorb(uc year) residuals(_Z_r)
+        qui reghdfe `yvar' `zvar' `ctrl' [aw=w_pre], absorb(uc year) ///
+            cluster(uni_id category)
+    }
+    else {
+        qui reghdfe `yvar' `ctrl', absorb(uni_id year) residuals(_y_r)
+        qui reghdfe `zvar' `ctrl', absorb(uni_id year) residuals(_Z_r)
+        qui reghdfe `yvar' `zvar' `ctrl', absorb(uni_id year) cluster(uni_id)
+    }
+    local b_str  : di %7.3f _b[`zvar']
+    local se_str : di %7.3f _se[`zvar']
+    qui gunique uni_id if e(sample)
+    local Nstr = trim(string(r(unique), "%15.0fc"))
+    if `uc_panel' == 1 {
+        binscatter _y_r _Z_r [aw=w_pre], n(`nbins') msymbol(O) mcolor(ebblue) ///
+            xtitle("`xtit'") ytitle("`ytit'") ///
+            ylab(#10) ///
+            legend(on order(- "{&beta} = `b_str' (SE: `se_str')") ///
+                   pos(7) ring(1) size(small) region(lwidth(none))) ///
+            plotregion(margin(sides))
+    }
+    else {
+        binscatter _y_r _Z_r, n(`nbins') msymbol(O) mcolor(ebblue) ///
+            xtitle("`xtit'") ytitle("`ytit'") ///
+            ylab(#10) ///
+            legend(on order(- "{&beta} = `b_str' (SE: `se_str')") ///
+                   pos(7) ring(1) size(small) region(lwidth(none))) ///
+            plotregion(margin(sides))
+    }
+    graph export `outfile', replace
+    restore
+end
+
+// -----------------------------------------------------------------------------
+// binscatter_did: FW binscatter of post_exp on each uni-yr outcome, raw and
+// with_S. Mirrors the outcome loop and FE/cluster structure of `did`.
+// -----------------------------------------------------------------------------
+program binscatter_did
+    use ../temp/uni_yr_panel, clear
+    gen post     = year >= 2014
+    gen post_exp = post * exposure
+    gen post_s   = post * s_treat
+
+    cap mkdir ../output/figures/binscatter
+
+    foreach yvar in log1_hi_ctrl_spend log1_hi_ctrl_qty ///
+                    log1_hi_treat_spend log1_hi_treat_qty ///
+                    log1_tot_spend ///
+                    log1_lo_ctrl_spend log1_lo_ctrl_qty ///
+                    log1_lo_treat_spend log1_lo_treat_qty ///
+                    log1_total_ctrl_full log1_total_treat_full ///
+                    log1_total_full_spend log1_total_full_qty {
+        _pretty_label, name(`yvar')
+        local ytit "`r(label)'"
+        _pretty_label, name(post_exp)
+        local xtit "`r(label)'"
+        _bin_did, yvar(`yvar') zvar(post_exp) uc_panel(0) ///
+            outfile(../output/figures/binscatter/bins_`yvar'_raw.pdf) ///
+            xtit("`xtit'") ytit("`ytit'")
+        _bin_did, yvar(`yvar') zvar(post_exp) uc_panel(0) ctrl(post_s) ///
+            outfile(../output/figures/binscatter/bins_`yvar'_with_S.pdf) ///
+            xtit("`xtit'") ytit("`ytit'")
+    }
+end
+
+// -----------------------------------------------------------------------------
+// binscatter_uc_did: FW binscatter at the uni x cat x year level for each of
+// {post_exp, post_tr, post_exp_tr}, raw and with_S. Same FE/cluster/weight
+// structure as `uc_did`.
+//   - post_exp:    exposure effect in CONTROL cells (substitution check)
+//   - post_tr:     average treated effect (price/spend response)
+//   - post_exp_tr: differential exposure effect, treated minus control
+// -----------------------------------------------------------------------------
+program binscatter_uc_did
+    use ../temp/uni_cat_yr_panel, clear
+    gen post        = year >= 2014
+    gen post_exp    = post * exposure
+    gen post_tr     = post * treated
+    gen post_exp_tr = post * exposure * treated
+    gen post_s      = post * s_treat
+    gen post_s_tr   = post * s_treat * treated
+
+    cap mkdir ../output/figures/binscatter
+
+    foreach yvar in log_raw_spend log_raw_qty avg_log_price {
+        _pretty_label, name(`yvar')
+        local ytit "`r(label)'"
+        _pretty_label, name(post_exp)
+        local xtit_exp "`r(label)'"
+        _pretty_label, name(post_tr)
+        local xtit_tr  "`r(label)'"
+        _pretty_label, name(post_exp_tr)
+        local xtit_xtr "`r(label)'"
+        // raw spec: residualize on FE + the two non-focal interactions
+        _bin_did, yvar(`yvar') zvar(post_exp) uc_panel(1) ///
+            ctrl(post_tr post_exp_tr) nbins(30) ///
+            outfile(../output/figures/binscatter/bins_uc_`yvar'_post_exp_raw.pdf) ///
+            xtit("`xtit_exp'") ytit("`ytit'")
+        _bin_did, yvar(`yvar') zvar(post_tr) uc_panel(1) ///
+            ctrl(post_exp post_exp_tr) nbins(30) ///
+            outfile(../output/figures/binscatter/bins_uc_`yvar'_post_tr_raw.pdf) ///
+            xtit("`xtit_tr'") ytit("`ytit'")
+        _bin_did, yvar(`yvar') zvar(post_exp_tr) uc_panel(1) ///
+            ctrl(post_exp post_tr) nbins(30) ///
+            outfile(../output/figures/binscatter/bins_uc_`yvar'_post_exp_tr_raw.pdf) ///
+            xtit("`xtit_xtr'") ytit("`ytit'")
+        // with_S spec: add post_s, post_s_tr as additional controls
+        _bin_did, yvar(`yvar') zvar(post_exp) uc_panel(1) ///
+            ctrl(post_tr post_exp_tr post_s post_s_tr) nbins(30) ///
+            outfile(../output/figures/binscatter/bins_uc_`yvar'_post_exp_with_S.pdf) ///
+            xtit("`xtit_exp'") ytit("`ytit'")
+        _bin_did, yvar(`yvar') zvar(post_tr) uc_panel(1) ///
+            ctrl(post_exp post_exp_tr post_s post_s_tr) nbins(30) ///
+            outfile(../output/figures/binscatter/bins_uc_`yvar'_post_tr_with_S.pdf) ///
+            xtit("`xtit_tr'") ytit("`ytit'")
+        _bin_did, yvar(`yvar') zvar(post_exp_tr) uc_panel(1) ///
+            ctrl(post_exp post_tr post_s post_s_tr) nbins(30) ///
+            outfile(../output/figures/binscatter/bins_uc_`yvar'_post_exp_tr_with_S.pdf) ///
+            xtit("`xtit_xtr'") ytit("`ytit'")
+    }
+end
+
+// -----------------------------------------------------------------------------
+// hi_ctrl_uc_es: buyer-level event study restricted to HI-CONF CONTROL cells
+// (treated == 0 in the hi-conf uc panel). Isolates the substitution margin
+// where the budget-binds story is the only mechanism that should move the
+// outcome; own-price elasticity has no role here because prices in these
+// cells didn't change. Coefficient series plotted = post x exposure.
+// -----------------------------------------------------------------------------
+program hi_ctrl_uc_es
+    foreach yvar in log_raw_spend log_raw_qty {
+        foreach spec in raw with_S {
+            hi_ctrl_uc_es_inner, yvar(`yvar') spec(`spec')
+        }
+    }
+end
+
+program hi_ctrl_uc_es_inner
+    syntax, yvar(str) spec(str)
+    use ../temp/uni_cat_yr_panel, clear
+    keep if treated == 0
+    gen rel = year - 2014
+    qui sum rel
+    local rmin = r(min)
+    local rmax = r(max)
+
+    forval k = `rmin'/`rmax' {
+        if `k' == -1 continue
+        local tag = cond(`k' < 0, "n" + string(abs(`k')), string(`k'))
+        gen exp_`tag' = exposure * (rel == `k')
+        gen str_`tag' = s_treat * (rel == `k')
+    }
+    ds exp_*
+    local exp_terms `r(varlist)'
+    ds str_*
+    local str_terms `r(varlist)'
+
+    if "`spec'" == "raw" {
+        reghdfe `yvar' `exp_terms' [aw=w_pre], absorb(uc year) cluster(uni_id category)
+    }
+    else {
+        reghdfe `yvar' `exp_terms' `str_terms' [aw=w_pre], ///
+            absorb(uc year) cluster(uni_id category)
+    }
+    local Nobs = e(N)
+
+    mat drop _all
+    forval k = `rmin'/`rmax' {
+        if `k' == -1 {
+            mat row = `k', 0, 0
+        }
+        else {
+            local tag = cond(`k' < 0, "n" + string(abs(`k')), string(`k'))
+            mat row = `k', _b[exp_`tag'], _se[exp_`tag']
+        }
+        mat es = nullmat(es) \ row
+    }
+
+    preserve
+    clear
+    svmat es
+    rename (es1 es2 es3) (rel b se)
+    gen ub = b + 1.96*se
+    gen lb = b - 1.96*se
+    gen year = rel + 2014
+    gen yvar = "`yvar'"
+    gen spec = "`spec'"
+    export delimited using ///
+        ../output/estimates/es_hi_ctrl_uc_`yvar'_`spec'.csv, replace
+    save ../temp/es_hi_ctrl_uc_`yvar'_`spec', replace
+
+    sum ub, d
+    local ymax = round(r(max), 0.01) + 0.01
+    sum lb, d
+    local ymin = round(r(min), 0.01) - 0.01
+    qui sum rel
+    local xmin = r(min)
+    local xmax = r(max)
+
+    _pretty_label, name(`yvar')
+    local ttit "`r(label)' (Hi-Conf Control Cells)"
+
+    tw rcap ub lb rel if rel != -1, lcolor(ebblue%70) msize(vsmall) || ///
+       scatter b rel, mcolor(ebblue) msize(small) || ///
+       scatteri `ymax' -0.25 `ymax' 0.25, bcolor(gs12%30) recast(area) base(`ymin') ///
+       xlab(`xmin'(1)`xmax', labsize(small)) ///
+       xtitle("Years Relative to 2014", size(small)) ///
+       ytitle("Coefficient on Year {&times} Exposure", size(small)) ///
+       ylab(, labsize(small)) ///
+       yline(0, lcolor(gs10) lpattern(solid)) ///
+       title("`ttit'", size(small)) ///
+       legend(off) plotregion(margin(sides))
+    graph export ../output/figures/es/es_hi_ctrl_uc_`yvar'_`spec'.pdf, replace
+    restore
+end
+
+// -----------------------------------------------------------------------------
+// output_tables: 3-row budget-binds summary table.
+//   Row 1: post_exp on log1_total_full_spend (uni-yr)        - envelope test
+//   Row 2: post_exp on log1_hi_ctrl_qty      (uni-yr)        - substitution
+//   Row 3: post_tr  on avg_log_price         (uni-cat-yr)    - shock landed
+//   Cols:  b_raw  se_raw  N_raw  b_with_S  se_with_S  N_with_S
+// -----------------------------------------------------------------------------
+program output_tables
+    cap mat drop budget_binds
+    mat budget_binds = J(3, 6, .)
+    mat colnames budget_binds = b_raw se_raw N_raw b_with_S se_with_S N_with_S
+    mat rownames budget_binds = total_full_spend hi_ctrl_qty avg_log_price_tr
+
+    use ../temp/uni_yr_panel, clear
+    gen post     = year >= 2014
+    gen post_exp = post * exposure
+    gen post_s   = post * s_treat
+
+    // Row 1: total_full_spend ~ post_exp [+ post_s]
+    qui reghdfe log1_total_full_spend post_exp, absorb(uni_id year) cluster(uni_id)
+    mat budget_binds[1,1] = _b[post_exp]
+    mat budget_binds[1,2] = _se[post_exp]
+    mat budget_binds[1,3] = e(N)
+    qui reghdfe log1_total_full_spend post_exp post_s, absorb(uni_id year) cluster(uni_id)
+    mat budget_binds[1,4] = _b[post_exp]
+    mat budget_binds[1,5] = _se[post_exp]
+    mat budget_binds[1,6] = e(N)
+
+    // Row 2: hi_ctrl_qty ~ post_exp [+ post_s]
+    qui reghdfe log1_hi_ctrl_qty post_exp, absorb(uni_id year) cluster(uni_id)
+    mat budget_binds[2,1] = _b[post_exp]
+    mat budget_binds[2,2] = _se[post_exp]
+    mat budget_binds[2,3] = e(N)
+    qui reghdfe log1_hi_ctrl_qty post_exp post_s, absorb(uni_id year) cluster(uni_id)
+    mat budget_binds[2,4] = _b[post_exp]
+    mat budget_binds[2,5] = _se[post_exp]
+    mat budget_binds[2,6] = e(N)
+
+    // Row 3: avg_log_price ~ post_tr (uc panel, full triple interaction)
+    use ../temp/uni_cat_yr_panel, clear
+    gen post        = year >= 2014
+    gen post_exp    = post * exposure
+    gen post_tr     = post * treated
+    gen post_exp_tr = post * exposure * treated
+    gen post_s      = post * s_treat
+    gen post_s_tr   = post * s_treat * treated
+    qui reghdfe avg_log_price post_exp post_tr post_exp_tr [aw=w_pre], ///
+        absorb(uc year) cluster(uni_id category)
+    mat budget_binds[3,1] = _b[post_tr]
+    mat budget_binds[3,2] = _se[post_tr]
+    mat budget_binds[3,3] = e(N)
+    qui reghdfe avg_log_price post_exp post_tr post_exp_tr post_s post_s_tr [aw=w_pre], ///
+        absorb(uc year) cluster(uni_id category)
+    mat budget_binds[3,4] = _b[post_tr]
+    mat budget_binds[3,5] = _se[post_tr]
+    mat budget_binds[3,6] = e(N)
+
+    cap mkdir ../output/tables
+    qui matrix_to_txt, saving("../output/tables/budget_binds.txt") ///
+        matrix(budget_binds) title(<tab:budget_binds>) format(%20.4f) replace
+    mat list budget_binds
 end
 
 **

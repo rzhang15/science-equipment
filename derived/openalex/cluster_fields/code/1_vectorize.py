@@ -27,12 +27,19 @@ stemmer = PorterStemmer()
 stemmed_stopwords = [stemmer.stem(word) for word in stopwords_list]
 
 print("Vectorizing...")
+# Text is already pre-tokenized (whitespace-separated), lowercased, and
+# stemmed by 0_combine_data.py. Skipping sklearn's default regex tokenizer
+# (via tokenizer=str.split + token_pattern=None + lowercase=False) cuts
+# this step ~2-3x.
 tfidf = TfidfVectorizer(
+    tokenizer=str.split,
+    token_pattern=None,
+    lowercase=False,
     stop_words=stemmed_stopwords,
-    min_df=15,        
-    max_df = 0.1, 
+    min_df=15,
+    max_df=0.1,
     max_features=30000,
-    dtype=np.float32
+    dtype=np.float32,
 )
 
 matrix = tfidf.fit_transform(pdf['processed_text'])

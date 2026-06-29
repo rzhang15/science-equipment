@@ -24,7 +24,7 @@ program create_athr_split
         keep if which_athr == first_athr | which_athr == last_athr
     }
     if "`cut'" == "second" {
-        keep if which_athr == first_athr | which_athr == last_athr | which_athr = first_athr + 1 | which_athr = last_athr - 1
+        keep if which_athr == first_athr | which_athr == last_athr | which_athr == first_athr + 1 | which_athr = last_athr - 1
     }
     if "`cut'" == "last" {
         keep if which_athr == last_athr

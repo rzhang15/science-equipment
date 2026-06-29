@@ -56,7 +56,6 @@ program boe
    graph export ../output/figures/perc_lab_spend.pdf, replace
    kdensity perc_nonlab_spend
    graph export ../output/figures/perc_nonlab_spend.pdf, replace
-   stop 
    gcollapse (mean) perc_lab_spend perc_nonlab_spend tot_spend nonlab_spend lab_spend (count) year, by(athr_id)
    binscatter perc_lab_spend lab_spend 
    graph export ../output/figures/bs_perc_lab_spend_by_lab_spend.pdf, replace

@@ -19,6 +19,13 @@
 set -e
 cd "${SLURM_SUBMIT_DIR:-$(dirname "$0")}"
 
+# Let BLAS (used by TruncatedSVD's randomized solver and MiniBatchKMeans'
+# dense matmuls) actually use the cores we asked for. Without these, numpy
+# defaults to 1 thread and the whole job runs at ~2% utilization.
+export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK:-48}
+export MKL_NUM_THREADS=${SLURM_CPUS_PER_TASK:-48}
+export OPENBLAS_NUM_THREADS=${SLURM_CPUS_PER_TASK:-48}
+
 # source ~/.bashrc
 # conda activate sci_eq
 

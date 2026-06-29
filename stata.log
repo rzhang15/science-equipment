@@ -1,13 +1,2 @@
-file describe using derived/exposure_msr/output/athr_exposure.dta
-describe
-    using
-    analysis/first_stage/external/samp/full_uni_category_yr_tfidf.dta
-describ
-    > e using
-    analysis/first_stage/external/merged/matched_uni_category_panel.dta
-descr
-    > ibe using
-    analysis/first_stage/external/samp/full_category_yr_tfidf.dta
-describe
-    using analysis/first_stage/external/samp/category_hhi_tfidf.dta not found
-r(601);
+invalid 'serum.dta' 
+r(198);

@@ -39,6 +39,16 @@ def main():
                          "imputations rest on out-of-domain TF-IDF vocabulary "
                          "overlap, not real topical similarity. Also drops authors "
                          "with no cluster assignment.")
+    ap.add_argument("--min-max-sim", type=float, default=0.0,
+                    help="Drop universe authors whose max cosine to any FOIA PI is "
+                         "below this threshold. Authors below the threshold get "
+                         "imputed_exposure=0 by the W @ E identity (no surviving "
+                         "neighbors above 2_similarity_wts.py's floor), so they "
+                         "are not really being imputed — they're being defaulted to "
+                         "zero. The holdout-FOIA stress test shows positive R² "
+                         "only above max_sim ~ 0.22; use that (or higher) here "
+                         "to keep only authors the imputation actually predicts. "
+                         "Default 0.0 = keep all (backward compatible).")
     args = ap.parse_args()
 
     tag = args.tag
@@ -49,7 +59,13 @@ def main():
     universe_ids_file = f"{OUT_DIR}/universe_ids{tag}.parquet"
     foia_ids_file     = f"{OUT_DIR}/foia_ids_ordered{tag}.csv"
     diag_file         = f"{OUT_DIR}/match_diagnostics{tag}.parquet"
-    out_suffix = "_cf" if args.cluster_filter else ""
+    out_suffix = ""
+    if args.cluster_filter:
+        out_suffix += "_cf"
+    if args.min_max_sim > 0:
+        # Tag with the threshold so different cutoffs coexist as outputs.
+        # _ms020 = 0.20, _ms022 = 0.22, etc.
+        out_suffix += f"_ms{int(round(args.min_max_sim * 100)):03d}"
     output_file       = f"{OUT_DIR}/final_imputed_exposure{tag}{out_suffix}.csv"
 
     if not os.path.exists(USER_EXPOSURE_FILE):
@@ -97,6 +113,21 @@ def main():
         nz = (imputed != 0).sum()
         print(f"  {var}: mean={imputed.mean():.5f}  sd={imputed.std():.5f}  "
               f"nonzero={nz:,}/{len(imputed):,}")
+
+    if args.min_max_sim > 0:
+        if not os.path.exists(diag_file):
+            raise SystemExit(f"--min-max-sim needs {diag_file}; run 2_similarity_wts.py first.")
+        diag = pd.read_parquet(diag_file)[["athr_id", "max_sim"]]
+        n_before = len(df_univ_ids)
+        df_univ_ids = df_univ_ids.merge(diag, on="athr_id", how="left")
+        n_no_sim = df_univ_ids["max_sim"].isna().sum()
+        keep_mask = df_univ_ids["max_sim"] >= args.min_max_sim
+        df_univ_ids = df_univ_ids.loc[keep_mask].drop(columns=["max_sim"])
+        print(f"\nmax_sim filter (>= {args.min_max_sim}):")
+        print(f"  authors dropped: {n_before - len(df_univ_ids):,} of {n_before:,} "
+              f"({100*(n_before-len(df_univ_ids))/n_before:.2f}%)")
+        print(f"    no max_sim in diagnostics: {n_no_sim:,}")
+        print(f"  authors kept:    {len(df_univ_ids):,}")
 
     if args.cluster_filter:
         cl = pd.read_csv(args.cluster_filter)

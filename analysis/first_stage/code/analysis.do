@@ -370,19 +370,39 @@ program robustness
     replace post = 1 if year >= 2014
     gen posttreat = treated * post
     gegen uni_year = group(uni_id year)
+    cap mat drop pooled_did
+    mat b_row = J(1, 9, .)
+    mat se_row = J(1, 9, .)
+    mat n_row = J(1, 9, .)
+    local col = 0
     foreach var in avg_log_price log_raw_qty log_raw_spend {
         cap mat drop robust_`var'
         reghdfe `var' posttreat [aw=spend_2013], cluster(mkt) absorb(year uni_id mkt)
         mat robust_`var' = nullmat(robust_`var') \ (_b[posttreat], _se[posttreat], e(N), e(r2))
+        local col = `col' + 1
+        mat b_row[1, `col']  = _b[posttreat]
+        mat se_row[1, `col'] = _se[posttreat]
+        mat n_row[1, `col']  = e(N)
         reghdfe `var' posttreat [aw=spend_2013], cluster(mkt) absorb(uni_mkt year)
         mat robust_`var' = nullmat(robust_`var') \ (_b[posttreat], _se[posttreat], e(N), e(r2))
+        local col = `col' + 1
+        mat b_row[1, `col']  = _b[posttreat]
+        mat se_row[1, `col'] = _se[posttreat]
+        mat n_row[1, `col']  = e(N)
         reghdfe `var' posttreat [aw=spend_2013], cluster(mkt) absorb(uni_year mkt)
         mat robust_`var' = nullmat(robust_`var') \ (_b[posttreat], _se[posttreat], e(N), e(r2))
+        local col = `col' + 1
+        mat b_row[1, `col']  = _b[posttreat]
+        mat se_row[1, `col'] = _se[posttreat]
+        mat n_row[1, `col']  = e(N)
         reghdfe `var' posttreat [aw=spend_2013], cluster(mkt) absorb(uni_mkt uni_year)
         mat robust_`var' = nullmat(robust_`var') \ (_b[posttreat], _se[posttreat], e(N), e(r2))
         mat colnames robust_`var' = b se N r2
         mat rownames robust_`var' = baseline uni_mkt_year uni_year_mkt uni_mkt_uni_year
     }
+    mat pooled_did = b_row \ se_row \ n_row
+    mat colnames pooled_did = price_base price_unimkt price_uniyr qty_base qty_unimkt qty_uniyr spend_base spend_unimkt spend_uniyr
+    mat rownames pooled_did = b se N
     // event study: leads/lags under each FE spec, overlaid per outcome
     gen rel = year - 2014
     replace rel = . if treated == 0
@@ -442,7 +462,7 @@ program robustness
 end
 
 program output_tables
-    foreach tab in robust_avg_log_price robust_log_raw_qty robust_log_raw_spend {
+    foreach tab in robust_avg_log_price robust_log_raw_qty robust_log_raw_spend pooled_did {
         qui matrix_to_txt, saving("../output/tables/`tab'.txt") matrix(`tab') ///
             title(<tab:`tab'>) format(%20.4f) replace
     }

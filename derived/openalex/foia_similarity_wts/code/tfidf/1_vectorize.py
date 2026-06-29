@@ -13,9 +13,13 @@ UNIVERSE_PATH = "../../external/us_appended_text/cleaned_static_author_text_pre_
 FOIA_PATH = "../../output/foia_author_text_final.csv"
 OUTPUT_DIR = "../../output/"
 
-# Default cluster-label source for --restrict-to-foia-clusters.
+# Default sources for --restrict-to-ls-clusters: author→cluster mapping plus
+# the worksheet that flags which clusters are life-science (keep=1).
 DEFAULT_CLUSTER_LABELS = (
-    "../../../cluster_fields/output/author_static_clusters_100.csv"
+    "../../external/appended_text/author_static_clusters_100.csv"
+)
+DEFAULT_CLUSTER_WORKSHEET = (
+    "../../external/appended_text/cluster_label_worksheet_100.csv"
 )
 
 # Vocab-shaping for universe→FOIA matching:
@@ -59,48 +63,53 @@ def transform_chunk(vec, texts, keep_idx):
     return _l2_normalize_rows(m).tocsr()
 
 
-def restrict_to_foia_clusters(df_universe, df_foia, cluster_labels_path,
-                              min_foia_pis):
-    """Filter universe to authors in clusters occupied by ≥ min_foia_pis FOIA PIs.
+def restrict_to_ls_clusters(df_universe, df_foia, cluster_labels_path,
+                            worksheet_path):
+    """Filter universe to authors in clusters flagged life-science (keep=1).
 
-    Returns (filtered_df_universe, audit_dict). Both df_universe and df_foia
-    are matched on athr_id against cluster_labels_path's (athr_id, cluster_label)
-    table. Authors with no cluster label are dropped.
+    Reads two files from cluster_fields/output:
+      - cluster_labels_path: (athr_id, cluster_label) per universe author
+      - worksheet_path:      (cluster_label, keep) per cluster
+    Drops universe authors with no cluster assignment OR in clusters with keep=0.
+    The FOIA list is just used for audit reporting (how many FOIA PIs fall in
+    kept vs dropped clusters).
     """
     if not os.path.exists(cluster_labels_path):
         raise SystemExit(f"cluster labels not found: {cluster_labels_path}")
-    print(f"Loading cluster labels: {cluster_labels_path}")
+    if not os.path.exists(worksheet_path):
+        raise SystemExit(f"cluster worksheet not found: {worksheet_path}")
+    print(f"Loading cluster labels:    {cluster_labels_path}")
+    print(f"Loading cluster worksheet: {worksheet_path}")
     labels = pd.read_csv(cluster_labels_path,
                          dtype={"athr_id": str, "cluster_label": int})
+    ws = pd.read_csv(worksheet_path)
+    ls_clusters = set(ws.loc[ws["keep"] == 1, "cluster_label"].astype(int))
 
     foia_labeled = df_foia[['athr_id']].merge(labels, on='athr_id', how='left')
     n_foia_with_cluster = foia_labeled['cluster_label'].notna().sum()
-    foia_cluster_counts = (
-        foia_labeled['cluster_label'].dropna().astype(int).value_counts()
-    )
-    keep_clusters = set(
-        foia_cluster_counts[foia_cluster_counts >= min_foia_pis].index.astype(int)
-    )
+    n_foia_in_ls = foia_labeled['cluster_label'].isin(ls_clusters).sum()
 
     univ_labeled = df_universe.merge(labels, on='athr_id', how='left')
     n_no_label = univ_labeled['cluster_label'].isna().sum()
-    keep_mask = univ_labeled['cluster_label'].isin(keep_clusters)
+    keep_mask = univ_labeled['cluster_label'].isin(ls_clusters)
     kept = univ_labeled.loc[keep_mask, ['athr_id', 'processed_text']].reset_index(drop=True)
 
     audit = {
         'cluster_labels_path': cluster_labels_path,
-        'min_foia_pis_per_cluster': min_foia_pis,
+        'worksheet_path': worksheet_path,
         'n_foia_with_cluster': int(n_foia_with_cluster),
+        'n_foia_in_ls_clusters': int(n_foia_in_ls),
         'n_foia_total': len(df_foia),
-        'n_keep_clusters': len(keep_clusters),
-        'keep_clusters': sorted(keep_clusters),
+        'n_ls_clusters': len(ls_clusters),
+        'ls_clusters': sorted(ls_clusters),
         'n_universe_before': len(df_universe),
         'n_universe_unlabeled': int(n_no_label),
         'n_universe_after': len(kept),
         'drop_pct': 100.0 * (1 - len(kept) / max(len(df_universe), 1)),
     }
-    print(f"  FOIA PIs with a cluster label: {audit['n_foia_with_cluster']}/{audit['n_foia_total']}")
-    print(f"  Kept clusters (≥{min_foia_pis} FOIA PIs): {audit['n_keep_clusters']}")
+    print(f"  Life-science clusters (keep=1): {audit['n_ls_clusters']}")
+    print(f"  FOIA PIs with a cluster label:  {audit['n_foia_with_cluster']}/{audit['n_foia_total']}")
+    print(f"  FOIA PIs in LS clusters:        {audit['n_foia_in_ls_clusters']}/{audit['n_foia_total']}")
     print(f"  Universe: {audit['n_universe_before']:,} -> {audit['n_universe_after']:,} "
           f"(dropped {audit['drop_pct']:.2f}%; {audit['n_universe_unlabeled']:,} unlabeled)")
     return kept, audit
@@ -108,14 +117,14 @@ def restrict_to_foia_clusters(df_universe, df_foia, cluster_labels_path,
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--restrict-to-foia-clusters", action="store_true",
-                    help="Restrict universe to authors in cluster_fields clusters "
-                         "occupied by ≥ --min-foia-pis FOIA PIs.")
+    ap.add_argument("--restrict-to-ls-clusters", action="store_true",
+                    help="Restrict universe to authors in clusters flagged "
+                         "life-science (keep=1) in cluster_label_worksheet_{K}.csv.")
     ap.add_argument("--cluster-labels-path", default=DEFAULT_CLUSTER_LABELS,
                     help="CSV with columns athr_id, cluster_label.")
-    ap.add_argument("--min-foia-pis", type=int, default=1,
-                    help="Only used with --restrict-to-foia-clusters. Drop clusters "
-                         "with fewer than this many FOIA PIs.")
+    ap.add_argument("--cluster-worksheet-path", default=DEFAULT_CLUSTER_WORKSHEET,
+                    help="CSV with columns cluster_label, keep (from "
+                         "3_filter_life_science.py in cluster_fields).")
     ap.add_argument("--tag", default="",
                     help="Optional suffix appended to all output filenames, e.g. "
                          "'_restricted'. Lets restricted/baseline runs coexist.")
@@ -180,11 +189,12 @@ def main():
     n_foia = len(df_foia)
     print(f"FOIA PIs: {n_foia}")
 
-    # --- OPTIONAL: RESTRICT UNIVERSE TO FOIA-OCCUPIED CLUSTERS ---
+    # --- OPTIONAL: RESTRICT UNIVERSE TO LIFE-SCIENCE CLUSTERS ---
     audit = None
-    if args.restrict_to_foia_clusters:
-        df_universe, audit = restrict_to_foia_clusters(
-            df_universe, df_foia, args.cluster_labels_path, args.min_foia_pis,
+    if args.restrict_to_ls_clusters:
+        df_universe, audit = restrict_to_ls_clusters(
+            df_universe, df_foia,
+            args.cluster_labels_path, args.cluster_worksheet_path,
         )
         final_count = len(df_universe)
 
