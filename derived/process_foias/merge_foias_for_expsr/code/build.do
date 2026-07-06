@@ -122,13 +122,18 @@ program clean_pi_id
     rename sponsoraward fund_id
     collapse (firstnm) *name, by(fund_id athr_id)
     save ../output/umich_pi, replace
+    
+    import excel using ../external/pis/ukansas_pi, firstrow clear
+    rename PI purchaser
+    save ../output/ukansas_pi, replace
 end
 
 program merge_ids_foia
     use ../output/merged_foias, clear    
-    keep if inlist(uni, "ecu", "utdallas", "utaustin", "ttu", "umich")
+    keep if inlist(uni, "ecu", "utdallas", "utaustin", "ttu", "umich", "ukansas")
     fmerge m:1 purchaser using ../output/utaustin_pi, assert(1 3) keep(1 3) nogen
     merge m:1 purchaser using ../output/ttu_pi, assert(1 2 3 4) keep(1 3 4) nogen update
+    merge m:1 purchaser using ../output/ukansas_pi, assert(1 2 3 4) keep(1 3 4) nogen update force
     merge m:1 fund_id using ../output/utdallas_pi, assert(1 2 3 4) keep(1 3 4) nogen update 
     merge m:1 fund_id using ../output/ecu_pi, assert(1 2 3 4) keep(1 3 4) nogen update
     merge m:1 fund_id using ../output/umich_pi, assert(1 2 3 4) keep(1 3 4) nogen update

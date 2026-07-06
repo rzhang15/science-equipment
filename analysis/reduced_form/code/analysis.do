@@ -14,20 +14,14 @@ program main
         restrict_samp, samp(`s') r1r2(1) public(1)
         desc_stats, samp(`s') r1r2(1) public(1)
         event_study, samp(`s') r1r2(1) public(1)
-        long_diff, samp(`s') r1r2(1) public(1)
-        first_diff, samp(`s') r1r2(1) public(1)
         pooled_did, samp(`s') r1r2(1) public(1)
         ppml_specs, samp(`s') r1r2(1) public(1)
+        placebo_treatment, samp(`s') r1r2(1) public(1)
+        trim_top, samp(`s') r1r2(1) public(1)
         output_tables, samp(`s') r1r2(1) public(1)
         confidence_strat_did, samp(`s') r1r2(1) public(1)
         combine_es_graphs, samp(`s')
         robustness, samp(`s') r1r2(1) public(1)
-    /*    // r1 + r2
-        restrict_samp, samp(`s') r1r2(1) public(0)
-        event_study, samp(`s') r1r2(1) public(0)
-        // everyone
-        restrict_samp, samp(`s') r1r2(0) public(0)
-        event_study, samp(`s') r1r2(0) public(0)*/
     }
     joint_outcome_test, samp(all_jrnls) r1r2(1) public(1)
     joint_sample_test, r1r2(1) public(1)
@@ -37,26 +31,10 @@ program gather_external_data
 /*    import delimited ../external/exposure/final_imputed_shift_share_restricted_ms010, clear
     rename exposure_ss imputed
     rename sum_imputed_shares imputed_mkt_spend_shr*/
-   import delimited ../external/exposure/final_imputed_exposure_restricted, clear
+   import delimited ../external/exposure/final_imputed_exposure, clear
     rename exposure imputed
     rename mkt_spend_shr imputed_mkt_spend_shr
     save ../temp/exposure, replace
-
-    // Per-universe-author match diagnostics (max_sim to nearest FOIA PI) for
-    // confidence-stratified pooled DiD. Source file is produced by running
-    // derived/openalex/foia_similarity_wts/code/tfidf/export_diag_to_dta.py
-    // once. If the .dta is missing we skip silently — confidence_strat_did
-    // will warn at call site.
-    cap noi use ../external/exposure/match_diagnostics, clear
-    if !_rc {
-        keep athr_id max_sim
-        save ../temp/diag, replace
-    }
-    else {
-        di as error "WARNING: match_diagnostics_restricted.dta not found. " ///
-            "Run export_diag_to_dta.py in derived/openalex/foia_similarity_wts " ///
-            "if you want confidence_strat_did to run."
-    }
 
     use ../external/grants/pi_grants_clean, clear
     bys athr_id year: gen num_grants = _N
@@ -73,10 +51,6 @@ program gather_external_data
     drop if nonlab == 0
     gcollapse (sum) spend, by(athr_id uni year)
     save ../temp/foia_spend, replace
-/*    merge m:1 athr_id using  ../external/real_exposure/athr_exposure, assert(1 2 3) keep(3) nogen
-    gen post = year >= 2014
-    gen Z_it = exposure*post
-    xtset athr_id year*/
 end
 
 program restrict_samp 
@@ -86,13 +60,13 @@ program restrict_samp
     if (`r1r2' == 1 & `public' == 1) local suf "_r1_r2_public"
     use ../external/samp/athr_panel_full_year_last_`samp'`suf',clear 
     bys athr_id: egen tot_pprs = total(ppr_cnt)
-    keep if tot_pprs >=15
+   * keep if tot_pprs >=15
     drop tot_pprs
     bys athr_id: egen max_year = max(year)
-    keep if max_year >= 2015
+  *  keep if max_year >= 2015
     keep if inrange(year, 2010, 2019)
     bys athr_id: egen min_year = min(year)
-    keep if min_year <= 2012
+    keep if min_year <= 2010
     merge m:1 athr_id using ../temp/exposure, assert(1 2 3) keep(3) nogen
     merge m:1 athr_id using ../external/real_exposure/athr_exposure, assert(1 2 3) keep(1 3) nogen
     gen foia_athr = 1 if !mi(exposure)
@@ -527,228 +501,6 @@ program event_study
     }
 end
 
-program long_diff
-    syntax, samp(string) [, r1r2(int 0) public(int 0)]
-    local suf ""
-    if (`r1r2' == 1 & `public' == 0) local suf "_r1_r2"
-    if (`r1r2' == 1 & `public' == 1) local suf "_r1_r2_public"
-    use ../temp/es_`samp'`suf', clear
-
-    foreach v in cite_affl_wt ppr_cnt {
-        cap gen ln_`v' = ln(1+`v')
-    }
-
-    local outcomes cite_affl_wt ppr_cnt ln_cite_affl_wt ln_ppr_cnt affl_wt body_adj_wt avg_num_coathrs num_grants
-
-    gen pre  = year <  2014
-    gen post = year >= 2014
-
-    // require both pre and post obs per PI for the long difference
-    bys athr_id: egen has_pre  = max(pre)
-    bys athr_id: egen has_post = max(post)
-    qui gunique athr_id
-    local n_total = r(unique)
-    qui gunique athr_id if has_pre == 0 | has_post == 0
-    local n_dropped = r(unique)
-    di as text "long_diff: dropping `n_dropped' / `n_total' PIs missing pre or post observations"
-    keep if has_pre == 1 & has_post == 1
-    drop has_pre has_post
-
-    preserve
-        keep if pre == 1
-        gcollapse (mean) `outcomes', by(athr_id)
-        foreach v of local outcomes {
-            rename `v' `v'_pre
-        }
-        save ../temp/ld_pre_means_`samp'`suf', replace
-    restore
-    preserve
-        keep if post == 1
-        gcollapse (mean) `outcomes', by(athr_id)
-        foreach v of local outcomes {
-            rename `v' `v'_post
-        }
-        save ../temp/ld_post_means_`samp'`suf', replace
-    restore
-
-    // collapse to PI-level cross-section: time-invariant chars
-    gcollapse (firstnm) exposure mkt_spend_shr q1 q2 q3 q4 above_median below_median ///
-                       young old r1 r2 high_pre_ppr low_pre_ppr high_grants low_grants age_2014, ///
-                       by(athr_id)
-    merge 1:1 athr_id using ../temp/ld_pre_means_`samp'`suf',  assert(3) nogen
-    merge 1:1 athr_id using ../temp/ld_post_means_`samp'`suf', assert(3) nogen
-
-    foreach v of local outcomes {
-        gen d_`v' = `v'_post - `v'_pre
-    }
-
-    save ../temp/ld_`samp'`suf', replace
-
-    cap mkdir ../output/tables
-    cap mkdir ../output/tables/`samp'
-
-    foreach yvar of local outcomes {
-        local var_name "`yvar'"
-        if "`yvar'" == "cite_affl_wt"    local var_name "Citation Weighted Output"
-        if "`yvar'" == "ppr_cnt"         local var_name "Publication Count"
-        if "`yvar'" == "ln_cite_affl_wt" local var_name "Log(1+Cite-Wtd Output)"
-        if "`yvar'" == "ln_ppr_cnt"      local var_name "Log(1+Pub Count)"
-        if "`yvar'" == "affl_wt"         local var_name "Affiliation Weighted Output"
-        if "`yvar'" == "body_adj_wt"     local var_name "Body-Adj Weighted Output"
-        if "`yvar'" == "avg_num_coathrs" local var_name "Avg Coauthors"
-        if "`yvar'" == "num_grants"      local var_name "Num Grants"
-
-        eststo clear
-        eststo m1: reg d_`yvar' exposure, vce(robust)
-        eststo m2: reg d_`yvar' q2 q3 q4, vce(robust)
-        eststo m3: reg d_`yvar' c.exposure##i.young, vce(robust)
-        eststo m4: reg d_`yvar' c.exposure##i.r1, vce(robust)
-        eststo m5: reg d_`yvar' c.exposure##i.high_pre_ppr, vce(robust)
-        eststo m6: reg d_`yvar' c.exposure##i.high_grants, vce(robust)
-
-        esttab m1 m2 m3 m4 m5 m6 using ../output/tables/`samp'/ld_`yvar'`suf'.tex, ///
-            replace label se r2 ///
-            title("Long Difference: `var_name'`suf'") ///
-            mtitles("Continuous" "Quartile" "x Young" "x R1" "x HighPrePub" "x HighGrants")
-
-        // base vs. + market-share spec, stored in ld_<yvar> matrix for matrix_to_txt
-        qui reg d_`yvar' exposure, vce(robust)
-        local b_b   = _b[exposure]
-        local b_se  = _se[exposure]
-        local b_N   = e(N)
-        local b_r2  = e(r2)
-        qui reg d_`yvar' exposure mkt_spend_shr, vce(robust)
-        local s_bx  = _b[exposure]
-        local s_sex = _se[exposure]
-        local s_bs  = _b[mkt_spend_shr]
-        local s_ses = _se[mkt_spend_shr]
-        local s_N   = e(N)
-        local s_r2  = e(r2)
-        cap mat drop ld_`yvar'
-        mat ld_`yvar' = J(6,2,.)
-        mat ld_`yvar'[1,1] = `b_b'
-        mat ld_`yvar'[2,1] = `b_se'
-        mat ld_`yvar'[5,1] = `b_N'
-        mat ld_`yvar'[6,1] = `b_r2'
-        mat ld_`yvar'[1,2] = `s_bx'
-        mat ld_`yvar'[2,2] = `s_sex'
-        mat ld_`yvar'[3,2] = `s_bs'
-        mat ld_`yvar'[4,2] = `s_ses'
-        mat ld_`yvar'[5,2] = `s_N'
-        mat ld_`yvar'[6,2] = `s_r2'
-        mat rownames ld_`yvar' = b_exposure se_exposure b_share se_share N r2
-        mat colnames ld_`yvar' = base with_share
-
-        local b_str   : dis %7.3f `b_b'
-        local bse_str : dis %7.3f `b_se'
-        binscatter d_`yvar' exposure, n(30) ///
-            xtitle("Exposure") ytitle("Change in `var_name'") ///
-            msymbol(O) mcolor(ebblue) ///
-            note("{&beta} = `b_str' (SE: `bse_str')") ///
-            plotregion(margin(sides))
-        graph export ../output/figures/`samp'/ld_`yvar'`suf'.pdf, replace
-
-        local s_b_str   : dis %7.3f `s_bx'
-        local s_bse_str : dis %7.3f `s_sex'
-        binscatter d_`yvar' exposure, n(30) controls(mkt_spend_shr) ///
-            xtitle("Exposure") ytitle("Change in `var_name'") ///
-            msymbol(O) mcolor(ebblue) ///
-            note("{&beta} = `s_b_str' (SE: `s_bse_str')") ///
-            plotregion(margin(sides))
-        graph export ../output/figures/`samp'/ld_`yvar'`suf'_mshrctrl.pdf, replace
-    }
-end
-
-program first_diff
-    // panel first difference: D.y on exposure x Delta(post) (= exposure at t=2014, 0 elsewhere)
-    // with year FE, clustered by PI. Identifies off the 2013->2014 jump.
-    syntax, samp(string) [, r1r2(int 0) public(int 0)]
-    local suf ""
-    if (`r1r2' == 1 & `public' == 0) local suf "_r1_r2"
-    if (`r1r2' == 1 & `public' == 1) local suf "_r1_r2_public"
-    use ../temp/es_`samp'`suf', clear
-
-    foreach v in cite_affl_wt ppr_cnt {
-        cap gen ln_`v' = ln(1+`v')
-    }
-
-    local outcomes cite_affl_wt ppr_cnt ln_cite_affl_wt ln_ppr_cnt affl_wt body_adj_wt avg_num_coathrs num_grants
-
-    xtset athr year
-    gen post = year >= 2014
-
-    foreach v of local outcomes {
-        gen d_`v' = D.`v'
-    }
-    // Delta treatment intensity: exposure * (post_t - post_{t-1}); nonzero only at t=2014
-    gen d_treat       = exposure              * (post - L.post)
-    gen d_share_treat = mkt_spend_shr * (post - L.post)
-    drop if mi(d_treat)
-
-    save ../temp/fd_`samp'`suf', replace
-
-    cap mkdir ../output/tables
-    cap mkdir ../output/tables/`samp'
-
-    foreach yvar of local outcomes {
-        local var_name "`yvar'"
-        if "`yvar'" == "cite_affl_wt"    local var_name "Citation Weighted Output"
-        if "`yvar'" == "ppr_cnt"         local var_name "Publication Count"
-        if "`yvar'" == "ln_cite_affl_wt" local var_name "Log(1+Cite-Wtd Output)"
-        if "`yvar'" == "ln_ppr_cnt"      local var_name "Log(1+Pub Count)"
-        if "`yvar'" == "affl_wt"         local var_name "Affiliation Weighted Output"
-        if "`yvar'" == "body_adj_wt"     local var_name "Body-Adj Weighted Output"
-        if "`yvar'" == "avg_num_coathrs" local var_name "Avg Coauthors"
-        if "`yvar'" == "num_grants"      local var_name "Num Grants"
-
-        eststo clear
-        eststo m1: reghdfe d_`yvar' d_treat,                          absorb(year) vce(cluster athr_id)
-        eststo m2: reghdfe d_`yvar' c.d_treat##i.young,               absorb(year) vce(cluster athr_id)
-        eststo m3: reghdfe d_`yvar' c.d_treat##i.r1,                  absorb(year) vce(cluster athr_id)
-        eststo m4: reghdfe d_`yvar' c.d_treat##i.high_pre_ppr,        absorb(year) vce(cluster athr_id)
-        eststo m5: reghdfe d_`yvar' c.d_treat##i.high_grants,        absorb(year) vce(cluster athr_id)
-
-        esttab m1 m2 m3 m4 m5 using ../output/tables/`samp'/fd_`yvar'`suf'.tex, ///
-            replace label se r2 ///
-            title("First Difference (D.y on exposure x 1[t=2014]): `var_name'`suf'") ///
-            mtitles("Continuous" "x Young" "x R1" "x HighPrePub" "x HighGrants")
-
-        // base vs. + market-share spec, stored in fd_<yvar> matrix for matrix_to_txt
-        qui reghdfe d_`yvar' d_treat,                absorb(year) vce(cluster athr_id)
-        local b_b   = _b[d_treat]
-        local b_se  = _se[d_treat]
-        local b_N   = e(N)
-        local b_r2  = e(r2)
-        qui reghdfe d_`yvar' d_treat d_share_treat,  absorb(year) vce(cluster athr_id)
-        local s_bx  = _b[d_treat]
-        local s_sex = _se[d_treat]
-        local s_bs  = _b[d_share_treat]
-        local s_ses = _se[d_share_treat]
-        local s_N   = e(N)
-        local s_r2  = e(r2)
-        cap mat drop fd_`yvar'
-        mat fd_`yvar' = J(6,2,.)
-        mat fd_`yvar'[1,1] = `b_b'
-        mat fd_`yvar'[2,1] = `b_se'
-        mat fd_`yvar'[5,1] = `b_N'
-        mat fd_`yvar'[6,1] = `b_r2'
-        mat fd_`yvar'[1,2] = `s_bx'
-        mat fd_`yvar'[2,2] = `s_sex'
-        mat fd_`yvar'[3,2] = `s_bs'
-        mat fd_`yvar'[4,2] = `s_ses'
-        mat fd_`yvar'[5,2] = `s_N'
-        mat fd_`yvar'[6,2] = `s_r2'
-        mat rownames fd_`yvar' = b_dtreat se_dtreat b_dshare se_dshare N r2
-        mat colnames fd_`yvar' = base with_share
-
-        binscatter d_`yvar' d_treat if year == 2014, n(30) ///
-            xtitle("Exposure (year-2014 jump only)") ///
-            ytitle("{&Delta} `var_name' (y_2014 - y_2013)") ///
-            title("First Difference: `var_name'") msymbol(O) mcolor(ebblue)
-        graph export ../output/figures/`samp'/fd_`yvar'`suf'.pdf, replace
-    }
-end
-
 program pooled_did
     // pooled DiD: y_it = a_i + g_t + b*(exposure_i x post_t) + e_it
     // matches event-study sample/FE/cluster; gives a single post-period beta with SE.
@@ -875,14 +627,10 @@ program pooled_did
 end
 
 program ppml_specs
-    // Poisson (ppmlhdfe) analogs of pooled_did, long_diff, first_diff.
+    // Poisson (ppmlhdfe) analog of pooled_did.
     //   ppml_pdid: y_it on Z_it (+ Z_share_it), absorb(athr_id year)
-    //   ppml_ld:   same but absorb(athr_id post)  -- collapses years into a
-    //              single pre/post contrast, Poisson analog of the long diff
-    //   ppml_fd:   y_it on d_treat (+ d_share_treat), absorb(athr_id year)
-    //              d_treat = exposure * (post - L.post), nonzero only at t=2014
     // Skips ln_ outcomes; ppmlhdfe wrapped in cap noi (may drop separated obs
-    // or fail to converge). Matrices ppml_<prog>_<yvar> have rows
+    // or fail to converge). Matrix ppml_pdid_<yvar> has rows
     // [b_x, se_x, b_share, se_share, pre_mean, N, r2_p] and cols [base, with_share].
     syntax, samp(string) [, r1r2(int 0) public(int 0)]
     local suf ""
@@ -893,11 +641,6 @@ program ppml_specs
     gen post = year >= 2014
     gen Z_it       = exposure      * post
     gen Z_share_it = mkt_spend_shr * post
-    xtset athr year
-    gen d_treat       = exposure      * (post - L.post)
-    gen d_share_treat = mkt_spend_shr * (post - L.post)
-    replace d_treat       = 0 if mi(d_treat)
-    replace d_share_treat = 0 if mi(d_share_treat)
 
     local outcomes cite_affl_wt ppr_cnt affl_wt body_adj_wt avg_num_coathrs num_grants
 
@@ -905,7 +648,6 @@ program ppml_specs
         qui sum `yvar' if year < 2014, d
         local pre_mean = r(mean)
 
-        // === ppml_pdid: athr + year FE ===
         local b_b = .
         local b_se = .
         local b_N = .
@@ -951,102 +693,383 @@ program ppml_specs
         mat rownames ppml_pdid_`yvar' = b_exposure se_exposure b_share se_share pre_mean N r2_p
         mat colnames ppml_pdid_`yvar' = base with_share
 
-        // === ppml_ld: athr + post FE (binary pre/post) ===
-        local b_b = .
-        local b_se = .
-        local b_N = .
-        local b_r2 = .
-        local s_bx = .
-        local s_sex = .
-        local s_bs = .
-        local s_ses = .
-        local s_N = .
-        local s_r2 = .
-        cap noi ppmlhdfe `yvar' Z_it,            absorb(athr_id post) vce(cluster athr_id)
-        if _rc == 0 {
-            local b_b  = _b[Z_it]
-            local b_se = _se[Z_it]
-            local b_N  = e(N)
-            local b_r2 = e(r2_p)
-        }
-        else di as error "ppml_ld `yvar' base failed (rc=`_rc')"
-        cap noi ppmlhdfe `yvar' Z_it Z_share_it, absorb(athr_id post) vce(cluster athr_id)
-        if _rc == 0 {
-            local s_bx  = _b[Z_it]
-            local s_sex = _se[Z_it]
-            local s_bs  = _b[Z_share_it]
-            local s_ses = _se[Z_share_it]
-            local s_N   = e(N)
-            local s_r2  = e(r2_p)
-        }
-        else di as error "ppml_ld `yvar' +share failed (rc=`_rc')"
-        cap mat drop ppml_ld_`yvar'
-        mat ppml_ld_`yvar' = J(7,2,.)
-        mat ppml_ld_`yvar'[1,1] = `b_b'
-        mat ppml_ld_`yvar'[2,1] = `b_se'
-        mat ppml_ld_`yvar'[5,1] = `pre_mean'
-        mat ppml_ld_`yvar'[6,1] = `b_N'
-        mat ppml_ld_`yvar'[7,1] = `b_r2'
-        mat ppml_ld_`yvar'[1,2] = `s_bx'
-        mat ppml_ld_`yvar'[2,2] = `s_sex'
-        mat ppml_ld_`yvar'[3,2] = `s_bs'
-        mat ppml_ld_`yvar'[4,2] = `s_ses'
-        mat ppml_ld_`yvar'[5,2] = `pre_mean'
-        mat ppml_ld_`yvar'[6,2] = `s_N'
-        mat ppml_ld_`yvar'[7,2] = `s_r2'
-        mat rownames ppml_ld_`yvar' = b_exposure se_exposure b_share se_share pre_mean N r2_p
-        mat colnames ppml_ld_`yvar' = base with_share
-
-        // === ppml_fd: athr + year FE, d_treat = exposure * 1[t=2014] ===
-        local b_b = .
-        local b_se = .
-        local b_N = .
-        local b_r2 = .
-        local s_bx = .
-        local s_sex = .
-        local s_bs = .
-        local s_ses = .
-        local s_N = .
-        local s_r2 = .
-        cap noi ppmlhdfe `yvar' d_treat,                absorb(athr_id year) vce(cluster athr_id)
-        if _rc == 0 {
-            local b_b  = _b[d_treat]
-            local b_se = _se[d_treat]
-            local b_N  = e(N)
-            local b_r2 = e(r2_p)
-        }
-        else di as error "ppml_fd `yvar' base failed (rc=`_rc')"
-        cap noi ppmlhdfe `yvar' d_treat d_share_treat,  absorb(athr_id year) vce(cluster athr_id)
-        if _rc == 0 {
-            local s_bx  = _b[d_treat]
-            local s_sex = _se[d_treat]
-            local s_bs  = _b[d_share_treat]
-            local s_ses = _se[d_share_treat]
-            local s_N   = e(N)
-            local s_r2  = e(r2_p)
-        }
-        else di as error "ppml_fd `yvar' +share failed (rc=`_rc')"
-        cap mat drop ppml_fd_`yvar'
-        mat ppml_fd_`yvar' = J(7,2,.)
-        mat ppml_fd_`yvar'[1,1] = `b_b'
-        mat ppml_fd_`yvar'[2,1] = `b_se'
-        mat ppml_fd_`yvar'[5,1] = `pre_mean'
-        mat ppml_fd_`yvar'[6,1] = `b_N'
-        mat ppml_fd_`yvar'[7,1] = `b_r2'
-        mat ppml_fd_`yvar'[1,2] = `s_bx'
-        mat ppml_fd_`yvar'[2,2] = `s_sex'
-        mat ppml_fd_`yvar'[3,2] = `s_bs'
-        mat ppml_fd_`yvar'[4,2] = `s_ses'
-        mat ppml_fd_`yvar'[5,2] = `pre_mean'
-        mat ppml_fd_`yvar'[6,2] = `s_N'
-        mat ppml_fd_`yvar'[7,2] = `s_r2'
-        mat rownames ppml_fd_`yvar' = b_dtreat se_dtreat b_dshare se_dshare pre_mean N r2_p
-        mat colnames ppml_fd_`yvar' = base with_share
-
-        di as text "ppml_specs `samp'`suf' `yvar': pdid b=" %7.4f `b_b' ///
-            "  ld b=" %7.4f ppml_ld_`yvar'[1,1] ///
-            "  fd b=" %7.4f ppml_fd_`yvar'[1,1] ///
+        di as text "ppml_specs `samp'`suf' `yvar': pdid b=" %7.4f ppml_pdid_`yvar'[1,1] ///
             "  pre_mean=" %7.4f `pre_mean'
+
+        // Figures: Frisch-Waugh-style binscatter on ln(1+y) so the visual
+        // slope is on the same semielasticity scale as the ppml coefficient
+        // shown in the note. Base + mshrctrl variants.
+        local var_name "`yvar'"
+        if "`yvar'" == "cite_affl_wt"    local var_name "Citation Weighted Output"
+        if "`yvar'" == "ppr_cnt"         local var_name "Publication Count"
+        if "`yvar'" == "affl_wt"         local var_name "Affiliation Weighted Output"
+        if "`yvar'" == "body_adj_wt"     local var_name "Body-Adj Weighted Output"
+        if "`yvar'" == "avg_num_coathrs" local var_name "Avg Coauthors"
+        if "`yvar'" == "num_grants"      local var_name "Num Grants"
+
+        preserve
+            cap drop _y_r _Z_r ln_pp_`yvar'
+            gen ln_pp_`yvar' = ln(`yvar' + 1)
+            qui reghdfe ln_pp_`yvar', absorb(athr_id year) residuals(_y_r)
+            qui reghdfe Z_it,         absorb(athr_id year) residuals(_Z_r)
+            local pb_str  : dis %7.3f ppml_pdid_`yvar'[1,1]
+            local pse_str : dis %7.3f ppml_pdid_`yvar'[2,1]
+            binscatter _y_r _Z_r, n(30) ///
+                xtitle("Exposure x Post (residualized)") ///
+                ytitle("ln(1 + `var_name') (residualized)") ///
+                msymbol(O) mcolor(ebblue) ///
+                note("ppml semielasticity {&beta} = `pb_str' (SE: `pse_str')") ///
+                plotregion(margin(sides))
+            graph export ../output/figures/`samp'/ppml_pdid_`yvar'`suf'.pdf, replace
+        restore
+
+        preserve
+            cap drop _y_r _Z_r ln_pp_`yvar'
+            gen ln_pp_`yvar' = ln(`yvar' + 1)
+            qui reghdfe ln_pp_`yvar' Z_share_it, absorb(athr_id year) residuals(_y_r)
+            qui reghdfe Z_it         Z_share_it, absorb(athr_id year) residuals(_Z_r)
+            local pbs_str  : dis %7.3f ppml_pdid_`yvar'[1,2]
+            local pses_str : dis %7.3f ppml_pdid_`yvar'[2,2]
+            binscatter _y_r _Z_r, n(30) ///
+                xtitle("Exposure x Post (residualized)") ///
+                ytitle("ln(1 + `var_name') (residualized)") ///
+                msymbol(O) mcolor(ebblue) ///
+                note("ppml semielasticity {&beta} = `pbs_str' (SE: `pses_str')") ///
+                plotregion(margin(sides))
+            graph export ../output/figures/`samp'/ppml_pdid_`yvar'`suf'_mshrctrl.pdf, replace
+        restore
+    }
+end
+
+program placebo_treatment
+    // Pre-period-only placebo: restrict panel to year <= 2013 (drops the actual
+    // treatment + post period entirely) and assign a fake treatment year.
+    // If parallel trends hold, beta on (exposure * placebo_post) should be ~0
+    // and statistically insignificant. Runs for placebo years 2011 and 2012.
+    // Also runs an event-study version where each pre-2014 year-relative-to-
+    // placebo gets its own exposure interaction, so you can visually inspect
+    // whether the placebo "effect" shows up at a specific year.
+    // Matrices placebo<yr>_<yvar> have rows [b, se, pre_mean, N, r2_or_r2p, ., .]
+    // and cols [reghdfe, ppmlhdfe]. Picked up by output_tables.
+    syntax, samp(string) [, r1r2(int 0) public(int 0)]
+    local fes athr_id year
+    local suf ""
+    if (`r1r2' == 1 & `public' == 0) local suf "_r1_r2"
+    if (`r1r2' == 1 & `public' == 1) local suf "_r1_r2_public"
+
+    local outcomes cite_affl_wt ppr_cnt body_adj_wt avg_num_coathrs num_grants
+
+    cap mkdir ../output/tables
+    cap mkdir ../output/tables/`samp'
+    cap mkdir ../output/figures/`samp'
+
+    foreach placebo_yr in 2011 2012 {
+        use ../temp/es_`samp'`suf', clear
+        keep if year <= 2013     // strictly pre-treatment window
+
+        gen placebo_post = year >= `placebo_yr'
+        gen Z_placebo    = exposure * placebo_post
+
+        foreach yvar of local outcomes {
+            qui sum `yvar' if year < `placebo_yr', d
+            local pre_mean = r(mean)
+
+            qui reghdfe `yvar' Z_placebo, absorb(`fes') vce(cluster athr_id)
+            local b   = _b[Z_placebo]
+            local se  = _se[Z_placebo]
+            local N   = e(N)
+            local r2  = e(r2)
+
+            local b_ppml  = .
+            local se_ppml = .
+            local N_ppml  = .
+            local r2_ppml = .
+            cap noi ppmlhdfe `yvar' Z_placebo, absorb(`fes') vce(cluster athr_id)
+            if _rc == 0 {
+                local b_ppml  = _b[Z_placebo]
+                local se_ppml = _se[Z_placebo]
+                local N_ppml  = e(N)
+                local r2_ppml = e(r2_p)
+            }
+            else di as error "placebo_treatment `yvar' (placebo=`placebo_yr') ppml failed (rc=`_rc')"
+
+            local t   = cond(`se' > 0, `b' / `se', .)
+            local tp  = cond(`se_ppml' > 0 & !mi(`se_ppml'), `b_ppml' / `se_ppml', .)
+            di as text "placebo_treatment `samp'`suf' `yvar' (placebo=`placebo_yr'):" ///
+                _newline "    reghdfe   b=" %8.4f `b'      "  se=" %8.4f `se'      "  t=" %6.2f `t'  ///
+                "  pre_mean=" %8.4f `pre_mean'  "  N=" %8.0f `N' ///
+                _newline "    ppmlhdfe  b=" %8.4f `b_ppml' "  se=" %8.4f `se_ppml' "  t=" %6.2f `tp' ///
+                "  N=" %8.0f `N_ppml'
+
+            cap mat drop placebo`placebo_yr'_`yvar'
+            mat placebo`placebo_yr'_`yvar' = J(5,2,.)
+            mat placebo`placebo_yr'_`yvar'[1,1] = `b'
+            mat placebo`placebo_yr'_`yvar'[2,1] = `se'
+            mat placebo`placebo_yr'_`yvar'[3,1] = `pre_mean'
+            mat placebo`placebo_yr'_`yvar'[4,1] = `N'
+            mat placebo`placebo_yr'_`yvar'[5,1] = `r2'
+            mat placebo`placebo_yr'_`yvar'[1,2] = `b_ppml'
+            mat placebo`placebo_yr'_`yvar'[2,2] = `se_ppml'
+            mat placebo`placebo_yr'_`yvar'[3,2] = `pre_mean'
+            mat placebo`placebo_yr'_`yvar'[4,2] = `N_ppml'
+            mat placebo`placebo_yr'_`yvar'[5,2] = `r2_ppml'
+            mat rownames placebo`placebo_yr'_`yvar' = b se pre_mean N r2
+            mat colnames placebo`placebo_yr'_`yvar' = reghdfe ppmlhdfe
+        }
+    }
+
+    // Placebo event study: re-run the entire event study on the FULL 2010-2019
+    // panel but with a fake treatment year as the omitted reference. Pre-placebo
+    // years should be ~0 if trends are parallel. Years between the placebo and
+    // 2014 should also be ~0 (no real treatment yet). The real effect should
+    // begin at 2014 (marked with a dashed vertical line). If the response curve
+    // jumps at the placebo year instead of 2014, that's evidence of a pre-trend
+    // problem in the real spec.
+    foreach placebo_yr in 2011 2012 {
+        foreach yvar in ppr_cnt cite_affl_wt {
+            if "`yvar'" == "ppr_cnt"      local var_name "Publication Count"
+            if "`yvar'" == "cite_affl_wt" local var_name "Citation Weighted Output"
+            if "`yvar'" == "ppr_cnt"      local gap 0.5
+            if "`yvar'" == "cite_affl_wt" local gap 1
+            if "`yvar'" == "ppr_cnt"      & "`samp'" == "top_jrnls" local gap 2
+            if "`yvar'" == "cite_affl_wt" & "`samp'" == "top_jrnls" local gap 2
+
+            use ../temp/es_`samp'`suf', clear
+            cap drop pl_rel pl_int_lead* pl_int_lag*
+            gen pl_rel = year - `placebo_yr'
+            qui sum pl_rel
+            local pl_abs_lag  = abs(r(max))
+            local pl_abs_lead = abs(r(min))
+            forval i = 1/`pl_abs_lead' {
+                gen pl_int_lead`i' = exposure if pl_rel == -`i'
+            }
+            forval i = 0/`pl_abs_lag' {
+                gen pl_int_lag`i' = exposure if pl_rel == `i'
+            }
+            ds pl_int_lead* pl_int_lag*
+            foreach v in `r(varlist)' {
+                replace `v' = 0 if mi(`v')
+            }
+            local pl_int_leads
+            local pl_int_lags
+            forval i = 2/`pl_abs_lead' {
+                local pl_int_leads pl_int_lead`i' `pl_int_leads'
+            }
+            forval i = 0/`pl_abs_lag' {
+                local pl_int_lags `pl_int_lags' pl_int_lag`i'
+            }
+
+            // pl_int_lead1 (year `placebo_yr'-1) is the omitted reference;
+            // listed last so reghdfe drops it under collinearity in athr_id FE.
+            reghdfe `yvar' `pl_int_leads' `pl_int_lags' pl_int_lead1, ///
+                    absorb(`fes') vce(cluster athr_id)
+
+            preserve
+            cap mat drop es
+            foreach var in `pl_int_leads' `pl_int_lags' pl_int_lead1 {
+                mat row = _b[`var'], _se[`var']
+                if "`var'" == "pl_int_lead1" mat row = 0,0
+                mat es = nullmat(es) \ row
+            }
+            svmat es
+            keep es1 es2
+            drop if mi(es1)
+            rename (es1 es2) (b se)
+            gen ub = b + 1.96*se
+            gen lb = b - 1.96*se
+            // rel mapping mirrors event_study: leads (deepest first), then
+            // lags 0..K, then the omitted reference -1 at the end.
+            gen rel = -`pl_abs_lead' if _n == 1
+            replace rel = rel[_n-1]+1 if _n > 1
+            replace rel = rel + 1 if rel >= -1
+            replace rel = -1 if rel == `pl_abs_lag' + 1
+            gen year = rel + `placebo_yr'
+            hashsort rel
+            sum ub, d
+            local ymax = round(r(max), `gap')
+            sum lb, d
+            local ymin = round(r(min), `gap')
+            local ref_yr = `placebo_yr' - 1
+            tw rcap ub lb year if year != `ref_yr', lcolor(cranberry%70) msize(vsmall) || ///
+              scatter b year, mcolor(cranberry) ///
+              , xlab(2010(1)2019) xtitle("Year (placebo treatment at `placebo_yr')") ytitle("`var_name'") ///
+                ylab(`ymin'(`gap')`ymax') yline(0, lcolor(gs10) lpattern(solid)) ///
+                xline(2014, lpattern(dash) lcolor(gs10)) ///
+                title("Placebo ES: treatment shifted to `placebo_yr' (real: 2014)", size(small)) ///
+                legend(off) plotregion(margin(sides))
+            graph export ../output/figures/`samp'/placebo_es_`yvar'_yr`placebo_yr'`suf'.pdf, replace
+            save ../temp/placebo_es_`yvar'_yr`placebo_yr'`suf', replace
+            restore
+        }
+    }
+end
+
+program trim_top
+    // Composition check: drop the top X% of PIs by pre-period publication
+    // count (pre_ppr_cnt_sum, computed in restrict_samp), then re-estimate
+    // pdid (reghdfe) and ppml_pdid. If the main effect is driven by a few
+    // high-baseline outliers, dropping them will collapse the coefficient.
+    // Runs at trim levels {1, 5, 10, 25}; writes one matrix per (trim, yvar)
+    // for output_tables and a comparison figure per outcome.
+    syntax, samp(string) [, r1r2(int 0) public(int 0)]
+    local fes athr_id year
+    local suf ""
+    if (`r1r2' == 1 & `public' == 0) local suf "_r1_r2"
+    if (`r1r2' == 1 & `public' == 1) local suf "_r1_r2_public"
+
+    local outcomes cite_affl_wt ppr_cnt body_adj_wt avg_num_coathrs num_grants
+    local trims 1 5 10 25
+
+    cap mkdir ../output/tables/`samp'
+    cap mkdir ../output/figures/`samp'
+
+    foreach trim of local trims {
+        use ../temp/es_`samp'`suf', clear
+        // pre_ppr_cnt_sum is one value per PI; collapse to one row, compute
+        // the (100-trim) percentile cut, drop above.
+        bys athr_id: gen _one = _n == 1
+        qui sum pre_ppr_cnt_sum if _one == 1, d
+        local p = 100 - `trim'
+        local cut_var p`p'
+        qui _pctile pre_ppr_cnt_sum if _one == 1, p(`p')
+        local cut = r(r1)
+        qui gunique athr_id
+        local n_pre = r(unique)
+        drop if pre_ppr_cnt_sum > `cut'
+        qui gunique athr_id
+        local n_post = r(unique)
+        di as text "trim_top `samp'`suf' trim=`trim'%: cut=" %7.2f `cut' ///
+            "  PIs dropped " (`n_pre' - `n_post') " / `n_pre' (kept " %7.4f (`n_post' / `n_pre') ")"
+
+        gen post       = year >= 2014
+        gen Z_it       = exposure      * post
+        gen Z_share_it = mkt_spend_shr * post
+
+        foreach yvar of local outcomes {
+            qui sum `yvar' if year < 2014, d
+            local pre_mean = r(mean)
+
+            local lb = .
+            local lse = .
+            local lN = .
+            cap noi reghdfe `yvar' Z_it, absorb(`fes') vce(cluster athr_id)
+            if _rc == 0 {
+                local lb  = _b[Z_it]
+                local lse = _se[Z_it]
+                local lN  = e(N)
+            }
+
+            local pb = .
+            local pse = .
+            local pN = .
+            cap noi ppmlhdfe `yvar' Z_it, absorb(`fes') vce(cluster athr_id)
+            if _rc == 0 {
+                local pb  = _b[Z_it]
+                local pse = _se[Z_it]
+                local pN  = e(N)
+            }
+
+            di as text "  trim=`trim'% `yvar': reghdfe b=" %8.4f `lb' "  se=" %8.4f `lse' ///
+                "    ppml b=" %8.4f `pb' "  se=" %8.4f `pse' "    pre_mean=" %7.4f `pre_mean'
+
+            cap mat drop trim`trim'_`yvar'
+            mat trim`trim'_`yvar' = J(5,2,.)
+            mat trim`trim'_`yvar'[1,1] = `lb'
+            mat trim`trim'_`yvar'[2,1] = `lse'
+            mat trim`trim'_`yvar'[3,1] = `pre_mean'
+            mat trim`trim'_`yvar'[4,1] = `lN'
+            mat trim`trim'_`yvar'[5,1] = `n_post'
+            mat trim`trim'_`yvar'[1,2] = `pb'
+            mat trim`trim'_`yvar'[2,2] = `pse'
+            mat trim`trim'_`yvar'[3,2] = `pre_mean'
+            mat trim`trim'_`yvar'[4,2] = `pN'
+            mat trim`trim'_`yvar'[5,2] = `n_post'
+            mat rownames trim`trim'_`yvar' = b se pre_mean N n_PIs
+            mat colnames trim`trim'_`yvar' = reghdfe ppmlhdfe
+        }
+        drop _one
+    }
+
+    // Comparison figure per key outcome: linear pdid β at each trim level
+    foreach yvar in ppr_cnt cite_affl_wt {
+        if "`yvar'" == "ppr_cnt"      local var_name "Publication Count"
+        if "`yvar'" == "cite_affl_wt" local var_name "Citation Weighted Output"
+
+        preserve
+        clear
+        set obs 5
+        gen trim = 0 in 1
+        replace trim = 1 in 2
+        replace trim = 5 in 3
+        replace trim = 10 in 4
+        replace trim = 25 in 5
+        gen b  = .
+        gen se = .
+        // trim = 0 uses the main pdid_<yvar> matrix
+        cap confirm matrix pdid_`yvar'
+        if !_rc {
+            replace b  = pdid_`yvar'[1,1] in 1
+            replace se = pdid_`yvar'[2,1] in 1
+        }
+        local i = 2
+        foreach t of local trims {
+            cap confirm matrix trim`t'_`yvar'
+            if !_rc {
+                replace b  = trim`t'_`yvar'[1,1] in `i'
+                replace se = trim`t'_`yvar'[2,1] in `i'
+            }
+            local ++i
+        }
+        gen ub = b + 1.96*se
+        gen lb = b - 1.96*se
+        tw rcap ub lb trim, lcolor(ebblue%70) msize(small) || ///
+           scatter b trim, mcolor(ebblue) msize(medium) ///
+           , xlab(0 "Full sample" 1 "Drop top 1%" 5 "5%" 10 "10%" 25 "25%", labsize(small)) ///
+             xtitle("Top-pre-pub PIs dropped") ///
+             ytitle("pdid {&beta}: `var_name'") ///
+             yline(0, lcolor(gs10) lpattern(solid)) ///
+             title("Trim-top sensitivity: `var_name'", size(small)) ///
+             legend(off) plotregion(margin(sides))
+        graph export ../output/figures/`samp'/trim_top_`yvar'`suf'.pdf, replace
+        restore
+
+        // ppml version
+        preserve
+        clear
+        set obs 5
+        gen trim = 0 in 1
+        replace trim = 1 in 2
+        replace trim = 5 in 3
+        replace trim = 10 in 4
+        replace trim = 25 in 5
+        gen b  = .
+        gen se = .
+        cap confirm matrix ppml_pdid_`yvar'
+        if !_rc {
+            replace b  = ppml_pdid_`yvar'[1,1] in 1
+            replace se = ppml_pdid_`yvar'[2,1] in 1
+        }
+        local i = 2
+        foreach t of local trims {
+            cap confirm matrix trim`t'_`yvar'
+            if !_rc {
+                replace b  = trim`t'_`yvar'[1,2] in `i'
+                replace se = trim`t'_`yvar'[2,2] in `i'
+            }
+            local ++i
+        }
+        gen ub = b + 1.96*se
+        gen lb = b - 1.96*se
+        tw rcap ub lb trim, lcolor(cranberry%70) msize(small) || ///
+           scatter b trim, mcolor(cranberry) msize(medium) ///
+           , xlab(0 "Full sample" 1 "Drop top 1%" 5 "5%" 10 "10%" 25 "25%", labsize(small)) ///
+             xtitle("Top-pre-pub PIs dropped") ///
+             ytitle("ppml semielasticity {&beta}: `var_name'") ///
+             yline(0, lcolor(gs10) lpattern(solid)) ///
+             title("Trim-top sensitivity (ppml): `var_name'", size(small)) ///
+             legend(off) plotregion(margin(sides))
+        graph export ../output/figures/`samp'/trim_top_ppml_`yvar'`suf'.pdf, replace
+        restore
     }
 end
 
@@ -2174,7 +2197,7 @@ program output_tables
     cap mkdir ../output/tables
     cap mkdir ../output/tables/`samp'
     local outcomes cite_affl_wt ppr_cnt ln_cite_affl_wt ln_ppr_cnt body_adj_wt avg_num_coathrs num_grants
-    foreach prog in ld fd pdid ppml_ld ppml_fd ppml_pdid {
+    foreach prog in pdid ppml_pdid placebo2011 placebo2012 trim1 trim5 trim10 trim25 {
         foreach yvar of local outcomes {
             cap confirm matrix `prog'_`yvar'
             if !_rc {

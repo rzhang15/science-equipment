@@ -1,0 +1,121 @@
+=== K=10 ===
+--- CLUSTER JOB: K=10  svd_dim=256 ---
+Loading TF-IDF matrix...
+  TF-IDF shape: (5287996, 30000)  nnz/row mean: 103.2
+Loading helper files...
+  rows with 0 nonzero features: 3
+  rows with <5 nonzero features: 462
+
+Reducing to 256 dims via TruncatedSVD...
+  cumulative explained variance: 0.182
+  dense shape: (5287996, 256)   mem: 5.41 GB
+  L2-normalized; ready for spherical K-means semantics.
+
+Clustering into 10 clusters with MiniBatchKMeans...
+
+--- CLUSTER SIZE DISTRIBUTION ---
+  largest cluster: 1,253,748 authors (23.71% of pool)
+  median size: 491,362    smallest: 268,651
+  size pctiles: 10%=271,910  25%=343,151  75%=546,119  90%=759,063
+
+Saving Results...
+Writing cluster top-term descriptions...
+Saved ../output/static_cluster_descriptions_10.txt
+Done.
+=== K=15 ===
+--- CLUSTER JOB: K=15  svd_dim=256 ---
+Loading TF-IDF matrix...
+  TF-IDF shape: (5287996, 30000)  nnz/row mean: 103.2
+Loading helper files...
+  rows with 0 nonzero features: 3
+  rows with <5 nonzero features: 462
+
+Reducing to 256 dims via TruncatedSVD...
+  cumulative explained variance: 0.182
+  dense shape: (5287996, 256)   mem: 5.41 GB
+  L2-normalized; ready for spherical K-means semantics.
+
+Clustering into 15 clusters with MiniBatchKMeans...
+
+--- CLUSTER SIZE DISTRIBUTION ---
+  largest cluster: 837,223 authors (15.83% of pool)
+  median size: 336,457    smallest: 78,919
+  size pctiles: 10%=186,326  25%=238,461  75%=383,804  90%=590,831
+
+Saving Results...
+Writing cluster top-term descriptions...
+Saved ../output/static_cluster_descriptions_15.txt
+Done.
+=== K=20 ===
+--- CLUSTER JOB: K=20  svd_dim=256 ---
+Loading TF-IDF matrix...
+  TF-IDF shape: (5287996, 30000)  nnz/row mean: 103.2
+Loading helper files...
+  rows with 0 nonzero features: 3
+  rows with <5 nonzero features: 462
+
+Reducing to 256 dims via TruncatedSVD...
+  cumulative explained variance: 0.182
+  dense shape: (5287996, 256)   mem: 5.41 GB
+  L2-normalized; ready for spherical K-means semantics.
+
+Clustering into 20 clusters with MiniBatchKMeans...
+
+--- CLUSTER SIZE DISTRIBUTION ---
+  largest cluster: 931,203 authors (17.61% of pool)
+  median size: 229,451    smallest: 83,414
+  size pctiles: 10%=115,129  25%=147,905  75%=313,218  90%=394,712
+
+Saving Results...
+Writing cluster top-term descriptions...
+Saved ../output/static_cluster_descriptions_20.txt
+Done.
+=== K=25 ===
+--- CLUSTER JOB: K=25  svd_dim=256 ---
+Loading TF-IDF matrix...
+  TF-IDF shape: (5287996, 30000)  nnz/row mean: 103.2
+Loading helper files...
+  rows with 0 nonzero features: 3
+  rows with <5 nonzero features: 462
+
+Reducing to 256 dims via TruncatedSVD...
+  cumulative explained variance: 0.182
+  dense shape: (5287996, 256)   mem: 5.41 GB
+  L2-normalized; ready for spherical K-means semantics.
+
+Clustering into 25 clusters with MiniBatchKMeans...
+
+--- CLUSTER SIZE DISTRIBUTION ---
+  largest cluster: 583,567 authors (11.04% of pool)
+  median size: 155,369    smallest: 74,693
+  size pctiles: 10%=91,701  25%=111,375  75%=236,232  90%=436,499
+
+Saving Results...
+Writing cluster top-term descriptions...
+Saved ../output/static_cluster_descriptions_25.txt
+Done.
+=== K=30 ===
+--- CLUSTER JOB: K=30  svd_dim=256 ---
+Loading TF-IDF matrix...
+  TF-IDF shape: (5287996, 30000)  nnz/row mean: 103.2
+Loading helper files...
+  rows with 0 nonzero features: 3
+  rows with <5 nonzero features: 462
+
+Reducing to 256 dims via TruncatedSVD...
+  cumulative explained variance: 0.182
+  dense shape: (5287996, 256)   mem: 5.41 GB
+  L2-normalized; ready for spherical K-means semantics.
+
+Clustering into 30 clusters with MiniBatchKMeans...
+
+--- CLUSTER SIZE DISTRIBUTION ---
+  largest cluster: 777,449 authors (14.70% of pool)
+  median size: 144,781    smallest: 45,948
+  size pctiles: 10%=80,901  25%=103,941  75%=214,565  90%=279,634
+
+Saving Results...
+Writing cluster top-term descriptions...
+Saved ../output/static_cluster_descriptions_30.txt
+Done.
+Done.

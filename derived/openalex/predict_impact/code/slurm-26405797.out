@@ -1,0 +1,18 @@
+reading ../external/ls_samp/cleaned_last20yrs_all_jrnls.dta via pandas chunked Stata reader
+   wrote 5,000,000 rows  (17,038 rows/s)
+   wrote 10,000,000 rows  (16,739 rows/s)
+   wrote 15,000,000 rows  (16,626 rows/s)
+   wrote 20,000,000 rows  (16,630 rows/s)
+   wrote 25,000,000 rows  (16,605 rows/s)
+   wrote 30,000,000 rows  (16,574 rows/s)
+   wrote 35,000,000 rows  (16,582 rows/s)
+   wrote 40,000,000 rows  (16,562 rows/s)
+   wrote 45,000,000 rows  (16,547 rows/s)
+   wrote 50,000,000 rows  (16,536 rows/s)
+   wrote 55,000,000 rows  (16,534 rows/s)
+   wrote 60,000,000 rows  (16,520 rows/s)
+   wrote 65,000,000 rows  (16,521 rows/s)
+   wrote 69,115,153 rows  (16,346 rows/s)
+done in 4502.4s
+  - ../temp/papers_all.parquet  (1.59 GB)
+  - ../temp/papers_2010_2019.parquet  (0.71 GB)

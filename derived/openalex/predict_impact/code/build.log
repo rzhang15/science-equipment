@@ -1,0 +1,297 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 120,000; see help set_maxvar.
+
+. do build.do 
+
+. /* --------------------------------------------------------------------------
+> -
+>  build.do  --  derived/openalex/predict_impact
+> 
+>  Merges Phase 2 predicted-tier counts (../temp/pi_year_pred_tiers.dta) and
+>  Phase 3 self-management variables (../temp/pi_year_self_mgmt.dta,
+>  ../temp/pi_static_self_mgmt.dta) onto the existing PI-year panel.
+> 
+>  For each samp in {all_jrnls, all_jrnls_r1_r2, all_jrnls_r1_r2_public}:
+>    - load ../external/samp/athr_panel_full_year_last_<samp>.dta
+>    - 1:1 merge predicted-tier counts on (athr_id, year), fill missing as 0
+>    - 1:1 merge main-line / side-line counts on (athr_id, year), fill missing 
+> as 0
+>    - m:1 merge static portfolio_hhi / lab_size_pre on athr_id (no fill)
+>    - save to ../output/panel/athr_panel_full_year_last_<samp>.dta
+> 
+>  The output filenames match the existing convention so restrict_samp in
+>  analysis/predicted_impact/code/analysis.do (a clone of the reduced-form file
+> )
+>  can pick them up unchanged via links.txt.
+> 
+>  top_jrnls panels are intentionally NOT produced here. The predicted-tier
+>  counts are built over the full scoring universe (all_jrnls), so merging onto
+>  top_jrnls would mostly produce zeros.
+> --------------------------------------------------------------------------- *
+> /
+. 
+. clear all
+
+. program drop _all
+
+. set more off
+
+. 
+. cap mkdir ../output
+
+. cap mkdir ../output/panel
+
+. 
+. program merge_one_samp
+  1.     syntax, samp(string)
+  2. 
+.     local src ../external/samp/athr_panel_full_year_last_`samp'.dta
+  3.     cap confirm file `src'
+  4.     if _rc {
+  5.         di as error "build.do: missing `src'; skipping samp=`samp'"
+  6.         exit 0
+  7.     }
+  8. 
+.     use `src', clear
+  9.     local n0 = _N
+ 10.     di as text "build.do: `samp'  start N=`n0'"
+ 11. 
+.     /* Phase 2: predicted-tier counts */
+.     cap confirm file ../temp/pi_year_pred_tiers.dta
+ 12.     if _rc {
+ 13.         di as error "  missing ../temp/pi_year_pred_tiers.dta; run step 05
+>  first"
+ 14.         exit 198
+ 15.     }
+ 16.     merge 1:1 athr_id year using ../temp/pi_year_pred_tiers.dta, ///
+>         keep(match master) nogen
+ 17.     foreach v in n_pred_high n_pred_mid n_pred_low                        
+> ///
+>                  n_pred_high_topdecile n_pred_low_topdecile               ///
+>                  n_pred_high_top15 n_pred_low_top15                       ///
+>                  n_real_high n_real_low                                   ///
+>                  n_large_team n_small_team n_high_junior n_low_junior     ///
+>                  n_scored {
+ 18.         cap confirm variable `v'
+ 19.         if !_rc replace `v' = 0 if mi(`v')
+ 20.     }
+ 21. 
+.     /* Phase 3.2: main-line vs side-line counts (PI-year) */
+.     cap confirm file ../temp/pi_year_self_mgmt.dta
+ 22.     if _rc {
+ 23.         di as error "  missing ../temp/pi_year_self_mgmt.dta; run step 06 
+> first"
+ 24.         exit 198
+ 25.     }
+ 26.     merge 1:1 athr_id year using ../temp/pi_year_self_mgmt.dta, ///
+>         keep(match master) nogen
+ 27.     foreach v in n_main_line n_side_line {
+ 28.         cap confirm variable `v'
+ 29.         if !_rc replace `v' = 0 if mi(`v')
+ 30.     }
+ 31. 
+.     /* Phase 3.1: static portfolio_hhi + lab_size_pre */
+.     cap confirm file ../temp/pi_static_self_mgmt.dta
+ 32.     if _rc {
+ 33.         di as error "  missing ../temp/pi_static_self_mgmt.dta; run step 0
+> 6 first"
+ 34.         exit 198
+ 35.     }
+ 36.     merge m:1 athr_id using ../temp/pi_static_self_mgmt.dta, ///
+>         keep(match master) nogen
+ 37. 
+.     /* Sanity: n_pred_high + n_pred_mid + n_pred_low == n_scored,
+>        row count unchanged                                       */
+.     local n1 = _N
+ 38.     if `n0' != `n1' {
+ 39.         di as error "  WARNING: row count `n0' -> `n1'"
+ 40.     }
+ 41.     cap noi gen __sumpred = n_pred_high + n_pred_mid + n_pred_low
+ 42.     cap noi count if !mi(n_scored) & __sumpred != n_scored
+ 43.     if `r(N)' > 0 di as error "  WARNING: `r(N)' rows where pred-tier coun
+> ts don't sum to n_scored"
+ 44.     cap drop __sumpred
+ 45. 
+.     save ../output/panel/athr_panel_full_year_last_`samp'.dta, replace
+ 46.     di as text "build.do: `samp'  saved N=`n1'"
+ 47. end
+
+. 
+. program main
+  1.     foreach samp in all_jrnls all_jrnls_r1_r2 all_jrnls_r1_r2_public {
+  2.         merge_one_samp, samp(`samp')
+  3.     }
+  4. end
+
+. 
+. main
+build.do: all_jrnls  start N=3334399
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                     2,654,499
+        from master                 2,654,499  
+        from using                          0  
+
+    Matched                           679,900  
+    -----------------------------------------
+(2,654,499 real changes made)
+(2,654,499 real changes made)
+(2,654,499 real changes made)
+(2,654,499 real changes made)
+(2,654,499 real changes made)
+(2,654,499 real changes made)
+(2,654,499 real changes made)
+(2,654,499 real changes made)
+(2,654,499 real changes made)
+(2,654,499 real changes made)
+(2,654,499 real changes made)
+(2,654,499 real changes made)
+(2,654,499 real changes made)
+(2,654,499 real changes made)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                     2,654,499
+        from master                 2,654,499  
+        from using                          0  
+
+    Matched                           679,900  
+    -----------------------------------------
+(2,654,499 real changes made)
+(2,654,499 real changes made)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                       981,417
+        from master                   981,417  
+        from using                          0  
+
+    Matched                         2,352,982  
+    -----------------------------------------
+  0
+(file ../output/panel/athr_panel_full_year_last_all_jrnls.dta not found)
+file ../output/panel/athr_panel_full_year_last_all_jrnls.dta saved
+build.do: all_jrnls  saved N=3334399
+build.do: all_jrnls_r1_r2  start N=1836737
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                     1,448,987
+        from master                 1,448,987  
+        from using                          0  
+
+    Matched                           387,750  
+    -----------------------------------------
+(1,448,987 real changes made)
+(1,448,987 real changes made)
+(1,448,987 real changes made)
+(1,448,987 real changes made)
+(1,448,987 real changes made)
+(1,448,987 real changes made)
+(1,448,987 real changes made)
+(1,448,987 real changes made)
+(1,448,987 real changes made)
+(1,448,987 real changes made)
+(1,448,987 real changes made)
+(1,448,987 real changes made)
+(1,448,987 real changes made)
+(1,448,987 real changes made)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                     1,448,987
+        from master                 1,448,987  
+        from using                          0  
+
+    Matched                           387,750  
+    -----------------------------------------
+(1,448,987 real changes made)
+(1,448,987 real changes made)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                       503,298
+        from master                   503,298  
+        from using                          0  
+
+    Matched                         1,333,439  
+    -----------------------------------------
+  0
+(file ../output/panel/athr_panel_full_year_last_all_jrnls_r1_r2.dta not
+    found)
+file ../output/panel/athr_panel_full_year_last_all_jrnls_r1_r2.dta saved
+build.do: all_jrnls_r1_r2  saved N=1836737
+build.do: all_jrnls_r1_r2_public  start N=1084738
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                       845,289
+        from master                   845,289  
+        from using                          0  
+
+    Matched                           239,449  
+    -----------------------------------------
+(845,289 real changes made)
+(845,289 real changes made)
+(845,289 real changes made)
+(845,289 real changes made)
+(845,289 real changes made)
+(845,289 real changes made)
+(845,289 real changes made)
+(845,289 real changes made)
+(845,289 real changes made)
+(845,289 real changes made)
+(845,289 real changes made)
+(845,289 real changes made)
+(845,289 real changes made)
+(845,289 real changes made)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                       845,289
+        from master                   845,289  
+        from using                          0  
+
+    Matched                           239,449  
+    -----------------------------------------
+(845,289 real changes made)
+(845,289 real changes made)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                       291,293
+        from master                   291,293  
+        from using                          0  
+
+    Matched                           793,445  
+    -----------------------------------------
+  0
+(file ../output/panel/athr_panel_full_year_last_all_jrnls_r1_r2_public.dta
+    not found)
+file ../output/panel/athr_panel_full_year_last_all_jrnls_r1_r2_public.dta
+    saved
+build.do: all_jrnls_r1_r2_public  saved N=1084738
+
+. 
+end of do-file

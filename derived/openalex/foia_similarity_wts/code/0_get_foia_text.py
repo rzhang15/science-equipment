@@ -38,11 +38,12 @@ import pandas as pd
 import polars as pl
 
 ap = argparse.ArgumentParser()
-ap.add_argument("--cluster-k", type=int, default=100,
-                help="Match author_static_clusters_{K}.csv from cluster_fields/output.")
+ap.add_argument("--cluster-k", type=int, default=0,
+                help="Match author_static_clusters_{K}.csv from cluster_fields/output. "
+                     "Default 0 = skip cluster validation (build FOIA-native clusters instead).")
 ap.add_argument("--drop-non-ls", action="store_true",
                 help="Drop FOIA authors whose cluster was flagged non-life-science. "
-                     "Default: report only, do not drop.")
+                     "Only applies if --cluster-k > 0. Default: report only, do not drop.")
 ap.add_argument("--restrict-to-panel", default="",
                 help="Suffix of the analysis panel .dta in "
                      "../external/athr_panel/athr_panel_full_year_last_{suffix}.dta. "
@@ -103,90 +104,90 @@ if args.restrict_to_panel:
 foia_ids = df_foia["athr_id"].tolist()
 
 # ----------------------------------------------------------------------
-# Join cluster assignment + cluster metadata
+# Join cluster assignment + cluster metadata (optional)
 # ----------------------------------------------------------------------
-if not os.path.exists(clusters_path):
-    raise FileNotFoundError(f"Missing cluster file: {clusters_path}. "
-                            f"Run cluster_fields/code/2_cluster.py first.")
-if not os.path.exists(worksheet_path):
-    raise FileNotFoundError(f"Missing worksheet: {worksheet_path}. "
-                            f"Run cluster_fields/code/3_filter_life_science.py first.")
+if args.cluster_k > 0:
+    if not os.path.exists(clusters_path):
+        raise FileNotFoundError(f"Missing cluster file: {clusters_path}. "
+                                f"Run cluster_fields/code/2_cluster.py first.")
+    if not os.path.exists(worksheet_path):
+        raise FileNotFoundError(f"Missing worksheet: {worksheet_path}. "
+                                f"Run cluster_fields/code/3_filter_life_science.py first.")
 
-print(f"Loading cluster assignments (K={args.cluster_k})...")
-df_clusters = (
-    pl.scan_csv(clusters_path, schema_overrides={"athr_id": pl.Utf8})
-    .filter(pl.col("athr_id").is_in(foia_ids))
-    .collect()
-    .to_pandas()
-)
-print(f"  matched cluster rows: {len(df_clusters)} / {len(df_foia)} FOIAs")
-
-print(f"Loading cluster worksheet...")
-df_ws = pd.read_csv(worksheet_path)[
-    ["cluster_label", "keep", "n_authors", "top_terms"]
-].rename(columns={
-    "n_authors": "cluster_size",
-    "keep": "cluster_keep",
-    "top_terms": "cluster_top_terms",
-})
-
-df_foia = df_foia.merge(df_clusters, on="athr_id", how="left")
-df_foia = df_foia.merge(df_ws, on="cluster_label", how="left")
-
-# ----------------------------------------------------------------------
-# Per-cluster FOIA breakdown
-# ----------------------------------------------------------------------
-print("\n=== FOIA authors grouped by cluster ===")
-breakdown = (
-    df_foia
-    .assign(_present=df_foia["cluster_label"].notna())
-    .groupby("cluster_label", dropna=False)
-    .agg(
-        n_foia=("athr_id", "size"),
-        cluster_size=("cluster_size", "first"),
-        cluster_keep=("cluster_keep", "first"),
-        cluster_top_terms=("cluster_top_terms", "first"),
+    print(f"Loading cluster assignments (K={args.cluster_k})...")
+    df_clusters = (
+        pl.scan_csv(clusters_path, schema_overrides={"athr_id": pl.Utf8})
+        .filter(pl.col("athr_id").is_in(foia_ids))
+        .collect()
+        .to_pandas()
     )
-    .reset_index()
-    .sort_values("n_foia", ascending=False)
-)
-for _, r in breakdown.iterrows():
-    if pd.isna(r["cluster_label"]):
-        print(f"  [NO CLUSTER]   n_foia={int(r['n_foia']):>3}   "
-              f"FOIAs missing from cluster file (no text -> not embedded)")
-        continue
-    flag = "KEEP" if r["cluster_keep"] == 1 else "DROP"
-    cid = int(r["cluster_label"])
-    cs  = int(r["cluster_size"]) if pd.notna(r["cluster_size"]) else 0
-    print(f"  C{cid:3d} [{flag}]  n_foia={int(r['n_foia']):>3}  "
-          f"cluster_size={cs:>8,}   top: {r['cluster_top_terms']}")
+    print(f"  matched cluster rows: {len(df_clusters)} / {len(df_foia)} FOIAs")
 
-n_in_drop = int((df_foia["cluster_keep"] == 0).sum())
-n_no_cluster = int(df_foia["cluster_label"].isna().sum())
-print(f"\nSummary:")
-print(f"  FOIAs in life-science clusters (keep=1):    "
-      f"{(df_foia['cluster_keep'] == 1).sum()}")
-print(f"  FOIAs in non-life-science clusters (keep=0): {n_in_drop}")
-print(f"  FOIAs missing from cluster file:             {n_no_cluster}")
+    print(f"Loading cluster worksheet...")
+    df_ws = pd.read_csv(worksheet_path)[
+        ["cluster_label", "keep", "n_authors", "top_terms"]
+    ].rename(columns={
+        "n_authors": "cluster_size",
+        "keep": "cluster_keep",
+        "top_terms": "cluster_top_terms",
+    })
 
-# ----------------------------------------------------------------------
-# Filter pass 3: optional cluster-based drop (non-life-science cluster)
-# ----------------------------------------------------------------------
-if args.drop_non_ls and n_in_drop > 0:
-    drop_mask = df_foia["cluster_keep"] == 0
-    for _, r in df_foia.loc[drop_mask].iterrows():
-        drop_records.append({
-            "athr_id": r["athr_id"],
-            "reason": "non_life_science_cluster",
-            "cluster_label": int(r["cluster_label"]) if pd.notna(r["cluster_label"]) else None,
-            "cluster_top_terms": r["cluster_top_terms"],
-        })
-    print(f"\nDropping {n_in_drop} FOIAs in non-life-science clusters "
-          f"(--drop-non-ls).")
-    df_foia = df_foia.loc[~drop_mask].reset_index(drop=True)
-elif n_in_drop > 0:
-    print(f"\nNOTE: {n_in_drop} FOIAs are in non-life-science clusters but "
-          f"not dropped. Pass --drop-non-ls to filter them out.")
+    df_foia = df_foia.merge(df_clusters, on="athr_id", how="left")
+    df_foia = df_foia.merge(df_ws, on="cluster_label", how="left")
+
+    # Per-cluster FOIA breakdown
+    print("\n=== FOIA authors grouped by cluster ===")
+    breakdown = (
+        df_foia
+        .assign(_present=df_foia["cluster_label"].notna())
+        .groupby("cluster_label", dropna=False)
+        .agg(
+            n_foia=("athr_id", "size"),
+            cluster_size=("cluster_size", "first"),
+            cluster_keep=("cluster_keep", "first"),
+            cluster_top_terms=("cluster_top_terms", "first"),
+        )
+        .reset_index()
+        .sort_values("n_foia", ascending=False)
+    )
+    for _, r in breakdown.iterrows():
+        if pd.isna(r["cluster_label"]):
+            print(f"  [NO CLUSTER]   n_foia={int(r['n_foia']):>3}   "
+                  f"FOIAs missing from cluster file (no text -> not embedded)")
+            continue
+        flag = "KEEP" if r["cluster_keep"] == 1 else "DROP"
+        cid = int(r["cluster_label"])
+        cs  = int(r["cluster_size"]) if pd.notna(r["cluster_size"]) else 0
+        print(f"  C{cid:3d} [{flag}]  n_foia={int(r['n_foia']):>3}  "
+              f"cluster_size={cs:>8,}   top: {r['cluster_top_terms']}")
+
+    n_in_drop = int((df_foia["cluster_keep"] == 0).sum())
+    n_no_cluster = int(df_foia["cluster_label"].isna().sum())
+    print(f"\nSummary:")
+    print(f"  FOIAs in life-science clusters (keep=1):    "
+          f"{(df_foia['cluster_keep'] == 1).sum()}")
+    print(f"  FOIAs in non-life-science clusters (keep=0): {n_in_drop}")
+    print(f"  FOIAs missing from cluster file:             {n_no_cluster}")
+
+    # Filter pass 3: optional cluster-based drop (non-life-science cluster)
+    if args.drop_non_ls and n_in_drop > 0:
+        drop_mask = df_foia["cluster_keep"] == 0
+        for _, r in df_foia.loc[drop_mask].iterrows():
+            drop_records.append({
+                "athr_id": r["athr_id"],
+                "reason": "non_life_science_cluster",
+                "cluster_label": int(r["cluster_label"]) if pd.notna(r["cluster_label"]) else None,
+                "cluster_top_terms": r["cluster_top_terms"],
+            })
+        print(f"\nDropping {n_in_drop} FOIAs in non-life-science clusters "
+              f"(--drop-non-ls).")
+        df_foia = df_foia.loc[~drop_mask].reset_index(drop=True)
+    elif n_in_drop > 0:
+        print(f"\nNOTE: {n_in_drop} FOIAs are in non-life-science clusters but "
+              f"not dropped. Pass --drop-non-ls to filter them out.")
+else:
+    print(f"Skipping cluster_fields validation (--cluster-k=0). "
+          f"Build your own FOIA clusters with cluster_foias.py.")
 
 # ----------------------------------------------------------------------
 # Pull text
@@ -212,16 +213,19 @@ df_final = df_foia.merge(df_text, on="athr_id", how="left", validate="one_to_one
 # Filter pass 4: drop empty/short text
 # ----------------------------------------------------------------------
 text_len = df_final["processed_text"].fillna("").str.len()
-drop_mask = text_len < 50
+drop_mask = text_len < 250
 if drop_mask.any():
     for _, r in df_final.loc[drop_mask].iterrows():
-        drop_records.append({
+        rec = {
             "athr_id": r["athr_id"],
             "reason": "empty_or_short_text",
-            "cluster_label": int(r["cluster_label"]) if pd.notna(r["cluster_label"]) else None,
-            "cluster_top_terms": r["cluster_top_terms"],
-        })
-    print(f"\nDROPPING {drop_mask.sum()} FOIAs with empty/short text (<50 chars):")
+        }
+        if "cluster_label" in df_final.columns:
+            rec["cluster_label"] = int(r["cluster_label"]) if pd.notna(r["cluster_label"]) else None
+        if "cluster_top_terms" in df_final.columns:
+            rec["cluster_top_terms"] = r["cluster_top_terms"]
+        drop_records.append(rec)
+    print(f"\nDROPPING {drop_mask.sum()} FOIAs with empty/short text (<250 chars):")
     for aid in df_final.loc[drop_mask, "athr_id"].tolist():
         chars = text_len.loc[df_final["athr_id"] == aid].iloc[0]
         print(f"  {aid}   text_chars={chars}")
@@ -230,8 +234,11 @@ if drop_mask.any():
 # ----------------------------------------------------------------------
 # Save outputs
 # ----------------------------------------------------------------------
-keep_cols = ["athr_id", "processed_text", "cluster_label",
-             "cluster_keep", "cluster_top_terms"]
+if args.cluster_k > 0:
+    keep_cols = ["athr_id", "processed_text", "cluster_label",
+                 "cluster_keep", "cluster_top_terms"]
+else:
+    keep_cols = ["athr_id", "processed_text"]
 df_final = df_final[[c for c in keep_cols if c in df_final.columns]]
 
 print(f"\nFinal FOIA pool size: {len(df_final)}")

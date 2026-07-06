@@ -29,10 +29,10 @@ DEFAULT_CLUSTER_WORKSHEET = (
 #     token counts scale with productivity. log(1+tf) shifts the signal to topical mix,
 #     i.e. "what fraction of an author's career is about X" — which is what we need
 #     for the spending-share imputation assumption (same topics ⇒ same product mix).
-MAX_FEATURES = 60_000
-MIN_DF = 25
-MAX_DF = 0.05
-NGRAM_RANGE = (1, 2)
+MAX_FEATURES = 100_000
+MIN_DF = 5 
+MAX_DF = 0.15
+NGRAM_RANGE = (1, 4)
 
 # Fit corpus cap. FOIA texts are always added to the fit sample so PI-specific
 # vocabulary cannot be excluded by random universe sampling.
@@ -43,7 +43,7 @@ SAMPLE_SIZE = 500_000
 # differentiate among the 200 FOIA PIs (the matching targets), so dropping them
 # tightens the cosine geometry around the discriminative axes.
 FOIA_MIN_DF = 2
-FOIA_MAX_DF_FRAC = 0.95
+FOIA_MAX_DF_FRAC = 0.85
 
 # Parallelism for the universe transform (fit is single-threaded in sklearn).
 N_JOBS = int(os.environ.get("SLURM_CPUS_PER_TASK", os.cpu_count() or 1))
