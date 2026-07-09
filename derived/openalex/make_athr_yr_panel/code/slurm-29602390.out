@@ -688,3 +688,117 @@ file ../output/athr_panel_full_comb_year_all_jrnls_no_clin.dta saved
 
     Matched                         8,813,757  
     -----------------------------------------
+(169,822,693 real changes made)
+(161,008,936 missing values generated)
+(8,813,757 real changes made)
+(161,008,936 observations deleted)
+(file ../output/athr_panel_full_year_all_jrnls_no_clin.dta not found)
+file ../output/athr_panel_full_year_all_jrnls_no_clin.dta saved
+(encoding automatically selected: ISO-8859-1)
+(4 vars, 266 obs)
+(4 observations deleted)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                               262  
+    -----------------------------------------
+file ../temp/ipeds_inst_id.dta saved
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                         4,773,577  
+    -----------------------------------------
+(file ../output/athr_panel_full_year_all_jrnls_no_clin_r1_r2.dta not found)
+file ../output/athr_panel_full_year_all_jrnls_no_clin_r1_r2.dta saved
+(2,000,814 observations deleted)
+(file ../output/athr_panel_full_year_all_jrnls_no_clin_r1_r2_public.dta not
+    found)
+file ../output/athr_panel_full_year_all_jrnls_no_clin_r1_r2_public.dta saved
+(encoding automatically selected: ISO-8859-2)
+(2 vars, 5,287,996 obs)
+file ../temp/clusters.dta saved
+file ../temp/all_athrs_top_jrnls_no_clin.dta saved
+file ../temp/paper_team_size_top_jrnls_no_clin.dta saved
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                         3,071,702  
+    -----------------------------------------
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                         3,071,702  
+    -----------------------------------------
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                         3,071,702  
+    -----------------------------------------
+(1,207,990 real changes made)
+(2,436,654 real changes made, 2,436,654 to missing)
+(2,436,654 real changes made, 2,436,654 to missing)
+(2,436,654 real changes made, 2,436,654 to missing)
+(2,436,654 real changes made, 2,436,654 to missing)
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+    avg_cite |    635,048    6.529759    27.51961          0   7302.429
+(2,436,654 missing values generated)
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+     avg_pat |    635,048    .1894057    2.566445          0   657.2885
+(2,436,654 missing values generated)
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+    avg_frnt |    635,048    .0948337    .9170196          0   159.5405
+(2,436,654 missing values generated)
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+    avg_body |    635,048    .0711793    1.674658          0        451
+(2,436,654 missing values generated)
+N = 3,071,702; 635,048 unbalanced groups of sizes 1 to 100
+(1,907,728 observations deleted)
+(file ../temp/focal_list_top_jrnls_no_clin.dta not found)
+file ../temp/focal_list_top_jrnls_no_clin.dta saved
+(file ../temp/coauthors_top_jrnls_no_clin.dta not found)
+file ../temp/coauthors_top_jrnls_no_clin.dta saved
+(1,163,974 observations deleted)
+(file ../temp/unique_coauthors_top_jrnls_no_clin.dta not found)
+file ../temp/unique_coauthors_top_jrnls_no_clin.dta saved
+(1,163,974 observations deleted)
+(2,959,790 observations deleted)
+(file ../temp/coauthor_in_msa_year_top_jrnls_no_clin.dta not found)
+file ../temp/coauthor_in_msa_year_top_jrnls_no_clin.dta saved
+(1,163,974 observations deleted)
+(574,484 real changes made)
+(file ../output/num_fund_coauthors_top_jrnls_no_clin.dta not found)
+file ../output/num_fund_coauthors_top_jrnls_no_clin.dta saved
+(1,163,974 real changes made)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                       185,140
+        from master                   185,140  
+        from using                          0  
+
+    Matched                           769,641  
+    -----------------------------------------
+(185,140 real changes made)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                        20,330
+        from master                    20,330  
+        from using                          0  
+
+    Matched                           934,451  
+    -----------------------------------------
+(20,330 real changes made)
