@@ -8,7 +8,7 @@ variation they introduce is exactly what Variant A could not deliver.
 Inputs
 ------
 ../temp/papers_all.parquet                              (from step 00)
-../external/clusters/author_static_clusters_5.csv       (athr_id -> cluster_label)
+../external/clusters/author_static_clusters_30.csv      (athr_id -> cluster_label)
 ../external/ipeds/ipeds_openalex.csv                    (inst_id -> R1/R2)
 
 Output
@@ -20,8 +20,8 @@ Columns
 id                      paper id
 team_size               distinct athr_id on the paper
 junior_share            share of authors with (year - first_pub_year) < 5
-cross_cluster_team      distinct cluster_5 values among authors
-paper_modal_cluster     modal cluster_5 among authors (first mode on ties)
+cross_cluster_team      distinct cluster_30 values among authors
+paper_modal_cluster     modal cluster_30 among authors (first mode on ties)
 multi_inst              distinct inst_id among authors
 has_r1_author           1 if any author at an R1 institution
 
@@ -34,7 +34,9 @@ Notes
 - has_r1_author is paper-level; institution attributed via inst_id on the
   paper-author row, then OR'd across authors.
 - Authors not in the cluster file get null field; cross_cluster_team and
-  paper_modal_cluster ignore those rows.
+  paper_modal_cluster ignore those rows. The k=30 US-specific cluster file
+  from us_cluster_fields covers only US-affiliated authors, so non-US
+  co-authors on the same paper drop out of these two aggregates.
 """
 
 import os
@@ -44,7 +46,9 @@ import time
 import polars as pl
 
 PAPERS = "../temp/papers_all.parquet"
-CLUSTERS = "../external/clusters/author_static_clusters_5.csv"
+# k=30 US-specific clusters (us_cluster_fields). Non-US authors get null field
+# and are excluded from cross_cluster_team / paper_modal_cluster.
+CLUSTERS = "../external/clusters/author_static_clusters_30.csv"
 IPEDS = "../external/ipeds/ipeds_openalex.csv"
 DST = "../temp/paper_features.parquet"
 

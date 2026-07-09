@@ -1,0 +1,302 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 120,000; see help set_maxvar.
+
+. do diag_pretrend_on_S.do 
+
+. // Cheap pre-trend diagnostic: does S_i (= mkt_spend_shr) predict differentia
+> l
+. // output trends in the pre-period 2010-2013?
+. set more off
+
+. capture log close
+
+. 
+. log using ../temp/diag_pretrend_on_S.log, text replace
+-------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  /n/holylabs/pakes_lab/Lab/sci_eq/analysis/reduced_form/code/../tem
+> p/diag_pretrend_on_S.log
+  log type:  text
+ opened on:   7 Jul 2026, 22:35:01
+
+. 
+. use ../temp/es_all_jrnls_r1_r2_public, clear
+
+. 
+. di as text _newline "===== S_i distribution (author level, one row per PI) ==
+> ==="
+
+===== S_i distribution (author level, one row per PI) =====
+
+. preserve
+
+.     bys athr_id: keep if _n == 1
+(289,584 observations deleted)
+
+.     sum mkt_spend_shr, d
+
+                        mkt_spend_shr
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%     .1278517       .0100839
+ 5%     .1677349       .0100839
+10%     .1890978       .0244392       Obs              32,176
+25%     .2319184       .0273335       Sum of wgt.      32,176
+
+50%     .2862104                      Mean           .2954469
+                        Largest       Std. dev.      .0893663
+75%     .3491636              1
+90%     .4167145              1       Variance       .0079863
+95%     .4586253              1       Skewness       .6695959
+99%     .5281656              1       Kurtosis       4.275074
+
+.     sum exposure, d
+
+                          exposure
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%     .0009722       7.86e-06
+ 5%     .0042802         .00001
+10%     .0076079       .0000119       Obs              32,176
+25%     .0159147       .0000141       Sum of wgt.      32,176
+
+50%     .0313055                      Mean           .0384085
+                        Largest       Std. dev.      .0294863
+75%     .0547902       .3817245
+90%     .0800601       .3817245       Variance       .0008694
+95%     .0947316       .3817245       Skewness       1.388778
+99%     .1250097       .3817245       Kurtosis       7.506266
+
+.     corr mkt_spend_shr exposure
+(obs=32,176)
+
+             | mkt_sp~r exposure
+-------------+------------------
+mkt_spend_~r |   1.0000
+    exposure |   0.4616   1.0000
+
+
+. restore
+
+. 
+. // -------------------------------------------------------------
+. // (1) PANEL SPEC: pre-period only, y on year * S_i, athr+year FE
+. // -------------------------------------------------------------
+. di as text _newline "===== (1) PANEL: reghdfe y (year x S_i) if year<=2013, a
+> bsorb(athr_id year) ====="
+
+===== (1) PANEL: reghdfe y (year x S_i) if year<=2013, absorb(athr_id year) ===
+> ==
+
+. preserve
+
+.     keep if year <= 2013
+(193,056 observations deleted)
+
+.     gen yr_x_S = year * mkt_spend_shr
+
+.     foreach yvar in ppr_cnt cite_affl_wt {
+  2.         di as text _newline "--- `yvar' ---"
+  3.         reghdfe `yvar' yr_x_S, absorb(athr_id year) vce(cluster athr_id)
+  4.     }
+
+--- ppr_cnt ---
+(MWFE estimator converged in 2 iterations)
+
+HDFE Linear regression                            Number of obs   =    128,704
+Absorbing 2 HDFE groups                           F(   1,  32175) =       2.13
+Statistics robust to heteroskedasticity           Prob > F        =     0.1448
+                                                  R-squared       =     0.6114
+                                                  Adj R-squared   =     0.4819
+                                                  Within R-sq.    =     0.0000
+Number of clusters (athr_id) =     32,176         Root MSE        =     0.9545
+
+                           (Std. err. adjusted for 32,176 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+      yr_x_S |  -.0394913   .0270838    -1.46   0.145    -.0925765     .013594
+       _cons |   24.26827   16.09567     1.51   0.132    -7.279854    55.81639
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |     32176       32176           0    *|
+        year |         4           1           3     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+--- cite_affl_wt ---
+(MWFE estimator converged in 2 iterations)
+
+HDFE Linear regression                            Number of obs   =    128,704
+Absorbing 2 HDFE groups                           F(   1,  32175) =       0.15
+Statistics robust to heteroskedasticity           Prob > F        =     0.6955
+                                                  R-squared       =     0.4890
+                                                  Adj R-squared   =     0.3186
+                                                  Within R-sq.    =     0.0000
+Number of clusters (athr_id) =     32,176         Root MSE        =     4.4535
+
+                           (Std. err. adjusted for 32,176 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+cite_affl_wt | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+      yr_x_S |  -.0423923   .1083017    -0.39   0.695    -.2546678    .1698832
+       _cons |   26.56796   64.36279     0.41   0.680    -99.58554    152.7215
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |     32176       32176           0    *|
+        year |         4           1           3     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. restore
+
+. 
+. // -------------------------------------------------------------
+. // (2) PI-LEVEL DELTA: growth_i = y_i,2013 - y_i,2010 regressed on S_i alone.
+. // -------------------------------------------------------------
+. di as text _newline "===== (2) PI-LEVEL: reg (y2013 - y2010) on S_i ====="
+
+===== (2) PI-LEVEL: reg (y2013 - y2010) on S_i =====
+
+. foreach yvar in ppr_cnt cite_affl_wt {
+  2.     preserve
+  3.         keep if inlist(year, 2010, 2013)
+  4.         keep athr_id year mkt_spend_shr `yvar'
+  5.         reshape wide `yvar', i(athr_id mkt_spend_shr) j(year)
+  6.         gen d_`yvar'    = `yvar'2013 - `yvar'2010
+  7.         gen ln_d_`yvar' = ln(1 + `yvar'2013) - ln(1 + `yvar'2010)
+  8.         di as text _newline "--- `yvar' level delta ---"
+  9.         reg d_`yvar' mkt_spend_shr, vce(robust)
+ 10.         di as text _newline "--- `yvar' log delta ---"
+ 11.         reg ln_d_`yvar' mkt_spend_shr, vce(robust)
+ 12.     restore
+ 13. }
+(257,408 observations deleted)
+(j = 2010 2013)
+
+Data                               Long   ->   Wide
+-----------------------------------------------------------------------------
+Number of observations           64,352   ->   32,176      
+Number of variables                   4   ->   4           
+j variable (2 values)              year   ->   (dropped)
+xij variables:
+                                ppr_cnt   ->   ppr_cnt2010 ppr_cnt2013
+-----------------------------------------------------------------------------
+
+--- ppr_cnt level delta ---
+
+Linear regression                               Number of obs     =     32,176
+                                                F(1, 32174)       =       2.38
+                                                Prob > F          =     0.1226
+                                                R-squared         =     0.0001
+                                                Root MSE          =     1.4339
+
+------------------------------------------------------------------------------
+             |               Robust
+   d_ppr_cnt | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+mkt_spend_~r |  -.1303469   .0844231    -1.54   0.123    -.2958193    .0351256
+       _cons |  -.1596495   .0255392    -6.25   0.000    -.2097074   -.1095917
+------------------------------------------------------------------------------
+
+--- ppr_cnt log delta ---
+
+Linear regression                               Number of obs     =     32,176
+                                                F(1, 32174)       =       2.02
+                                                Prob > F          =     0.1555
+                                                R-squared         =     0.0001
+                                                Root MSE          =     .61541
+
+------------------------------------------------------------------------------
+             |               Robust
+ln_d_ppr_cnt | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+mkt_spend_~r |  -.0533945   .0375925    -1.42   0.156    -.1270772    .0202882
+       _cons |  -.1047647   .0115238    -9.09   0.000    -.1273517   -.0821777
+------------------------------------------------------------------------------
+(257,408 observations deleted)
+(j = 2010 2013)
+
+Data                               Long   ->   Wide
+-----------------------------------------------------------------------------
+Number of observations           64,352   ->   32,176      
+Number of variables                   4   ->   4           
+j variable (2 values)              year   ->   (dropped)
+xij variables:
+                           cite_affl_wt   ->   cite_affl_wt2010 cite_affl_wt201
+> 3
+-----------------------------------------------------------------------------
+
+--- cite_affl_wt level delta ---
+
+Linear regression                               Number of obs     =     32,176
+                                                F(1, 32174)       =       0.11
+                                                Prob > F          =     0.7365
+                                                R-squared         =     0.0000
+                                                Root MSE          =     6.1081
+
+------------------------------------------------------------------------------
+             |               Robust
+d_cite_aff~t | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+mkt_spend_~r |  -.1145748   .3405559    -0.34   0.737    -.7820772    .5529276
+       _cons |  -.2614887   .1076967    -2.43   0.015    -.4725783   -.0503991
+------------------------------------------------------------------------------
+
+--- cite_affl_wt log delta ---
+
+Linear regression                               Number of obs     =     32,176
+                                                F(1, 32174)       =       5.38
+                                                Prob > F          =     0.0204
+                                                R-squared         =     0.0002
+                                                Root MSE          =     .79997
+
+------------------------------------------------------------------------------
+             |               Robust
+ln_d_cite_~t | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+mkt_spend_~r |  -.1137602   .0490552    -2.32   0.020    -.2099102   -.0176102
+       _cons |  -.0853424   .0149714    -5.70   0.000    -.1146868   -.0559979
+------------------------------------------------------------------------------
+
+. 
+. log close
+      name:  <unnamed>
+       log:  /n/holylabs/pakes_lab/Lab/sci_eq/analysis/reduced_form/code/../tem
+> p/diag_pretrend_on_S.log
+  log type:  text
+ closed on:   7 Jul 2026, 22:36:02
+-------------------------------------------------------------------------------
+
+. 
+end of do-file

@@ -32,18 +32,20 @@ import pandas as pd
 import scipy.sparse
 
 OUT_DIR = "../../output"
-EXPOSURE_DTA = "../../external/exposure_wts/athr_exposure.dta"
+DEFAULT_EXPOSURE_DTA = "../../external/exposure_wts/athr_exposure_hc.dta"
 
 
-def _paths(tag: str) -> dict:
+def _paths(tag: str, out_suffix: str = "") -> dict:
     if tag and not tag.startswith("_"):
         tag = "_" + tag
+    if out_suffix and not out_suffix.startswith("_"):
+        out_suffix = "_" + out_suffix
     return {
         "foia_matrix": f"{OUT_DIR}/tfidf_foia{tag}.npz",
         "foia_ids":    f"{OUT_DIR}/foia_ids_ordered{tag}.csv",
-        "out_pairs":   f"{OUT_DIR}/holdout_stress_pairs{tag}.csv",
-        "out_summary": f"{OUT_DIR}/holdout_stress_summary{tag}.csv",
-        "out_overall": f"{OUT_DIR}/holdout_stress_overall{tag}.txt",
+        "out_pairs":   f"{OUT_DIR}/holdout_stress_pairs{tag}{out_suffix}.csv",
+        "out_summary": f"{OUT_DIR}/holdout_stress_summary{tag}{out_suffix}.csv",
+        "out_overall": f"{OUT_DIR}/holdout_stress_overall{tag}{out_suffix}.txt",
     }
 
 
@@ -90,6 +92,16 @@ def main():
     ap.add_argument("--tag", default="restricted",
                     help="FOIA matrix tag (default: 'restricted' matches "
                          "production exposure file).")
+    ap.add_argument("--exposure-dta", default=DEFAULT_EXPOSURE_DTA,
+                    help="Path to FOIA exposure .dta with columns "
+                         "(athr_id, exposure). Default: athr_exposure_hc.dta. "
+                         "Point at athr_exposure_all.dta or "
+                         "athr_exposure_treated_hc.dta to validate the other "
+                         "denominators.")
+    ap.add_argument("--out-tag", default="",
+                    help="Suffix appended to output filenames so multiple "
+                         "denominators' results coexist. E.g. --out-tag hc "
+                         "writes holdout_stress_overall_restricted_hc.txt.")
     ap.add_argument("--folds", type=int, default=20)
     ap.add_argument("--holdout-frac", type=float, default=0.20)
     ap.add_argument("--k", type=int, default=5,
@@ -99,20 +111,21 @@ def main():
     ap.add_argument("--seed", type=int, default=8975)
     args = ap.parse_args()
 
-    paths = _paths(args.tag)
-    for p in (paths["foia_matrix"], paths["foia_ids"], EXPOSURE_DTA):
+    paths = _paths(args.tag, args.out_tag)
+    for p in (paths["foia_matrix"], paths["foia_ids"], args.exposure_dta):
         if not os.path.exists(p):
             raise SystemExit(f"missing: {p}")
 
     print(f"Recipe: K={args.k}  sharpen={args.sharpen}  floor={args.floor}  "
-          f"holdout_frac={args.holdout_frac}  folds={args.folds}  tag={args.tag!r}")
+          f"holdout_frac={args.holdout_frac}  folds={args.folds}  "
+          f"tag={args.tag!r}  exposure={args.exposure_dta!r}")
 
     X = scipy.sparse.load_npz(paths["foia_matrix"]).tocsr().astype(np.float32)
     foia_ids = pd.read_csv(paths["foia_ids"])["athr_id"].astype(str).tolist()
     n = X.shape[0]
     print(f"FOIA pool: {n}   vocab: {X.shape[1]:,}")
 
-    df_exp = pd.read_stata(EXPOSURE_DTA)[["athr_id", "exposure"]]
+    df_exp = pd.read_stata(args.exposure_dta)[["athr_id", "exposure"]]
     df_exp["athr_id"] = df_exp["athr_id"].astype(str)
     E = pd.Series(df_exp.set_index("athr_id")["exposure"]).reindex(foia_ids).fillna(0).values.astype(np.float32)
     print(f"Exposure: mean={E.mean():.4f}  sd={E.std():.4f}  "
@@ -190,7 +203,8 @@ def main():
     n_unique_foia = df["athr_id"].nunique()
     n_obs = len(df)
     line = (
-        f"holdout_stress  tag={args.tag}  folds={args.folds}  "
+        f"holdout_stress  tag={args.tag}  exposure={args.exposure_dta}  "
+        f"folds={args.folds}  "
         f"holdout_frac={args.holdout_frac}  K={args.k}  sharpen={args.sharpen}\n"
         f"  n_unique_FOIAs_tested={n_unique_foia}/{n}   n_predictions={n_obs}\n"
         f"  OVERALL:  MSE={overall['mse']:.5f}  MAE={overall['mae']:.5f}  "

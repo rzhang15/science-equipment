@@ -1,0 +1,20 @@
+Cleared: `../output/`
+Cleared: `../temp/`
+Removed: `/n/holylabs/pakes_lab/Lab/sci_eq/derived/openalex/get_coauthors/external`
+Starting makelog file at: `/n/holylabs/pakes_lab/Lab/sci_eq/derived/openalex/get_coauthors/output/make.log`
+External links successfully created!
+Executing command: `stata-mp -e do \"/n/holylabs/pakes_lab/Lab/sci_eq/derived/openalex/get_coauthors/code/build\.do\"`
+Traceback (most recent call last):
+  File "/n/holylabs/pakes_lab/Lab/sci_eq/derived/openalex/get_coauthors/code/make.py", line 21, in <module>
+    run_stata(paths, program = 'build.do')
+  File "/n/holylabs/LABS/pakes_lab/Lab/env/lib/python3.10/site-packages/gslab_make/run_program.py", line 1023, in run_stata
+    _check_stata_output(output)
+  File "/n/holylabs/LABS/pakes_lab/Lab/env/lib/python3.10/site-packages/gslab_make/run_program.py", line 1040, in _check_stata_output
+    raise ProgramError(error_message, 'See makelog for more detail.')
+gslab_make.private.exceptionclasses.ProgramError: 
+
+***************************************
+* Stata program executed with errors. *
+***************************************
+
+See makelog for more detail.

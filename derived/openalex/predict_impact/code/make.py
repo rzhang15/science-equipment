@@ -24,6 +24,8 @@ PYTHON_STEPS = [
     '01_field_year_normalize.py',
     '02_paper_features.py',
     '02b_pi_features.py',
+    '02d_paper_mesh_features.py',
+    '02e_pi_svd_features.py',
     '02c_assemble_training_table.py',
     # Phase 2: train, score, collapse
     '03_train_freeze_model.py',

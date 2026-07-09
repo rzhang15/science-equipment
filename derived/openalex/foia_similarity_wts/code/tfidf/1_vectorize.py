@@ -9,7 +9,11 @@ from joblib import Parallel, delayed
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 # --- CONFIGURATION ---
-UNIVERSE_PATH = "../../external/us_appended_text/cleaned_static_author_text_pre_us.parquet"
+# Reads the cleaned US corpus (v2) produced by us_cluster_fields/0b_clean_us_corpus.py:
+# scraper-boilerplate + <200-char authors dropped. Matches the universe that
+# us_cluster_fields/2_cluster.py clusters, so cluster_sanity_check.py sees
+# 1:1 coverage between imputation universe and cluster labels.
+UNIVERSE_PATH = "../../external/us_appended_text/cleaned_static_author_text_pre_us_v2.parquet"
 FOIA_PATH = "../../output/foia_author_text_final.csv"
 OUTPUT_DIR = "../../output/"
 

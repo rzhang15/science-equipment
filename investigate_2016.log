@@ -1,0 +1,409 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 120,000; see help set_maxvar.
+
+. do /tmp/investigate_2016.do 
+
+. set more off
+
+. capture log close
+
+. log using /tmp/investigate_2016.log, replace text
+(file /tmp/investigate_2016.log not found)
+-------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  /tmp/investigate_2016.log
+  log type:  text
+ opened on:   9 Jul 2026, 02:45:17
+
+. 
+. cd /n/home02/cxu75/sci_eq/analysis/reduced_form/temp
+/n/holylabs/pakes_lab/Lab/sci_eq/analysis/reduced_form/temp
+
+. use es_all_jrnls_r1_r2_public, clear
+
+. 
+. * Persistent foia flag
+. bys athr_id: egen foia_ever = max(foia_athr)
+(121,820 missing values generated)
+
+. replace foia_athr = (foia_ever == 1)
+(122,105 real changes made)
+
+. drop foia_ever
+
+. 
+. * First, look at the SD anomaly for cite_affl_wt in 2016
+. di as text "===== cite_affl_wt distribution by year (all authors) ====="
+===== cite_affl_wt distribution by year (all authors) =====
+
+. tabstat cite_affl_wt, by(year) s(mean sd p50 p75 p90 p95 p99 max count) notot
+> al
+
+Summary for variables: cite_affl_wt
+Group variable: year 
+
+    year |      Mean        SD       p50       p75       p90       p95
+---------+------------------------------------------------------------
+    2010 |  3.495998   9.05708   1.60728  3.750321  7.719817  11.95719
+    2011 |   2.65835  6.453463  .8021182  2.897976  6.649819  10.91916
+    2012 |  2.680479  9.924044  .7451937  2.787576  6.679144  10.48791
+    2013 |   2.61188  7.171715  .6505659  2.690977  6.564802  10.58648
+    2014 |  2.297727  6.006871  .4776883  2.388442  5.891489  9.808533
+    2015 |  2.132044  6.221345  .2759977  2.104482  5.554453  9.107923
+    2016 |  1.968019  11.76107   .037636  1.844166  4.779778   8.09175
+    2017 |  1.919412  5.839036         0  1.738785  5.174956  8.693927
+    2018 |  1.786076  6.918354         0  1.563987   4.78396  8.141931
+    2019 |  1.639854  5.238509         0  1.345489  4.553962  7.969433
+----------------------------------------------------------------------
+
+    year |       p99       Max         N
+---------+------------------------------
+    2010 |  29.34505  459.2439     12273
+    2011 |  26.05591  226.1197     12273
+    2012 |  26.21978  705.4777     12273
+    2013 |  26.43663  267.4713     12273
+    2014 |  23.88441   241.137     12273
+    2015 |  22.94231  221.9366     12273
+    2016 |  21.07618  1091.972     12273
+    2017 |  22.39721  183.2763     12273
+    2018 |  21.38982   469.334     12273
+    2019 |  19.50958   266.355     12273
+----------------------------------------
+
+. 
+. * Are there mega-outliers?
+. di as text "===== Top 10 cite_affl_wt in 2016 ====="
+===== Top 10 cite_affl_wt in 2016 =====
+
+. gsort -cite_affl_wt
+
+. list athr_id year cite_affl_wt ppr_cnt exposure foia_athr if year == 2016 in 
+> 1/10, sep(0) noobs
+
+  +----------------------------------------------------------------+
+  |     athr_id   year   cite_a~t   ppr_cnt    exposure   foia_a~r |
+  |----------------------------------------------------------------|
+  | A5001670387   2016   1091.972         3    .0052251          0 |
+  | A5020008219   2016   380.6509         1   -.0046886          0 |
+  +----------------------------------------------------------------+
+
+. di as text "===== Top 10 cite_affl_wt in 2015 ====="
+===== Top 10 cite_affl_wt in 2015 =====
+
+. list athr_id year cite_affl_wt ppr_cnt exposure foia_athr if year == 2015 in 
+> 1/10, sep(0) noobs
+
+. di as text "===== Top 10 cite_affl_wt in 2017 ====="
+===== Top 10 cite_affl_wt in 2017 =====
+
+. list athr_id year cite_affl_wt ppr_cnt exposure foia_athr if year == 2017 in 
+> 1/10, sep(0) noobs
+
+. 
+. * ppr_cnt: is 2016 unusually low or is 2015/2017 unusually high?
+. di as text "===== ppr_cnt by year x exposure quartile ====="
+===== ppr_cnt by year x exposure quartile =====
+
+. foreach q in q1 q2 q3 q4 {
+  2.     di as text "----- `q' -----"
+  3.     tabstat ppr_cnt if `q'==1, by(year) s(mean sd count) nototal
+  4. }
+----- q1 -----
+
+Summary for variables: ppr_cnt
+Group variable: year 
+
+    year |      Mean        SD         N
+---------+------------------------------
+    2010 |  1.863744  1.528381      2943
+    2011 |  1.477404  1.731683      2943
+    2012 |  1.395175  1.701702      2943
+    2013 |  1.386001  1.725317      2943
+    2014 |  1.262657  1.663374      2943
+    2015 |   1.16072  1.636491      2943
+    2016 |  1.033299  1.473161      2943
+    2017 |  .9993204  1.475842      2943
+    2018 |  .9279647  1.427696      2943
+    2019 |  .8657832  1.416133      2943
+----------------------------------------
+----- q2 -----
+
+Summary for variables: ppr_cnt
+Group variable: year 
+
+    year |      Mean        SD         N
+---------+------------------------------
+    2010 |  1.775163  1.505717      3060
+    2011 |  1.322549   1.67092      3060
+    2012 |  1.291176  1.633616      3060
+    2013 |  1.249346  1.642715      3060
+    2014 |  1.155556  1.532257      3060
+    2015 |  1.058497   1.49714      3060
+    2016 |  .8875817  1.312465      3060
+    2017 |   .904902  1.392236      3060
+    2018 |  .7996732  1.300062      3060
+    2019 |  .7310458  1.258596      3060
+----------------------------------------
+----- q3 -----
+
+Summary for variables: ppr_cnt
+Group variable: year 
+
+    year |      Mean        SD         N
+---------+------------------------------
+    2010 |  1.913636  1.604944      3080
+    2011 |  1.508766  1.791119      3080
+    2012 |   1.45974  1.735236      3080
+    2013 |  1.356818  1.668817      3080
+    2014 |  1.265584  1.659438      3080
+    2015 |  1.163636  1.678391      3080
+    2016 |  1.013961   1.43591      3080
+    2017 |   .974026  1.548179      3080
+    2018 |  .9074675  1.564737      3080
+    2019 |  .8493506  1.493963      3080
+----------------------------------------
+----- q4 -----
+
+Summary for variables: ppr_cnt
+Group variable: year 
+
+    year |      Mean        SD         N
+---------+------------------------------
+    2010 |  1.949843  1.652272      3190
+    2011 |  1.537931  1.816867      3190
+    2012 |   1.52884  1.860521      3190
+    2013 |  1.447962  1.824441      3190
+    2014 |  1.285893  1.733884      3190
+    2015 |  1.181818  1.700584      3190
+    2016 |  1.044201  1.465263      3190
+    2017 |  .9780564  1.524388      3190
+    2018 |  .8981191  1.505284      3190
+    2019 |  .8194357  1.366168      3190
+----------------------------------------
+
+. 
+. * Look at 2016 within FOIA obs
+. di as text "===== FOIA-only cite_affl_wt by year ====="
+===== FOIA-only cite_affl_wt by year =====
+
+. tabstat cite_affl_wt if foia_athr==1, by(year) s(mean sd max count) nototal
+
+Summary for variables: cite_affl_wt
+Group variable: year 
+
+    year |      Mean        SD       Max         N
+---------+----------------------------------------
+    2010 |   4.14505  5.582479  33.63113        91
+    2011 |  3.005171  4.001633  20.33758        91
+    2012 |  2.442428  3.689241  22.49381        91
+    2013 |  2.222388   2.56158  11.23705        91
+    2014 |  2.651607  4.704612  31.68666        91
+    2015 |  1.759485  2.640819  15.59387        91
+    2016 |  1.506683  2.237884  11.55427        91
+    2017 |   1.78064  3.112328  21.15522        91
+    2018 |  1.554888  2.367302   12.3739        91
+    2019 |  2.043255  3.174127  15.68012        91
+--------------------------------------------------
+
+. di as text "===== Non-FOIA cite_affl_wt by year ====="
+===== Non-FOIA cite_affl_wt by year =====
+
+. tabstat cite_affl_wt if foia_athr==0, by(year) s(mean sd max count) nototal
+
+Summary for variables: cite_affl_wt
+Group variable: year 
+
+    year |      Mean        SD       Max         N
+---------+----------------------------------------
+    2010 |  3.491149  9.078001  459.2439     12182
+    2011 |  2.655759  6.468315  226.1197     12182
+    2012 |  2.682257  9.955974  705.4777     12182
+    2013 |  2.614789  7.195006  267.4713     12182
+    2014 |  2.295084  6.015612   241.137     12182
+    2015 |  2.134827  6.240329  221.9366     12182
+    2016 |  1.971465  11.80328  1091.972     12182
+    2017 |  1.920448  5.854684  183.2763     12182
+    2018 |  1.787803  6.941137   469.334     12182
+    2019 |   1.63684   5.25084   266.355     12182
+--------------------------------------------------
+
+. 
+. * Author-level regressions for post-period cross section
+. di as text "===== Author-level Δ (yr - 2013) on exposure ====="
+===== Author-level Δ (yr - 2013) on exposure =====
+
+. preserve
+
+. keep athr_id year ppr_cnt cite_affl_wt exposure foia_athr
+
+. reshape wide ppr_cnt cite_affl_wt, i(athr_id exposure foia_athr) j(year)
+(j = 2010 2011 2012 2013 2014 2015 2016 2017 2018 2019)
+
+Data                               Long   ->   Wide
+-----------------------------------------------------------------------------
+Number of observations          122,730   ->   12,273      
+Number of variables                   6   ->   23          
+j variable (10 values)             year   ->   (dropped)
+xij variables:
+                                ppr_cnt   ->   ppr_cnt2010 ppr_cnt2011 ... ppr_
+> cnt2019
+                           cite_affl_wt   ->   cite_affl_wt2010 cite_affl_wt201
+> 1 ... cite_affl_wt2019
+-----------------------------------------------------------------------------
+
+. foreach yr in 2014 2015 2016 2017 2018 2019 {
+  2.     gen dp_`yr' = ppr_cnt`yr' - ppr_cnt2013
+  3.     gen dc_`yr' = cite_affl_wt`yr' - cite_affl_wt2013
+  4. }
+
+. di "----- ppr_cnt δ (should match main event study) -----"
+----- ppr_cnt δ (should match main event study) -----
+
+. foreach yr in 2014 2015 2016 2017 2018 2019 {
+  2.     di "yr = `yr'"
+  3.     qui reg dp_`yr' exposure, r
+  4.     di "  β_ppr_" %04.0f `yr' = " " %8.4f _b[exposure] "  se = " %8.4f _se
+> [exposure]
+  5. }
+yr = 2014
+  β_ppr_2014  -0.2172  se =   0.3672
+yr = 2015
+  β_ppr_2015  -0.4642  se =   0.3747
+yr = 2016
+  β_ppr_2016  -0.1884  se =   0.3773
+yr = 2017
+  β_ppr_2017  -0.6728  se =   0.3844
+yr = 2018
+  β_ppr_2018  -0.4740  se =   0.3889
+yr = 2019
+  β_ppr_2019  -0.6582  se =   0.3695
+
+. di "----- cite_affl_wt δ -----"
+----- cite_affl_wt δ -----
+
+. foreach yr in 2014 2015 2016 2017 2018 2019 {
+  2.     di "yr = `yr'"
+  3.     qui reg dc_`yr' exposure, r
+  4.     di "  β_cite_" %04.0f `yr' = " " %8.4f _b[exposure] "  se = " %8.4f _s
+> e[exposure]
+  5. }
+yr = 2014
+  β_cite_2014  -0.3309  se =   1.2793
+yr = 2015
+  β_cite_2015  -1.3451  se =   1.5969
+yr = 2016
+  β_cite_2016  -3.6739  se =   1.9462
+yr = 2017
+  β_cite_2017  -0.1280  se =   1.3414
+yr = 2018
+  β_cite_2018  -1.7322  se =   1.5388
+yr = 2019
+  β_cite_2019  -1.5443  se =   1.3406
+
+. 
+. * Impact of trimming top cite outliers
+. di as text "===== ppr_cnt 2016 rerun after dropping top 5 cite_affl_wt 2016 a
+> uthors ====="
+===== ppr_cnt 2016 rerun after dropping top 5 cite_affl_wt 2016 authors =====
+
+. gen high_cite_2016 = cite_affl_wt2016 > 100
+
+. count if high_cite_2016 == 1
+  7
+
+. list athr_id exposure foia_athr ppr_cnt2013 ppr_cnt2016 cite_affl_wt2013 cite
+> _affl_wt2016 if high_cite_2016==1, sep(0) noobs
+
+  +---------------------------------------------------------------------+
+  |     athr_id |  exposure | foia_a~r | ppr~2013 | ppr~2016 | cit~2013 |
+  | A5001670387 |  .0052251 |        0 |        3 |        3 | 3.992109 |
+  |---------------------------------------------------------------------|
+  |                              cit~2016                               |
+  |                              1091.972                               |
+  +---------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------+
+  |     athr_id |  exposure | foia_a~r | ppr~2013 | ppr~2016 | cit~2013 |
+  | A5020008219 | -.0046886 |        0 |        3 |        1 |  4.25825 |
+  |---------------------------------------------------------------------|
+  |                              cit~2016                               |
+  |                              380.6509                               |
+  +---------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------+
+  |     athr_id |  exposure | foia_a~r | ppr~2013 | ppr~2016 | cit~2013 |
+  | A5045720453 | -.0049173 |        0 |       12 |        9 | 46.27889 |
+  |---------------------------------------------------------------------|
+  |                              cit~2016                               |
+  |                              188.5566                               |
+  +---------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------+
+  |     athr_id |  exposure | foia_a~r | ppr~2013 | ppr~2016 | cit~2013 |
+  | A5055468442 |  .0519977 |        0 |        2 |        9 | 9.167065 |
+  |---------------------------------------------------------------------|
+  |                              cit~2016                               |
+  |                               204.025                               |
+  +---------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------+
+  |     athr_id |  exposure | foia_a~r | ppr~2013 | ppr~2016 | cit~2013 |
+  | A5061593498 |  .0666053 |        0 |        0 |        4 |        0 |
+  |---------------------------------------------------------------------|
+  |                              cit~2016                               |
+  |                              100.0366                               |
+  +---------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------+
+  |     athr_id |  exposure | foia_a~r | ppr~2013 | ppr~2016 | cit~2013 |
+  | A5082310752 | -.0036615 |        0 |        1 |       11 | 11.88761 |
+  |---------------------------------------------------------------------|
+  |                              cit~2016                               |
+  |                              113.2845                               |
+  +---------------------------------------------------------------------+
+
+  +---------------------------------------------------------------------+
+  |     athr_id |  exposure | foia_a~r | ppr~2013 | ppr~2016 | cit~2013 |
+  | A5083897996 | -.0053079 |        0 |        3 |        5 | 66.47601 |
+  |---------------------------------------------------------------------|
+  |                              cit~2016                               |
+  |                              112.6823                               |
+  +---------------------------------------------------------------------+
+
+. qui reg dp_2016 exposure if high_cite_2016 == 0, r
+
+. di "  β_ppr_2016 (no high cite) = " %8.4f _b[exposure] "  se = " %8.4f _se[ex
+> posure]
+  β_ppr_2016 (no high cite) =  -0.1883  se =   0.3768
+
+. qui reg dc_2016 exposure if high_cite_2016 == 0, r
+
+. di "  β_cite_2016 (no high cite) = " %8.4f _b[exposure] "  se = " %8.4f _se[e
+> xposure]
+  β_cite_2016 (no high cite) =  -1.6299  se =   1.2598
+
+. restore
+
+. 
+. 
+end of do-file

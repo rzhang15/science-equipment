@@ -1,0 +1,2 @@
+./samp/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/clean_ls_samp/output 
+./clinical/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/pubmed/edirect_pull/output 

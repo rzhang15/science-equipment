@@ -27,7 +27,6 @@ program get_coauthors
     drop _freq
     rename athr_id coauthor_id
     joinby id using ../temp/relevant_ppr_athrs, unmatched(both)
-    merge m:1 id using ../temp/relevant_ppr_athrs
     save ../temp/coathrs, replace
     contract athr_id coauthor_id
     drop _freq

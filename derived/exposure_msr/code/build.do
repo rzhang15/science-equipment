@@ -42,7 +42,7 @@ program gen_exposure
     use ../output/cleaned_merged_fois, clear
     replace spend = price * qty if mi(spend)
     drop if mi(spend)
-    gen lab_spend = spend if category != "Non-Lab" 
+    gen lab_spend = spend if category != "Non-Lab"
     replace lab_spend = 0 if mi(lab_spend)
     merge m:1 category using ../external/ml/categories_tfidf, assert(1 2 3)  keep(1 3) nogen
     gcollapse (sum) spend lab_spend (mean) keep, by(athr_id category year)
@@ -52,22 +52,36 @@ program gen_exposure
     gen spend_keep = spend if keep == 1
     replace spend_keep = 0 if mi(spend_keep)
     gen lab_spend_keep = lab_spend if keep == 1
-    replace lab_spend_keep = 0 if mi(lab_spend_keep)    
+    replace lab_spend_keep = 0 if mi(lab_spend_keep)
     gcollapse (sum) spend lab_spend  spend_keep lab_spend_keep, by(athr_id year)
     save ../output/athr_spend, replace
     restore
 
+    // Three definitions of the market spend share denominator:
+    //   hc         : sum over high-confidence markets (keep == 1)
+    //   all        : sum over all consumables (no keep restriction)
+    //   treated_hc : sum over treated high-confidence markets (keep == 1 & treated == 1)
+    //                → mkt_spend_shr sums to 1 per author by construction
+    foreach v in hc all treated_hc {
+        preserve
+        build_exposure_version `v'
+        restore
+    }
+end
+
+program build_exposure_version
+    args version
     keep if year <= 2013
     gcollapse (mean) spend lab_spend keep, by(athr_id category)
     bys athr_id: egen tot_spend = total(spend)
     bys athr_id: egen tot_lab_spend = total(lab_spend)
     gen lab_spend_shr = tot_lab_spend / tot_spend
     drop if category == "Non-Lab"
-    keep if keep == 1
-    bys athr_id: egen tot_hc_spend = total(spend)
-    gen hc_spend_shr = tot_hc_spend/tot_lab_spend
-    gen mkt_spend_shr = spend / tot_hc_spend
-   * gen mkt_spend_shr = spend / tot_lab_spend
+
+    // reference totals computed on all consumables, before any version-specific restriction
+    bys athr_id: egen tot_hc_spend = total(spend * (keep == 1))
+    gen hc_spend_shr = tot_hc_spend / tot_lab_spend
+
     // align slash → hyphen so the two betas in did_coefs merge
     replace category = "acrylamide-bis solution" if category == "acrylamide/bis solution"
     replace category = "dmem-f-12" if category == "dmem/f-12"
@@ -75,26 +89,39 @@ program gen_exposure
     rename _merge has_beta
     replace has_beta = 0 if has_beta == 1
     replace has_beta = 1 if has_beta == 3
-    *keep if has_beta == 1
-    bys athr_id: egen tot_treated_spend = total(spend)
-    *gen mkt_spend_shr = spend / tot_treated_spend
-    * gen exposure = b*lab_spend_shr*mkt_spend_shr
+    bys athr_id: egen tot_treated_hc_spend = total(spend * (keep == 1 & treated == 1))
+
+    // version-specific sample restriction (defines which markets enter the denominator)
+    if "`version'" == "hc" {
+        keep if keep == 1
+    }
+    else if "`version'" == "treated_hc" {
+        keep if keep == 1 & treated == 1
+    }
+    // "all": no restriction — denominator spans all consumables
+
+    bys athr_id: egen tot_shr_spend = total(spend)
+    gen mkt_spend_shr = spend / tot_shr_spend
+
     gen exposure = b*mkt_spend_shr
     gen treated_spend = spend if treated == 1
-    replace mkt_spend_shr = . if has_beta == 0 
+    replace mkt_spend_shr = . if has_beta == 0
     preserve
-    contract athr_id category mkt_spend_shr spend tot_hc_spend
-    save ../output/athr_exposure_by_category, replace
+    contract athr_id category mkt_spend_shr spend tot_shr_spend tot_hc_spend
+    save ../output/athr_exposure_by_category_`version', replace
     restore
 
-    collapse (sum) exposure treated_spend mkt_spend_shr (mean) hc_spend_shr tot_hc_spend lab_spend_shr tot_lab_spend tot_spend, by(athr_id)
+    collapse (sum) exposure treated_spend mkt_spend_shr ///
+             (mean) tot_shr_spend tot_hc_spend hc_spend_shr tot_treated_hc_spend ///
+                    lab_spend_shr tot_lab_spend tot_spend, ///
+             by(athr_id)
     drop if treated_spend == 0
     drop if mi(exposure)
-    save ../output/athr_exposure, replace
+    save ../output/athr_exposure_`version', replace
     preserve
     contract athr_id
     drop _freq
-    save ../output/athr_exposure_list, replace
+    save ../output/athr_exposure_list_`version', replace
     restore
 end
 

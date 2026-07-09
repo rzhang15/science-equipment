@@ -10,7 +10,7 @@ Inputs
 ------
 ../temp/paper_athr_field_year_pct.parquet   (from step 01)
 ../temp/papers_all.parquet                  (from step 00; for inst_id history)
-../external/clusters/author_static_clusters_5.csv
+../external/clusters/author_static_clusters_30.csv
 
 Output
 ------
@@ -19,20 +19,29 @@ Output
 Columns (one row per athr_id with >= 1 pre-2014 publication)
 ------------------------------------------------------------
 athr_id
-mean_cite_pct_pre       mean(cite_pct) over the PI's pre-2014 paper-author rows
+sum_cite_pct_pre        sum(cite_pct) over the PI's pre-2014 paper-author rows
+                        (nulls skipped). Used by 02c to build the leave-one-
+                        paper-out mean for training rows.
+n_nonnull_cite_pct_pre  count of pre-2014 paper-author rows for this PI with
+                        non-null cite_pct.
+mean_cite_pct_pre       sum_cite_pct_pre / n_nonnull_cite_pct_pre (full mean).
+                        Used for scoring rows (year >= 2014) where the LOO
+                        adjustment is identity.
 total_pubs_pre          n distinct (id, athr_id) pre-2014
 top15_count_pre         n pre-2014 paper-author rows with y_top15 == 1
 min_year                min(year) over the full panel (PI age)
 pubs_per_yr_pre         total_pubs_pre / (2013 - min_year + 1)
-pi_cluster5             k=5 author cluster
+pi_cluster              k=30 author cluster
 r1_share_pre            share of pre-2014 paper-author rows at an R1 institution
-is_r1_modal             1 if r1_share_pre >= 0.5
 n_coauthors_pre         distinct coauthors observed on pre-2014 papers, capped
                         at team-size 50 to bound the self-join
 
 The PI's modal pre-2013 cluster (used to define topic_distance_from_PI_core in
 step 02c) is computed there, not here, since it needs the paper_modal_cluster
 from step 02.
+
+is_r1_modal (= r1_share_pre >= 0.5) was previously emitted here. Dropped:
+it's mathematically redundant with r1_share_pre and had ~0 gain in trees.
 """
 
 import os
@@ -43,7 +52,8 @@ import polars as pl
 
 PCT = "../temp/paper_athr_field_year_pct.parquet"
 PAPERS = "../temp/papers_all.parquet"
-CLUSTERS = "../external/clusters/author_static_clusters_5.csv"
+# k=30 US-specific clusters (us_cluster_fields). Same file consumed by 01/02.
+CLUSTERS = "../external/clusters/author_static_clusters_30.csv"
 IPEDS = "../external/ipeds/ipeds_openalex.csv"
 DST = "../temp/pi_features.parquet"
 
@@ -69,10 +79,17 @@ def main():
     pre = pct.filter(pl.col("year") < 2014)
 
     print("computing self-track-record features (pre-2014)", flush=True)
+    # Emit sum + non-null count so 02c can build the leave-one-paper-out mean
+    # for training rows (row's own cite_pct otherwise contaminates the feature).
     self_feats = pre.group_by("athr_id").agg(
-        mean_cite_pct_pre=pl.col("cite_pct").mean(),
-        total_pubs_pre=pl.col("id").n_unique(),
-        top15_count_pre=pl.col("y_top15").sum(),
+        sum_cite_pct_pre=pl.col("cite_pct").sum(),
+        n_nonnull_cite_pct_pre=pl.col("cite_pct").count().cast(pl.Int64),
+        total_pubs_pre=pl.col("id").n_unique().cast(pl.Int64),
+        top15_count_pre=pl.col("y_top15").sum().cast(pl.Int64),
+    ).with_columns(
+        mean_cite_pct_pre=pl.when(pl.col("n_nonnull_cite_pct_pre") > 0)
+        .then(pl.col("sum_cite_pct_pre") / pl.col("n_nonnull_cite_pct_pre"))
+        .otherwise(None)
     )
 
     pi = self_feats.join(min_year, on="athr_id", how="left").with_columns(
@@ -86,8 +103,8 @@ def main():
     print(f"reading clusters {CLUSTERS}", flush=True)
     clusters = (
         pl.read_csv(CLUSTERS, schema_overrides={"cluster_label": pl.Int32})
-        .rename({"cluster_label": "pi_cluster5"})
-        .select(["athr_id", "pi_cluster5"])
+        .rename({"cluster_label": "pi_cluster"})
+        .select(["athr_id", "pi_cluster"])
         .unique(subset=["athr_id"])
     )
     pi = pi.join(clusters, on="athr_id", how="left")
@@ -109,8 +126,6 @@ def main():
     )
     r1 = papers_pre.group_by("athr_id").agg(
         r1_share_pre=pl.col("r1_flag").mean()
-    ).with_columns(
-        is_r1_modal=(pl.col("r1_share_pre") >= 0.5).cast(pl.Int8)
     )
     pi = pi.join(r1, on="athr_id", how="left")
 

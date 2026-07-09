@@ -19,3 +19,6 @@ foreach f in clinical diseases fundamental therapeutics {
 rename v1 pmid
 gduplicates drop pmid, force
 save ../output/pmids, replace
+
+import delimited using clinical_results.txt, clear
+save ../output/clinical_pmids, replace

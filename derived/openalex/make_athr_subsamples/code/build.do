@@ -9,15 +9,18 @@ here, set
 set maxvar 120000
 program main
 
-foreach samp in last firstlast first { 
-    create_athr_split, samp(top_jrnls) cut(`samp')
+foreach samp in last firstlast first {
+    *create_athr_split, samp(top_jrnls) cut(`samp') src(openalex)
+    create_athr_split, samp(top_jrnls_no_clin) cut(`samp') src(openalex_no_clin)
+    create_athr_split, samp(all_jrnls_no_clin) cut(`samp') src(openalex_no_clin)
 }
 end
 
 program create_athr_split
-    syntax, samp(str) cut(str)
+    syntax, samp(str) cut(str) [src(str)]
+    if "`src'" == "" local src "openalex"
     cap mkdir "../output/`cut'"
-    use id pmid which_athr which_affl pub_date year jrnl cite_count front_only body_only patent_count athr_id athr_name  stateshort region inst_id country_code country city us_state msacode msatitle msa_comb msa_c_world inst using ../external/openalex/cleaned_`samp', clear
+    use id pmid which_athr which_affl pub_date year jrnl cite_count front_only body_only patent_count athr_id athr_name  stateshort region inst_id country_code country city us_state msacode msatitle msa_comb msa_c_world inst using ../external/`src'/cleaned_`samp', clear
     bys id: egen first_athr = min(which_athr)
     bys id: egen last_athr = max(which_athr)
     if "`cut'" == "firstlast" {

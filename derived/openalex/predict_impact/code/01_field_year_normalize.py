@@ -2,13 +2,13 @@
 01_field_year_normalize.py
 
 For every (paper, athr_id) row, compute the citation percentile within the
-(author's cluster_5 field, publication year) bucket and the two binary impact
+(author's cluster_30 field, publication year) bucket and the two binary impact
 targets.
 
 Inputs
 ------
 ../temp/papers_all.parquet                              (from step 00)
-../external/clusters/author_static_clusters_5.csv       (athr_id -> cluster_label)
+../external/clusters/author_static_clusters_30.csv      (athr_id -> cluster_label)
 
 Output
 ------
@@ -24,7 +24,7 @@ y_top15         jrnl in TOP_JRNLS
 Notes
 -----
 - field is attached at the author-row level: every (paper, athr_id) row inherits
-  the author's k=5 cluster. Same convention the PI-year panel uses via affl_wt.
+  the author's k=30 cluster. Same convention the PI-year panel uses via affl_wt.
 - Authors not in the cluster file are dropped (they'd be unrankable without a
   field). Reports the drop rate.
 - avg_cite_yr is null for rows where years_since_pub is 0 in clean_ls_samp; we
@@ -41,7 +41,9 @@ import time
 import polars as pl
 
 PAPERS = "../temp/papers_all.parquet"
-CLUSTERS = "../external/clusters/author_static_clusters_5.csv"
+# k=30 US-specific clusters (us_cluster_fields). Non-US authors have no cluster
+# label here and get dropped from the field-year normalization.
+CLUSTERS = "../external/clusters/author_static_clusters_30.csv"
 DST = "../temp/paper_athr_field_year_pct.parquet"
 
 # Mirror make_jrnl_cuts/code/build.do line 16.
