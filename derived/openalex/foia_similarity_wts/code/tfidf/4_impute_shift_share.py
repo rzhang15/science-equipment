@@ -1,18 +1,15 @@
 """
-Shift-share imputation. Impute the PI x market share MATRIX, then multiply
-imputed shares by observed market shocks. Shocks enter exactly (never
-smoothed); only the shares are imputed. Supports three denominator versions
-matching athr_exposure_{hc,all,treated_hc}.dta, and two smoothers (K-NN
-weights W, or per-market Ridge on TF-IDF).
+Shift-share imputation. Impute the PI x market share MATRIX using K-NN
+weights W, then multiply imputed shares by observed market shocks. Shocks
+enter exactly (never smoothed); only the shares are imputed. Supports
+three denominator versions matching athr_exposure_{hc,all,treated_hc}.dta.
 
 Math:
   s_ik    = (PI i's pre-period spend in market k) / (PI i's pre-period DENOM)
   S       sparse FOIA x K_treated
-  S_hat   = smoothed universe x K_treated
-              K-NN:  W @ S
-              Ridge: fit Ridge(X_foia -> S[:,k]) per market k, predict on X_univ
-  z_hat   = S_hat @ g      universe x 1 shift-share exposure
-  S_sum   = rowsum(S_hat)  universe x 1 sum-of-shares control (mkt_spend_shr)
+  S_hat   = W @ S           universe x K_treated
+  z_hat   = S_hat @ g       universe x 1 shift-share exposure
+  S_sum   = rowsum(S_hat)   universe x 1 sum-of-shares control (mkt_spend_shr)
 
 Denominators per --version:
   hc         : denom = sum of PI's spend on (Non-Lab==False & keep==1) categories
@@ -27,27 +24,19 @@ Denominators per --version:
 Inputs:
   ../../external/exposure_wts/athr_category_spend.dta       PI x category x year
   --betas-path (default did_coefs_eb_price.dta)             per-market shocks g_k = b
-  # for --method knn:
   ../../output/weight_matrix{tag}.npz                       universe x FOIA W
-  # for --method ridge:
-  ../../output/tfidf_foia{tag}.npz                          n_foia x V TF-IDF
-  ../../output/tfidf_universe{tag}.npz                      n_univ x V TF-IDF
   ../../output/foia_ids_ordered{tag}.csv                    row order
   ../../output/universe_ids{tag}.parquet                    row order
 
-Outputs (per --version, per --method):
-  ../../output/final_imputed_shift_share_{version}{tag}{method_sfx}{filter_sfx}.csv
+Outputs (per --version):
+  ../../output/final_imputed_shift_share_{version}{tag}{filter_sfx}.csv
        columns: athr_id, exposure_ss, sum_imputed_shares
-  ../../output/imputed_shares_matrix_{version}{tag}{method_sfx}{filter_sfx}.npz
+  ../../output/imputed_shares_matrix_{version}{tag}{filter_sfx}.npz
        S_hat as CSR
-  ../../output/imputed_shares_markets_{version}{tag}{method_sfx}{filter_sfx}.csv
+  ../../output/imputed_shares_markets_{version}{tag}{filter_sfx}.csv
        per-market diagnostics: category, g, s_bar, rotemberg_wt, n_foia_pis
-       (+ alpha, in_r2 for --method ridge)
-  ../../output/shock_balance_{version}{tag}{method_sfx}{filter_sfx}.csv
+  ../../output/shock_balance_{version}{tag}{filter_sfx}.csv
        BHJ shock-balance regression coefficients.
-
-method_sfx = ""     for knn (backward-compat with existing K-NN outputs)
-           = "_ridge" for ridge
 """
 import argparse
 import os
@@ -55,7 +44,6 @@ import numpy as np
 import pandas as pd
 import scipy.sparse as sp
 from scipy.stats import norm
-from sklearn.linear_model import Ridge, RidgeCV
 
 OUT_DIR = "../../output"
 CATEGORY_SPEND_FILE = "../../external/exposure_wts/athr_category_spend.dta"
@@ -70,7 +58,6 @@ DEFAULT_BETAS_FILE = (
 )
 PRE_PERIOD_LAST_YEAR = 2013
 VERSIONS = ["hc", "all", "treated_hc"]
-DEFAULT_ALPHAS = np.logspace(-3, 4, 30)
 
 CATEGORY_RENAMES = {
     "acrylamide/bis solution": "acrylamide-bis solution",
@@ -232,45 +219,6 @@ def impute_knn(S, W):
     return (W @ S).tocsr()
 
 
-def impute_ridge(S, X_foia, X_univ, alphas, clip_nonneg=True, verbose=True):
-    """Per-market ridge. For each column k of S:
-        RidgeCV on (X_foia, S[:,k]) -> alpha_k
-        Ridge fit -> beta_k, intercept_k
-        pred_k = X_univ @ beta_k + intercept_k
-    Returns (S_hat as CSR, per-market diagnostics as DataFrame)."""
-    K = S.shape[1]
-    n_univ = X_univ.shape[0]
-    S_hat = np.zeros((n_univ, K), dtype=np.float64)
-    diag_rows = []
-    S_dense = S.toarray() if sp.issparse(S) else np.asarray(S)
-    for k in range(K):
-        y = S_dense[:, k].astype(np.float64)
-        n_nz = int((y > 0).sum())
-        if y.std() == 0.0 or n_nz == 0:
-            S_hat[:, k] = float(y.mean())
-            diag_rows.append({"col": k, "alpha": np.nan, "in_r2": 0.0,
-                              "n_nonzero": n_nz})
-            if verbose:
-                print(f"    market {k+1}/{K}: zero variance, using mean={y.mean():.4g}",
-                      flush=True)
-            continue
-        cv = RidgeCV(alphas=alphas, fit_intercept=True, scoring=None, cv=None)
-        cv.fit(X_foia, y)
-        alpha = float(cv.alpha_)
-        model = Ridge(alpha=alpha, fit_intercept=True).fit(X_foia, y)
-        pred = X_univ.dot(model.coef_.astype(np.float64)) + float(model.intercept_)
-        if clip_nonneg:
-            np.maximum(pred, 0.0, out=pred)
-        S_hat[:, k] = pred
-        in_r2 = float(model.score(X_foia, y))
-        diag_rows.append({"col": k, "alpha": alpha, "in_r2": in_r2,
-                          "n_nonzero": n_nz})
-        if verbose and (k + 1) % 10 == 0:
-            print(f"    market {k+1}/{K}  alpha={alpha:.3g}  in_R2={in_r2:.3f}  "
-                  f"n_nz={n_nz}", flush=True)
-    return sp.csr_matrix(S_hat), pd.DataFrame(diag_rows)
-
-
 def apply_filters(df_univ, S_hat, args, df_foia, diag_file):
     """Apply --min-max-sim and --cluster-filter (mirrors 3_impute_exposure.py).
     Returns filtered (df_univ, S_hat)."""
@@ -321,17 +269,8 @@ def main():
                          "Empty = baseline artifacts.")
     ap.add_argument("--versions", nargs="+", default=VERSIONS, choices=VERSIONS,
                     help="Which exposure-denominator versions to impute (loops).")
-    ap.add_argument("--method", choices=["knn", "ridge"], default="knn",
-                    help="Smoother for S -> S_hat. 'knn' uses the W matrix from "
-                         "2_similarity_wts.py (backward-compat with the previous "
-                         "4_ default). 'ridge' fits a Ridge per market on TF-IDF, "
-                         "using the same X_foia/X_univ artifacts as "
-                         "3_impute_exposure_ridge.py.")
     ap.add_argument("--betas-path", default=DEFAULT_BETAS_FILE,
                     help="Stata file with columns [category, b] giving per-market shocks.")
-    ap.add_argument("--alphas", nargs="+", type=float, default=None,
-                    help="Ridge alpha grid (only used if --method ridge). "
-                         "Default logspace(-3, 4, 30).")
     ap.add_argument("--cluster-filter", default="",
                     help="author_static_clusters_K.csv from openalex/cluster_fields. "
                          "After imputation, drop universe authors whose K-cluster "
@@ -350,7 +289,6 @@ def main():
     if tag and not tag.startswith("_"):
         tag = "_" + tag
 
-    method_sfx = "" if args.method == "knn" else "_ridge"
     filter_sfx = ""
     if args.cluster_filter:
         filter_sfx += "_cf" if args.min_foia_per_cluster <= 1 else f"_cf{args.min_foia_per_cluster}"
@@ -385,38 +323,18 @@ def main():
     print(f"  g_k stats: mean={g.mean():.4f}  sd={g.std():.4f}  "
           f"min={g.min():.4f}  max={g.max():.4f}")
 
-    # ---- Load the smoother once (W for knn, TF-IDF for ridge) ----
-    W = None
-    X_foia = None
-    X_univ = None
-    if args.method == "knn":
-        weights_file = f"{OUT_DIR}/weight_matrix{tag}.npz"
-        if not os.path.exists(weights_file):
-            raise SystemExit(f"missing: {weights_file}")
-        print(f"Loading W (tag={args.tag!r}) ...")
-        W = sp.load_npz(weights_file)
-        print(f"  W shape: {W.shape}  nnz: {W.nnz:,}")
-        report_W_health(W)
-        if W.shape != (len(df_univ_master), len(foia_ids)):
-            raise SystemExit(
-                f"W shape {W.shape} != (n_univ={len(df_univ_master)}, n_foia={len(foia_ids)})"
-            )
-    else:
-        foia_matrix_file = f"{OUT_DIR}/tfidf_foia{tag}.npz"
-        univ_matrix_file = f"{OUT_DIR}/tfidf_universe{tag}.npz"
-        for p in (foia_matrix_file, univ_matrix_file):
-            if not os.path.exists(p):
-                raise SystemExit(f"missing: {p}")
-        print(f"Loading TF-IDF matrices (tag={args.tag!r}) ...")
-        X_foia = sp.load_npz(foia_matrix_file).tocsr().astype(np.float64)
-        X_univ = sp.load_npz(univ_matrix_file).tocsr()
-        print(f"  X_foia={X_foia.shape}  X_univ={X_univ.shape}  dtype={X_univ.dtype}")
-        if X_foia.shape[0] != len(foia_ids):
-            raise SystemExit(f"X_foia rows {X_foia.shape[0]} != n_foia {len(foia_ids)}")
-        if X_univ.shape[0] != len(df_univ_master):
-            raise SystemExit(f"X_univ rows {X_univ.shape[0]} != n_univ {len(df_univ_master)}")
-
-    alphas = np.asarray(args.alphas) if args.alphas else DEFAULT_ALPHAS
+    # ---- Load W once (shared across versions) ----
+    weights_file = f"{OUT_DIR}/weight_matrix{tag}.npz"
+    if not os.path.exists(weights_file):
+        raise SystemExit(f"missing: {weights_file}")
+    print(f"Loading W (tag={args.tag!r}) ...")
+    W = sp.load_npz(weights_file)
+    print(f"  W shape: {W.shape}  nnz: {W.nnz:,}")
+    report_W_health(W)
+    if W.shape != (len(df_univ_master), len(foia_ids)):
+        raise SystemExit(
+            f"W shape {W.shape} != (n_univ={len(df_univ_master)}, n_foia={len(foia_ids)})"
+        )
 
     # ---- PI characteristics (shared) ----
     print("Computing FOIA pre-period characteristics ...")
@@ -426,7 +344,7 @@ def main():
     version_summary_rows = []
     for version in args.versions:
         print(f"\n{'='*78}")
-        print(f"version={version}   method={args.method}   tag={args.tag!r}")
+        print(f"version={version}   tag={args.tag!r}")
         print(f"{'='*78}")
 
         share_path = CATEGORY_SHARE_FILE.format(version=version)
@@ -443,12 +361,8 @@ def main():
               f"p5={int(np.percentile(cov,5))}  p50={int(np.percentile(cov,50))}  "
               f"p95={int(np.percentile(cov,95))}  max={cov.max()}")
 
-        print(f"Imputing shares  (method={args.method})  ...")
-        if args.method == "knn":
-            S_hat = impute_knn(S, W)
-            ridge_diag = None
-        else:
-            S_hat, ridge_diag = impute_ridge(S, X_foia, X_univ, alphas)
+        print("Imputing shares  S_hat = W @ S  ...")
+        S_hat = impute_knn(S, W)
 
         print("Aggregating: z_hat = S_hat @ g,  S_sum = rowsum(S_hat) ...")
         z_hat = np.asarray(S_hat @ g).ravel()
@@ -502,7 +416,7 @@ def main():
         df_univ, S_hat = apply_filters(df_univ, S_hat, args, df_foia, diag_file)
 
         # ---- Save outputs (version-specific filenames) ----
-        stem = f"_{version}{tag}{method_sfx}{filter_sfx}"
+        stem = f"_{version}{tag}{filter_sfx}"
         out_csv = f"{OUT_DIR}/final_imputed_shift_share{stem}.csv"
         out_npz = f"{OUT_DIR}/imputed_shares_matrix{stem}.npz"
         out_markets = f"{OUT_DIR}/imputed_shares_markets{stem}.csv"
@@ -518,11 +432,6 @@ def main():
             "rotemberg_wt": rot_wt,
             "n_foia_pis": coverage.to_numpy(),
         })
-        if ridge_diag is not None:
-            markets_df = markets_df.merge(
-                ridge_diag.rename(columns={"col": "market_idx"}),
-                on="market_idx", how="left",
-            )
         markets_df.to_csv(out_markets, index=False)
 
         if balance_df is not None:
@@ -536,7 +445,6 @@ def main():
 
         version_summary_rows.append({
             "version": version,
-            "method":  args.method,
             "n_foia_with_shares":     int((np.asarray(S.sum(axis=1)).ravel() > 0).sum()),
             "z_hat_mean_universe":    float(z_hat.mean()),
             "z_hat_sd_universe":      float(z_hat.std()),
@@ -553,7 +461,7 @@ def main():
                            "display.max_columns", None,
                            "display.float_format", "{:.4f}".format):
         print(df_summary.to_string(index=False))
-    summary_out = f"{OUT_DIR}/shift_share_summary{tag}{method_sfx}{filter_sfx}.csv"
+    summary_out = f"{OUT_DIR}/shift_share_summary{tag}{filter_sfx}.csv"
     df_summary.to_csv(summary_out, index=False)
     print(f"\nSaved {summary_out}")
     print("Done!")

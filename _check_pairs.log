@@ -1,0 +1,185 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 120,000; see help set_maxvar.
+
+. do /tmp/_check_pairs.do 
+
+. set more off
+
+. capture log close
+
+. log using /tmp/_check_pairs.log, replace text
+(file /tmp/_check_pairs.log not found)
+-------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  /tmp/_check_pairs.log
+  log type:  text
+ opened on:  16 Jul 2026, 12:00:11
+
+. 
+. global IC_ALIASES contr fdlsb fdls fdlsh gntsf hhlsb hhls hhlsh nflsb nfls nf
+> lsh ///
+>     subrf busf fedf tfnd instf nonpf statf lsf hsf biof applx apfx basx bfx c
+> linx ///
+>     devx lscx medx endow
+
+. global PI_Q_BASES pre_ppr grants team coauth msa
+
+. 
+. global IC_PAIRS_MED
+
+. global IC_PAIRS_Q
+
+. foreach a of global IC_ALIASES {
+  2.     global IC_PAIRS_MED `"${IC_PAIRS_MED} "hi_`a' lo_`a'" "'
+  3.     global IC_PAIRS_Q   `"${IC_PAIRS_Q} "q4_`a' q1_`a'" "'
+  4. }
+
+. global PI_PAIRS_Q
+
+. foreach b of global PI_Q_BASES {
+  2.     global PI_PAIRS_Q `"${PI_PAIRS_Q} "q4_`b' q1_`b'" "'
+  3. }
+
+. 
+. di as text "-- IC_PAIRS_MED iteration --"
+-- IC_PAIRS_MED iteration --
+
+. local n = 0
+
+. foreach pair of global IC_PAIRS_MED {
+  2.     local ++n
+  3.     local g1 : word 1 of `pair'
+  4.     local g2 : word 2 of `pair'
+  5.     di as text "  `n': g1=`g1' g2=`g2'"
+  6. }
+  1: g1=hi_contr g2=lo_contr
+  2: g1=hi_fdlsb g2=lo_fdlsb
+  3: g1=hi_fdls g2=lo_fdls
+  4: g1=hi_fdlsh g2=lo_fdlsh
+  5: g1=hi_gntsf g2=lo_gntsf
+  6: g1=hi_hhlsb g2=lo_hhlsb
+  7: g1=hi_hhls g2=lo_hhls
+  8: g1=hi_hhlsh g2=lo_hhlsh
+  9: g1=hi_nflsb g2=lo_nflsb
+  10: g1=hi_nfls g2=lo_nfls
+  11: g1=hi_nflsh g2=lo_nflsh
+  12: g1=hi_subrf g2=lo_subrf
+  13: g1=hi_busf g2=lo_busf
+  14: g1=hi_fedf g2=lo_fedf
+  15: g1=hi_tfnd g2=lo_tfnd
+  16: g1=hi_instf g2=lo_instf
+  17: g1=hi_nonpf g2=lo_nonpf
+  18: g1=hi_statf g2=lo_statf
+  19: g1=hi_lsf g2=lo_lsf
+  20: g1=hi_hsf g2=lo_hsf
+  21: g1=hi_biof g2=lo_biof
+  22: g1=hi_applx g2=lo_applx
+  23: g1=hi_apfx g2=lo_apfx
+  24: g1=hi_basx g2=lo_basx
+  25: g1=hi_bfx g2=lo_bfx
+  26: g1=hi_clinx g2=lo_clinx
+  27: g1=hi_devx g2=lo_devx
+  28: g1=hi_lscx g2=lo_lscx
+  29: g1=hi_medx g2=lo_medx
+  30: g1=hi_endow g2=lo_endow
+
+. di as text "TOTAL med pairs: `n'"
+TOTAL med pairs: 30
+
+. 
+. di as text "-- IC_PAIRS_Q iteration --"
+-- IC_PAIRS_Q iteration --
+
+. local n = 0
+
+. foreach pair of global IC_PAIRS_Q {
+  2.     local ++n
+  3.     local g1 : word 1 of `pair'
+  4.     local g2 : word 2 of `pair'
+  5.     di as text "  `n': g1=`g1' g2=`g2'"
+  6. }
+  1: g1=q4_contr g2=q1_contr
+  2: g1=q4_fdlsb g2=q1_fdlsb
+  3: g1=q4_fdls g2=q1_fdls
+  4: g1=q4_fdlsh g2=q1_fdlsh
+  5: g1=q4_gntsf g2=q1_gntsf
+  6: g1=q4_hhlsb g2=q1_hhlsb
+  7: g1=q4_hhls g2=q1_hhls
+  8: g1=q4_hhlsh g2=q1_hhlsh
+  9: g1=q4_nflsb g2=q1_nflsb
+  10: g1=q4_nfls g2=q1_nfls
+  11: g1=q4_nflsh g2=q1_nflsh
+  12: g1=q4_subrf g2=q1_subrf
+  13: g1=q4_busf g2=q1_busf
+  14: g1=q4_fedf g2=q1_fedf
+  15: g1=q4_tfnd g2=q1_tfnd
+  16: g1=q4_instf g2=q1_instf
+  17: g1=q4_nonpf g2=q1_nonpf
+  18: g1=q4_statf g2=q1_statf
+  19: g1=q4_lsf g2=q1_lsf
+  20: g1=q4_hsf g2=q1_hsf
+  21: g1=q4_biof g2=q1_biof
+  22: g1=q4_applx g2=q1_applx
+  23: g1=q4_apfx g2=q1_apfx
+  24: g1=q4_basx g2=q1_basx
+  25: g1=q4_bfx g2=q1_bfx
+  26: g1=q4_clinx g2=q1_clinx
+  27: g1=q4_devx g2=q1_devx
+  28: g1=q4_lscx g2=q1_lscx
+  29: g1=q4_medx g2=q1_medx
+  30: g1=q4_endow g2=q1_endow
+
+. di as text "TOTAL quart pairs: `n'"
+TOTAL quart pairs: 30
+
+. 
+. di as text "-- PI_PAIRS_Q iteration --"
+-- PI_PAIRS_Q iteration --
+
+. local n = 0
+
+. foreach pair of global PI_PAIRS_Q {
+  2.     local ++n
+  3.     local g1 : word 1 of `pair'
+  4.     local g2 : word 2 of `pair'
+  5.     di as text "  `n': g1=`g1' g2=`g2'"
+  6. }
+  1: g1=q4_pre_ppr g2=q1_pre_ppr
+  2: g1=q4_grants g2=q1_grants
+  3: g1=q4_team g2=q1_team
+  4: g1=q4_coauth g2=q1_coauth
+  5: g1=q4_msa g2=q1_msa
+
+. di as text "TOTAL PI quart pairs: `n'"
+TOTAL PI quart pairs: 5
+
+. 
+. log close
+      name:  <unnamed>
+       log:  /tmp/_check_pairs.log
+  log type:  text
+ closed on:  16 Jul 2026, 12:00:11
+-------------------------------------------------------------------------------
+
+. 
+end of do-file

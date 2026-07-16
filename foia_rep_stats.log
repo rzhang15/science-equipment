@@ -1,0 +1,151 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 120,000; see help set_maxvar.
+
+. do /tmp/foia_rep_stats.do 
+
+. use /n/home02/cxu75/sci_eq/analysis/reduced_form/temp/es_all_jrnls_r1_r2_publ
+> ic, clear
+
+. bys athr_id: gen _one = _n == 1
+
+. qui count if _one == 1
+
+. di as text "Total PIs in analysis panel: " r(N)
+Total PIs in analysis panel: 6382
+
+. qui count if _one == 1 & foia_athr == 1
+
+. di as text "FOIA-anchored PIs: " r(N)
+FOIA-anchored PIs: 69
+
+. 
+. // pre-merger annual pubs (per PI-year, year < 2014)
+. qui sum ppr_cnt if year < 2014
+
+. di as text "Full panel pre-2014 mean ppr_cnt (per PI-year): " %6.3f r(mean)
+Full panel pre-2014 mean ppr_cnt (per PI-year):  2.344
+
+. qui sum ppr_cnt if year < 2014 & foia_athr == 1
+
+. di as text "FOIA-anchored pre-2014 mean ppr_cnt (per PI-year): " %6.3f r(mean
+> )
+FOIA-anchored pre-2014 mean ppr_cnt (per PI-year):  1.953
+
+. 
+. // pre-merger citation-weighted output (winsorized)
+. qui sum cite_affl_wt if year < 2014
+
+. di as text "Full panel pre-2014 mean cite_affl_wt: " %6.3f r(mean)
+Full panel pre-2014 mean cite_affl_wt:  4.214
+
+. qui sum cite_affl_wt if year < 2014 & foia_athr == 1
+
+. di as text "FOIA-anchored pre-2014 mean cite_affl_wt: " %6.3f r(mean)
+FOIA-anchored pre-2014 mean cite_affl_wt:  3.419
+
+. 
+. // R1 share (at PI level)
+. qui sum r1 if _one == 1
+
+. di as text "Full panel R1 share: " %6.3f r(mean)
+Full panel R1 share:  0.945
+
+. qui sum r1 if _one == 1 & foia_athr == 1
+
+. di as text "FOIA-anchored R1 share: " %6.3f r(mean)
+FOIA-anchored R1 share:  0.986
+
+. 
+. // Exposure at PI level
+. qui sum exposure if _one == 1
+
+. di as text "Full panel exposure mean: " %8.5f r(mean)
+Full panel exposure mean:  0.03162
+
+. qui sum exposure if _one == 1 & foia_athr == 1
+
+. di as text "FOIA-anchored exposure mean: " %8.5f r(mean)
+FOIA-anchored exposure mean:  0.02049
+
+. 
+. // Cluster distribution (30 clusters)
+. qui count if _one == 1 & !mi(cluster_30)
+
+. local nfull = r(N)
+
+. qui count if _one == 1 & foia_athr == 1 & !mi(cluster_30)
+
+. local nfoia = r(N)
+
+. di as text "Non-missing cluster PIs: full=" `nfull' " foia=" `nfoia'
+Non-missing cluster PIs: full=6382 foia=69
+
+. 
+. di as text ""
+
+
+. di as text "cluster full_pct foia_pct"
+cluster full_pct foia_pct
+
+. forvalues c = 0/29 {
+  2.     qui count if _one == 1 & cluster_30 == `c'
+  3.     local n_full = r(N)
+  4.     qui count if _one == 1 & cluster_30 == `c' & foia_athr == 1
+  5.     local n_foia = r(N)
+  6.     local pct_full = 100*`n_full'/`nfull'
+  7.     local pct_foia = 100*`n_foia'/`nfoia'
+  8.     di as text "`c'  " %7.3f `pct_full' "  " %7.3f `pct_foia'
+  9. }
+0    3.745    1.449
+1   11.673   17.391
+2    2.820    0.000
+3    6.722   10.145
+4    0.000    0.000
+5    5.421    2.899
+6    0.000    0.000
+7   11.642   21.739
+8    2.209    1.449
+9    0.000    0.000
+10    6.832    8.696
+11    0.000    0.000
+12    0.000    0.000
+13    4.309    2.899
+14    4.419    4.348
+15    1.489    2.899
+16    0.000    0.000
+17    1.222    1.449
+18    2.366    0.000
+19    4.528    7.246
+20    2.538    4.348
+21    0.000    0.000
+22   11.250    2.899
+23    1.990    1.449
+24    3.651    1.449
+25    5.092    4.348
+26    5.296    2.899
+27    0.000    0.000
+28    0.783    0.000
+29    0.000    0.000
+
+. 
+end of do-file

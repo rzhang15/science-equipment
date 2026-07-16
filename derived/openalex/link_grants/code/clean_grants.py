@@ -6,7 +6,7 @@ NIH grant numbers have the structure:
 e.g. 5R01HL088243-03A1. The "core" identifier (same grant across years,
 amendments, and application types) is IC + serial -> "HL088243".
 
-For each row from ../output/pi_grants.dta we produce:
+For each row we produce:
     clean_grant_id  - dedup key: NIH core (IC + 6-digit serial) when parseable,
                       otherwise an alnum-stripped uppercase form
     activity_code   - R01, K23, P01, ... when present
@@ -19,8 +19,18 @@ import re
 import pandas as pd
 from pathlib import Path
 
-SRC = Path("../output/pi_grants.dta")
-OUT = Path("../output/pi_grants_clean.dta")
+JOBS = [
+    {
+        "src": Path("../output/pi_grants.dta"),
+        "out": Path("../output/pi_grants_clean.dta"),
+        "by": ["athr_id", "year", "clean_grant_id", "agency", "country"],
+    },
+    {
+        "src": Path("../output/pi_ppr_grants.dta"),
+        "out": Path("../output/pi_ppr_grants_clean.dta"),
+        "by": ["pmid", "athr_id", "year", "clean_grant_id", "agency", "country"],
+    },
+]
 
 # pattern A: [opt 1-digit type][3-char activity, e.g. R01/U01/K23][2L IC][5-7 digit serial][rest]
 PAT_A = re.compile(r"^[0-9]?([A-Z][0-9A-Z]{2})([A-Z]{2})([0-9]{5,7})")
@@ -47,9 +57,9 @@ def parse_nih(norm: str):
     return "", "", ""
 
 
-def main():
-    df = pd.read_stata(SRC, convert_categoricals=False)
-    print(f"read {len(df):,} rows from {SRC}")
+def clean_file(src: Path, out: Path, by: list):
+    df = pd.read_stata(src, convert_categoricals=False)
+    print(f"read {len(df):,} rows from {src}")
 
     # normalize: upper, strip all non-alnum
     norm = (df["grant_id"].astype(str)
@@ -82,7 +92,6 @@ def main():
     df["orig_grant_id"] = df["grant_id"]
     df["_one"] = 1
 
-    by = ["athr_id", "year", "clean_grant_id", "agency", "country"]
     agg = {
         "orig_grant_id": "first",
         "activity_code": "first",
@@ -94,10 +103,18 @@ def main():
     before = len(df)
     df = df.groupby(by, dropna=False, as_index=False, sort=False).agg(agg)
     df = df.rename(columns={"_one": "n_records"})
-    print(f"collapsed {before:,} -> {len(df):,} unique (athr_id, year, clean_grant_id, agency, country)")
+    print(f"collapsed {before:,} -> {len(df):,} unique ({', '.join(by)})")
 
-    df.to_stata(OUT, write_index=False, version=118)
-    print(f"wrote {len(df):,} rows to {OUT}")
+    df.to_stata(out, write_index=False, version=118)
+    print(f"wrote {len(df):,} rows to {out}")
+
+
+def main():
+    for job in JOBS:
+        if not job["src"].exists():
+            print(f"skipping {job['src']} (not found)")
+            continue
+        clean_file(job["src"], job["out"], job["by"])
 
 
 if __name__ == "__main__":

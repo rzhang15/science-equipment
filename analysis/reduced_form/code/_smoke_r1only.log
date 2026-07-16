@@ -1,0 +1,3782 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 120,000; see help set_maxvar.
+
+. do /tmp/_smoke_r1only.do 
+
+. set more off
+
+. tempfile stripped
+
+. !sed -e '/^clear all$/d' -e '/^capture log close$/d' -e '/^set scheme modern$
+> /d' -e 's/^main$/di as text "STUB-END"/' /n/holylabs/pakes_lab/Lab/sci_eq/ana
+> lysis/reduced_form/code/analysis.do > `stripped'
+
+
+. do `stripped'
+
+. set more off
+
+. program drop _all
+
+. preliminaries
+
+. version 17
+
+. 
+. * ============================================================
+. *  ONE PLACE TO SWITCH EXPOSURE MEASURE
+. *  EXPOSURE_VERSION : hc | all | treated_hc
+. *      -> picks both  ../external/exposure/final_imputed_exposure_${VER}${FLT}.csv
+. *                and  ../external/real_exposure/athr_exposure_${VER}.dta
+. *  EXPOSURE_FILTER  : ""  |  "_cf"  |  "_cf2"  |  "_cf5"
+. *      -> only affects the imputed CSV (post-imputation cluster filter)
+. * ============================================================
+. global EXPOSURE_VERSION "hc"
+
+. global EXPOSURE_FILTER  "_cf"
+
+. 
+. * ============================================================
+. *  ONE PLACE TO SWITCH FIXED EFFECTS
+. *  FE_MODE : "author"             (default) -> absorb(athr_id year) vce(cluster athr_id)
+. *            "inst_cluster"                  -> absorb(inst_id cluster_30 year) vce(cluster inst_id)
+. *            "inst_cluster_fldyr"            -> absorb(inst_id i.cluster_30#i.year) vce(cluster inst_id)
+. *  Event studies still use rel = -1 as the omitted reference regardless of mode:
+. *  int_lead1 (and its heterogeneity variants) is left out of the regressor list
+. *  explicitly, so the reference year is preserved even when there is no athr_id FE
+. *  to force collinearity dropping of int_lead1.
+. *  Honored by: event_study, pooled_did, ppml_specs, placebo_treatment, trim_top, robustness.
+. *  The "inst_cluster_fldyr" mode drops year main effects and replaces them with
+. *  cluster-by-year interacted FEs, so identification comes off within-field-year
+. *  variation. Any pure exposure * year shock common to a research field is
+. *  absorbed; β is the differential response across fields.
+. * ============================================================
+. global FE_MODE "author"
+
+. 
+. * ============================================================
+. *  MAX-SIM WEIGHTING SWITCH
+. *  WEIGHT_MSIM : 0 (default) -> unweighted regressions
+. *                1           -> [pw=max_sim] on every reghdfe / ppmlhdfe call.
+. *                               Output figures / matrices / .dta files get a
+. *                               "_msimwt" suffix so the two versions coexist.
+. *  max_sim comes from match_diagnostics_restricted.dta (best cosine similarity
+. *  between the universe PI and any FOIA PI). For observed-exposure FOIA PIs
+. *  max_sim is set to 1 (they anchor their own exposure); imputed PIs use the
+. *  merged value; unmatched (rare) get max_sim = 0 so they drop out of the
+. *  weighted regression.
+. *  main() runs the full pipeline twice — once at WEIGHT_MSIM=0, once at
+. *  WEIGHT_MSIM=1 — so a single execution produces both flavors.
+. * ============================================================
+. global WEIGHT_MSIM 1
+
+. 
+. program main
+  1.     gather_external_data
+  2.     gather_inst_chars
+  3.     define_group_labels
+  4.     foreach s in all_jrnls top_jrnls {
+  5.         cap mkdir "../output/figures/`s'"
+  6.         // restrict_samp is weight-mode-agnostic — max_sim is saved as a column
+.         // in ../temp/es_`s'`suf' so the same dataset feeds both weighted and
+.         // unweighted runs of the estimation programs.
+.         restrict_samp, samp(`s') r1r2(1) public(1)
+  7.         foreach wmode in 0 1 {
+  8.             global WEIGHT_MSIM `wmode'
+  9.             di as text _newline "=========================================="
+ 10.             di as text "  RUNNING sample=`s' WEIGHT_MSIM=`wmode'"
+ 11.             di as text "=========================================="
+ 12.             // Clear stale matrices from the prior mode so output_tables only
+.             // dumps matrices from programs actually run in this iteration.
+.             mat drop _all
+ 13.             // event_study produces the OLS heterogeneity coefplots (highest
+.             // iteration priority) — kept first in the chain so its PDFs land
+.             // before anything downstream can abort the do file.
+.             event_study, samp(`s') r1r2(1) public(1)
+ 14.             pooled_did, samp(`s') r1r2(1) public(1)
+ 15.             ppml_specs, samp(`s') r1r2(1) public(1)
+ 16.             // ppml_pdid_het_binscatter has been observed to abort with a Mata
+.             // r(3301) ("no observations for one of the fit lines") on some
+.             // (sample, spec) combos. Wrap in `cap noi` so a crash there does
+.             // not skip the remaining wmode / sample iterations.
+.             cap noi ppml_pdid_het_binscatter, samp(`s') r1r2(1) public(1)
+ 17.             if _rc {
+ 18.                 di as error "main: ppml_pdid_het_binscatter failed for `s' wmode=`wmode' (rc=`_rc'); continuing."
+ 19.             }
+ 20.             // Diagnostics / robustness / age-split combine only run under the
+.             // default unweighted spec — no weighted twin needed for pre-trend
+.             // or trim/attrition sanity checks.
+.             if `wmode' == 0 {
+ 21.                 placebo_treatment, samp(`s') r1r2(1) public(1)
+ 22.                 trim_top, samp(`s') r1r2(1) public(1)
+ 23.                 combine_es_graphs, samp(`s')
+ 24.                 robustness, samp(`s') r1r2(1) public(1)
+ 25.             }
+ 26.             output_tables, samp(`s') r1r2(1) public(1)
+ 27.         }
+ 28.         // Reset to default so any downstream reads use the unweighted flavor.
+.         global WEIGHT_MSIM 0
+ 29.     }
+ 30.     joint_outcome_test, samp(all_jrnls) r1r2(1) public(1)
+ 31.     joint_sample_test, r1r2(1) public(1)
+ 32. 
+.     // ---- R1-only pass (all_jrnls, public=1). Same estimation chain as
+.     // above, but restrict_samp filters to type=="r1" so all splits /
+.     // regressions run on R1 authors only. Outputs get "_r1_public" suffix.
+.     restrict_samp, samp(all_jrnls) r1r2(1) public(1) r1_only(1)
+ 33.     foreach wmode in 0 1 {
+ 34.         global WEIGHT_MSIM `wmode'
+ 35.         di as text _newline "=========================================="
+ 36.         di as text "  RUNNING sample=all_jrnls WEIGHT_MSIM=`wmode' (R1-only)"
+ 37.         di as text "=========================================="
+ 38.         mat drop _all
+ 39.         event_study, samp(all_jrnls) r1r2(1) public(1) r1_only(1)
+ 40.         pooled_did,  samp(all_jrnls) r1r2(1) public(1) r1_only(1)
+ 41.         ppml_specs,  samp(all_jrnls) r1r2(1) public(1) r1_only(1)
+ 42.         cap noi ppml_pdid_het_binscatter, samp(all_jrnls) r1r2(1) public(1) r1_only(1)
+ 43.         if _rc {
+ 44.             di as error "main: ppml_pdid_het_binscatter r1_only failed wmode=`wmode' (rc=`_rc'); continuing."
+ 45.         }
+ 46.         if `wmode' == 0 {
+ 47.             placebo_treatment, samp(all_jrnls) r1r2(1) public(1) r1_only(1)
+ 48.             trim_top,          samp(all_jrnls) r1r2(1) public(1) r1_only(1)
+ 49.             combine_es_graphs, samp(all_jrnls)
+ 50.             robustness,        samp(all_jrnls) r1r2(1) public(1) r1_only(1)
+ 51.         }
+ 52.         output_tables, samp(all_jrnls) r1r2(1) public(1) r1_only(1)
+ 53.     }
+ 54.     global WEIGHT_MSIM 0
+ 55. end
+
+. 
+. program gather_external_data
+  1.     import delimited ../external/exposure/final_imputed_shift_share_${EXPOSURE_VERSION}${EXPOSURE_FILTER}, clear
+  2.     rename exposure_ss imputed
+  3.     rename sum_imputed_shares imputed_mkt_spend_shr
+  4.     save ../temp/exposure, replace
+  5. 
+.     use ../external/grants/pi_grants_clean, clear
+  6.     bys athr_id year: gen num_grants = _N
+  7.     contract athr_id year num_grants
+  8.     drop _freq
+  9.     save ../temp/athr_yr_grnt_cnt, replace
+ 10. 
+.     use ../external/foias/merged_foias_with_pis,  clear
+ 11.     drop if mi(athr_id)
+ 12.     gen year = year(date(date, "YMD"))
+ 13.     merge m:1 category using ../external/categories/categories_tfidf, assert(1 2 3) keep(1 3)
+ 14.     gen nonlab = 1 if _merge == 1
+ 15.     replace nonlab = 0 if mi(nonlab)
+ 16.     drop if nonlab == 0
+ 17.     gcollapse (sum) spend, by(athr_id uni year)
+ 18.     save ../temp/foia_spend, replace
+ 19. 
+.     // author -> us_cluster_fields 30-cluster assignment (used when FE_MODE = "inst_cluster" or "inst_cluster_fldyr")
+.     cap confirm file ../temp/athr_cluster30.dta
+ 20.     if _rc {
+ 21.         import delimited ../external/cluster/author_static_clusters_30.csv, clear varnames(1)
+ 22.         cap tostring athr_id, replace
+ 23.         rename cluster_label cluster_30
+ 24.         save ../temp/athr_cluster30, replace
+ 25.     }
+ 26. 
+.     // Universe PI match-quality diagnostics (max_sim = best cosine similarity
+.     // between the universe PI and any FOIA PI). Keyed on athr_id; keeps
+.     // athr_id + max_sim only. Real FOIA PIs are handled in restrict_samp
+.     // where max_sim is forced to 1 (they anchor themselves).
+.     use athr_id max_sim using ../external/exposure/match_diagnostics_restricted, clear
+ 27.     save ../temp/match_diag, replace
+ 28. 
+. end
+
+. 
+. program gather_inst_chars
+  1.     // Build ../temp/inst_chars_pre.dta keyed by OpenAlex inst_id, holding 30
+.     // pre-period university characteristics (funding buckets + expenditures +
+.     // endowment). Source: derived/inst_chars/output/combined_pre.dta (keyed on
+.     // ipeds_id) merged onto the netscratch ipeds<->openalex crosswalk.
+.     // Vars are renamed to short (`ic_<alias>`, <=8 char) aliases so downstream
+.     // interaction names like `mshr_lead4_q4_<alias>` stay under Stata's 32-char
+.     // variable-name limit.
+.     import delimited "/n/netscratch/pakes_lab/Lab/sci_eq/college/ipeds_openalex.csv", ///
+>         clear varn(1) stringcols(_all)
+  2.     keep ipeds_id inst_id
+  3.     drop if inst_id == "" | ipeds_id == ""
+  4.     destring ipeds_id, replace
+  5.     duplicates drop
+  6.     tempfile xw
+  7.     save `xw'
+  8. 
+.     use "/n/holylabs/pakes_lab/Lab/sci_eq/derived/inst_chars/output/combined_pre.dta", clear
+  9.     merge 1:1 ipeds_id using `xw', keep(3) nogen
+ 10.     drop ipeds_id
+ 11. 
+.     rename contracts_fund      ic_contr
+ 12.     rename fed_ls_bio_fund     ic_fdlsb
+ 13.     rename fed_ls_fund         ic_fdls
+ 14.     rename fed_ls_hs_fund      ic_fdlsh
+ 15.     rename grants_fund         ic_gntsf
+ 16.     rename hhs_ls_bio_fund     ic_hhlsb
+ 17.     rename hhs_ls_fund         ic_hhls
+ 18.     rename hhs_ls_hs_fund      ic_hhlsh
+ 19.     rename nonfed_ls_bio_fund  ic_nflsb
+ 20.     rename nonfed_ls_fund      ic_nfls
+ 21.     rename nonfed_ls_hs_fund   ic_nflsh
+ 22.     rename subrecipient_fund   ic_subrf
+ 23.     rename tot_bus_fund        ic_busf
+ 24.     rename tot_fed_fund        ic_fedf
+ 25.     rename tot_fund            ic_tfnd
+ 26.     rename tot_inst_fund       ic_instf
+ 27.     rename tot_nonprof_fund    ic_nonpf
+ 28.     rename tot_state_fund      ic_statf
+ 29.     rename ls_fund             ic_lsf
+ 30.     rename hs_fund             ic_hsf
+ 31.     rename bio_fund            ic_biof
+ 32.     rename applied_expend      ic_applx
+ 33.     rename applied_fed_expend  ic_apfx
+ 34.     rename basic_expend        ic_basx
+ 35.     rename basic_fed_expend    ic_bfx
+ 36.     rename clin_trial_expend   ic_clinx
+ 37.     rename dev_expend          ic_devx
+ 38.     rename ls_cap_expend       ic_lscx
+ 39.     rename med_sch_expend      ic_medx
+ 40.     rename endownment          ic_endow
+ 41. 
+.     order inst_id
+ 42.     compress
+ 43.     save ../temp/inst_chars_pre, replace
+ 44. end
+
+. 
+. // -- Shared name lists driving the inst-char + quartile heterogeneity blocks.
+. // $IC_ALIASES : 30 short-alias inst-char variables in ../temp/inst_chars_pre
+. //               (each stored as ic_<alias> after gather_inst_chars).
+. // $PI_Q_BASES : 5 PI-level continuous vars (built in restrict_samp) that get
+. //               a quartile split on top of their existing median split.
+. // $IC_PAIRS_MED / $IC_PAIRS_Q / $PI_PAIRS_Q are the pair lists the estimation
+. // programs iterate over. Kept as globals so event_study,
+. // ppml_pdid_het_binscatter, and ppml_het_coefplot see the same lists.
+. global IC_ALIASES contr fdlsb fdls fdlsh gntsf hhlsb hhls hhlsh nflsb nfls nflsh ///
+>     subrf busf fedf tfnd instf nonpf statf lsf hsf biof applx apfx basx bfx clinx ///
+>     devx lscx medx endow
+
+. global PI_Q_BASES pre_ppr grants team coauth msa
+
+. 
+. program define_group_labels
+  1.     // Sets $LBL_<groupname> for every dummy used in a heterogeneity spec.
+.     // Called once at the top of main so all plot-labeling code can look up
+.     // human-readable labels via ${LBL_<grp>} without repeating chains of
+.     // if-`grp'=="X" checks.
+.     // Existing PI-level splits (median).
+.     global LBL_young        "Young"
+  2.     global LBL_old          "Old"
+  3.     global LBL_r1           "R1"
+  4.     global LBL_r2           "R2"
+  5.     global LBL_high_pre_ppr "More Productive at Baseline"
+  6.     global LBL_low_pre_ppr  "Less Productive at Baseline"
+  7.     global LBL_high_grants  "More Grants per Paper at Baseline"
+  8.     global LBL_low_grants   "Fewer Grants per Paper at Baseline"
+  9.     global LBL_big_team     "Larger Team Size"
+ 10.     global LBL_small_team   "Smaller Team Size"
+ 11.     global LBL_many_coauth  "More Coauthors"
+ 12.     global LBL_few_coauth   "Fewer Coauthors"
+ 13.     global LBL_big_msa      "Larger MSA"
+ 14.     global LBL_small_msa    "Smaller MSA"
+ 15. 
+.     // PI-level continuous chars, Q1 vs Q4 (mid = Q2 U Q3, plotted as nuisance).
+.     global LBL_q1_pre_ppr   "Q1 Pre-Period Productivity"
+ 16.     global LBL_q4_pre_ppr   "Q4 Pre-Period Productivity"
+ 17.     global LBL_mid_pre_ppr  "Mid Pre-Period Productivity"
+ 18.     global LBL_q1_grants    "Q1 Grants per Paper"
+ 19.     global LBL_q4_grants    "Q4 Grants per Paper"
+ 20.     global LBL_mid_grants   "Mid Grants per Paper"
+ 21.     global LBL_q1_team      "Q1 Team Size"
+ 22.     global LBL_q4_team      "Q4 Team Size"
+ 23.     global LBL_mid_team     "Mid Team Size"
+ 24.     global LBL_q1_coauth    "Q1 Coauthors"
+ 25.     global LBL_q4_coauth    "Q4 Coauthors"
+ 26.     global LBL_mid_coauth   "Mid Coauthors"
+ 27.     global LBL_q1_msa       "Q1 MSA Size"
+ 28.     global LBL_q4_msa       "Q4 MSA Size"
+ 29.     global LBL_mid_msa      "Mid MSA Size"
+ 30. 
+.     // Inst-char labels (source: HERD funding buckets + expenditures + endowment).
+.     // Keyed on the same short alias used in the dummy names.
+.     local ic_lbl_contr "Total Contract Funding"
+ 31.     local ic_lbl_fdlsb "Federal Life-Sci Biology Funding"
+ 32.     local ic_lbl_fdls  "Federal Life-Sci Funding"
+ 33.     local ic_lbl_fdlsh "Federal Life-Sci Health-Sci Funding"
+ 34.     local ic_lbl_gntsf "Grants Funding"
+ 35.     local ic_lbl_hhlsb "HHS Life-Sci Biology Funding"
+ 36.     local ic_lbl_hhls  "HHS Life-Sci Funding"
+ 37.     local ic_lbl_hhlsh "HHS Life-Sci Health-Sci Funding"
+ 38.     local ic_lbl_nflsb "Non-Federal Life-Sci Biology Funding"
+ 39.     local ic_lbl_nfls  "Non-Federal Life-Sci Funding"
+ 40.     local ic_lbl_nflsh "Non-Federal Life-Sci Health-Sci Funding"
+ 41.     local ic_lbl_subrf "Subrecipient Funding"
+ 42.     local ic_lbl_busf  "Business Funding"
+ 43.     local ic_lbl_fedf  "Total Federal Funding"
+ 44.     local ic_lbl_tfnd  "Total R&D Funding"
+ 45.     local ic_lbl_instf "Institutional Funding"
+ 46.     local ic_lbl_nonpf "Non-Profit Funding"
+ 47.     local ic_lbl_statf "State Funding"
+ 48.     local ic_lbl_lsf   "Life-Sci Funding"
+ 49.     local ic_lbl_hsf   "Health-Sci Funding"
+ 50.     local ic_lbl_biof  "Biology Funding"
+ 51.     local ic_lbl_applx "Applied Research Expenditures"
+ 52.     local ic_lbl_apfx  "Federal Applied Research Expenditures"
+ 53.     local ic_lbl_basx  "Basic Research Expenditures"
+ 54.     local ic_lbl_bfx   "Federal Basic Research Expenditures"
+ 55.     local ic_lbl_clinx "Clinical Trial Expenditures"
+ 56.     local ic_lbl_devx  "Development Expenditures"
+ 57.     local ic_lbl_lscx  "Life-Sci Capital Expenditures"
+ 58.     local ic_lbl_medx  "Medical School Expenditures"
+ 59.     local ic_lbl_endow "Endowment"
+ 60.     foreach a of global IC_ALIASES {
+ 61.         global LBL_hi_`a'  "High `ic_lbl_`a''"
+ 62.         global LBL_lo_`a'  "Low `ic_lbl_`a''"
+ 63.         global LBL_q1_`a'  "Q1 `ic_lbl_`a''"
+ 64.         global LBL_q4_`a'  "Q4 `ic_lbl_`a''"
+ 65.         global LBL_mid_`a' "Mid `ic_lbl_`a''"
+ 66.     }
+ 67. 
+.     // Pair lists (see IC_ALIASES / PI_Q_BASES globals above).
+.     // Convention (matches the existing PI-level median pairs high_/low_):
+.     //   pair = "focal_group  base_group"
+.     //   Median:   "hi_<x>  lo_<x>"    -> base absorbs low, β_g1 = High-Low diff
+.     //   Quartile: "q4_<x>  q1_<x>"    -> base absorbs Q1,  β_g1 = Q4-Q1 diff
+.     // For the three-group PPML quartile fit, mid_<x> is added as a nuisance
+.     // interaction alongside the pair; both q1 and q4 level β's are extracted.
+.     global IC_PAIRS_MED
+ 68.     global IC_PAIRS_Q
+ 69.     foreach a of global IC_ALIASES {
+ 70.         global IC_PAIRS_MED `"${IC_PAIRS_MED} "hi_`a' lo_`a'" "'
+ 71.         global IC_PAIRS_Q   `"${IC_PAIRS_Q} "q4_`a' q1_`a'" "'
+ 72.     }
+ 73.     global PI_PAIRS_Q
+ 74.     foreach b of global PI_Q_BASES {
+ 75.         global PI_PAIRS_Q `"${PI_PAIRS_Q} "q4_`b' q1_`b'" "'
+ 76.     }
+ 77. end
+
+. 
+. program restrict_samp
+  1.     syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0)]
+  2.     local suf ""
+  3.     if (`r1r2' == 1 & `public' == 0 & `r1_only' == 0) local suf "_r1_r2"
+  4.     if (`r1r2' == 1 & `public' == 1 & `r1_only' == 0) local suf "_r1_r2_public"
+  5.     if (`r1_only' == 1 & `public' == 0) local suf "_r1"
+  6.     if (`r1_only' == 1 & `public' == 1) local suf "_r1_public"
+  7. 
+.     // input_suf identifies the upstream panel file to load. There's no
+.     // "_r1" panel file — R1-only is done by loading the R1+R2 panel and
+.     // filtering to type=="r1" here. So under r1_only=1 the input file
+.     // reads with the r1_r2[_public] suffix; only the OUTPUT files (es_,
+.     // exposure_dist, ...) carry the `_r1[_public]` suffix.
+.     local input_suf ""
+  8.     if (`r1r2' == 1 & `public' == 0) local input_suf "_r1_r2"
+  9.     if (`r1r2' == 1 & `public' == 1) local input_suf "_r1_r2_public"
+ 10.     if (`r1_only' == 1 & `public' == 0) local input_suf "_r1_r2"
+ 11.     if (`r1_only' == 1 & `public' == 1) local input_suf "_r1_r2_public"
+ 12. 
+.     // all-authors counterpart: same file name minus the "last_" token.
+.     // Contains ppr_cnt / cite_affl_wt / affl_wt counting papers where the PI
+.     // appears in ANY authorship position (not just last). Also carries paper-
+.     // position metrics (avg_position, avg_position_rat, n_first/middle/last_ppr,
+.     // avg_team_size_(last|notlast)) once make_athr_yr_panel/build.do has been
+.     // rerun — the load is wrapped in cap so the pipeline still works with the
+.     // pre-position-metrics build; a global flag toggles whether position
+.     // outcomes are added downstream.
+.     preserve
+ 13.         cap use athr_id year ppr_cnt cite_affl_wt affl_wt ///
+>                 avg_position avg_position_rat ///
+>                 n_first_ppr n_middle_ppr n_last_ppr ///
+>                 avg_team_size_last avg_team_size_notlast ///
+>                 using ../external/samp/athr_panel_full_year_`samp'`input_suf', clear
+ 14.         local _pos_rc = _rc
+ 15.         if `_pos_rc' {
+ 16.             di as text "restrict_samp `samp'`suf': position vars not in panel yet — falling back to base _any outcomes. Rerun make_athr_yr_panel/code/build.do to enable them."
+ 17.             use athr_id year ppr_cnt cite_affl_wt affl_wt ///
+>                 using ../external/samp/athr_panel_full_year_`samp'`input_suf', clear
+ 18.         }
+ 19.         global POSITION_OUTCOMES_AVAIL = cond(`_pos_rc' == 0, 1, 0)
+ 20.         rename (ppr_cnt cite_affl_wt affl_wt) (ppr_cnt_any cite_affl_wt_any affl_wt_any)
+ 21.         save ../temp/athr_any_`samp'`input_suf', replace
+ 22. 
+.         // Per-PI min year across ALL authorship positions -- used below to
+.         // build age_2014. Under the last-author panel's min_year, a PI who
+.         // published as first/middle author for years before their first
+.         // last-author paper looked spuriously young.
+.         bys athr_id: egen min_year_any = min(year)
+ 23.         keep athr_id min_year_any
+ 24.         duplicates drop
+ 25.         save ../temp/athr_min_year_any_`samp'`input_suf', replace
+ 26.     restore
+ 27. 
+.     use ../external/samp/athr_panel_full_year_last_`samp'`input_suf',clear
+ 28.     // R1-only filter: the upstream panel is R1+R2; keep type=="r1" so all
+.     // downstream medians / quartiles / regressions run on R1 authors only.
+.     if `r1_only' == 1 {
+ 29.         keep if type == "r1"
+ 30.         di as text "restrict_samp `samp'`suf' (r1_only=1): kept N=" _N " R1-only rows"
+ 31.     }
+ 32. *    bys athr_id: egen tot_pprs = total(ppr_cnt)
+.     bys athr_id: egen max_year = max(year)
+ 33.     bys athr_id: egen min_year = min(year)
+ 34.     keep if min_year <= 2013
+ 35.     keep if max_year >= 2015
+ 36.     keep if inrange(year, 2010, 2019)
+ 37.     merge m:1 athr_id using ../temp/exposure, assert(1 2 3) keep(3) nogen
+ 38.     merge m:1 athr_id using ../external/real_exposure/athr_exposure_${EXPOSURE_VERSION}, assert(1 2 3) keep(1 3) nogen
+ 39.     merge m:1 athr_id using ../temp/athr_cluster30, keep(1 3) nogen
+ 40.     merge m:1 athr_id using ../temp/athr_min_year_any_`samp'`input_suf', keep(1 3) nogen
+ 41.     // Safety fallback: if a PI is somehow missing from the all-authors panel,
+.     // reuse the last-author min_year so age_2014 isn't left missing.
+.     replace min_year_any = min_year if mi(min_year_any)
+ 42.     gen foia_athr = 1 if !mi(exposure)
+ 43.     // Merge max_sim (universe match confidence). Real FOIA PIs get max_sim = 1
+.     // — they contribute observed exposure so imputation confidence isn't
+.     // meaningful. Imputed PIs keep their similarity to the nearest FOIA PI.
+.     // If unmatched (rare), max_sim stays missing and is set to 0 below so the
+.     // PI drops out of any [pw=max_sim] regression cleanly.
+.     merge m:1 athr_id using ../temp/match_diag, keep(1 3) nogen
+ 44.     replace max_sim = 1 if foia_athr == 1
+ 45.     replace max_sim = 0 if mi(max_sim)
+ 46.     bys athr_id : gen athr_indicator = _n == 1
+ 47.     sum exposure if athr_indicator == 1, d
+ 48.     local mean : di %4.3f r(mean)
+ 49.     local sd   : di %4.3f r(sd)
+ 50.     sum imputed if athr_indicator == 1, d
+ 51.     local imputed_mean : di %4.3f r(mean)
+ 52.     local imputed_sd   : di %4.3f r(sd)
+ 53.     sum mkt_spend_shr if athr_indicator == 1, d
+ 54.     local mshr_mean : di %4.3f r(mean)
+ 55.     local mshr_sd   : di %4.3f r(sd)
+ 56.     sum imputed_mkt_spend_shr if athr_indicator == 1, d
+ 57.     local imshr_mean : di %4.3f r(mean)
+ 58.     local imshr_sd   : di %4.3f r(sd)
+ 59.     tw kdensity exposure if athr_indicator == 1   || kdensity imputed if athr_indicator == 1  , xtitle("Exposure Measure") ytitle("Density") ///
+>         xlab(#15) ///
+>         legend(on label(1 "FOIA PI Observed Exposure (mean = `mean', sd = `sd')") label(2 "Imputed Exposure (mean = `imputed_mean', sd = `imputed_sd')") pos(7) ring(1) size(small))
+ 60.     graph export ../output/figures/`samp'/exposure_dist`suf'.pdf, replace
+ 61.     tw kdensity mkt_spend_shr if athr_indicator == 1  || kdensity imputed_mkt_spend_shr if athr_indicator == 1, xtitle("Market Spend Share") ytitle("Density") ///
+>         xlab(#15) ///
+>         legend(on label(1 "FOIA PI Observed (mean = `mshr_mean', sd = `mshr_sd')") label(2 "Imputed (mean = `imshr_mean', sd = `imshr_sd')") pos(7) ring(1) size(small))
+ 62.     graph export ../output/figures/`samp'/mkt_spend_shr_dist`suf'.pdf, replace
+ 63.     replace imputed = exposure if !mi(exposure)
+ 64.     replace imputed_mkt_spend_shr = mkt_spend_shr if !mi(mkt_spend_shr)
+ 65.     drop exposure
+ 66.     rename imputed exposure
+ 67.     drop mkt_spend_shr
+ 68.     rename imputed_mkt_spend_shr mkt_spend_shr
+ 69.     bys athr_id: egen num_yrs_pre = total(year < 2014)
+ 70.     bys athr_id: gen tot_yrs = _N 
+ 71.     bys athr_id inst_id: gen plc_cntr = _n == 1
+ 72.     bys athr_id : egen num_place = total(plc_cntr)
+ 73.     drop if num_yrs <= 2
+ 74. *    drop if tot_yrs <= 4
+.     keep if num_place==1
+ 75.     gegen athr = group(athr_id)
+ 76.     preserve
+ 77.     contract athr num_place athr_id exposure inst_id inst msa_comb msa_c_world min_year min_year_any type mkt_spend_shr cluster_30 max_sim foia_athr
+ 78.     drop _freq
+ 79.     save ../temp/athr_xw, replace
+ 80.     restore
+ 81.     xtset athr year
+ 82.     tsfill, full
+ 83.     drop athr_id exposure inst_id inst msa_comb msa_c_world min_year min_year_any type mkt_spend_shr cluster_30 max_sim foia_athr
+ 84.     merge m:1 athr using ../temp/athr_xw, assert(3) keep(3) nogen
+ 85.     // The last-author panel *also* carries position vars (build.do computes them
+.     // for both branches). Under Stata's merge default, master-side variables
+.     // override same-named using-side variables silently — so if we don't drop
+.     // these first, the athr_any values would be discarded and we'd keep the
+.     // degenerate last-author-panel copies (where which_athr == num_athrs
+.     // makes n_first_ppr into a solo-only count, n_middle_ppr uniformly zero, etc.).
+.     foreach v in n_first_ppr n_middle_ppr n_last_ppr n_solo_ppr ///
+>                  avg_position avg_position_rat ///
+>                  avg_team_size_last avg_team_size_notlast {
+ 86.         cap drop `v'
+ 87.     }
+ 88.     // Merge in all-authors counts (any authorship position) as parallel outcomes.
+.     // Kept on the same tsfilled PI x year grid; missings after tsfill mean "no
+.     // papers that year in the all-authors panel either" → filled to 0 below.
+.     merge 1:1 athr_id year using ../temp/athr_any_`samp'`input_suf', keep(1 3) nogen
+ 89.     foreach var in ppr_cnt cite_affl_wt affl_wt ppr_cnt_any cite_affl_wt_any affl_wt_any {
+ 90.         replace `var' = 0 if mi(`var')
+ 91.     }
+ 92.     // Position-metric outcomes (from all-authors panel via athr_any merge):
+.     //   counts: zero-fill (mi means the PI had no papers of that role that year)
+.     //   means : leave missing when PI publishes nothing that year, so β on the
+.     //           mean-based outcomes is intensive-margin only (same convention
+.     //           as avg_num_coathrs).
+.     if "$POSITION_OUTCOMES_AVAIL" == "1" {
+ 93.         foreach v in n_first_ppr n_middle_ppr n_last_ppr {
+ 94.             replace `v' = 0 if mi(`v')
+ 95.         }
+ 96.         // Retro-fix for double-counted solo-author papers: in the build.do
+.         // preceding the 2026-07-10 fix, solo papers had paper_is_first == 1
+.         // AND paper_is_last == 1. The excess (which_first + n_middle + n_last -
+.         // ppr_cnt_any) equals n_solo, so we subtract it from n_first to keep
+.         // the "last/senior" convention consistent. Post-rebuild this line is a
+.         // no-op (the sum already matches ppr_cnt_any).
+.         cap confirm variable n_solo_ppr
+ 97.         if _rc {
+ 98.             gen n_solo_ppr = n_first_ppr + n_middle_ppr + n_last_ppr - ppr_cnt_any
+ 99.             replace n_solo_ppr = 0 if n_solo_ppr < 0
+100.             replace n_first_ppr = n_first_ppr - n_solo_ppr
+101.             replace n_first_ppr = 0 if n_first_ppr < 0
+102.         }
+103.         // avg_position, avg_position_rat, avg_team_size_last, avg_team_size_notlast
+.         // remain missing when no papers of the relevant type exist that year.
+.     }
+104.     // _notlast = _any - _last is deferred to AFTER the winsorization block
+.     // below so the diff uses the same p99-capped components that flow into
+.     // the base and _any regressions. Computing before winsorization would
+.     // leave the diff carrying raw mega-cite tails while the components are
+.     // capped — asymmetric outcomes.
+.     gen pre_ppr_cnt = ppr_cnt if year < 2014
+105.     bys athr_id: egen pre_ppr_cnt_sum = sum(pre_ppr_cnt)
+106.     bys athr_id: egen pre_ppr_cnt_avg = mean(pre_ppr_cnt)
+107.     qui sum pre_ppr_cnt_avg if athr_indicator == 1, d
+108.     drop if pre_ppr_cnt_avg <= r(p5)
+109.     // Median split at PI level (one row per athr_id); save cut into a local
+.     // because `drop if` below clears r(), which silently made high_pre_ppr = 0
+.     // for everyone (`x >= .` is FALSE, so all obs became "low").
+.     qui sum pre_ppr_cnt_sum if athr_indicator == 1, d
+110.     local ppr_cut = r(p50)
+111.     drop if pre_ppr_cnt_sum <= r(p5)
+112.     gen high_pre_ppr = pre_ppr_cnt_sum >= `ppr_cut'
+113.     gen low_pre_ppr  = pre_ppr_cnt_sum <  `ppr_cut'
+114.     // Career age proxy: first year in the all-authors panel (any position),
+.     // not just first year as last author -- see restrict_samp preserve block.
+.     gen age_2014 = 2014 - min_year_any + 30
+115.     sum age_2014, d
+116.     local med = r(p50)
+117.     gen young = age_2014 < `med'
+118.     gen old = age_2014 >= `med'
+119.     gen r1 = type == "r1" 
+120.     gen r2 = type == "r2" 
+121.     drop if mi(exposure)  
+122.     drop if mi(mkt_spend_shr) | mkt_spend_shr <= 0
+123.     sum exposure if athr_indicator == 1, d
+124.     gen median = exposure >= r(p50)
+125.     merge 1:1 athr_id year using ../external/coathrs/avg_coathrs, keep(1 3) assert(1 2 3) nogen
+126.     replace avg_num_coathrs = 0 if mi(avg_num_coathrs)
+127.     // Intensive-margin only: team size is undefined in years the PI publishes
+.     // nothing. Setting to missing means reghdfe/ppmlhdfe drop those rows and
+.     // β on Z_it is "conditional on publishing, does exposure shift team size,"
+.     // not confounded by the extensive margin. Report N alongside β so any
+.     // sample composition shift is visible.
+.     replace avg_num_coathrs = . if ppr_cnt == 0
+128.     merge 1:1 athr_id year using ../temp/athr_yr_grnt_cnt, keep(1 3) assert(1 2 3) nogen
+129.     replace num_grants = 0 if mi(num_grants)
+130. 
+.     // Derived grants outcomes — both sidestep the num_grants mechanical
+.     // confounding by paper counts flagged in the audit.
+.     //   grants_per_paper : distinct grants cited per paper in the year;
+.     //     intensive-margin — β tells you whether each paper cites fewer grants
+.     //     (e.g. PIs pushed toward unfunded work). Undefined when ppr_cnt == 0.
+.     //   grant_density    : num_grants scaled by the PI's *pre-period* mean
+.     //     ppr_cnt (constant per PI). Denominator is fixed pre-2014 so post-
+.     //     period changes in ppr_cnt do not mechanically move it — β isolates
+.     //     "given typical output rate, how many grants are now cited."
+.     gen grants_per_paper = num_grants / ppr_cnt         if ppr_cnt > 0
+131.     gen grant_density    = num_grants / pre_ppr_cnt_avg if pre_ppr_cnt_avg > 0
+132. 
+.     gen pre_grants_cnt = num_grants if year < 2014
+133.     bys athr_id: egen pre_grants_sum = total(pre_grants_cnt)
+134.     drop pre_grants_cnt
+135.     // Split on pre-period grants PER PAPER (ratio of totals — robust to years
+.     // with ppr_cnt == 0). pre_ppr_cnt_sum >= 5 for all remaining PIs after
+.     // the p5 drop above, so denominator is safe.
+.     gen pre_gpp = pre_grants_sum / pre_ppr_cnt_sum
+136.     qui sum pre_gpp if athr_indicator == 1, d
+137.     local g_cut = r(p50)
+138.     di as text "restrict_samp `samp'`suf' pre-gpp median = `g_cut'"
+139.     gen high_grants = pre_gpp >= `g_cut'
+140.     gen low_grants  = pre_gpp <  `g_cut'
+141. 
+.     // Additional pre-period heterogeneity splits (median splits)
+.     //   big_team  / small_team    : mean pre-period avg_team_size
+.     //   many_coauth / few_coauth  : mean pre-period n_coauthors_yr
+.     //   big_msa   / small_msa     : msa_size at 2014 (metro scientific mass)
+.     gen pre_team_yr = avg_team_size if year < 2014
+142.     bys athr_id: egen pre_team_avg = mean(pre_team_yr)
+143.     drop pre_team_yr
+144.     qui sum pre_team_avg if athr_indicator == 1, d
+145.     di as text "restrict_samp `samp'`suf' pre-team median = " r(p50)
+146.     gen big_team   = pre_team_avg >= r(p50)
+147.     gen small_team = pre_team_avg <  r(p50)
+148. 
+.     gen pre_coauth_yr = n_coauthors_yr if year < 2014
+149.     bys athr_id: egen pre_coauth_avg = mean(pre_coauth_yr)
+150.     drop pre_coauth_yr
+151.     qui sum pre_coauth_avg if athr_indicator == 1, d
+152.     di as text "restrict_samp `samp'`suf' pre-n-coauth median = " r(p50)
+153.     gen many_coauth = pre_coauth_avg >= r(p50)
+154.     gen few_coauth  = pre_coauth_avg <  r(p50)
+155. 
+.     gen msa_size_2014 = msa_size if year == 2014
+156.     bys athr_id: egen msa_size_at = max(msa_size_2014)
+157.     drop msa_size_2014
+158.     qui sum msa_size_at if athr_indicator == 1, d
+159.     di as text "restrict_samp `samp'`suf' msa_size median = " r(p50)
+160.     gen big_msa   = msa_size_at >= r(p50)
+161.     gen small_msa = msa_size_at <  r(p50)
+162. 
+.     // Winsorize cite_affl_wt / affl_wt at pooled p99 to cap mega-cite outliers
+.     // (e.g. A5001670387 hit cite_affl_wt=1092 in 2016 vs a p99 ~25).
+.     // Same treatment for the _any counterparts so the two versions of each
+.     // outcome are affected symmetrically.
+.     foreach v in cite_affl_wt affl_wt cite_affl_wt_any affl_wt_any {
+163.         qui sum `v', d
+164.         local p99_`v' = r(p99)
+165.         replace `v' = `p99_`v'' if `v' > `p99_`v'' & !mi(`v')
+166.         di as text "restrict_samp `samp'`suf' winsorized `v' at p99=`p99_`v''"
+167.     }
+168. 
+.     // _notlast = _any - _last, computed on the winsorized components so all
+.     // three flavors (last / any / notlast) sit on the same scale.
+.     // Interpretation: β on _notlast tells you whether the PI's collaboration
+.     // participation moved; a big drop in _last with flat _notlast says the PI
+.     // is losing senior-role papers but not the ones they contribute to as a
+.     // middle author.
+.     gen ppr_cnt_notlast      = ppr_cnt_any      - ppr_cnt
+169.     gen cite_affl_wt_notlast = cite_affl_wt_any - cite_affl_wt
+170.     gen affl_wt_notlast      = affl_wt_any      - affl_wt
+171.     // Floor at zero — even after winsorization the diff can go slightly
+.     // negative when the p99 cap for _any lands below the raw last value.
+.     foreach v in ppr_cnt_notlast cite_affl_wt_notlast affl_wt_notlast {
+172.         replace `v' = 0 if `v' < 0
+173.     }
+174.     // p99-cap the diff for symmetry with the base and _any outcomes.
+.     foreach v in cite_affl_wt_notlast affl_wt_notlast {
+175.         qui sum `v', d
+176.         local p99_`v' = r(p99)
+177.         replace `v' = `p99_`v'' if `v' > `p99_`v'' & !mi(`v')
+178.         di as text "restrict_samp `samp'`suf' winsorized `v' at p99=`p99_`v''"
+179.     }
+180. 
+.     // -- Institutional-characteristic heterogeneity ---------------------------
+.     // Merge 30 pre-period university characteristics (HERD funding buckets +
+.     // expenditures + endowment) keyed on OpenAlex inst_id. inst_id is constant
+.     // per PI in this panel, so m:1 is safe and each ic_ variable is PI-constant.
+.     // Then build both a median split (hi_/lo_) and a quartile split
+.     // (q1_/mid_/q4_) at the PI level, dropping PIs with missing value only from
+.     // that dimension (dummies set to missing => obs drop from the fit for that
+.     // regression, panel-wide N unchanged).
+.     merge m:1 inst_id using ../temp/inst_chars_pre, keep(1 3) nogen
+181.     foreach a of global IC_ALIASES {
+182.         cap confirm variable ic_`a'
+183.         if _rc continue
+184.         qui sum ic_`a' if athr_indicator == 1, d
+185.         local ic_n = r(N)
+186.         local ic_p50 = r(p50)
+187.         local ic_p25 = r(p25)
+188.         local ic_p75 = r(p75)
+189.         di as text "restrict_samp `samp'`suf' ic_`a' N_pi=`ic_n' p25=`ic_p25' p50=`ic_p50' p75=`ic_p75'"
+190.         gen byte hi_`a'  = ic_`a' >= `ic_p50' if !mi(ic_`a')
+191.         gen byte lo_`a'  = ic_`a' <  `ic_p50' if !mi(ic_`a')
+192.         gen byte q1_`a'  = ic_`a' <= `ic_p25' if !mi(ic_`a')
+193.         gen byte q4_`a'  = ic_`a' >= `ic_p75' if !mi(ic_`a')
+194.         gen byte mid_`a' = (ic_`a' > `ic_p25' & ic_`a' < `ic_p75') if !mi(ic_`a')
+195.     }
+196. 
+.     // -- PI-level continuous quartile splits ----------------------------------
+.     // Same three-group parameterization as inst-char quartile splits.
+.     // Median counterparts (high_/low_/big_/small_/many_/few_) already exist above.
+.     // Base var mapping:
+.     //   pre_ppr <- pre_ppr_cnt_sum   grants <- pre_gpp
+.     //   team    <- pre_team_avg      coauth <- pre_coauth_avg   msa <- msa_size_at
+.     local pi_q_source pre_ppr_cnt_sum pre_gpp pre_team_avg pre_coauth_avg msa_size_at
+197.     local pi_q_alias  pre_ppr        grants  team         coauth         msa
+198.     local nq : word count `pi_q_alias'
+199.     forvalues i = 1/`nq' {
+200.         local src : word `i' of `pi_q_source'
+201.         local alias : word `i' of `pi_q_alias'
+202.         qui sum `src' if athr_indicator == 1, d
+203.         local p25 = r(p25)
+204.         local p75 = r(p75)
+205.         di as text "restrict_samp `samp'`suf' `alias' p25=`p25' p75=`p75'"
+206.         gen byte q1_`alias'  = `src' <= `p25' if !mi(`src')
+207.         gen byte q4_`alias'  = `src' >= `p75' if !mi(`src')
+208.         gen byte mid_`alias' = (`src' > `p25' & `src' < `p75') if !mi(`src')
+209.     }
+210. 
+.     assert !mi(athr_id)
+211.     assert !mi(exposure)
+212.     assert !mi(mkt_spend_shr)
+213.     save ../temp/es_`samp'`suf', replace
+214. end
+
+. 
+. program event_study
+  1.     syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0)]
+  2.     // Fixed-effect choice driven by $FE_MODE. int_lead1 (and heterogeneity variants) is
+.     // never included in the regressor list — under FE_MODE=author it would be dropped
+.     // via collinearity with athr_id FE; under FE_MODE=inst_cluster it must be omitted
+.     // manually so that rel = -1 remains the reference year.
+.     local fes athr_id year
+  3.     local vce_cl athr_id
+  4.     if "$FE_MODE" == "inst_cluster" {
+  5.         local fes inst_id cluster_30 year
+  6.         local vce_cl inst_id
+  7.     }
+  8.     if "$FE_MODE" == "inst_cluster_fldyr" {
+  9.         local fes inst_id i.cluster_30#i.year
+ 10.         local vce_cl inst_id
+ 11.     }
+ 12.     // Max-sim weighting: `wt' goes on every reghdfe/ppmlhdfe call, `wsuf' on
+.     // every graph export / .dta save so the weighted and unweighted output
+.     // files coexist.
+.     local wt ""
+ 13.     local wsuf ""
+ 14.     if "$WEIGHT_MSIM" == "1" {
+ 15.         // Weight-type notes:
+.         //   `wt' = [pw=max_sim]  — reghdfe/ppmlhdfe accept pw; ppmlhdfe rejects aw
+.         //   `wt_bin' = [aw=max_sim] — binscatter accepts only aw / fw, not pw
+.         // WLS coefficients are identical under aw vs pw (SEs are handled by
+.         // vce(cluster) anyway), so mixing the two doesn't change anything
+.         // substantively — it just gets past each command's accepted weight type.
+.         local wt "[pw=max_sim]"
+ 16.         local wt_bin "[aw=max_sim]"
+ 17.         local wsuf "_msimwt"
+ 18.     }
+ 19.     local suf ""
+ 20.     if (`r1r2' == 1 & `public' == 0 & `r1_only' == 0) local suf "_r1_r2"
+ 21.     if (`r1r2' == 1 & `public' == 1 & `r1_only' == 0) local suf "_r1_r2_public"
+ 22.     if (`r1_only' == 1 & `public' == 0) local suf "_r1"
+ 23.     if (`r1_only' == 1 & `public' == 1) local suf "_r1_public"
+ 24.     use ../temp/es_`samp'`suf', clear
+ 25. 
+.     gen rel = year - 2014
+ 26.     qui sum rel, d
+ 27.     local abs_lag = abs(r(max))
+ 28.     qui sum rel, d
+ 29.     local abs_lead = abs(r(min))
+ 30.     local timeframe = max(`abs_lag', `abs_lead')
+ 31.     forval i = 1/`timeframe' {
+ 32.         gen int_lag`i' = exposure if rel == `i'
+ 33.         gen int_lead`i' = exposure if rel == -`i'
+ 34.         gen lag`i' = 1 if rel == `i'
+ 35.         gen lead`i' = 1 if rel == -`i'
+ 36.         gen mshr_lag`i'  = mkt_spend_shr if rel == `i'
+ 37.         gen mshr_lead`i' = mkt_spend_shr if rel == -`i'
+ 38.     }
+ 39.     gen int_lag0 = exposure if rel == 0
+ 40.     gen lag0 = 1 if rel == 0
+ 41.     gen mshr_lag0 = mkt_spend_shr if rel == 0
+ 42.     ds lead* lag* int_lead* int_lag* mshr_lead* mshr_lag*
+ 43.     foreach var in `r(varlist)' {
+ 44.         replace `var' = 0 if mi(`var')
+ 45.     }
+ 46.     local leads
+ 47.     local int_leads
+ 48.     local mshr_leads
+ 49.     local lags
+ 50.     local int_lags
+ 51.     local mshr_lags
+ 52.     forval i = 2/`abs_lead' {
+ 53.         local leads lead`i' `leads'
+ 54.         local int_leads int_lead`i' `int_leads'
+ 55.         local mshr_leads mshr_lead`i' `mshr_leads'
+ 56.     }
+ 57.     forval i = 0/`abs_lag' {
+ 58.         local lags `lags' lag`i'
+ 59.         local int_lags `int_lags' int_lag`i'
+ 60.         local mshr_lags `mshr_lags' mshr_lag`i'
+ 61.     }
+ 62.     foreach v in ppr_cnt cite_affl_wt ppr_cnt_any cite_affl_wt_any ///
+>                  ppr_cnt_notlast cite_affl_wt_notlast {
+ 63.         gen ln_`v' = ln(1+`v')
+ 64.     }
+ 65. 
+.     // pre-build group-suffixed event-time interactions for heterogeneity (used in pooled-interaction regressions below).
+.     // For each group build both exposure-based (int_*) and mkt_spend_shr-based (mshr_*) interactions, so
+.     // every heterogeneity spec below can be run twice: base and with sum-of-shares controls.
+.     //
+.     // $HET_GROUPS is the master list of all group dummies feeding heterogeneity
+.     // specs. Existing 14 PI-level (median + binary categorical) groups, plus
+.     // all inst-char and PI-continuous quartile-split groups built in restrict_samp.
+.     // Groups whose dummy is all-missing or degenerate (all 0 or all 1) are
+.     // silently skipped — this shields the inst-char specs from ipeds ids that
+.     // never appear in the panel or that don't have enough non-missing PIs to
+.     // form a median/quartile split.
+.     local het_groups young old r1 r2 high_pre_ppr low_pre_ppr high_grants low_grants ///
+>                      big_team small_team many_coauth few_coauth big_msa small_msa
+ 66.     foreach a of global IC_ALIASES {
+ 67.         local het_groups `het_groups' hi_`a' lo_`a' q1_`a' mid_`a' q4_`a'
+ 68.     }
+ 69.     foreach b of global PI_Q_BASES {
+ 70.         local het_groups `het_groups' q1_`b' mid_`b' q4_`b'
+ 71.     }
+ 72.     global HET_GROUPS_ACTIVE
+ 73.     foreach grp of local het_groups {
+ 74.         cap confirm variable `grp'
+ 75.         if _rc {
+ 76.             di as text "restrict_samp `samp'`suf': dummy `grp' not built — skipping interactions."
+ 77.             continue
+ 78.         }
+ 79.         qui sum `grp'
+ 80.         if r(N) == 0 | r(min) == r(max) {
+ 81.             di as text "restrict_samp `samp'`suf': dummy `grp' degenerate (N=" r(N) " min=" r(min) " max=" r(max) ") — skipping."
+ 82.             continue
+ 83.         }
+ 84.         foreach v of local int_leads {
+ 85.             gen `v'_`grp' = `v' * `grp'
+ 86.         }
+ 87.         foreach v of local int_lags {
+ 88.             gen `v'_`grp' = `v' * `grp'
+ 89.         }
+ 90.         gen int_lead1_`grp' = int_lead1 * `grp'
+ 91.         foreach v of local mshr_leads {
+ 92.             gen `v'_`grp' = `v' * `grp'
+ 93.         }
+ 94.         foreach v of local mshr_lags {
+ 95.             gen `v'_`grp' = `v' * `grp'
+ 96.         }
+ 97.         gen mshr_lead1_`grp' = mshr_lead1 * `grp'
+ 98.         local leads_`grp'
+ 99.         local lags_`grp'
+100.         local mleads_`grp'
+101.         local mlags_`grp'
+102.         foreach v of local int_leads {
+103.             local leads_`grp' `leads_`grp'' `v'_`grp'
+104.         }
+105.         foreach v of local int_lags {
+106.             local lags_`grp' `lags_`grp'' `v'_`grp'
+107.         }
+108.         foreach v of local mshr_leads {
+109.             local mleads_`grp' `mleads_`grp'' `v'_`grp'
+110.         }
+111.         foreach v of local mshr_lags {
+112.             local mlags_`grp' `mlags_`grp'' `v'_`grp'
+113.         }
+114.         global HET_GROUPS_ACTIVE `"${HET_GROUPS_ACTIVE} `grp'"'
+115.     }
+116. 
+.     local position_outcomes ""
+117.     if "$POSITION_OUTCOMES_AVAIL" == "1" {
+118.         local position_outcomes n_first_ppr n_middle_ppr n_last_ppr ///
+>             avg_position avg_position_rat avg_team_size_last avg_team_size_notlast
+119.     }
+120. 
+.     // PPML heterogeneity results collector: one row per (yvar, grp, spec) written
+.     // by the PPML het block inside the yvar loop below. Kept as a dta rather
+.     // than named matrices to avoid Stata's 32-char matrix-name limit
+.     // (e.g. phet_cite_affl_wt_notlast_high_pre_ppr_mshrctrl = 47 chars).
+.     // output_tables and ppml_het_coefplot consume ../temp/phet_results_<samp>...dta.
+.     tempname ph_handle
+121.     postfile `ph_handle' str30 yvar str24 grp str12 spec str8 split_type ///
+>         double(post_b post_se pre_b pre_se N r2_p) ///
+>         using "../temp/phet_results_`samp'`suf'`wsuf'", replace
+122. 
+.     foreach yvar in ppr_cnt cite_affl_wt ln_ppr_cnt ln_cite_affl_wt ///
+>                     ppr_cnt_any cite_affl_wt_any ln_ppr_cnt_any ln_cite_affl_wt_any ///
+>                     ppr_cnt_notlast cite_affl_wt_notlast ln_ppr_cnt_notlast ln_cite_affl_wt_notlast ///
+>                     avg_num_coathrs num_grants grants_per_paper grant_density ///
+>                     `position_outcomes' {
+123.         if "`yvar'" == "ln_spend" local var_name = "Log Spending"
+124.         if "`yvar'" == "ln_spend" local gap  0.5
+125.         if "`yvar'" == "cite_affl_wt" local var_name = "Citation Weighted Output"
+126.         if "`yvar'" == "cite_affl_wt" local gap  1
+127.         if "`yvar'" == "ppr_cnt" local var_name = "Publication Count"
+128.         if "`yvar'" == "ppr_cnt" local gap 0.5
+129.         if "`yvar'" == "ln_ppr_cnt"      local var_name = "Log Publication Counts"
+130.         if "`yvar'" == "ln_ppr_cnt"      local gap 0.1
+131.         if "`yvar'" == "ln_cite_affl_wt" local var_name = "Log Citation Weighted Output"
+132.         if "`yvar'" == "ln_cite_affl_wt" local gap 0.1
+133.         if "`yvar'" == "ppr_cnt"      & "`samp'" == "top_jrnls" local gap 2
+134.         if "`yvar'" == "cite_affl_wt" & "`samp'" == "top_jrnls" local gap 2
+135.         // _any = papers where the PI is at any authorship position (not just last).
+.         // _notlast = _any - _last = papers where PI is first / middle author.
+.         if "`yvar'" == "ppr_cnt_any"         local var_name = "Publication Count (any position)"
+136.         if "`yvar'" == "ppr_cnt_any"         local gap 0.5
+137.         if "`yvar'" == "cite_affl_wt_any"    local var_name = "Citation Weighted Output (any position)"
+138.         if "`yvar'" == "cite_affl_wt_any"    local gap 1
+139.         if "`yvar'" == "ln_ppr_cnt_any"      local var_name = "Log Publication Counts (any position)"
+140.         if "`yvar'" == "ln_ppr_cnt_any"      local gap 0.1
+141.         if "`yvar'" == "ln_cite_affl_wt_any" local var_name = "Log Citation Weighted Output (any position)"
+142.         if "`yvar'" == "ln_cite_affl_wt_any" local gap 0.1
+143.         if "`yvar'" == "ppr_cnt_any"         & "`samp'" == "top_jrnls" local gap 2
+144.         if "`yvar'" == "cite_affl_wt_any"    & "`samp'" == "top_jrnls" local gap 2
+145.         if "`yvar'" == "ppr_cnt_notlast"         local var_name = "Publication Count (non-last author)"
+146.         if "`yvar'" == "ppr_cnt_notlast"         local gap 0.5
+147.         if "`yvar'" == "cite_affl_wt_notlast"    local var_name = "Citation Weighted Output (non-last author)"
+148.         if "`yvar'" == "cite_affl_wt_notlast"    local gap 1
+149.         if "`yvar'" == "ln_ppr_cnt_notlast"      local var_name = "Log Publication Counts (non-last author)"
+150.         if "`yvar'" == "ln_ppr_cnt_notlast"      local gap 0.1
+151.         if "`yvar'" == "ln_cite_affl_wt_notlast" local var_name = "Log Citation Weighted Output (non-last author)"
+152.         if "`yvar'" == "ln_cite_affl_wt_notlast" local gap 0.1
+153.         if "`yvar'" == "ppr_cnt_notlast"         & "`samp'" == "top_jrnls" local gap 2
+154.         if "`yvar'" == "cite_affl_wt_notlast"    & "`samp'" == "top_jrnls" local gap 2
+155.         if "`yvar'" == "avg_num_coathrs"   local var_name = "Average Team Size"
+156.         if "`yvar'" == "avg_num_coathrs"   local gap 0.5
+157.         if "`yvar'" == "num_grants"        local var_name = "Number of Grants"
+158.         if "`yvar'" == "num_grants"        local gap 0.5
+159.         if "`yvar'" == "grants_per_paper"  local var_name = "Grants per Paper (num_grants / ppr_cnt)"
+160.         if "`yvar'" == "grants_per_paper"  local gap 0.5
+161.         if "`yvar'" == "grant_density"     local var_name = "Grant Density (num_grants / pre-period avg ppr)"
+162.         if "`yvar'" == "grant_density"     local gap 0.5
+163.         // Position-metric labels (only used when POSITION_OUTCOMES_AVAIL == 1)
+.         if "`yvar'" == "n_first_ppr"           local var_name = "# First-Author Papers"
+164.         if "`yvar'" == "n_first_ppr"           local gap 0.5
+165.         if "`yvar'" == "n_middle_ppr"          local var_name = "# Middle-Author Papers"
+166.         if "`yvar'" == "n_middle_ppr"          local gap 0.5
+167.         if "`yvar'" == "n_last_ppr"            local var_name = "# Last-Author Papers"
+168.         if "`yvar'" == "n_last_ppr"            local gap 0.5
+169.         if "`yvar'" == "avg_position"          local var_name = "Avg Author Position (1=first, N=last)"
+170.         if "`yvar'" == "avg_position"          local gap 0.5
+171.         if "`yvar'" == "avg_position_rat"      local var_name = "Avg Author Position / Team Size (0-1)"
+172.         if "`yvar'" == "avg_position_rat"      local gap 0.05
+173.         if "`yvar'" == "avg_team_size_last"    local var_name = "Team Size (papers where PI is last)"
+174.         if "`yvar'" == "avg_team_size_last"    local gap 0.5
+175.         if "`yvar'" == "avg_team_size_notlast" local var_name = "Team Size (papers where PI is not last)"
+176.         if "`yvar'" == "avg_team_size_notlast" local gap 0.5
+177.         local poisson_name "`var_name'"
+178.         if "`yvar'" == "ppr_cnt"              local poisson_name "Publications"
+179.         if "`yvar'" == "cite_affl_wt"         local poisson_name "Citation-Weighted Output"
+180.         if "`yvar'" == "ppr_cnt_any"          local poisson_name "Publications (any position)"
+181.         if "`yvar'" == "cite_affl_wt_any"     local poisson_name "Citation-Weighted Output (any position)"
+182.         if "`yvar'" == "ppr_cnt_notlast"      local poisson_name "Publications (non-last author)"
+183.         if "`yvar'" == "cite_affl_wt_notlast" local poisson_name "Citation-Weighted Output (non-last author)"
+184.         if "`yvar'" == "avg_num_coathrs"      local poisson_name "Coauthors"
+185.         if "`yvar'" == "num_grants"           local poisson_name "Grants"
+186.         if "`yvar'" == "grants_per_paper"     local poisson_name "Grants per Paper"
+187.         if "`yvar'" == "grant_density"        local poisson_name "Grant Density"
+188. 
+.         preserve
+189.         cap mat drop es
+190.         sum `yvar' if rel <= -1 & exposure > 0, d
+191.         local pre_mean : dis %4.3f r(mean)
+192.         gunique athr_id
+193.         local num_athrs = r(unique)
+194.         gunique inst_id
+195.         local num_insts = r(unique)
+196.         cap noi reghdfe `yvar' `int_leads' `int_lags' `wt', absorb(`fes') vce(cluster `vce_cl')
+197.         if _rc {
+198.             di as error "event_study `samp'`suf' `yvar' base failed (rc=`_rc'); skipping this outcome."
+199.             restore
+200.             continue
+201.         }
+202.         foreach var in `int_leads' `int_lags' int_lead1 {
+203.             if "`var'" == "int_lead1" {
+204.                 mat row = 0,0
+205.             }
+206.             else {
+207.                 mat row = _b[`var'], _se[`var']
+208.             }
+209.             mat es = nullmat(es) \ row
+210.         }
+211.         svmat es
+212.         keep es1 es2
+213.         drop if mi(es1)
+214.         rename (es1 es2) (b se)
+215.         gen ub = b + 1.96*se
+216.         sum ub, d
+217.         local ymax =round(r(max),`gap')
+218.         gen lb = b - 1.96*se
+219.         sum lb, d
+220.         local ymin = min(-2.5,round(r(min),`gap'))
+221.         if inlist("`yvar'", "ln_ppr_cnt", "ln_cite_affl_wt") local ymin = -1
+222.         gen rel = -4 if _n == 1
+223.         replace rel = rel[_n-1]+1 if _n > 1
+224.         replace rel = rel + 1 if rel >= -1
+225.         replace rel = -1 if rel == `abs_lag' + 1
+226.         gen year = rel + 2014
+227.         hashsort rel
+228.         tw rcap ub lb year if year != 2013 , lcolor(ebblue%70) msize(vsmall) || ///
+>           scatter b year, mcolor(ebblue) || ///
+>           scatteri `ymax' 2013.75 `ymax' 2014.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
+>           xlab(2010(1)2019) xtitle("Year") ///
+>           ytitle("`var_name'") ylab(`ymin'(`gap')`ymax') ///
+>           yline(0, lcolor(gs10) lpattern(solid)) ///
+>           legend(on order(- "Num. PIs: `num_athrs'" "Num. Institutions: `num_insts'" "Pre-Period Avg : `pre_mean'") pos(7) ring(1) rows(2) bmargin(zero) size(small)) plotregion(margin(sides))
+229.         graph export ../output/figures/`samp'/es_`yvar'`suf'`wsuf'.pdf, replace
+230.         save ../temp/es_`yvar'`wsuf', replace
+231.         restore
+232. 
+.         // alternative spec: control for mkt_spend_shr x rel-year dummies
+.         preserve
+233.         cap mat drop es
+234.         cap noi reghdfe `yvar' `int_leads' `int_lags' `mshr_leads' `mshr_lags' `wt', ///
+>                        absorb(`fes') vce(cluster `vce_cl')
+235.         if _rc {
+236.             di as error "event_study `samp'`suf' `yvar' mshrctrl failed (rc=`_rc'); skipping mshrctrl plot."
+237.             restore
+238.             // Skip only the mshrctrl plot; PPML and heterogeneity blocks below will try independently.
+.         }
+239.         else {
+240.         foreach var in `int_leads' `int_lags' int_lead1 {
+241.             if "`var'" == "int_lead1" {
+242.                 mat row = 0,0
+243.             }
+244.             else {
+245.                 mat row = _b[`var'], _se[`var']
+246.             }
+247.             mat es = nullmat(es) \ row
+248.         }
+249.         svmat es
+250.         keep es1 es2
+251.         drop if mi(es1)
+252.         rename (es1 es2) (b se)
+253.         gen ub = b + 1.96*se
+254.         sum ub, d
+255.         local ymax = round(r(max),`gap')
+256.         gen lb = b - 1.96*se
+257.         sum lb, d
+258.         local ymin = min(-2.5,round(r(min),`gap'))
+259.         if inlist("`yvar'", "ln_ppr_cnt", "ln_cite_affl_wt") local ymin = -1
+260.         gen rel = -4 if _n == 1
+261.         replace rel = rel[_n-1]+1 if _n > 1
+262.         replace rel = rel + 1 if rel >= -1
+263.         replace rel = -1 if rel == `abs_lag' + 1
+264.         gen year = rel + 2014
+265.         hashsort rel
+266.         tw rcap ub lb year if year != 2013 , lcolor(ebblue%70) msize(vsmall) || ///
+>           scatter b year, mcolor(ebblue) || ///
+>           scatteri `ymax' 2013.75 `ymax' 2014.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
+>           xlab(2010(1)2019) xtitle("Year") ///
+>           ytitle("`var_name'") ylab(`ymin'(`gap')`ymax') ///
+>           yline(0, lcolor(gs10) lpattern(solid)) ///
+>           legend(on order(- "Num. PIs: `num_athrs'" "Num. Institutions: `num_insts'" "Pre-Period Avg : `pre_mean'") pos(7) ring(1) rows(2) bmargin(zero) size(small)) plotregion(margin(sides))
+267.         graph export ../output/figures/`samp'/es_`yvar'`suf'_mshrctrl`wsuf'.pdf, replace
+268.         save ../temp/es_`yvar'`suf'_mshrctrl`wsuf', replace
+269.         restore
+270.         }
+271. 
+.         // Poisson (ppmlhdfe) version — skip already-logged outcomes; coefs are semielasticities
+.         if !regexm("`yvar'", "^ln_") {
+272.             foreach spec in base mshrctrl {
+273.                 preserve
+274.                 cap mat drop es
+275.                 if "`spec'" == "base" {
+276.                     cap noi ppmlhdfe `yvar' `int_leads' `int_lags' `wt', ///
+>                             absorb(`fes') vce(cluster `vce_cl')
+277.                 }
+278.                 else {
+279.                     cap noi ppmlhdfe `yvar' `int_leads' `int_lags' ///
+>                                            `mshr_leads' `mshr_lags' `wt', ///
+>                             absorb(`fes') vce(cluster `vce_cl')
+280.                 }
+281.                 if _rc {
+282.                     di as error "ppmlhdfe `yvar' `spec' failed (rc=`_rc'); skipping plot."
+283.                     restore
+284.                     continue
+285.                 }
+286.                 foreach var in `int_leads' `int_lags' int_lead1 {
+287.                     if "`var'" == "int_lead1" {
+288.                         mat row = 0,0
+289.                     }
+290.                     else {
+291.                         mat row = _b[`var'], _se[`var']
+292.                     }
+293.                     mat es = nullmat(es) \ row
+294.                 }
+295.                 svmat es
+296.                 keep es1 es2
+297.                 drop if mi(es1)
+298.                 rename (es1 es2) (b se)
+299.                 gen ub = b + 1.96*se
+300.                 sum ub, d
+301.                 local ymax = round(r(max), 0.1)
+302.                 gen lb = b - 1.96*se
+303.                 sum lb, d
+304.                 local ymin = round(r(min), 0.1)
+305.                 gen rel = -4 if _n == 1
+306.                 replace rel = rel[_n-1]+1 if _n > 1
+307.                 replace rel = rel + 1 if rel >= -1
+308.                 replace rel = -1 if rel == `abs_lag' + 1
+309.                 gen year = rel + 2014
+310.                 hashsort rel
+311.                 local plot_suf "_ppml"
+312.                 if "`spec'" == "mshrctrl" local plot_suf "_ppml_mshrctrl"
+313.                 tw rcap ub lb year if year != 2013, lcolor(ebblue%70) msize(vsmall) || ///
+>                   scatter b year, mcolor(ebblue) || ///
+>                   scatteri `ymax' 2013.75 `ymax' 2014.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
+>                   xlab(2010(1)2019) xtitle("Year") ///
+>                   ytitle("{&Delta} Log Expected `poisson_name'") ylab(`ymin'(0.1)`ymax') ///
+>                   yline(0, lcolor(gs10) lpattern(solid)) ///
+>                   legend(on order(- "Num. PIs: `num_athrs'" "Num. Institutions: `num_insts'" "Pre-Period Avg : `pre_mean'") pos(7) ring(1) rows(2) bmargin(zero) size(small)) plotregion(margin(sides))
+314.                 graph export ../output/figures/`samp'/es_`yvar'`suf'`plot_suf'`wsuf'.pdf, replace
+315.                 save ../temp/es_`yvar'`suf'`plot_suf'`wsuf', replace
+316.                 restore
+317.             }
+318.         }
+319. 
+.         // heterogeneity by author & inst characteristics — one regression per dummy pair, split-interaction form.
+.         // Run twice per pair: base (no mkt-share controls) and mshrctrl (+ mshr x rel-time x group).
+.         // Three pair-list globals feed the loops below (also used by PPML het):
+.         //   $DUMMY_PAIRS_MED  : 7 existing PI-level median pairs + 30 IC median pairs
+.         //   $IC_PAIRS_Q       : 30 inst-char quartile pairs (Q4 vs Q1, mid = nuisance)
+.         //   $PI_PAIRS_Q       : 5 PI-continuous quartile pairs (same three-group spec)
+.         // See define_group_labels for construction.
+.         global DUMMY_PAIRS_MED `" "young old" "r1 r2" "high_pre_ppr low_pre_ppr" "high_grants low_grants" "big_team small_team" "many_coauth few_coauth" "big_msa small_msa" ${IC_PAIRS_MED} "'
+320.         // Runtime saver: OLS heterogeneity runs on the four headline outcomes
+.         // (publications + citation-weighted output, level and log). PPML het
+.         // (below) is broader.
+.         if inlist("`yvar'", "ppr_cnt", "ln_ppr_cnt", "cite_affl_wt", "ln_cite_affl_wt") {
+321.         foreach pair of global DUMMY_PAIRS_MED {
+322.             local g1: word 1 of `pair'
+323.             local g2: word 2 of `pair'
+324.             // Skip pairs whose dummy failed the degeneracy check during the pre-
+.             // build in restrict_samp (e.g., an ic_ var with no non-missing PIs
+.             // in this sample). HET_GROUPS_ACTIVE is set in the pre-build loop.
+.             if strpos(" ${HET_GROUPS_ACTIVE} ", " `g1' ") == 0 continue
+325.             if strpos(" ${HET_GROUPS_ACTIVE} ", " `g2' ") == 0 continue
+326.             // Human-readable label for the g1 (dummy=1) group; used as the
+.             // plot subtitle so each split PDF is self-describing. Falls back to
+.             // the group name if no LBL_<g1> global was defined.
+.             local g1_label = "${LBL_`g1'}"
+327.             if "`g1_label'" == "" local g1_label "`g1'"
+328.             // Base + interaction form: un-interacted int_lead/lag_* absorb the
+.             // event-time path for the dummy=0 (`g2') group; leads_`g1'/lags_`g1'
+.             // are the *differential* effect for the dummy=1 group. Only one
+.             // coefplot per split is saved (the differential), since it already
+.             // encodes the comparison to the dummy=0 group.
+.             //
+.             // For pre-period-baseline splits (high_pre_ppr, high_grants) the
+.             // median split is mechanically confounded with regression-to-mean.
+.             // Adding i.year#c.<baseline> lets each year have its own slope on
+.             // continuous baseline productivity, absorbing the mean-reversion
+.             // time-path; the surviving `leads_`g1''/`lags_`g1'' is the
+.             // differential response to treatment net of "big producers
+.             // naturally fall back."
+.             local specs base mshrctrl
+329.             local mr_baseline ""
+330.             if "`g1'" == "high_pre_ppr" {
+331.                 local specs `specs' mshrctrl_mr
+332.                 local mr_baseline pre_ppr_cnt_sum
+333.             }
+334.             if "`g1'" == "high_grants" {
+335.                 local specs `specs' mshrctrl_mr
+336.                 local mr_baseline pre_gpp
+337.             }
+338.             foreach spec of local specs {
+339.                 local mshr_ctrls
+340.                 local plot_suf
+341.                 local mr_abs
+342.                 if "`spec'" == "mshrctrl" | "`spec'" == "mshrctrl_mr" {
+343.                     // un-interacted mshr_lead/lag_* absorbs the base MShr
+.                     // event-time; mleads_`g1'/mlags_`g1' lets high group have
+.                     // its own MShr slope
+.                     local mshr_ctrls `mshr_leads' `mshr_lags' `mleads_`g1'' `mlags_`g1''
+344.                     local plot_suf "_mshrctrl"
+345.                 }
+346.                 if "`spec'" == "mshrctrl_mr" {
+347.                     local mr_abs i.year#c.`mr_baseline'
+348.                     local plot_suf "_mshrctrl_mr"
+349.                 }
+350.                 // int_lead1 (rel=-1) omitted for both base and differential —
+.                 // shared reference year.
+.                 cap noi reghdfe `yvar' `int_leads' `int_lags' ///
+>                                `leads_`g1'' `lags_`g1'' ///
+>                                `mshr_ctrls' `wt', ///
+>                                absorb(`fes' `mr_abs') vce(cluster `vce_cl')
+351.                 if _rc {
+352.                     di as error "event_study `samp'`suf' `yvar' `g1' `spec' failed (rc=`_rc'); skipping."
+353.                     continue
+354.                 }
+355. 
+.                 // Extract the differential coefficients (only the `g1'-suffixed
+.                 // ones); int_lead1_`g1' is the rel=-1 reference and pinned to 0.
+.                 sum `yvar' if rel <= -1 & exposure > 0 & `g1' == 1, d
+356.                 local pre_mean : dis %4.3f r(mean)
+357.                 gunique athr_id if exposure > 0 & `g1' == 1
+358.                 local num_athrs = r(unique)
+359.                 preserve
+360.                 cap mat drop es
+361.                 foreach var in `leads_`g1'' `lags_`g1'' int_lead1_`g1' {
+362.                     if "`var'" == "int_lead1_`g1'" {
+363.                         mat row = 0,0
+364.                     }
+365.                     else {
+366.                         mat row = _b[`var'], _se[`var']
+367.                     }
+368.                     mat es = nullmat(es) \ row
+369.                 }
+370.                 svmat es
+371.                 keep es1 es2
+372.                 drop if mi(es1)
+373.                 rename (es1 es2) (b se)
+374.                 gen ub = b + 1.96*se
+375.                 sum ub, d
+376.                 local ymax = round(r(max),`gap')
+377.                 gen lb = b - 1.96*se
+378.                 sum lb, d
+379.                 local ymin = round(r(min),`gap')
+380.                 if inlist("`yvar'", "ln_ppr_cnt", "ln_cite_affl_wt") local ymin = -1
+381.                 gen rel = -4 if _n == 1
+382.                 replace rel = rel[_n-1]+1 if _n > 1
+383.                 replace rel = rel + 1 if rel >= -1
+384.                 replace rel = -1 if rel == `abs_lag' + 1
+385.                 gen year = rel + 2014
+386.                 hashsort rel
+387.                 tw rcap ub lb year if year != 2013 , lcolor(ebblue%70) msize(vsmall) || ///
+>                   scatter b year, mcolor(ebblue) || ///
+>                 scatteri `ymax' 2013.75 `ymax' 2014.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
+>                   xlab(2010(1)2019, labsize(small)) xtitle("Year") ///
+>                   ytitle("Exposure x Post") ylab(`ymin'(`gap')`ymax') ///
+>                   subtitle("`g1_label'", pos(11) size(small)) ///
+>                   legend(on order(- "Num. PIs: `num_athrs'" "Pre-Period Avg : `pre_mean'") pos(7) ring(1) rows(2) bmargin(zero) size(small)) ///
+>                   yline(0, lcolor(gs10) lpattern(solid)) plotregion(margin(sides))
+388.                 graph export ../output/figures/`samp'/es_`yvar'`suf'_`g1'`plot_suf'`wsuf'.pdf, replace
+389.                 save ../temp/es_`yvar'`suf'_`g1'`plot_suf'`wsuf', replace
+390.                 restore
+391.             }
+392.         }
+393. 
+.         // ---- OLS heterogeneity: quartile split (Q1 vs Q4, mid = Q2 U Q3 as nuisance).
+.         //   reghdfe y  int_leads int_lags  leads_q4 lags_q4  leads_mid lags_mid  [mshr]
+.         // Q1 is absorbed by the un-interacted int_leads/int_lags (same "base +
+.         // interaction" pattern as the median loop); leads_q4 / lags_q4 are the
+.         // Q4-Q1 differential (what gets plotted); leads_mid / lags_mid are
+.         // nuisance interactions that keep mid PIs contributing to the FEs
+.         // without contaminating the Q4-Q1 contrast. Iterates over inst-char
+.         // quartile pairs (${IC_PAIRS_Q}) + PI-continuous quartile pairs
+.         // (${PI_PAIRS_Q}). Coefplot suffix "_q4vsq1" distinguishes from the
+.         // median-split PDFs written above.
+.         foreach pair of global IC_PAIRS_Q {
+394.             local quart_pairs_all `"`quart_pairs_all' `"`pair'"' "'
+395.         }
+396.         foreach pair of global PI_PAIRS_Q {
+397.             local quart_pairs_all `"`quart_pairs_all' `"`pair'"' "'
+398.         }
+399.         foreach pair of local quart_pairs_all {
+400.             local g1: word 1 of `pair'  // "q4_<x>" — focal / plotted
+401.             local g2: word 2 of `pair'  // "q1_<x>" — base (absorbed by un-interacted int_*)
+402.             // Recover the mid group name from g1 (strip "q4_" and prepend "mid_").
+.             local base = substr("`g1'", 4, .)
+403.             local gm = "mid_`base'"
+404.             if strpos(" ${HET_GROUPS_ACTIVE} ", " `g1' ") == 0 continue
+405.             if strpos(" ${HET_GROUPS_ACTIVE} ", " `g2' ") == 0 continue
+406.             if strpos(" ${HET_GROUPS_ACTIVE} ", " `gm' ") == 0 continue
+407.             local g1_label = "${LBL_`g1'}"
+408.             if "`g1_label'" == "" local g1_label "`g1'"
+409.             local specs base mshrctrl
+410.             foreach spec of local specs {
+411.                 local mshr_ctrls
+412.                 local plot_suf "_q4vsq1"
+413.                 if "`spec'" == "mshrctrl" {
+414.                     local mshr_ctrls `mshr_leads' `mshr_lags' `mleads_`g1'' `mlags_`g1'' `mleads_`gm'' `mlags_`gm''
+415.                     local plot_suf "_q4vsq1_mshrctrl"
+416.                 }
+417.                 cap noi reghdfe `yvar' `int_leads' `int_lags' ///
+>                                `leads_`g1'' `lags_`g1'' ///
+>                                `leads_`gm'' `lags_`gm'' ///
+>                                `mshr_ctrls' `wt', ///
+>                                absorb(`fes') vce(cluster `vce_cl')
+418.                 if _rc {
+419.                     di as error "event_study `samp'`suf' `yvar' `g1' quart `spec' failed (rc=`_rc'); skipping."
+420.                     continue
+421.                 }
+422.                 sum `yvar' if rel <= -1 & exposure > 0 & `g1' == 1, d
+423.                 local pre_mean : dis %4.3f r(mean)
+424.                 gunique athr_id if exposure > 0 & `g1' == 1
+425.                 local num_athrs = r(unique)
+426.                 preserve
+427.                 cap mat drop es
+428.                 foreach var in `leads_`g1'' `lags_`g1'' int_lead1_`g1' {
+429.                     if "`var'" == "int_lead1_`g1'" {
+430.                         mat row = 0,0
+431.                     }
+432.                     else {
+433.                         mat row = _b[`var'], _se[`var']
+434.                     }
+435.                     mat es = nullmat(es) \ row
+436.                 }
+437.                 svmat es
+438.                 keep es1 es2
+439.                 drop if mi(es1)
+440.                 rename (es1 es2) (b se)
+441.                 gen ub = b + 1.96*se
+442.                 sum ub, d
+443.                 local ymax = round(r(max),`gap')
+444.                 gen lb = b - 1.96*se
+445.                 sum lb, d
+446.                 local ymin = round(r(min),`gap')
+447.                 if inlist("`yvar'", "ln_ppr_cnt", "ln_cite_affl_wt") local ymin = -1
+448.                 gen rel = -4 if _n == 1
+449.                 replace rel = rel[_n-1]+1 if _n > 1
+450.                 replace rel = rel + 1 if rel >= -1
+451.                 replace rel = -1 if rel == `abs_lag' + 1
+452.                 gen year = rel + 2014
+453.                 hashsort rel
+454.                 tw rcap ub lb year if year != 2013 , lcolor(cranberry%70) msize(vsmall) || ///
+>                   scatter b year, mcolor(cranberry) || ///
+>                 scatteri `ymax' 2013.75 `ymax' 2014.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
+>                   xlab(2010(1)2019, labsize(small)) xtitle("Year") ///
+>                   ytitle("Q4-Q1 Diff (Exposure x Post)") ylab(`ymin'(`gap')`ymax') ///
+>                   subtitle("`g1_label' vs Q1", pos(11) size(small)) ///
+>                   legend(on order(- "Num. PIs (Q4): `num_athrs'" "Pre-Period Avg : `pre_mean'") pos(7) ring(1) rows(2) bmargin(zero) size(small)) ///
+>                   yline(0, lcolor(gs10) lpattern(solid)) plotregion(margin(sides))
+455.                 graph export ../output/figures/`samp'/es_`yvar'`suf'_`g1'`plot_suf'`wsuf'.pdf, replace
+456.                 save ../temp/es_`yvar'`suf'_`g1'`plot_suf'`wsuf', replace
+457.                 restore
+458.             }
+459.         }
+460.         local quart_pairs_all
+461.         }  // closes OLS-only inlist gate
+462. 
+.         // ---- PPML heterogeneity: split-form spec matching ppml_pdid_het_binscatter.
+.         //   ppmlhdfe y  leads_g1 lags_g1  leads_g2 lags_g2  [mshr_g1 mshr_g2]
+.         // Under this parameterization there is no un-interacted base and
+.         // g1 + g2 = 1 for every observation, so `_b[lags_g1_k]` is the LEVEL
+.         // of the event-time effect for the g1 subgroup (not a differential
+.         // vs g2). Post one row per (yvar, g, spec) — g takes both sides of
+.         // each pair, so the coefplot below can compare g1 and g2 head-to-head.
+.         //
+.         // Runs for all PPML-eligible outcomes under mshrctrl; adds `base` for
+.         // ppr_cnt (backwards-compat with the older single-outcome block).
+.         // Skipped for already-logged (ln_*) outcomes (PPML on log outcomes is
+.         // nonsense) and for average-based outcomes (avg_*), which are
+.         // conditional means, not counts. mshrctrl_mr also skipped —
+.         // mean-reversion i.year#c.baseline is an OLS-only diagnostic and its
+.         // interpretation in the Poisson link is opaque.
+.         // Per-group event-time PDFs only generated for ppr_cnt to keep runtime
+.         // bounded.
+.         local ppml_het_skip ln_ppr_cnt ln_cite_affl_wt ln_ppr_cnt_any ln_cite_affl_wt_any ln_ppr_cnt_notlast ln_cite_affl_wt_notlast avg_position avg_position_rat avg_team_size_last avg_team_size_notlast
+463.         if strpos(" `ppml_het_skip' ", " `yvar' ") == 0 {
+464.             foreach pair of global DUMMY_PAIRS_MED {
+465.                 local g1: word 1 of `pair'
+466.                 local g2: word 2 of `pair'
+467.                 if strpos(" ${HET_GROUPS_ACTIVE} ", " `g1' ") == 0 continue
+468.                 if strpos(" ${HET_GROUPS_ACTIVE} ", " `g2' ") == 0 continue
+469.                 local ppml_specs mshrctrl
+470.                 if "`yvar'" == "ppr_cnt" local ppml_specs base mshrctrl
+471.                 foreach spec of local ppml_specs {
+472.                     local mshr_ctrls
+473.                     local plot_suf "_ppml"
+474.                     if "`spec'" == "mshrctrl" {
+475.                         local mshr_ctrls `mleads_`g1'' `mlags_`g1'' `mleads_`g2'' `mlags_`g2''
+476.                         local plot_suf "_ppml_mshrctrl"
+477.                     }
+478.                     cap noi ppmlhdfe `yvar' `leads_`g1'' `lags_`g1'' `leads_`g2'' `lags_`g2'' ///
+>                                    `mshr_ctrls' `wt', ///
+>                                    absorb(`fes') vce(cluster `vce_cl')
+479.                     if _rc {
+480.                         di as error "event_study `samp'`suf' `yvar' `g1'/`g2' ppml `spec' failed (rc=`_rc'); skipping."
+481.                         continue
+482.                     }
+483.                     local Nppml = e(N)
+484.                     local r2ppml = e(r2_p)
+485. 
+.                     foreach grp in `g1' `g2' {
+486.                         // Human-readable label for this group side (used as
+.                         // subtitle on the per-group event-time PDF below).
+.                         // Falls back to the group name if no LBL_<grp> was set.
+.                         local grp_label = "${LBL_`grp'}"
+487.                         if "`grp_label'" == "" local grp_label "`grp'"
+488. 
+.                         sum `yvar' if rel <= -1 & exposure > 0 & `grp' == 1, d
+489.                         local pre_mean : dis %4.3f r(mean)
+490.                         gunique athr_id if exposure > 0 & `grp' == 1
+491.                         local num_athrs = r(unique)
+492. 
+.                         // Pooled post- and pre-averages of the group's
+.                         // event-time β via lincom on the fitted model. Post =
+.                         // mean of int_lag0..lag(abs_lag) coefs for the group;
+.                         // pre = mean of the included leads (int_lead2..
+.                         // lead(abs_lead)) since lead1 is the omitted reference.
+.                         local n_post = `abs_lag' + 1
+493.                         local n_pre  = `abs_lead' - 1
+494.                         local sum_post
+495.                         foreach v of local lags_`grp' {
+496.                             local sum_post `sum_post' + `v'
+497.                         }
+498.                         local sum_post = substr("`sum_post'", 3, .)
+499.                         local sum_pre
+500.                         foreach v of local leads_`grp' {
+501.                             local sum_pre `sum_pre' + `v'
+502.                         }
+503.                         local sum_pre = substr("`sum_pre'", 3, .)
+504. 
+.                         local b_post = .
+505.                         local se_post = .
+506.                         local b_pre = .
+507.                         local se_pre = .
+508.                         cap qui lincom (`sum_post') / `n_post'
+509.                         if _rc == 0 {
+510.                             local b_post = r(estimate)
+511.                             local se_post = r(se)
+512.                         }
+513.                         cap qui lincom (`sum_pre') / `n_pre'
+514.                         if _rc == 0 {
+515.                             local b_pre = r(estimate)
+516.                             local se_pre = r(se)
+517.                         }
+518. 
+.                         di as text "ppml het `samp'`suf' `yvar' `grp' `spec': post_avg=" %8.4f `b_post' ///
+>                             " (se=" %8.4f `se_post' ")   pre_avg=" %8.4f `b_pre' ///
+>                             " (se=" %8.4f `se_pre' ")   N=" %9.0f `Nppml'
+519. 
+.                         post `ph_handle' ("`yvar'") ("`grp'") ("`spec'") ("med") ///
+>                             (`b_post') (`se_post') (`b_pre') (`se_pre') (`Nppml') (`r2ppml')
+520. 
+.                         // Per-group event-time PDF only for ppr_cnt (runtime + volume)
+.                         if "`yvar'" != "ppr_cnt" continue
+521.                         preserve
+522.                         cap mat drop es
+523.                         foreach var in `leads_`grp'' `lags_`grp'' int_lead1_`grp' {
+524.                             if "`var'" == "int_lead1_`grp'" {
+525.                                 mat row = 0,0
+526.                             }
+527.                             else {
+528.                                 mat row = _b[`var'], _se[`var']
+529.                             }
+530.                             mat es = nullmat(es) \ row
+531.                         }
+532.                         svmat es
+533.                         keep es1 es2
+534.                         drop if mi(es1)
+535.                         rename (es1 es2) (b se)
+536.                         gen ub = b + 1.96*se
+537.                         sum ub, d
+538.                         local ymax = round(r(max), 0.1)
+539.                         gen lb = b - 1.96*se
+540.                         sum lb, d
+541.                         local ymin = round(r(min), 0.1)
+542.                         gen rel = -4 if _n == 1
+543.                         replace rel = rel[_n-1]+1 if _n > 1
+544.                         replace rel = rel + 1 if rel >= -1
+545.                         replace rel = -1 if rel == `abs_lag' + 1
+546.                         gen year = rel + 2014
+547.                         hashsort rel
+548.                         tw rcap ub lb year if year != 2013, lcolor(ebblue%70) msize(vsmall) || ///
+>                           scatter b year, mcolor(ebblue) || ///
+>                         scatteri `ymax' 2013.75 `ymax' 2014.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
+>                           xlab(2010(1)2019, labsize(small)) xtitle("Year") ///
+>                           ytitle("Exposure x Post") ylab(`ymin'(0.1)`ymax') ///
+>                           subtitle("`grp_label'", pos(11) size(small)) ///
+>                           legend(on order(- "Num. PIs: `num_athrs'" "Pre-Period Avg : `pre_mean'") pos(7) ring(1) rows(2) bmargin(zero) size(small)) ///
+>                           yline(0, lcolor(gs10) lpattern(solid)) plotregion(margin(sides))
+549.                         graph export ../output/figures/`samp'/es_`yvar'`suf'_`grp'`plot_suf'`wsuf'.pdf, replace
+550.                         save ../temp/es_`yvar'`suf'_`grp'`plot_suf'`wsuf', replace
+551.                         restore
+552.                     }
+553.                 }
+554.             }
+555. 
+.             // ---- PPML heterogeneity: quartile split (three-group full-sample
+.             // interaction). Fit is:
+.             //   ppmlhdfe y  leads_q1 lags_q1  leads_mid lags_mid  leads_q4 lags_q4  [mshr]
+.             // Since q1 + mid + q4 = 1 for every observed obs, each side gets its
+.             // own LEVEL β for that subgroup. We extract q1 and q4 β's (skip mid —
+.             // nuisance) and post both to phet_results with split_type = "quart".
+.             // Per-group event-time PDFs written only for ppr_cnt.
+.             local quart_all
+556.             foreach pair of global IC_PAIRS_Q {
+557.                 local quart_all `"`quart_all' `"`pair'"' "'
+558.             }
+559.             foreach pair of global PI_PAIRS_Q {
+560.                 local quart_all `"`quart_all' `"`pair'"' "'
+561.             }
+562.             foreach pair of local quart_all {
+563.                 local g1: word 1 of `pair'  // "q4_<x>"
+564.                 local g2: word 2 of `pair'  // "q1_<x>"
+565.                 local base = substr("`g1'", 4, .)
+566.                 local gm = "mid_`base'"
+567.                 if strpos(" ${HET_GROUPS_ACTIVE} ", " `g1' ") == 0 continue
+568.                 if strpos(" ${HET_GROUPS_ACTIVE} ", " `g2' ") == 0 continue
+569.                 if strpos(" ${HET_GROUPS_ACTIVE} ", " `gm' ") == 0 continue
+570.                 local ppml_specs mshrctrl
+571.                 if "`yvar'" == "ppr_cnt" local ppml_specs base mshrctrl
+572.                 foreach spec of local ppml_specs {
+573.                     local mshr_ctrls
+574.                     local plot_suf "_ppml_q"
+575.                     if "`spec'" == "mshrctrl" {
+576.                         local mshr_ctrls `mleads_`g1'' `mlags_`g1'' ///
+>                                          `mleads_`g2'' `mlags_`g2'' ///
+>                                          `mleads_`gm'' `mlags_`gm''
+577.                         local plot_suf "_ppml_q_mshrctrl"
+578.                     }
+579.                     cap noi ppmlhdfe `yvar' `leads_`g1'' `lags_`g1'' ///
+>                                             `leads_`g2'' `lags_`g2'' ///
+>                                             `leads_`gm'' `lags_`gm'' ///
+>                                             `mshr_ctrls' `wt', ///
+>                                             absorb(`fes') vce(cluster `vce_cl')
+580.                     if _rc {
+581.                         di as error "event_study `samp'`suf' `yvar' `g1'/`g2' ppml quart `spec' failed (rc=`_rc'); skipping."
+582.                         continue
+583.                     }
+584.                     local Nppml = e(N)
+585.                     local r2ppml = e(r2_p)
+586. 
+.                     foreach grp in `g1' `g2' {
+587.                         local grp_label = "${LBL_`grp'}"
+588.                         if "`grp_label'" == "" local grp_label "`grp'"
+589.                         sum `yvar' if rel <= -1 & exposure > 0 & `grp' == 1, d
+590.                         local pre_mean : dis %4.3f r(mean)
+591.                         gunique athr_id if exposure > 0 & `grp' == 1
+592.                         local num_athrs = r(unique)
+593. 
+.                         local n_post = `abs_lag' + 1
+594.                         local n_pre  = `abs_lead' - 1
+595.                         local sum_post
+596.                         foreach v of local lags_`grp' {
+597.                             local sum_post `sum_post' + `v'
+598.                         }
+599.                         local sum_post = substr("`sum_post'", 3, .)
+600.                         local sum_pre
+601.                         foreach v of local leads_`grp' {
+602.                             local sum_pre `sum_pre' + `v'
+603.                         }
+604.                         local sum_pre = substr("`sum_pre'", 3, .)
+605. 
+.                         local b_post = .
+606.                         local se_post = .
+607.                         local b_pre = .
+608.                         local se_pre = .
+609.                         cap qui lincom (`sum_post') / `n_post'
+610.                         if _rc == 0 {
+611.                             local b_post = r(estimate)
+612.                             local se_post = r(se)
+613.                         }
+614.                         cap qui lincom (`sum_pre') / `n_pre'
+615.                         if _rc == 0 {
+616.                             local b_pre = r(estimate)
+617.                             local se_pre = r(se)
+618.                         }
+619. 
+.                         di as text "ppml het `samp'`suf' `yvar' `grp' quart `spec': post_avg=" %8.4f `b_post' ///
+>                             " (se=" %8.4f `se_post' ")   pre_avg=" %8.4f `b_pre' ///
+>                             " (se=" %8.4f `se_pre' ")   N=" %9.0f `Nppml'
+620. 
+.                         post `ph_handle' ("`yvar'") ("`grp'") ("`spec'") ("quart") ///
+>                             (`b_post') (`se_post') (`b_pre') (`se_pre') (`Nppml') (`r2ppml')
+621. 
+.                         // Per-group event-time PDF only for ppr_cnt.
+.                         if "`yvar'" != "ppr_cnt" continue
+622.                         preserve
+623.                         cap mat drop es
+624.                         foreach var in `leads_`grp'' `lags_`grp'' int_lead1_`grp' {
+625.                             if "`var'" == "int_lead1_`grp'" {
+626.                                 mat row = 0,0
+627.                             }
+628.                             else {
+629.                                 mat row = _b[`var'], _se[`var']
+630.                             }
+631.                             mat es = nullmat(es) \ row
+632.                         }
+633.                         svmat es
+634.                         keep es1 es2
+635.                         drop if mi(es1)
+636.                         rename (es1 es2) (b se)
+637.                         gen ub = b + 1.96*se
+638.                         sum ub, d
+639.                         local ymax = round(r(max), 0.1)
+640.                         gen lb = b - 1.96*se
+641.                         sum lb, d
+642.                         local ymin = round(r(min), 0.1)
+643.                         gen rel = -4 if _n == 1
+644.                         replace rel = rel[_n-1]+1 if _n > 1
+645.                         replace rel = rel + 1 if rel >= -1
+646.                         replace rel = -1 if rel == `abs_lag' + 1
+647.                         gen year = rel + 2014
+648.                         hashsort rel
+649.                         tw rcap ub lb year if year != 2013, lcolor(cranberry%70) msize(vsmall) || ///
+>                           scatter b year, mcolor(cranberry) || ///
+>                         scatteri `ymax' 2013.75 `ymax' 2014.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
+>                           xlab(2010(1)2019, labsize(small)) xtitle("Year") ///
+>                           ytitle("Exposure x Post") ylab(`ymin'(0.1)`ymax') ///
+>                           subtitle("`grp_label'", pos(11) size(small)) ///
+>                           legend(on order(- "Num. PIs: `num_athrs'" "Pre-Period Avg : `pre_mean'") pos(7) ring(1) rows(2) bmargin(zero) size(small)) ///
+>                           yline(0, lcolor(gs10) lpattern(solid)) plotregion(margin(sides))
+650.                         graph export ../output/figures/`samp'/es_`yvar'`suf'_`grp'`plot_suf'`wsuf'.pdf, replace
+651.                         save ../temp/es_`yvar'`suf'_`grp'`plot_suf'`wsuf', replace
+652.                         restore
+653.                     }
+654.                 }
+655.             }
+656.         }
+657.     }
+658.     postclose `ph_handle'
+659. end
+
+. 
+. program pooled_did
+  1.     // pooled DiD: y_it = a_i + g_t + b*(exposure_i x post_t) + e_it
+.     // matches event-study sample/FE/cluster; gives a single post-period beta with SE.
+.     syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0)]
+  2.     local fes athr_id year
+  3.     local vce_cl athr_id
+  4.     if "$FE_MODE" == "inst_cluster" {
+  5.         local fes inst_id cluster_30 year
+  6.         local vce_cl inst_id
+  7.     }
+  8.     if "$FE_MODE" == "inst_cluster_fldyr" {
+  9.         local fes inst_id i.cluster_30#i.year
+ 10.         local vce_cl inst_id
+ 11.     }
+ 12.     local wt ""
+ 13.     local wsuf ""
+ 14.     if "$WEIGHT_MSIM" == "1" {
+ 15.         // Weight-type notes:
+.         //   `wt' = [pw=max_sim]  — reghdfe/ppmlhdfe accept pw; ppmlhdfe rejects aw
+.         //   `wt_bin' = [aw=max_sim] — binscatter accepts only aw / fw, not pw
+.         // WLS coefficients are identical under aw vs pw (SEs are handled by
+.         // vce(cluster) anyway), so mixing the two doesn't change anything
+.         // substantively — it just gets past each command's accepted weight type.
+.         local wt "[pw=max_sim]"
+ 16.         local wt_bin "[aw=max_sim]"
+ 17.         local wsuf "_msimwt"
+ 18.     }
+ 19.     local suf ""
+ 20.     if (`r1r2' == 1 & `public' == 0 & `r1_only' == 0) local suf "_r1_r2"
+ 21.     if (`r1r2' == 1 & `public' == 1 & `r1_only' == 0) local suf "_r1_r2_public"
+ 22.     if (`r1_only' == 1 & `public' == 0) local suf "_r1"
+ 23.     if (`r1_only' == 1 & `public' == 1) local suf "_r1_public"
+ 24.     use ../temp/es_`samp'`suf', clear
+ 25. 
+.     foreach v in cite_affl_wt ppr_cnt cite_affl_wt_any ppr_cnt_any ///
+>                  cite_affl_wt_notlast ppr_cnt_notlast {
+ 26.         cap gen ln_`v' = ln(1+`v')
+ 27.     }
+ 28. 
+.     gen post       = year >= 2014
+ 29.     gen Z_it       = exposure              * post
+ 30.     gen Z_share_it = mkt_spend_shr * post
+ 31. 
+.     local position_outcomes ""
+ 32.     if "$POSITION_OUTCOMES_AVAIL" == "1" {
+ 33.         local position_outcomes n_first_ppr n_middle_ppr n_last_ppr ///
+>             avg_position avg_position_rat avg_team_size_last avg_team_size_notlast
+ 34.     }
+ 35.     local outcomes cite_affl_wt ppr_cnt ln_cite_affl_wt ln_ppr_cnt ///
+>                    cite_affl_wt_any ppr_cnt_any ln_cite_affl_wt_any ln_ppr_cnt_any ///
+>                    cite_affl_wt_notlast ppr_cnt_notlast ln_cite_affl_wt_notlast ln_ppr_cnt_notlast ///
+>                    avg_num_coathrs num_grants grants_per_paper grant_density ///
+>                    `position_outcomes'
+ 36. 
+.     cap mkdir ../output/tables
+ 37.     cap mkdir ../output/tables/`samp'
+ 38. 
+.     cap mat drop results
+ 39.     foreach yvar of local outcomes {
+ 40.         qui sum `yvar' if year < 2014, d
+ 41.         local pre_mean = r(mean)
+ 42. 
+.         // base spec — cap noi + skip so sparse outcomes (e.g. n_first_ppr on top_jrnls)
+.         // that trigger "insufficient observations" (r(2001)) don't halt the pipeline.
+.         local b_b = .
+ 43.         local b_se = .
+ 44.         local b_N = .
+ 45.         local b_r2 = .
+ 46.         cap noi qui reghdfe `yvar' Z_it `wt', absorb(`fes') vce(cluster `vce_cl')
+ 47.         if _rc {
+ 48.             di as error "pooled_did `samp'`suf' `yvar' base failed (rc=`_rc'); skipping outcome."
+ 49.             continue
+ 50.         }
+ 51.         local b_b   = _b[Z_it]
+ 52.         local b_se  = _se[Z_it]
+ 53.         local b_N   = e(N)
+ 54.         local b_r2  = e(r2)
+ 55. 
+.         // with shares
+.         local s_bx = .
+ 56.         local s_sex = .
+ 57.         local s_bs = .
+ 58.         local s_ses = .
+ 59.         local s_N = .
+ 60.         local s_r2 = .
+ 61.         cap noi qui reghdfe `yvar' Z_it Z_share_it `wt', absorb(`fes') vce(cluster `vce_cl')
+ 62.         if _rc {
+ 63.             di as error "pooled_did `samp'`suf' `yvar' +share failed (rc=`_rc'); using base-only for this outcome."
+ 64.         }
+ 65.         else {
+ 66.             local s_bx  = _b[Z_it]
+ 67.             local s_sex = _se[Z_it]
+ 68.             local s_bs  = _b[Z_share_it]
+ 69.             local s_ses = _se[Z_share_it]
+ 70.             local s_N   = e(N)
+ 71.             local s_r2  = e(r2)
+ 72.         }
+ 73. 
+.         di as text "pooled_did `samp'`suf' `yvar':  base b=" %7.4f `b_b' " se=" %7.4f `b_se' ///
+>             "    +share b=" %7.4f `s_bx' " se=" %7.4f `s_sex' ///
+>             "    share_b=" %7.4f `s_bs' " se=" %7.4f `s_ses' ///
+>             "    pre-mean=" %7.4f `pre_mean'
+ 74. 
+.         cap mat drop pdid_`yvar'
+ 75.         mat pdid_`yvar' = J(7,2,.)
+ 76.         mat pdid_`yvar'[1,1] = `b_b'
+ 77.         mat pdid_`yvar'[2,1] = `b_se'
+ 78.         mat pdid_`yvar'[5,1] = `pre_mean'
+ 79.         mat pdid_`yvar'[6,1] = `b_N'
+ 80.         mat pdid_`yvar'[7,1] = `b_r2'
+ 81.         mat pdid_`yvar'[1,2] = `s_bx'
+ 82.         mat pdid_`yvar'[2,2] = `s_sex'
+ 83.         mat pdid_`yvar'[3,2] = `s_bs'
+ 84.         mat pdid_`yvar'[4,2] = `s_ses'
+ 85.         mat pdid_`yvar'[5,2] = `pre_mean'
+ 86.         mat pdid_`yvar'[6,2] = `s_N'
+ 87.         mat pdid_`yvar'[7,2] = `s_r2'
+ 88.         mat rownames pdid_`yvar' = b_exposure se_exposure b_share se_share pre_mean N r2
+ 89.         mat colnames pdid_`yvar' = base with_share
+ 90. 
+.         // accumulate one row per outcome for the summary dta
+.         mat row = `b_b', `b_se', `s_bx', `s_sex', `s_bs', `s_ses', `pre_mean'
+ 91.         mat results = nullmat(results) \ row
+ 92. 
+.         // Frisch-Waugh partial-regression binscatter: pooled DiD analog of ld plot
+.         local var_name "`yvar'"
+ 93.         if "`yvar'" == "cite_affl_wt"            local var_name "Citation Weighted Output"
+ 94.         if "`yvar'" == "ppr_cnt"                 local var_name "Publication Count"
+ 95.         if "`yvar'" == "ln_cite_affl_wt"         local var_name "Log Citation Weighted Output"
+ 96.         if "`yvar'" == "ln_ppr_cnt"              local var_name "Log Publication Counts"
+ 97.         if "`yvar'" == "cite_affl_wt_any"        local var_name "Citation Weighted Output (any position)"
+ 98.         if "`yvar'" == "ppr_cnt_any"             local var_name "Publication Count (any position)"
+ 99.         if "`yvar'" == "ln_cite_affl_wt_any"     local var_name "Log Citation Weighted Output (any position)"
+100.         if "`yvar'" == "ln_ppr_cnt_any"          local var_name "Log Publication Counts (any position)"
+101.         if "`yvar'" == "cite_affl_wt_notlast"    local var_name "Citation Weighted Output (non-last author)"
+102.         if "`yvar'" == "ppr_cnt_notlast"         local var_name "Publication Count (non-last author)"
+103.         if "`yvar'" == "ln_cite_affl_wt_notlast" local var_name "Log Citation Weighted Output (non-last author)"
+104.         if "`yvar'" == "ln_ppr_cnt_notlast"      local var_name "Log Publication Counts (non-last author)"
+105.         if "`yvar'" == "avg_num_coathrs"         local var_name "Avg Coauthors"
+106.         if "`yvar'" == "num_grants"              local var_name "Num Grants"
+107.         if "`yvar'" == "grants_per_paper"        local var_name "Grants per Paper"
+108.         if "`yvar'" == "grant_density"           local var_name "Grant Density (num_grants / pre-avg ppr)"
+109.         if "`yvar'" == "n_first_ppr"             local var_name "# First-Author Papers"
+110.         if "`yvar'" == "n_middle_ppr"            local var_name "# Middle-Author Papers"
+111.         if "`yvar'" == "n_last_ppr"              local var_name "# Last-Author Papers"
+112.         if "`yvar'" == "avg_position"            local var_name "Avg Author Position"
+113.         if "`yvar'" == "avg_position_rat"        local var_name "Avg Author Position Ratio"
+114.         if "`yvar'" == "avg_team_size_last"      local var_name "Team Size (last-author papers)"
+115.         if "`yvar'" == "avg_team_size_notlast"   local var_name "Team Size (non-last papers)"
+116. 
+.         preserve
+117.             cap noi qui reghdfe `yvar' `wt', absorb(`fes') residuals(_y_r)
+118.             if _rc == 0 cap noi qui reghdfe Z_it `wt', absorb(`fes') residuals(_Z_r)
+119.             if _rc == 0 {
+120.                 local pd_b_str  : dis %7.3f `b_b'
+121.                 local pd_se_str : dis %7.3f `b_se'
+122.                 binscatter _y_r _Z_r `wt_bin', n(30) ///
+>                     xtitle("Exposure x Post") ytitle("`var_name'") ///
+>                     xlab(-0.06(0.015)0.06, format(%5.3f)) ///
+>                     msymbol(O) mcolor(ebblue) ///
+>                     note("{&beta} = `pd_b_str' (SE: `pd_se_str')") ///
+>                     plotregion(margin(sides))
+123.                 graph export ../output/figures/`samp'/pdid_`yvar'`suf'`wsuf'.pdf, replace
+124.             }
+125.             else di as error "pdid binscatter `yvar' failed; skipping plot."
+126.         restore
+127. 
+.         preserve
+128.             cap noi qui reghdfe `yvar' Z_share_it `wt', absorb(`fes') residuals(_y_r)
+129.             if _rc == 0 cap noi qui reghdfe Z_it Z_share_it `wt', absorb(`fes') residuals(_Z_r)
+130.             if _rc == 0 {
+131.                 local pds_b_str  : dis %7.3f `s_bx'
+132.                 local pds_se_str : dis %7.3f `s_sex'
+133.                 binscatter _y_r _Z_r `wt_bin', n(30) ///
+>                     xtitle("Exposure x Post") ytitle("`var_name'") ///
+>                     xlab(-0.06(0.015)0.06, format(%5.3f)) ///
+>                     msymbol(O) mcolor(ebblue) ///
+>                     note("{&beta} = `pds_b_str' (SE: `pds_se_str')") ///
+>                     plotregion(margin(sides))
+134.                 graph export ../output/figures/`samp'/pdid_`yvar'`suf'_mshrctrl`wsuf'.pdf, replace
+135.             }
+136.             else di as error "pdid mshrctrl binscatter `yvar' failed; skipping plot."
+137.         restore
+138.     }
+139. 
+.     // small dta with both specs per outcome for quoting in figure legends or text
+.     preserve
+140.         clear
+141.         svmat results
+142.         rename (results1 results2 results3 results4 results5 results6 results7) ///
+>                (b_base se_base b_exp_wshr se_exp_wshr b_shr_wshr se_shr_wshr pre_mean)
+143.         gen outcome = ""
+144.         local i = 1
+145.         foreach yvar of local outcomes {
+146.             replace outcome = "`yvar'" if _n == `i'
+147.             local ++i
+148.         }
+149.         order outcome b_base se_base b_exp_wshr se_exp_wshr b_shr_wshr se_shr_wshr pre_mean
+150.         save ../temp/pooled_did_`samp'`suf'`wsuf', replace
+151.         list, sep(0) noobs abbrev(20)
+152.     restore
+153. end
+
+. 
+. program ppml_specs
+  1.     // Poisson (ppmlhdfe) analog of pooled_did.
+.     //   ppml_pdid: y_it on Z_it (+ Z_share_it), absorb(FEs from $FE_MODE)
+.     // Skips ln_ outcomes; ppmlhdfe wrapped in cap noi (may drop separated obs
+.     // or fail to converge). Matrix ppml_pdid_<yvar> has rows
+.     // [b_x, se_x, b_share, se_share, pre_mean, N, r2_p] and cols [base, with_share].
+.     syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0)]
+  2.     local fes athr_id year
+  3.     local vce_cl athr_id
+  4.     if "$FE_MODE" == "inst_cluster" {
+  5.         local fes inst_id cluster_30 year
+  6.         local vce_cl inst_id
+  7.     }
+  8.     if "$FE_MODE" == "inst_cluster_fldyr" {
+  9.         local fes inst_id i.cluster_30#i.year
+ 10.         local vce_cl inst_id
+ 11.     }
+ 12.     local wt ""
+ 13.     local wsuf ""
+ 14.     if "$WEIGHT_MSIM" == "1" {
+ 15.         // Weight-type notes:
+.         //   `wt' = [pw=max_sim]  — reghdfe/ppmlhdfe accept pw; ppmlhdfe rejects aw
+.         //   `wt_bin' = [aw=max_sim] — binscatter accepts only aw / fw, not pw
+.         // WLS coefficients are identical under aw vs pw (SEs are handled by
+.         // vce(cluster) anyway), so mixing the two doesn't change anything
+.         // substantively — it just gets past each command's accepted weight type.
+.         local wt "[pw=max_sim]"
+ 16.         local wt_bin "[aw=max_sim]"
+ 17.         local wsuf "_msimwt"
+ 18.     }
+ 19.     local suf ""
+ 20.     if (`r1r2' == 1 & `public' == 0 & `r1_only' == 0) local suf "_r1_r2"
+ 21.     if (`r1r2' == 1 & `public' == 1 & `r1_only' == 0) local suf "_r1_r2_public"
+ 22.     if (`r1_only' == 1 & `public' == 0) local suf "_r1"
+ 23.     if (`r1_only' == 1 & `public' == 1) local suf "_r1_public"
+ 24.     use ../temp/es_`samp'`suf', clear
+ 25. 
+.     gen post = year >= 2014
+ 26.     gen Z_it       = exposure      * post
+ 27.     gen Z_share_it = mkt_spend_shr * post
+ 28. 
+.     // PPML expects non-negative counts / weights. Position counts (n_first_ppr,
+.     // n_middle_ppr, n_last_ppr) fit fine; the mean-based position metrics
+.     // (avg_position, avg_team_size_*) are conditional means and belong in reghdfe/OLS only.
+.     local position_outcomes ""
+ 29.     if "$POSITION_OUTCOMES_AVAIL" == "1" {
+ 30.         local position_outcomes n_first_ppr n_middle_ppr n_last_ppr
+ 31.     }
+ 32.     local outcomes cite_affl_wt ppr_cnt affl_wt ///
+>                    cite_affl_wt_any ppr_cnt_any affl_wt_any ///
+>                    cite_affl_wt_notlast ppr_cnt_notlast affl_wt_notlast ///
+>                    avg_num_coathrs num_grants grants_per_paper grant_density ///
+>                    `position_outcomes'
+ 33. 
+.     foreach yvar of local outcomes {
+ 34.         qui sum `yvar' if year < 2014, d
+ 35.         local pre_mean = r(mean)
+ 36. 
+.         local b_b = .
+ 37.         local b_se = .
+ 38.         local b_N = .
+ 39.         local b_r2 = .
+ 40.         local s_bx = .
+ 41.         local s_sex = .
+ 42.         local s_bs = .
+ 43.         local s_ses = .
+ 44.         local s_N = .
+ 45.         local s_r2 = .
+ 46.         cap noi ppmlhdfe `yvar' Z_it            `wt', absorb(`fes') vce(cluster `vce_cl')
+ 47.         if _rc == 0 {
+ 48.             local b_b  = _b[Z_it]
+ 49.             local b_se = _se[Z_it]
+ 50.             local b_N  = e(N)
+ 51.             local b_r2 = e(r2_p)
+ 52.         }
+ 53.         else di as error "ppml_pdid `yvar' base failed (rc=`_rc')"
+ 54.         cap noi ppmlhdfe `yvar' Z_it Z_share_it `wt', absorb(`fes') vce(cluster `vce_cl')
+ 55.         if _rc == 0 {
+ 56.             local s_bx  = _b[Z_it]
+ 57.             local s_sex = _se[Z_it]
+ 58.             local s_bs  = _b[Z_share_it]
+ 59.             local s_ses = _se[Z_share_it]
+ 60.             local s_N   = e(N)
+ 61.             local s_r2  = e(r2_p)
+ 62.         }
+ 63.         else di as error "ppml_pdid `yvar' +share failed (rc=`_rc')"
+ 64.         cap mat drop ppml_pdid_`yvar'
+ 65.         mat ppml_pdid_`yvar' = J(7,2,.)
+ 66.         mat ppml_pdid_`yvar'[1,1] = `b_b'
+ 67.         mat ppml_pdid_`yvar'[2,1] = `b_se'
+ 68.         mat ppml_pdid_`yvar'[5,1] = `pre_mean'
+ 69.         mat ppml_pdid_`yvar'[6,1] = `b_N'
+ 70.         mat ppml_pdid_`yvar'[7,1] = `b_r2'
+ 71.         mat ppml_pdid_`yvar'[1,2] = `s_bx'
+ 72.         mat ppml_pdid_`yvar'[2,2] = `s_sex'
+ 73.         mat ppml_pdid_`yvar'[3,2] = `s_bs'
+ 74.         mat ppml_pdid_`yvar'[4,2] = `s_ses'
+ 75.         mat ppml_pdid_`yvar'[5,2] = `pre_mean'
+ 76.         mat ppml_pdid_`yvar'[6,2] = `s_N'
+ 77.         mat ppml_pdid_`yvar'[7,2] = `s_r2'
+ 78.         mat rownames ppml_pdid_`yvar' = b_exposure se_exposure b_share se_share pre_mean N r2_p
+ 79.         mat colnames ppml_pdid_`yvar' = base with_share
+ 80. 
+.         di as text "ppml_specs `samp'`suf' `yvar': pdid b=" %7.4f ppml_pdid_`yvar'[1,1] ///
+>             "  pre_mean=" %7.4f `pre_mean'
+ 81. 
+.         // Figures: PPML-consistent Frisch-Waugh binscatter. Uses the IRLS
+.         // working response z = xb + (y - mu)/mu with mu-weighted partial-out;
+.         // slope of the plotted line equals the ppmlhdfe beta by construction.
+.         local var_name "`yvar'"
+ 82.         if "`yvar'" == "cite_affl_wt"         local var_name "Citation Weighted Output"
+ 83.         if "`yvar'" == "ppr_cnt"              local var_name "Publication Count"
+ 84.         if "`yvar'" == "affl_wt"              local var_name "Affiliation Weighted Output"
+ 85.         if "`yvar'" == "cite_affl_wt_any"     local var_name "Citation Weighted Output (any position)"
+ 86.         if "`yvar'" == "ppr_cnt_any"          local var_name "Publication Count (any position)"
+ 87.         if "`yvar'" == "affl_wt_any"          local var_name "Affiliation Weighted Output (any position)"
+ 88.         if "`yvar'" == "cite_affl_wt_notlast" local var_name "Citation Weighted Output (non-last author)"
+ 89.         if "`yvar'" == "ppr_cnt_notlast"      local var_name "Publication Count (non-last author)"
+ 90.         if "`yvar'" == "affl_wt_notlast"      local var_name "Affiliation Weighted Output (non-last author)"
+ 91.         if "`yvar'" == "avg_num_coathrs"      local var_name "Avg Coauthors"
+ 92.         if "`yvar'" == "num_grants"           local var_name "Num Grants"
+ 93.         if "`yvar'" == "grants_per_paper"     local var_name "Grants per Paper"
+ 94.         if "`yvar'" == "grant_density"        local var_name "Grant Density"
+ 95.         if "`yvar'" == "n_first_ppr"          local var_name "# First-Author Papers"
+ 96.         if "`yvar'" == "n_middle_ppr"         local var_name "# Middle-Author Papers"
+ 97.         if "`yvar'" == "n_last_ppr"           local var_name "# Last-Author Papers"
+ 98.         local poisson_name "`var_name'"
+ 99.         if "`yvar'" == "ppr_cnt"              local poisson_name "Publications"
+100.         if "`yvar'" == "cite_affl_wt"         local poisson_name "Citation-Weighted Output"
+101.         if "`yvar'" == "affl_wt"              local poisson_name "Affiliation-Weighted Output"
+102.         if "`yvar'" == "ppr_cnt_any"          local poisson_name "Publications (any position)"
+103.         if "`yvar'" == "cite_affl_wt_any"     local poisson_name "Citation-Weighted Output (any position)"
+104.         if "`yvar'" == "affl_wt_any"          local poisson_name "Affiliation-Weighted Output (any position)"
+105.         if "`yvar'" == "ppr_cnt_notlast"      local poisson_name "Publications (non-last author)"
+106.         if "`yvar'" == "cite_affl_wt_notlast" local poisson_name "Citation-Weighted Output (non-last author)"
+107.         if "`yvar'" == "affl_wt_notlast"      local poisson_name "Affiliation-Weighted Output (non-last author)"
+108.         if "`yvar'" == "avg_num_coathrs"      local poisson_name "Coauthors"
+109.         if "`yvar'" == "num_grants"           local poisson_name "Grants"
+110.         if "`yvar'" == "grants_per_paper"     local poisson_name "Grants per Paper"
+111.         if "`yvar'" == "grant_density"        local poisson_name "Grant Density"
+112. 
+.         // FWL partial-out uses the IRLS working-weight _mu. Under max_sim
+.         // weighting, the effective analytic weight is _mu * max_sim so the
+.         // slope of the plotted binscatter still equals the weighted ppmlhdfe β.
+.         preserve
+113.             cap drop _y_r _Z_r _mu _z_work _dvar _fwlw
+114.             cap noi ppmlhdfe `yvar' Z_it `wt', absorb(`fes') vce(cluster `vce_cl') d(_dvar)
+115.             if _rc == 0 {
+116.                 predict double _mu, mu
+117.                 keep if !mi(_mu) & _mu > 0
+118.                 gen double _z_work = ln(_mu) + (`yvar' - _mu)/_mu
+119.                 gen double _fwlw = _mu
+120.                 if "$WEIGHT_MSIM" == "1" replace _fwlw = _mu * max_sim
+121.                 cap noi qui reghdfe _z_work [pw=_fwlw], absorb(`fes') residuals(_y_r)
+122.                 if _rc == 0 cap noi qui reghdfe Z_it [pw=_fwlw], absorb(`fes') residuals(_Z_r)
+123.                 if _rc {
+124.                     di as error "ppml FWL `yvar' failed; skipping plot."
+125.                     restore
+126.                     continue
+127.                 }
+128.                 local pb_str  : dis %7.3f ppml_pdid_`yvar'[1,1]
+129.                 local pse_str : dis %7.3f ppml_pdid_`yvar'[2,1]
+130.                 binscatter _y_r _Z_r [aw=_fwlw], n(30) ///
+>                     xtitle("Exposure x Post") ///
+>                     ytitle("{&Delta} Log Expected `poisson_name'") ///
+>                     xlab(-0.06(0.015)0.06, format(%5.3f)) ///
+>                     msymbol(O) mcolor(ebblue) ///
+>                     note("{&beta} = `pb_str' (SE: `pse_str')", size(small) pos(7) ring(1) justification(left)) ///
+>                     plotregion(margin(sides))
+131.                 graph export ../output/figures/`samp'/ppml_pdid_`yvar'`suf'`wsuf'.pdf, replace
+132.             }
+133.         restore
+134. 
+.         preserve
+135.             cap drop _y_r _Z_r _mu _z_work _dvar _fwlw
+136.             cap noi ppmlhdfe `yvar' Z_it Z_share_it `wt', absorb(`fes') vce(cluster `vce_cl') d(_dvar)
+137.             if _rc == 0 {
+138.                 predict double _mu, mu
+139.                 keep if !mi(_mu) & _mu > 0
+140.                 gen double _z_work = ln(_mu) + (`yvar' - _mu)/_mu
+141.                 gen double _fwlw = _mu
+142.                 if "$WEIGHT_MSIM" == "1" replace _fwlw = _mu * max_sim
+143.                 cap noi qui reghdfe _z_work Z_share_it [pw=_fwlw], absorb(`fes') residuals(_y_r)
+144.                 if _rc == 0 cap noi qui reghdfe Z_it Z_share_it [pw=_fwlw], absorb(`fes') residuals(_Z_r)
+145.                 if _rc {
+146.                     di as error "ppml FWL mshrctrl `yvar' failed; skipping plot."
+147.                     restore
+148.                     continue
+149.                 }
+150.                 local pbs_str  : dis %7.3f ppml_pdid_`yvar'[1,2]
+151.                 local pses_str : dis %7.3f ppml_pdid_`yvar'[2,2]
+152.                 binscatter _y_r _Z_r [aw=_fwlw], n(30) ///
+>                     xtitle("Exposure x Post") ///
+>                     ytitle("{&Delta} Log Expected `poisson_name'") ///
+>                     xlab(-0.06(0.015)0.06, format(%5.3f)) ///
+>                     msymbol(O) mcolor(ebblue) ///
+>                     note("{&beta} = `pbs_str' (SE: `pses_str')", size(small) pos(7) ring(1) justification(left)) ///
+>                     plotregion(margin(sides))
+153.                 graph export ../output/figures/`samp'/ppml_pdid_`yvar'`suf'_mshrctrl`wsuf'.pdf, replace
+154.             }
+155.         restore
+156.     }
+157. end
+
+. 
+. program ppml_pdid_het_binscatter
+  1.     // Per-group PPML pooled-DiD FWL binscatter of ppr_cnt on Z_it, with
+.     // Z_share_it (mkt_spend_shr x post) partialled out. One figure per group
+.     // per heterogeneity dimension -- same 7 dummy pairs as event_study's
+.     // heterogeneity block.
+.     //
+.     // Match to the interacted parameterization: for each pair (g1, g2) we
+.     // fit ONE PPML on the FULL sample with fully-interacted Z and share:
+.     //   ppmlhdfe ppr_cnt Z_g1 Z_g2 S_g1 S_g2, absorb(FEs)
+.     // where Z_g = Z_it * g and S_g = Z_share_it * g. So _b[Z_g1] and
+.     // _b[Z_g2] are the group-specific β's -- identical to the split-
+.     // interaction spec in event_study's heterogeneity block (up to
+.     // reparameterization). This lets institution / cluster FEs pool
+.     // across g1 and g2 rather than being re-estimated per subgroup, so
+.     // under FE_MODE = inst_cluster(_fldyr) it recovers the interacted β
+.     // rather than a subsample β.
+.     //
+.     // Binscatter FWL: residualize _z_work and Z_g against the OTHER
+.     // interactions plus S_g and FEs, then plot on the g==1 rows -- on
+.     // those rows the "other" interactions are mechanically zero, so the
+.     // FWL slope of _z_work on Z_g equals _b[Z_g] exactly.
+.     syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0)]
+  2.     local fes athr_id year
+  3.     local vce_cl athr_id
+  4.     if "$FE_MODE" == "inst_cluster" {
+  5.         local fes inst_id cluster_30 year
+  6.         local vce_cl inst_id
+  7.     }
+  8.     if "$FE_MODE" == "inst_cluster_fldyr" {
+  9.         local fes inst_id i.cluster_30#i.year
+ 10.         local vce_cl inst_id
+ 11.     }
+ 12.     local wt ""
+ 13.     local wsuf ""
+ 14.     if "$WEIGHT_MSIM" == "1" {
+ 15.         local wt "[pw=max_sim]"
+ 16.         local wsuf "_msimwt"
+ 17.     }
+ 18.     local suf ""
+ 19.     if (`r1r2' == 1 & `public' == 0 & `r1_only' == 0) local suf "_r1_r2"
+ 20.     if (`r1r2' == 1 & `public' == 1 & `r1_only' == 0) local suf "_r1_r2_public"
+ 21.     if (`r1_only' == 1 & `public' == 0) local suf "_r1"
+ 22.     if (`r1_only' == 1 & `public' == 1) local suf "_r1_public"
+ 23.     cap mkdir "../output/figures/`samp'/ppml_pdid_het_bs"
+ 24. 
+.     local dummy_pairs `" "young old" "r1 r2" "high_pre_ppr low_pre_ppr" "high_grants low_grants" "big_team small_team" "many_coauth few_coauth" "big_msa small_msa" "'
+ 25. 
+.     foreach pair of local dummy_pairs {
+ 26.         local g1 : word 1 of `pair'
+ 27.         local g2 : word 2 of `pair'
+ 28. 
+.         preserve
+ 29.             use ../temp/es_`samp'`suf', clear
+ 30.             gen post       = year >= 2014
+ 31.             gen Z_it       = exposure      * post
+ 32.             gen Z_share_it = mkt_spend_shr * post
+ 33.             // Fully-interacted parameterization: one Z per group, one S per group.
+.             gen Z_`g1' = Z_it       * `g1'
+ 34.             gen Z_`g2' = Z_it       * `g2'
+ 35.             gen S_`g1' = Z_share_it * `g1'
+ 36.             gen S_`g2' = Z_share_it * `g2'
+ 37. 
+.             cap drop _mu _z_work _dvar _fwlw
+ 38.             cap noi ppmlhdfe ppr_cnt Z_`g1' Z_`g2' S_`g1' S_`g2' `wt', ///
+>                     absorb(`fes') vce(cluster `vce_cl') d(_dvar)
+ 39.             if _rc {
+ 40.                 di as error "ppml_pdid_het_bs `samp'`suf' `g1'/`g2' joint failed (rc=`_rc'); skipping pair."
+ 41.                 restore
+ 42.                 continue
+ 43.             }
+ 44.             local b_`g1'  = _b[Z_`g1']
+ 45.             local se_`g1' = _se[Z_`g1']
+ 46.             local b_`g2'  = _b[Z_`g2']
+ 47.             local se_`g2' = _se[Z_`g2']
+ 48. 
+.             // IRLS working response + FWL weight, computed once from the joint fit.
+.             predict double _mu, mu
+ 49.             keep if !mi(_mu) & _mu > 0
+ 50.             gen double _z_work = ln(_mu) + (ppr_cnt - _mu)/_mu
+ 51.             gen double _fwlw = _mu
+ 52.             if "$WEIGHT_MSIM" == "1" replace _fwlw = _mu * max_sim
+ 53. 
+.             foreach grp in `g1' `g2' {
+ 54.                 // "other" = the sibling group whose Z / S are treated as controls.
+.                 local other = cond("`grp'" == "`g1'", "`g2'", "`g1'")
+ 55. 
+.                 cap drop _y_r _Z_r
+ 56.                 cap noi qui reghdfe _z_work Z_`other' S_`g1' S_`g2' [pw=_fwlw], ///
+>                         absorb(`fes') residuals(_y_r)
+ 57.                 if _rc == 0 cap noi qui reghdfe Z_`grp' Z_`other' S_`g1' S_`g2' [pw=_fwlw], ///
+>                         absorb(`fes') residuals(_Z_r)
+ 58.                 if _rc {
+ 59.                     di as error "ppml_pdid_het_bs FWL `grp' (paired with `other') failed; skipping plot."
+ 60.                     continue
+ 61.                 }
+ 62.                 local b_str  : dis %7.3f `b_`grp''
+ 63.                 local se_str : dis %7.3f `se_`grp''
+ 64.                 binscatter _y_r _Z_r [aw=_fwlw] if `grp' == 1, n(30) ///
+>                     xtitle("Exposure x Post") ///
+>                     ytitle("{&Delta} Log Expected Publications") ///
+>                     xlab(-0.06(0.015)0.06, format(%5.3f)) ///
+>                     msymbol(O) mcolor(ebblue) ///
+>                     note("{&beta} = `b_str' (SE: `se_str')", size(small) pos(7) ring(1) justification(left)) ///
+>                     plotregion(margin(sides))
+ 65.                 graph export ///
+>                     ../output/figures/`samp'/ppml_pdid_het_bs/ppml_pdid_ppr_cnt_`grp'_mshrctrl`suf'`wsuf'.pdf, ///
+>                     replace
+ 66.             }
+ 67.         restore
+ 68.     }
+ 69. end
+
+. 
+. program placebo_treatment
+  1.     // Pre-period-only placebo: restrict panel to year <= 2013 (drops the actual
+.     // treatment + post period entirely) and assign a fake treatment year.
+.     // If parallel trends hold, beta on (exposure * placebo_post) should be ~0
+.     // and statistically insignificant. Runs for placebo years 2011 and 2012.
+.     // Also runs an event-study version where each pre-2014 year-relative-to-
+.     // placebo gets its own exposure interaction, so you can visually inspect
+.     // whether the placebo "effect" shows up at a specific year.
+.     // All specifications are ppmlhdfe with the mkt_spend_shr sum-of-shares control.
+.     // Matrices placebo<yr>_<yvar> have rows
+.     // [b_exp, se_exp, b_share, se_share, pre_mean, N, r2_p] and one column.
+.     syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0)]
+  2.     local fes athr_id year
+  3.     local vce_cl athr_id
+  4.     if "$FE_MODE" == "inst_cluster" {
+  5.         local fes inst_id cluster_30 year
+  6.         local vce_cl inst_id
+  7.     }
+  8.     if "$FE_MODE" == "inst_cluster_fldyr" {
+  9.         local fes inst_id i.cluster_30#i.year
+ 10.         local vce_cl inst_id
+ 11.     }
+ 12.     local suf ""
+ 13.     if (`r1r2' == 1 & `public' == 0 & `r1_only' == 0) local suf "_r1_r2"
+ 14.     if (`r1r2' == 1 & `public' == 1 & `r1_only' == 0) local suf "_r1_r2_public"
+ 15.     if (`r1_only' == 1 & `public' == 0) local suf "_r1"
+ 16.     if (`r1_only' == 1 & `public' == 1) local suf "_r1_public"
+ 17. 
+.     local outcomes cite_affl_wt ppr_cnt cite_affl_wt_any ppr_cnt_any ///
+>                    cite_affl_wt_notlast ppr_cnt_notlast ///
+>                    avg_num_coathrs num_grants grants_per_paper grant_density
+ 18. 
+.     cap mkdir ../output/tables
+ 19.     cap mkdir ../output/tables/`samp'
+ 20.     cap mkdir ../output/figures/`samp'
+ 21. 
+.     foreach placebo_yr in 2011 2012 {
+ 22.         use ../temp/es_`samp'`suf', clear
+ 23.         keep if year <= 2013     // strictly pre-treatment window
+ 24. 
+.         gen placebo_post   = year >= `placebo_yr'
+ 25.         gen Z_placebo      = exposure      * placebo_post
+ 26.         gen Z_share_placebo = mkt_spend_shr * placebo_post
+ 27. 
+.         foreach yvar of local outcomes {
+ 28.             qui sum `yvar' if year < `placebo_yr', d
+ 29.             local pre_mean = r(mean)
+ 30. 
+.             local b     = .
+ 31.             local se    = .
+ 32.             local b_s   = .
+ 33.             local se_s  = .
+ 34.             local N     = .
+ 35.             local r2_p  = .
+ 36.             cap noi ppmlhdfe `yvar' Z_placebo Z_share_placebo, ///
+>                     absorb(`fes') vce(cluster `vce_cl')
+ 37.             if _rc == 0 {
+ 38.                 local b    = _b[Z_placebo]
+ 39.                 local se   = _se[Z_placebo]
+ 40.                 local b_s  = _b[Z_share_placebo]
+ 41.                 local se_s = _se[Z_share_placebo]
+ 42.                 local N    = e(N)
+ 43.                 local r2_p = e(r2_p)
+ 44.             }
+ 45.             else di as error "placebo_treatment `yvar' (placebo=`placebo_yr') ppml failed (rc=`_rc')"
+ 46. 
+.             local t = cond(`se' > 0 & !mi(`se'), `b' / `se', .)
+ 47.             di as text "placebo_treatment `samp'`suf' `yvar' (placebo=`placebo_yr'):" ///
+>                 _newline "    ppmlhdfe (+share)  b=" %8.4f `b'   "  se=" %8.4f `se'   "  t=" %6.2f `t' ///
+>                 "  b_share=" %8.4f `b_s' "  se_share=" %8.4f `se_s' ///
+>                 "  pre_mean=" %8.4f `pre_mean' "  N=" %8.0f `N'
+ 48. 
+.             cap mat drop placebo`placebo_yr'_`yvar'
+ 49.             mat placebo`placebo_yr'_`yvar' = J(7,1,.)
+ 50.             mat placebo`placebo_yr'_`yvar'[1,1] = `b'
+ 51.             mat placebo`placebo_yr'_`yvar'[2,1] = `se'
+ 52.             mat placebo`placebo_yr'_`yvar'[3,1] = `b_s'
+ 53.             mat placebo`placebo_yr'_`yvar'[4,1] = `se_s'
+ 54.             mat placebo`placebo_yr'_`yvar'[5,1] = `pre_mean'
+ 55.             mat placebo`placebo_yr'_`yvar'[6,1] = `N'
+ 56.             mat placebo`placebo_yr'_`yvar'[7,1] = `r2_p'
+ 57.             mat rownames placebo`placebo_yr'_`yvar' = b_exp se_exp b_share se_share pre_mean N r2_p
+ 58.             mat colnames placebo`placebo_yr'_`yvar' = ppmlhdfe_wshr
+ 59.         }
+ 60.     }
+ 61. 
+.     // Placebo event study: re-run the entire event study on the FULL 2010-2019
+.     // panel but with a fake treatment year as the omitted reference. Pre-placebo
+.     // years should be ~0 if trends are parallel. Years between the placebo and
+.     // 2014 should also be ~0 (no real treatment yet). The real effect should
+.     // begin at 2014 (marked with a dashed vertical line). If the response curve
+.     // jumps at the placebo year instead of 2014, that's evidence of a pre-trend
+.     // problem in the real spec. Estimated by ppmlhdfe with mkt_spend_shr
+.     // sum-of-shares interacted with event time as controls.
+.     foreach placebo_yr in 2011 2012 {
+ 62.         // Placebo ES on all four headline outcome flavors so the pre-trend
+.         // check covers the same outcomes we report on. Position outcomes are
+.         // omitted here — placebo pre-trends on counts of first/middle papers
+.         // are covered by the placebo_treatment pooled test above.
+.         foreach yvar in ppr_cnt cite_affl_wt ppr_cnt_any cite_affl_wt_any ///
+>                         ppr_cnt_notlast cite_affl_wt_notlast {
+ 63.             if "`yvar'" == "ppr_cnt"              local poisson_name "Publications"
+ 64.             if "`yvar'" == "cite_affl_wt"         local poisson_name "Citation-Weighted Output"
+ 65.             if "`yvar'" == "ppr_cnt_any"          local poisson_name "Publications (any position)"
+ 66.             if "`yvar'" == "cite_affl_wt_any"     local poisson_name "Citation-Weighted Output (any position)"
+ 67.             if "`yvar'" == "ppr_cnt_notlast"      local poisson_name "Publications (non-last author)"
+ 68.             if "`yvar'" == "cite_affl_wt_notlast" local poisson_name "Citation-Weighted Output (non-last author)"
+ 69. 
+.             use ../temp/es_`samp'`suf', clear
+ 70.             cap drop pl_rel pl_int_lead* pl_int_lag* pl_mshr_lead* pl_mshr_lag*
+ 71.             gen pl_rel = year - `placebo_yr'
+ 72.             qui sum pl_rel
+ 73.             local pl_abs_lag  = abs(r(max))
+ 74.             local pl_abs_lead = abs(r(min))
+ 75.             forval i = 1/`pl_abs_lead' {
+ 76.                 gen pl_int_lead`i'  = exposure      if pl_rel == -`i'
+ 77.                 gen pl_mshr_lead`i' = mkt_spend_shr if pl_rel == -`i'
+ 78.             }
+ 79.             forval i = 0/`pl_abs_lag' {
+ 80.                 gen pl_int_lag`i'  = exposure      if pl_rel == `i'
+ 81.                 gen pl_mshr_lag`i' = mkt_spend_shr if pl_rel == `i'
+ 82.             }
+ 83.             ds pl_int_lead* pl_int_lag* pl_mshr_lead* pl_mshr_lag*
+ 84.             foreach v in `r(varlist)' {
+ 85.                 replace `v' = 0 if mi(`v')
+ 86.             }
+ 87.             local pl_int_leads
+ 88.             local pl_int_lags
+ 89.             local pl_mshr_leads
+ 90.             local pl_mshr_lags
+ 91.             forval i = 2/`pl_abs_lead' {
+ 92.                 local pl_int_leads  pl_int_lead`i'  `pl_int_leads'
+ 93.                 local pl_mshr_leads pl_mshr_lead`i' `pl_mshr_leads'
+ 94.             }
+ 95.             forval i = 0/`pl_abs_lag' {
+ 96.                 local pl_int_lags  `pl_int_lags'  pl_int_lag`i'
+ 97.                 local pl_mshr_lags `pl_mshr_lags' pl_mshr_lag`i'
+ 98.             }
+ 99. 
+.             // pl_int_lead1 / pl_mshr_lead1 (year `placebo_yr'-1) are the omitted
+.             // reference for exposure and share interactions — never included in
+.             // the regressor list, so rel=-1 stays the reference year.
+.             cap noi ppmlhdfe `yvar' `pl_int_leads' `pl_int_lags' ///
+>                                     `pl_mshr_leads' `pl_mshr_lags', ///
+>                     absorb(`fes') vce(cluster `vce_cl')
+100.             if _rc {
+101.                 di as error "placebo ES ppmlhdfe `yvar' yr`placebo_yr' failed (rc=`_rc'); skipping."
+102.                 continue
+103.             }
+104. 
+.             preserve
+105.             cap mat drop es
+106.             foreach var in `pl_int_leads' `pl_int_lags' pl_int_lead1 {
+107.                 if "`var'" == "pl_int_lead1" {
+108.                     mat row = 0,0
+109.                 }
+110.                 else {
+111.                     mat row = _b[`var'], _se[`var']
+112.                 }
+113.                 mat es = nullmat(es) \ row
+114.             }
+115.             svmat es
+116.             keep es1 es2
+117.             drop if mi(es1)
+118.             rename (es1 es2) (b se)
+119.             gen ub = b + 1.96*se
+120.             gen lb = b - 1.96*se
+121.             // rel mapping mirrors event_study: leads (deepest first), then
+.             // lags 0..K, then the omitted reference -1 at the end.
+.             gen rel = -`pl_abs_lead' if _n == 1
+122.             replace rel = rel[_n-1]+1 if _n > 1
+123.             replace rel = rel + 1 if rel >= -1
+124.             replace rel = -1 if rel == `pl_abs_lag' + 1
+125.             gen year = rel + `placebo_yr'
+126.             hashsort rel
+127.             sum ub, d
+128.             local ymax = round(r(max), 0.1)
+129.             sum lb, d
+130.             local ymin = round(r(min), 0.1)
+131.             local ref_yr = `placebo_yr' - 1
+132.             tw rcap ub lb year if year != `ref_yr', lcolor(cranberry%70) msize(vsmall) || ///
+>               scatter b year, mcolor(cranberry) ///
+>               , xlab(2010(1)2019) xtitle("Year (placebo treatment at `placebo_yr')") ///
+>                 ytitle("{&Delta} Log Expected `poisson_name'") ///
+>                 ylab(`ymin'(0.1)`ymax') yline(0, lcolor(gs10) lpattern(solid)) ///
+>                 xline(2014, lpattern(dash) lcolor(gs10)) ///
+>                 title("Placebo ES: treatment shifted to `placebo_yr' (real: 2014)", size(small)) ///
+>                 legend(off) plotregion(margin(sides))
+133.             graph export ../output/figures/`samp'/placebo_es_`yvar'_yr`placebo_yr'`suf'.pdf, replace
+134.             save ../temp/placebo_es_`yvar'_yr`placebo_yr'`suf', replace
+135.             restore
+136.         }
+137.     }
+138. end
+
+. 
+. program trim_top
+  1.     // Composition check: drop the top X% of PIs by pre-period publication
+.     // count (pre_ppr_cnt_sum, computed in restrict_samp), then re-estimate
+.     // pdid (reghdfe) and ppml_pdid. If the main effect is driven by a few
+.     // high-baseline outliers, dropping them will collapse the coefficient.
+.     // Runs at trim levels {1, 5, 10, 25}; writes one matrix per (trim, yvar)
+.     // for output_tables and a comparison figure per outcome.
+.     syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0)]
+  2.     local fes athr_id year
+  3.     local vce_cl athr_id
+  4.     if "$FE_MODE" == "inst_cluster" {
+  5.         local fes inst_id cluster_30 year
+  6.         local vce_cl inst_id
+  7.     }
+  8.     if "$FE_MODE" == "inst_cluster_fldyr" {
+  9.         local fes inst_id i.cluster_30#i.year
+ 10.         local vce_cl inst_id
+ 11.     }
+ 12.     local suf ""
+ 13.     if (`r1r2' == 1 & `public' == 0 & `r1_only' == 0) local suf "_r1_r2"
+ 14.     if (`r1r2' == 1 & `public' == 1 & `r1_only' == 0) local suf "_r1_r2_public"
+ 15.     if (`r1_only' == 1 & `public' == 0) local suf "_r1"
+ 16.     if (`r1_only' == 1 & `public' == 1) local suf "_r1_public"
+ 17. 
+.     local outcomes cite_affl_wt ppr_cnt cite_affl_wt_any ppr_cnt_any ///
+>                    cite_affl_wt_notlast ppr_cnt_notlast ///
+>                    avg_num_coathrs num_grants grants_per_paper grant_density
+ 18.     local trims 1 5 10 25
+ 19. 
+.     cap mkdir ../output/tables/`samp'
+ 20.     cap mkdir ../output/figures/`samp'
+ 21. 
+.     foreach trim of local trims {
+ 22.         use ../temp/es_`samp'`suf', clear
+ 23.         // pre_ppr_cnt_sum is one value per PI; collapse to one row, compute
+.         // the (100-trim) percentile cut, drop above.
+.         bys athr_id: gen _one = _n == 1
+ 24.         qui sum pre_ppr_cnt_sum if _one == 1, d
+ 25.         local p = 100 - `trim'
+ 26.         qui _pctile pre_ppr_cnt_sum if _one == 1, p(`p')
+ 27.         local cut = r(r1)
+ 28.         qui gunique athr_id
+ 29.         local n_pre = r(unique)
+ 30.         drop if pre_ppr_cnt_sum > `cut'
+ 31.         qui gunique athr_id
+ 32.         local n_post = r(unique)
+ 33.         di as text "trim_top `samp'`suf' trim=`trim'%: cut=" %7.2f `cut' ///
+>             "  PIs dropped " (`n_pre' - `n_post') " / `n_pre' (kept " %7.4f (`n_post' / `n_pre') ")"
+ 34. 
+.         gen post       = year >= 2014
+ 35.         gen Z_it       = exposure      * post
+ 36.         gen Z_share_it = mkt_spend_shr * post
+ 37. 
+.         foreach yvar of local outcomes {
+ 38.             qui sum `yvar' if year < 2014, d
+ 39.             local pre_mean = r(mean)
+ 40. 
+.             local lb = .
+ 41.             local lse = .
+ 42.             local lN = .
+ 43.             cap noi reghdfe `yvar' Z_it, absorb(`fes') vce(cluster `vce_cl')
+ 44.             if _rc == 0 {
+ 45.                 local lb  = _b[Z_it]
+ 46.                 local lse = _se[Z_it]
+ 47.                 local lN  = e(N)
+ 48.             }
+ 49. 
+.             local pb = .
+ 50.             local pse = .
+ 51.             local pN = .
+ 52.             cap noi ppmlhdfe `yvar' Z_it, absorb(`fes') vce(cluster `vce_cl')
+ 53.             if _rc == 0 {
+ 54.                 local pb  = _b[Z_it]
+ 55.                 local pse = _se[Z_it]
+ 56.                 local pN  = e(N)
+ 57.             }
+ 58. 
+.             di as text "  trim=`trim'% `yvar': reghdfe b=" %8.4f `lb' "  se=" %8.4f `lse' ///
+>                 "    ppml b=" %8.4f `pb' "  se=" %8.4f `pse' "    pre_mean=" %7.4f `pre_mean'
+ 59. 
+.             cap mat drop trim`trim'_`yvar'
+ 60.             mat trim`trim'_`yvar' = J(5,2,.)
+ 61.             mat trim`trim'_`yvar'[1,1] = `lb'
+ 62.             mat trim`trim'_`yvar'[2,1] = `lse'
+ 63.             mat trim`trim'_`yvar'[3,1] = `pre_mean'
+ 64.             mat trim`trim'_`yvar'[4,1] = `lN'
+ 65.             mat trim`trim'_`yvar'[5,1] = `n_post'
+ 66.             mat trim`trim'_`yvar'[1,2] = `pb'
+ 67.             mat trim`trim'_`yvar'[2,2] = `pse'
+ 68.             mat trim`trim'_`yvar'[3,2] = `pre_mean'
+ 69.             mat trim`trim'_`yvar'[4,2] = `pN'
+ 70.             mat trim`trim'_`yvar'[5,2] = `n_post'
+ 71.             mat rownames trim`trim'_`yvar' = b se pre_mean N n_PIs
+ 72.             mat colnames trim`trim'_`yvar' = reghdfe ppmlhdfe
+ 73.         }
+ 74.         drop _one
+ 75.     }
+ 76. 
+.     // Comparison figure per key outcome: linear pdid β at each trim level
+.     foreach yvar in ppr_cnt cite_affl_wt {
+ 77.         if "`yvar'" == "ppr_cnt"      local var_name "Publication Count"
+ 78.         if "`yvar'" == "cite_affl_wt" local var_name "Citation Weighted Output"
+ 79.         local poisson_name "`var_name'"
+ 80.         if "`yvar'" == "ppr_cnt"      local poisson_name "Publications"
+ 81.         if "`yvar'" == "cite_affl_wt" local poisson_name "Citation-Weighted Output"
+ 82. 
+.         preserve
+ 83.         clear
+ 84.         set obs 5
+ 85.         gen trim = 0 in 1
+ 86.         replace trim = 1 in 2
+ 87.         replace trim = 5 in 3
+ 88.         replace trim = 10 in 4
+ 89.         replace trim = 25 in 5
+ 90.         gen b  = .
+ 91.         gen se = .
+ 92.         // trim = 0 uses the main pdid_<yvar> matrix
+.         cap confirm matrix pdid_`yvar'
+ 93.         if !_rc {
+ 94.             replace b  = pdid_`yvar'[1,1] in 1
+ 95.             replace se = pdid_`yvar'[2,1] in 1
+ 96.         }
+ 97.         local i = 2
+ 98.         foreach t of local trims {
+ 99.             cap confirm matrix trim`t'_`yvar'
+100.             if !_rc {
+101.                 replace b  = trim`t'_`yvar'[1,1] in `i'
+102.                 replace se = trim`t'_`yvar'[2,1] in `i'
+103.             }
+104.             local ++i
+105.         }
+106.         gen ub = b + 1.96*se
+107.         gen lb = b - 1.96*se
+108.         tw rcap ub lb trim, lcolor(ebblue%70) msize(small) || ///
+>            scatter b trim, mcolor(ebblue) msize(medium) ///
+>            , xlab(0 "Full sample" 1 "Drop top 1%" 5 "5%" 10 "10%" 25 "25%", labsize(small)) ///
+>              xtitle("Top-pre-pub PIs dropped") ///
+>              ytitle("pdid {&beta}: `var_name'") ///
+>              yline(0, lcolor(gs10) lpattern(solid)) ///
+>              title("Trim-top sensitivity: `var_name'", size(small)) ///
+>              legend(off) plotregion(margin(sides))
+109.         graph export ../output/figures/`samp'/trim_top_`yvar'`suf'.pdf, replace
+110.         restore
+111. 
+.         // ppml version
+.         preserve
+112.         clear
+113.         set obs 5
+114.         gen trim = 0 in 1
+115.         replace trim = 1 in 2
+116.         replace trim = 5 in 3
+117.         replace trim = 10 in 4
+118.         replace trim = 25 in 5
+119.         gen b  = .
+120.         gen se = .
+121.         cap confirm matrix ppml_pdid_`yvar'
+122.         if !_rc {
+123.             replace b  = ppml_pdid_`yvar'[1,1] in 1
+124.             replace se = ppml_pdid_`yvar'[2,1] in 1
+125.         }
+126.         local i = 2
+127.         foreach t of local trims {
+128.             cap confirm matrix trim`t'_`yvar'
+129.             if !_rc {
+130.                 replace b  = trim`t'_`yvar'[1,2] in `i'
+131.                 replace se = trim`t'_`yvar'[2,2] in `i'
+132.             }
+133.             local ++i
+134.         }
+135.         gen ub = b + 1.96*se
+136.         gen lb = b - 1.96*se
+137.         tw rcap ub lb trim, lcolor(cranberry%70) msize(small) || ///
+>            scatter b trim, mcolor(cranberry) msize(medium) ///
+>            , xlab(0 "Full sample" 1 "Drop top 1%" 5 "5%" 10 "10%" 25 "25%", labsize(small)) ///
+>              xtitle("Top-pre-pub PIs dropped") ///
+>              ytitle("{&Delta} Log Expected `poisson_name'") ///
+>              yline(0, lcolor(gs10) lpattern(solid)) ///
+>              title("Trim-top sensitivity (ppml): `var_name'", size(small)) ///
+>              legend(off) plotregion(margin(sides))
+138.         graph export ../output/figures/`samp'/trim_top_ppml_`yvar'`suf'.pdf, replace
+139.         restore
+140.     }
+141. end
+
+. 
+. program joint_outcome_test
+  1.     // Three parameterizations of the same H0: exposure-on-papers = exposure-on-cite-weighted-output.
+.     //   log   : reghdfe on ln(1+y). β interpreted as proportional log response; comparable
+.     //           because both outcomes are on the same log scale. Existing default.
+.     //   norm  : reghdfe on y / pre-period mean(y). β is "% of pre-mean per unit exposure",
+.     //           so ppr and cite are on the same "% change" ruler. Raw levels version of the same test.
+.     //   ppml  : ppmlhdfe on raw y. β is semi-elasticity per outcome — directly comparable
+.     //           without the log(1+·) fudge and without the pre-mean normalization.
+.     // Stacking pattern is identical across the three: outcome dummy + Z x outcome_cite, cluster athr_id.
+.     syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0)]
+  2.     local suf ""
+  3.     if (`r1r2' == 1 & `public' == 0 & `r1_only' == 0) local suf "_r1_r2"
+  4.     if (`r1r2' == 1 & `public' == 1 & `r1_only' == 0) local suf "_r1_r2_public"
+  5.     if (`r1_only' == 1 & `public' == 0) local suf "_r1"
+  6.     if (`r1_only' == 1 & `public' == 1) local suf "_r1_public"
+  7.     use ../temp/es_`samp'`suf', clear
+  8. 
+.     foreach v in cite_affl_wt ppr_cnt {
+  9.         cap gen ln_`v' = ln(1+`v')
+ 10.     }
+ 11. 
+.     gen post = year >= 2014
+ 12.     gen Z_it = exposure * post
+ 13. 
+.     // pre-period means used for the normalized-levels parameterization
+.     qui sum ppr_cnt      if year < 2014
+ 14.     local mean_ppr = r(mean)
+ 15.     qui sum cite_affl_wt if year < 2014
+ 16.     local mean_cite = r(mean)
+ 17. 
+.     keep athr_id year Z_it ppr_cnt cite_affl_wt ln_ppr_cnt ln_cite_affl_wt
+ 18. 
+.     // Stack: outcome == 0 -> ppr row; outcome == 1 -> cite row. Each row carries
+.     // all three y-parameterizations (raw for ppml, log, normalized level).
+.     preserve
+ 19.         gen outcome = 1
+ 20.         gen y_raw = cite_affl_wt
+ 21.         gen y_ln  = ln_cite_affl_wt
+ 22.         gen y_nrm = cite_affl_wt / `mean_cite'
+ 23.         keep athr_id year Z_it outcome y_raw y_ln y_nrm
+ 24.         save ../temp/stack_cite_`samp'`suf', replace
+ 25.     restore
+ 26.     gen outcome = 0
+ 27.     gen y_raw = ppr_cnt
+ 28.     gen y_ln  = ln_ppr_cnt
+ 29.     gen y_nrm = ppr_cnt / `mean_ppr'
+ 30.     keep athr_id year Z_it outcome y_raw y_ln y_nrm
+ 31.     append using ../temp/stack_cite_`samp'`suf'
+ 32. 
+.     egen athr_outcome = group(athr_id outcome)
+ 33.     egen year_outcome = group(year outcome)
+ 34.     gen Z_it_cite = Z_it * (outcome == 1)
+ 35. 
+.     cap mat drop joint_`samp'`suf'
+ 36.     mat joint_`samp'`suf' = J(8,3,.)
+ 37.     mat rownames joint_`samp'`suf' = b_ppr se_ppr b_cite se_cite b_diff se_diff Wald_F p_value
+ 38.     mat colnames joint_`samp'`suf' = log norm_levels ppml
+ 39. 
+.     // --- log parameterization ---
+.     reghdfe y_ln Z_it Z_it_cite, absorb(athr_outcome year_outcome) vce(cluster athr_id)
+ 40.     local b_ppr_ln  = _b[Z_it]
+ 41.     local se_ppr_ln = _se[Z_it]
+ 42.     local b_diff_ln = _b[Z_it_cite]
+ 43.     local se_diff_ln = _se[Z_it_cite]
+ 44.     qui lincom Z_it + Z_it_cite
+ 45.     local b_cite_ln  = r(estimate)
+ 46.     local se_cite_ln = r(se)
+ 47.     qui test Z_it_cite
+ 48.     local F_ln = r(F)
+ 49.     local p_ln = r(p)
+ 50.     mat joint_`samp'`suf'[1,1] = `b_ppr_ln'
+ 51.     mat joint_`samp'`suf'[2,1] = `se_ppr_ln'
+ 52.     mat joint_`samp'`suf'[3,1] = `b_cite_ln'
+ 53.     mat joint_`samp'`suf'[4,1] = `se_cite_ln'
+ 54.     mat joint_`samp'`suf'[5,1] = `b_diff_ln'
+ 55.     mat joint_`samp'`suf'[6,1] = `se_diff_ln'
+ 56.     mat joint_`samp'`suf'[7,1] = `F_ln'
+ 57.     mat joint_`samp'`suf'[8,1] = `p_ln'
+ 58. 
+.     // --- normalized-levels parameterization ---
+.     reghdfe y_nrm Z_it Z_it_cite, absorb(athr_outcome year_outcome) vce(cluster athr_id)
+ 59.     local b_ppr_nr  = _b[Z_it]
+ 60.     local se_ppr_nr = _se[Z_it]
+ 61.     local b_diff_nr = _b[Z_it_cite]
+ 62.     local se_diff_nr = _se[Z_it_cite]
+ 63.     qui lincom Z_it + Z_it_cite
+ 64.     local b_cite_nr  = r(estimate)
+ 65.     local se_cite_nr = r(se)
+ 66.     qui test Z_it_cite
+ 67.     local F_nr = r(F)
+ 68.     local p_nr = r(p)
+ 69.     mat joint_`samp'`suf'[1,2] = `b_ppr_nr'
+ 70.     mat joint_`samp'`suf'[2,2] = `se_ppr_nr'
+ 71.     mat joint_`samp'`suf'[3,2] = `b_cite_nr'
+ 72.     mat joint_`samp'`suf'[4,2] = `se_cite_nr'
+ 73.     mat joint_`samp'`suf'[5,2] = `b_diff_nr'
+ 74.     mat joint_`samp'`suf'[6,2] = `se_diff_nr'
+ 75.     mat joint_`samp'`suf'[7,2] = `F_nr'
+ 76.     mat joint_`samp'`suf'[8,2] = `p_nr'
+ 77. 
+.     // --- PPML parameterization (semi-elasticity per outcome, unit-free comparison) ---
+.     local b_ppr_pp = .
+ 78.     local se_ppr_pp = .
+ 79.     local b_cite_pp = .
+ 80.     local se_cite_pp = .
+ 81.     local b_diff_pp = .
+ 82.     local se_diff_pp = .
+ 83.     local F_pp = .
+ 84.     local p_pp = .
+ 85.     cap noi ppmlhdfe y_raw Z_it Z_it_cite, absorb(athr_outcome year_outcome) vce(cluster athr_id)
+ 86.     if _rc == 0 {
+ 87.         local b_ppr_pp  = _b[Z_it]
+ 88.         local se_ppr_pp = _se[Z_it]
+ 89.         local b_diff_pp = _b[Z_it_cite]
+ 90.         local se_diff_pp = _se[Z_it_cite]
+ 91.         qui lincom Z_it + Z_it_cite
+ 92.         local b_cite_pp  = r(estimate)
+ 93.         local se_cite_pp = r(se)
+ 94.         qui test Z_it_cite
+ 95.         local F_pp = r(F)
+ 96.         local p_pp = r(p)
+ 97.     }
+ 98.     else di as error "joint_outcome_test ppml failed (rc=`_rc'); ppml column left missing."
+ 99.     mat joint_`samp'`suf'[1,3] = `b_ppr_pp'
+100.     mat joint_`samp'`suf'[2,3] = `se_ppr_pp'
+101.     mat joint_`samp'`suf'[3,3] = `b_cite_pp'
+102.     mat joint_`samp'`suf'[4,3] = `se_cite_pp'
+103.     mat joint_`samp'`suf'[5,3] = `b_diff_pp'
+104.     mat joint_`samp'`suf'[6,3] = `se_diff_pp'
+105.     mat joint_`samp'`suf'[7,3] = `F_pp'
+106.     mat joint_`samp'`suf'[8,3] = `p_pp'
+107. 
+.     di as text "joint outcome test `samp'`suf':  H0 beta_ppr = beta_cite (same H0 in three flavors)"
+108.     di as text "  --- log      : β_ln_ppr    = " %9.4f `b_ppr_ln'  "  β_ln_cite    = " %9.4f `b_cite_ln'  "  diff = " %9.4f `b_diff_ln'  "  F = " %9.4f `F_ln'  "  p = " %9.4f `p_ln'
+109.     di as text "  --- norm lvl : β_ppr/mean  = " %9.4f `b_ppr_nr'  "  β_cite/mean  = " %9.4f `b_cite_nr'  "  diff = " %9.4f `b_diff_nr'  "  F = " %9.4f `F_nr'  "  p = " %9.4f `p_nr'
+110.     di as text "  --- ppml     : β_ppr (sel) = " %9.4f `b_ppr_pp'  "  β_cite (sel) = " %9.4f `b_cite_pp'  "  diff = " %9.4f `b_diff_pp'  "  F = " %9.4f `F_pp'  "  p = " %9.4f `p_pp'
+111. 
+.     cap mkdir ../output/tables
+112.     cap mkdir ../output/tables/`samp'
+113.     qui matrix_to_txt, saving("../output/tables/`samp'/joint_outcome_test`suf'.txt") ///
+>         matrix(joint_`samp'`suf') title(<tab:joint_outcome_test`suf'>) format(%20.4f) replace
+114. end
+
+. 
+. program joint_sample_test
+  1.     // Stacked DiD across the all_jrnls and top_jrnls samples (same outcome:
+.     // ppr_cnt) so we get the joint covariance of beta_all and beta_top and
+.     // can Wald-test H0: beta_all = beta_top. Rejecting => the paper-count
+.     // response in top-tier outlets differs from the response measured across
+.     // all outlets, i.e. the cut is not tier-uniform.
+.     syntax, [r1r2(int 0) public(int 0) r1_only(int 0)]
+  2.     local suf ""
+  3.     if (`r1r2' == 1 & `public' == 0 & `r1_only' == 0) local suf "_r1_r2"
+  4.     if (`r1r2' == 1 & `public' == 1 & `r1_only' == 0) local suf "_r1_r2_public"
+  5.     if (`r1_only' == 1 & `public' == 0) local suf "_r1"
+  6.     if (`r1_only' == 1 & `public' == 1) local suf "_r1_public"
+  7. 
+.     cap confirm file ../temp/es_all_jrnls`suf'.dta
+  8.     if _rc {
+  9.         di as error "joint_sample_test: ../temp/es_all_jrnls`suf'.dta missing; skipping."
+ 10.         exit
+ 11.     }
+ 12.     cap confirm file ../temp/es_top_jrnls`suf'.dta
+ 13.     if _rc {
+ 14.         di as error "joint_sample_test: ../temp/es_top_jrnls`suf'.dta missing; skipping."
+ 15.         exit
+ 16.     }
+ 17. 
+.     use ../temp/es_all_jrnls`suf', clear
+ 18.     keep athr_id year exposure ppr_cnt
+ 19.     rename ppr_cnt y
+ 20.     gen sample = 0     // all_jrnls
+ 21.     save ../temp/stack_all_jrnls`suf', replace
+ 22. 
+.     use ../temp/es_top_jrnls`suf', clear
+ 23.     keep athr_id year exposure ppr_cnt
+ 24.     rename ppr_cnt y
+ 25.     gen sample = 1     // top_jrnls
+ 26.     append using ../temp/stack_all_jrnls`suf'
+ 27. 
+.     gen post = year >= 2014
+ 28.     gen Z_it     = exposure * post
+ 29.     gen Z_it_top = Z_it * (sample == 1)
+ 30. 
+.     egen athr_sample = group(athr_id sample)
+ 31.     egen year_sample = group(year sample)
+ 32. 
+.     // Cluster on athr_id so PIs that appear in both samples are not treated
+.     // as independent across rows.
+.     reghdfe y Z_it Z_it_top, absorb(athr_sample year_sample) vce(cluster athr_id)
+ 33. 
+.     local b_all   = _b[Z_it]
+ 34.     local se_all  = _se[Z_it]
+ 35.     local b_diff  = _b[Z_it_top]
+ 36.     local se_diff = _se[Z_it_top]
+ 37.     qui lincom Z_it + Z_it_top
+ 38.     local b_top   = r(estimate)
+ 39.     local se_top  = r(se)
+ 40. 
+.     qui test Z_it_top
+ 41.     local F_w = r(F)
+ 42.     local p_w = r(p)
+ 43. 
+.     di as text "joint sample test `suf':  H0 beta_all_jrnls = beta_top_jrnls (ppr_cnt)"
+ 44.     di as text "  beta_all_jrnls   = " %9.4f `b_all'  "   SE = " %9.4f `se_all'
+ 45.     di as text "  beta_top_jrnls   = " %9.4f `b_top'  "   SE = " %9.4f `se_top'
+ 46.     di as text "  diff (top - all) = " %9.4f `b_diff' "   SE = " %9.4f `se_diff'
+ 47.     di as text "  Wald F = " %9.4f `F_w' "   p = " %9.4f `p_w'
+ 48. 
+.     cap mat drop joint_sample`suf'
+ 49.     mat joint_sample`suf' = J(8,1,.)
+ 50.     mat joint_sample`suf'[1,1] = `b_all'
+ 51.     mat joint_sample`suf'[2,1] = `se_all'
+ 52.     mat joint_sample`suf'[3,1] = `b_top'
+ 53.     mat joint_sample`suf'[4,1] = `se_top'
+ 54.     mat joint_sample`suf'[5,1] = `b_diff'
+ 55.     mat joint_sample`suf'[6,1] = `se_diff'
+ 56.     mat joint_sample`suf'[7,1] = `F_w'
+ 57.     mat joint_sample`suf'[8,1] = `p_w'
+ 58.     mat rownames joint_sample`suf' = b_all se_all b_top se_top b_diff se_diff Wald_F p_value
+ 59.     mat colnames joint_sample`suf' = stacked
+ 60. 
+.     cap mkdir ../output/tables
+ 61.     qui matrix_to_txt, saving("../output/tables/joint_sample_test`suf'.txt") ///
+>         matrix(joint_sample`suf') title(<tab:joint_sample_test`suf'>) format(%20.4f) replace
+ 62. end
+
+. 
+. program combine_es_graphs
+  1.     syntax, samp(str)
+  2.     // Extended outcome list mirrors event_study's outer loop. Position outcomes
+.     // are attempted; combine_es_graphs already skips outcomes whose young/old
+.     // .dta files are missing, so pre-position-metrics builds fall through cleanly.
+.     local position_outcomes n_first_ppr n_middle_ppr n_last_ppr ///
+>         avg_position avg_position_rat avg_team_size_last avg_team_size_notlast
+  3.     foreach yvar in cite_affl_wt ppr_cnt ln_cite_affl_wt ln_ppr_cnt ///
+>                     cite_affl_wt_any ppr_cnt_any ln_cite_affl_wt_any ln_ppr_cnt_any ///
+>                     cite_affl_wt_notlast ppr_cnt_notlast ln_cite_affl_wt_notlast ln_ppr_cnt_notlast ///
+>                     avg_num_coathrs num_grants grants_per_paper grant_density ///
+>                     `position_outcomes' {
+  4.         // Base outcome labels
+.         if "`yvar'" == "cite_affl_wt"    local var_name = "Citation Weighted Output"
+  5.         if "`yvar'" == "cite_affl_wt"    local gap  1
+  6.         if "`yvar'" == "ppr_cnt"         local var_name = "Publication Count"
+  7.         if "`yvar'" == "ppr_cnt"         local gap 0.5
+  8.         if "`yvar'" == "ln_ppr_cnt"      local var_name = "Log Publication Counts"
+  9.         if "`yvar'" == "ln_ppr_cnt"      local gap 0.1
+ 10.         if "`yvar'" == "ln_cite_affl_wt" local var_name = "Log Citation Weighted Output"
+ 11.         if "`yvar'" == "ln_cite_affl_wt" local gap 0.1
+ 12.         if "`yvar'" == "ppr_cnt"      & "`samp'" == "top_jrnls" local gap 2
+ 13.         if "`yvar'" == "cite_affl_wt" & "`samp'" == "top_jrnls" local gap 2
+ 14.         // _any labels
+.         if "`yvar'" == "ppr_cnt_any"         local var_name = "Publication Count (any position)"
+ 15.         if "`yvar'" == "ppr_cnt_any"         local gap 0.5
+ 16.         if "`yvar'" == "cite_affl_wt_any"    local var_name = "Citation Weighted Output (any position)"
+ 17.         if "`yvar'" == "cite_affl_wt_any"    local gap 1
+ 18.         if "`yvar'" == "ln_ppr_cnt_any"      local var_name = "Log Publication Counts (any position)"
+ 19.         if "`yvar'" == "ln_ppr_cnt_any"      local gap 0.1
+ 20.         if "`yvar'" == "ln_cite_affl_wt_any" local var_name = "Log Citation Weighted Output (any position)"
+ 21.         if "`yvar'" == "ln_cite_affl_wt_any" local gap 0.1
+ 22.         if "`yvar'" == "ppr_cnt_any"      & "`samp'" == "top_jrnls" local gap 2
+ 23.         if "`yvar'" == "cite_affl_wt_any" & "`samp'" == "top_jrnls" local gap 2
+ 24.         // _notlast labels
+.         if "`yvar'" == "ppr_cnt_notlast"         local var_name = "Publication Count (non-last author)"
+ 25.         if "`yvar'" == "ppr_cnt_notlast"         local gap 0.5
+ 26.         if "`yvar'" == "cite_affl_wt_notlast"    local var_name = "Citation Weighted Output (non-last author)"
+ 27.         if "`yvar'" == "cite_affl_wt_notlast"    local gap 1
+ 28.         if "`yvar'" == "ln_ppr_cnt_notlast"      local var_name = "Log Publication Counts (non-last author)"
+ 29.         if "`yvar'" == "ln_ppr_cnt_notlast"      local gap 0.1
+ 30.         if "`yvar'" == "ln_cite_affl_wt_notlast" local var_name = "Log Citation Weighted Output (non-last author)"
+ 31.         if "`yvar'" == "ln_cite_affl_wt_notlast" local gap 0.1
+ 32.         if "`yvar'" == "ppr_cnt_notlast"      & "`samp'" == "top_jrnls" local gap 2
+ 33.         if "`yvar'" == "cite_affl_wt_notlast" & "`samp'" == "top_jrnls" local gap 2
+ 34.         // Coauthor / grant labels (variable is avg_num_coathrs, not avg_coathrs)
+.         if "`yvar'" == "avg_num_coathrs" local var_name = "Average Team Size"
+ 35.         if "`yvar'" == "avg_num_coathrs" local gap 0.5
+ 36.         if "`yvar'" == "num_grants"        local var_name = "Number of Grants"
+ 37.         if "`yvar'" == "num_grants"        local gap 0.5
+ 38.         if "`yvar'" == "grants_per_paper"  local var_name = "Grants per Paper"
+ 39.         if "`yvar'" == "grants_per_paper"  local gap 0.5
+ 40.         if "`yvar'" == "grant_density"     local var_name = "Grant Density"
+ 41.         if "`yvar'" == "grant_density"     local gap 0.5
+ 42.         // Position labels
+.         if "`yvar'" == "n_first_ppr"           local var_name = "# First-Author Papers"
+ 43.         if "`yvar'" == "n_first_ppr"           local gap 0.5
+ 44.         if "`yvar'" == "n_middle_ppr"          local var_name = "# Middle-Author Papers"
+ 45.         if "`yvar'" == "n_middle_ppr"          local gap 0.5
+ 46.         if "`yvar'" == "n_last_ppr"            local var_name = "# Last-Author Papers"
+ 47.         if "`yvar'" == "n_last_ppr"            local gap 0.5
+ 48.         if "`yvar'" == "avg_position"          local var_name = "Avg Author Position (1=first, N=last)"
+ 49.         if "`yvar'" == "avg_position"          local gap 0.5
+ 50.         if "`yvar'" == "avg_position_rat"      local var_name = "Avg Author Position / Team Size (0-1)"
+ 51.         if "`yvar'" == "avg_position_rat"      local gap 0.05
+ 52.         if "`yvar'" == "avg_team_size_last"    local var_name = "Team Size (papers where PI is last)"
+ 53.         if "`yvar'" == "avg_team_size_last"    local gap 0.5
+ 54.         if "`yvar'" == "avg_team_size_notlast" local var_name = "Team Size (papers where PI is not last)"
+ 55.         if "`yvar'" == "avg_team_size_notlast" local gap 0.5
+ 56.         cap confirm file ../temp/es_`yvar'_r1_r2_public_young.dta
+ 57.         if _rc {
+ 58.             di as text "combine_es_graphs: es_`yvar'_r1_r2_public_young.dta missing; skipping."
+ 59.             continue
+ 60.         }
+ 61.         cap confirm file ../temp/es_`yvar'_r1_r2_public_old.dta
+ 62.         if _rc {
+ 63.             di as text "combine_es_graphs: es_`yvar'_r1_r2_public_old.dta missing; skipping."
+ 64.             continue
+ 65.         }
+ 66.         use "../temp/es_`yvar'_r1_r2_public_young", clear
+ 67.         gen group = "young"                                                                             
+ 68.         replace rel = rel - 0.1                                                                         
+ 69.         sum b if group == "young" & rel > 0                                                             
+ 70.         local young_mean : dis %4.3f r(mean)                                                            
+ 71.         append using ../temp/es_`yvar'_r1_r2_public_old
+ 72.         replace group = "old" if mi(group)                                                            
+ 73. 
+.         sum b if group == "old" & rel > 0
+ 74.         local old_mean : dis %4.3f r(mean)
+ 75.         cap drop year
+ 76.         gen year = rel + 2014
+ 77.         tw rcap ub lb year if year != 2012.9 & group == "young",  lcolor(lavender%60) msize(small) || ///
+>            scatter b year if group == "young", mcolor(lavender%60) msize(small) || ///
+>            rcap ub lb year if year != 2013   & group == "old",  lcolor(dkorange) msize(small) || ///
+>            scatter b year if group == "old", mcolor(dkorange) msymbol(smdiamond) msize(small)  ///
+>            xlab(2010(1)2019) ylab(#8) ///
+>               yline(0, lcolor(black) lpattern(solid)) ///
+>               legend(on order(2 "Below Median Age (Post Period Avg: `young_mean')" 4 "Above Median Age (Post Period Avg: `old_mean')" ) pos(7) ring(1) size(small) region(fcolor(none))) xtitle("Year") ytitle("`var_name'") plotregion(margin(sides))
+ 78.         graph export ../output/figures/`samp'/es_`yvar'_age_split.pdf, replace
+ 79.     }
+ 80. end
+
+. 
+. program robustness
+  1.     syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0)]
+  2.     local fes athr_id year
+  3.     local vce_cl athr_id
+  4.     if "$FE_MODE" == "inst_cluster" {
+  5.         local fes inst_id cluster_30 year
+  6.         local vce_cl inst_id
+  7.     }
+  8.     if "$FE_MODE" == "inst_cluster_fldyr" {
+  9.         local fes inst_id i.cluster_30#i.year
+ 10.         local vce_cl inst_id
+ 11.     }
+ 12.     local suf ""
+ 13.     if (`r1r2' == 1 & `public' == 0 & `r1_only' == 0) local suf "_r1_r2"
+ 14.     if (`r1r2' == 1 & `public' == 1 & `r1_only' == 0) local suf "_r1_r2_public"
+ 15.     if (`r1_only' == 1 & `public' == 0) local suf "_r1"
+ 16.     if (`r1_only' == 1 & `public' == 1) local suf "_r1_public"
+ 17.     cap mkdir "../output/figures/`samp'/robustness"
+ 18.     cap mkdir "../output/tables"
+ 19.     cap mkdir "../output/tables/`samp'"
+ 20.     cap mkdir "../output/tables/`samp'/robustness"
+ 21. 
+.     // Main (pooled, no-heterogeneity) event study stress tests:
+.     //     base / + age x year controls / drop late-exit PIs
+.     // Applied to the same set of headline outcomes we would report in the paper.
+.     foreach yvar in ppr_cnt cite_affl_wt ppr_cnt_any cite_affl_wt_any ///
+>                     ppr_cnt_notlast cite_affl_wt_notlast {
+ 22.         if "`yvar'" == "ppr_cnt"              local var_name "Publication Count"
+ 23.         if "`yvar'" == "cite_affl_wt"         local var_name "Citation Weighted Output"
+ 24.         if "`yvar'" == "ppr_cnt_any"          local var_name "Publication Count (any position)"
+ 25.         if "`yvar'" == "cite_affl_wt_any"     local var_name "Citation Weighted Output (any position)"
+ 26.         if "`yvar'" == "ppr_cnt_notlast"      local var_name "Publication Count (non-last author)"
+ 27.         if "`yvar'" == "cite_affl_wt_notlast" local var_name "Citation Weighted Output (non-last author)"
+ 28.         if regexm("`yvar'", "^ppr_cnt")      local gap 0.5
+ 29.         if regexm("`yvar'", "^cite_affl_wt") local gap 1
+ 30.         if regexm("`yvar'", "^ppr_cnt")      & "`samp'" == "top_jrnls" local gap 2
+ 31.         if regexm("`yvar'", "^cite_affl_wt") & "`samp'" == "top_jrnls" local gap 2
+ 32. 
+.         foreach spec in base ageCtrl noattrit {
+ 33.             if "`spec'" == "base"     local title "Base (replicates main)"
+ 34.             if "`spec'" == "ageCtrl"  local title "Age x year controls"
+ 35.             if "`spec'" == "noattrit" local title "PIs with last real pub year >= 2018"
+ 36. 
+.             use ../temp/es_`samp'`suf', clear
+ 37.             cap drop rel int_lead* int_lag*
+ 38.             gen rel = year - 2014
+ 39.             qui sum rel
+ 40.             local abs_lag  = abs(r(max))
+ 41.             local abs_lead = abs(r(min))
+ 42.             forval i = 1/`abs_lead' {
+ 43.                 gen int_lead`i' = exposure if rel == -`i'
+ 44.             }
+ 45.             forval i = 1/`abs_lag' {
+ 46.                 gen int_lag`i'  = exposure if rel == `i'
+ 47.             }
+ 48.             gen int_lag0 = exposure if rel == 0
+ 49.             ds int_lead* int_lag*
+ 50.             foreach var in `r(varlist)' {
+ 51.                 replace `var' = 0 if mi(`var')
+ 52.             }
+ 53.             if "`spec'" == "noattrit" {
+ 54.                 bys athr_id: egen latest_pub = max(cond(ppr_cnt > 0, year, .))
+ 55.                 keep if latest_pub >= 2018
+ 56.                 drop latest_pub
+ 57.             }
+ 58.             qui sum rel
+ 59.             local abs_lag  = abs(r(max))
+ 60.             local abs_lead = abs(r(min))
+ 61.             local int_leads
+ 62.             local int_lags
+ 63.             forval i = 2/`abs_lead' {
+ 64.                 local int_leads int_lead`i' `int_leads'
+ 65.             }
+ 66.             forval i = 0/`abs_lag' {
+ 67.                 local int_lags `int_lags' int_lag`i'
+ 68.             }
+ 69.             local addctrl
+ 70.             if "`spec'" == "ageCtrl" local addctrl c.age_2014#i.year
+ 71. 
+.             cap noi reghdfe `yvar' `int_leads' `int_lags' int_lead1 `addctrl', ///
+>                     absorb(`fes') vce(cluster `vce_cl')
+ 72.             if _rc {
+ 73.                 di as error "robustness `samp'`suf' `yvar' `spec' failed (rc=`_rc'); skipping."
+ 74.                 continue
+ 75.             }
+ 76.             local ref_b = _b[int_lead1]
+ 77.             di as text "robustness `yvar' `spec': ref _b[int_lead1] = `ref_b'"
+ 78.             gunique athr_id
+ 79.             local n_pi = r(unique)
+ 80. 
+.             preserve
+ 81.             cap mat drop es
+ 82.             foreach var in `int_leads' `int_lags' int_lead1 {
+ 83.                 mat row = _b[`var'] - `ref_b', _se[`var']
+ 84.                 if "`var'" == "int_lead1" mat row = 0,0
+ 85.                 mat es = nullmat(es) \ row
+ 86.             }
+ 87.             svmat es
+ 88.             keep es1 es2
+ 89.             drop if mi(es1)
+ 90.             rename (es1 es2) (b se)
+ 91.             gen ub = b + 1.96*se
+ 92.             gen lb = b - 1.96*se
+ 93.             gen rel = -4 if _n == 1
+ 94.             replace rel = rel[_n-1]+1 if _n > 1
+ 95.             replace rel = rel + 1 if rel >= -1
+ 96.             replace rel = -1 if rel == `abs_lag' + 1
+ 97.             gen year = rel + 2014
+ 98.             hashsort rel
+ 99.             // persist coefs to .dta so a downstream plot crash doesn't lose results
+.             save ../temp/robust_es_main_`yvar'_`spec'_`samp'`suf', replace
+100.             sum ub, d
+101.             local ymax = round(r(max),`gap')
+102.             sum lb, d
+103.             local ymin = round(r(min),`gap')
+104.             if inlist("`yvar'", "ln_ppr_cnt", "ln_cite_affl_wt") local ymin = -1
+105.             cap graph drop _all
+106.             cap noi tw rcap ub lb year if year != 2013, lcolor(ebblue%70) msize(vsmall) || ///
+>               scatter b year, mcolor(ebblue) ///
+>               , xlab(2010(1)2019) xtitle("Year") ytitle("`var_name'") ///
+>                 ylab(`ymin'(`gap')`ymax') yline(0, lcolor(gs10) lpattern(solid)) ///
+>                 title("Main ES: `title' (N PIs = `n_pi')", size(small)) ///
+>                 legend(off) plotregion(margin(sides))
+107.             cap noi graph export ../output/figures/`samp'/robustness/es_`yvar'_main_`spec'`suf'.pdf, replace
+108.             restore
+109.         }
+110.     }
+111. 
+. end
+
+. 
+. program output_tables
+  1.     // dumps the base vs. + market-share DiD matrices built by long_diff,
+.     // first_diff, and pooled_did. Each matrix has rows = coefs/SEs + N/R2
+.     // (+ pre_mean for pooled) and cols = base / with_share.
+.     syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0)]
+  2.     local wsuf ""
+  3.     if "$WEIGHT_MSIM" == "1" local wsuf "_msimwt"
+  4.     local suf ""
+  5.     if (`r1r2' == 1 & `public' == 0 & `r1_only' == 0) local suf "_r1_r2"
+  6.     if (`r1r2' == 1 & `public' == 1 & `r1_only' == 0) local suf "_r1_r2_public"
+  7.     if (`r1_only' == 1 & `public' == 0) local suf "_r1"
+  8.     if (`r1_only' == 1 & `public' == 1) local suf "_r1_public"
+  9.     cap mkdir ../output/tables
+ 10.     cap mkdir ../output/tables/`samp'
+ 11.     local position_outcomes ""
+ 12.     if "$POSITION_OUTCOMES_AVAIL" == "1" {
+ 13.         local position_outcomes n_first_ppr n_middle_ppr n_last_ppr ///
+>             avg_position avg_position_rat avg_team_size_last avg_team_size_notlast
+ 14.     }
+ 15.     local outcomes cite_affl_wt ppr_cnt ln_cite_affl_wt ln_ppr_cnt ///
+>                    cite_affl_wt_any ppr_cnt_any ln_cite_affl_wt_any ln_ppr_cnt_any ///
+>                    cite_affl_wt_notlast ppr_cnt_notlast ln_cite_affl_wt_notlast ln_ppr_cnt_notlast ///
+>                    avg_num_coathrs num_grants grants_per_paper grant_density ///
+>                    `position_outcomes'
+ 16.     // main() clears matrices between weighting modes, so matrices that don't
+.     // exist in the current run are silently skipped via cap confirm.
+.     foreach prog in pdid ppml_pdid placebo2011 placebo2012 trim1 trim5 trim10 trim25 {
+ 17.         foreach yvar of local outcomes {
+ 18.             cap confirm matrix `prog'_`yvar'
+ 19.             if !_rc {
+ 20.                 qui matrix_to_txt, saving("../output/tables/`samp'/`prog'_`yvar'`suf'`wsuf'.txt") ///
+>                     matrix(`prog'_`yvar') title(<tab:`prog'_`yvar'`suf'`wsuf'>) format(%20.4f) replace
+ 21.             }
+ 22.         }
+ 23.     }
+ 24. 
+.     // PPML heterogeneity results collected in ../temp/phet_results_<samp><suf><wsuf>.dta
+.     // by event_study (long-format: one row per yvar × grp × spec). Dump as a single
+.     // long-format tab-separated file for easy inspection.
+.     cap confirm file "../temp/phet_results_`samp'`suf'`wsuf'.dta"
+ 25.     if !_rc {
+ 26.         preserve
+ 27.         use "../temp/phet_results_`samp'`suf'`wsuf'.dta", clear
+ 28.         export delimited using "../output/tables/`samp'/phet_results`suf'`wsuf'.txt", replace delim(tab)
+ 29.         restore
+ 30.     }
+ 31.     ppml_het_coefplot, samp(`samp') r1r2(`r1r2') public(`public')
+ 32. end
+
+. 
+. program ppml_het_coefplot
+  1.     // Combined coefficient plot of PPML heterogeneity results (mshrctrl spec).
+.     // Produces up to three panels per yvar per split_type ({med, quart}):
+.     //   "pi"      : PI-level groups (age/type/median-productivity/etc.)
+.     //   "ic_fund" : 21 HERD funding-bucket inst chars
+.     //   "ic_expx" : 9 expenditure + endowment inst chars
+.     // Both sides of each pair are plotted (LEVEL β_post under split-form spec),
+.     // with pair rows visually adjacent (focal side first). Uses ${LBL_<grp>}
+.     // globals from define_group_labels for y-axis labels; falls back to the
+.     // group name if no label was defined. Rows whose grp doesn't appear in
+.     // phet_results are silently skipped (an all-missing or degenerate dummy
+.     // never got posted upstream).
+.     syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0)]
+  2.     local suf ""
+  3.     if (`r1r2' == 1 & `public' == 0 & `r1_only' == 0) local suf "_r1_r2"
+  4.     if (`r1r2' == 1 & `public' == 1 & `r1_only' == 0) local suf "_r1_r2_public"
+  5.     if (`r1_only' == 1 & `public' == 0) local suf "_r1"
+  6.     if (`r1_only' == 1 & `public' == 1) local suf "_r1_public"
+  7.     local wsuf ""
+  8.     if "$WEIGHT_MSIM" == "1" local wsuf "_msimwt"
+  9. 
+.     cap confirm file "../temp/phet_results_`samp'`suf'`wsuf'.dta"
+ 10.     if _rc {
+ 11.         di as error "ppml_het_coefplot: ../temp/phet_results_`samp'`suf'`wsuf'.dta not found — skipping"
+ 12.         exit 0
+ 13.     }
+ 14. 
+.     local ppml_het_yvars ppr_cnt cite_affl_wt ppr_cnt_any cite_affl_wt_any ///
+>                         ppr_cnt_notlast cite_affl_wt_notlast ///
+>                         avg_num_coathrs num_grants grants_per_paper grant_density ///
+>                         n_first_ppr n_middle_ppr n_last_ppr
+ 15. 
+.     // Inst-char category split (used for both med and quart panels).
+.     // Funding buckets vs. expenditures + endowment.
+.     local ic_fund_aliases contr fdlsb fdls fdlsh gntsf hhlsb hhls hhlsh ///
+>         nflsb nfls nflsh subrf busf fedf tfnd instf nonpf statf lsf hsf biof
+ 16.     local ic_expx_aliases applx apfx basx bfx clinx devx lscx medx endow
+ 17. 
+.     // Iterate split_type -> panel -> yvar. Each combination writes one PDF.
+.     foreach st in med quart {
+ 18.         // Build groups list for this split_type × panel.
+.         // "pi" panel: existing PI-level groups (median) or PI quartile groups.
+.         // "ic_fund" and "ic_expx" panels: inst-char groups per split type.
+.         if "`st'" == "med" {
+ 19.             local groups_pi     young old r1 r2 ///
+>                                 high_pre_ppr low_pre_ppr ///
+>                                 high_grants low_grants ///
+>                                 big_team small_team ///
+>                                 many_coauth few_coauth ///
+>                                 big_msa small_msa
+ 20.             local groups_ic_fund
+ 21.             foreach a of local ic_fund_aliases {
+ 22.                 local groups_ic_fund `groups_ic_fund' hi_`a' lo_`a'
+ 23.             }
+ 24.             local groups_ic_expx
+ 25.             foreach a of local ic_expx_aliases {
+ 26.                 local groups_ic_expx `groups_ic_expx' hi_`a' lo_`a'
+ 27.             }
+ 28.         }
+ 29.         else {
+ 30.             // quart
+.             local groups_pi
+ 31.             foreach b of global PI_Q_BASES {
+ 32.                 local groups_pi `groups_pi' q4_`b' q1_`b'
+ 33.             }
+ 34.             local groups_ic_fund
+ 35.             foreach a of local ic_fund_aliases {
+ 36.                 local groups_ic_fund `groups_ic_fund' q4_`a' q1_`a'
+ 37.             }
+ 38.             local groups_ic_expx
+ 39.             foreach a of local ic_expx_aliases {
+ 40.                 local groups_ic_expx `groups_ic_expx' q4_`a' q1_`a'
+ 41.             }
+ 42.         }
+ 43. 
+.         foreach panel in pi ic_fund ic_expx {
+ 44.             local groups `groups_`panel''
+ 45.             local n_groups : word count `groups'
+ 46.             if `n_groups' == 0 continue
+ 47. 
+.             foreach yvar of local ppml_het_yvars {
+ 48.                 preserve
+ 49.                 use "../temp/phet_results_`samp'`suf'`wsuf'.dta", clear
+ 50.                 keep if yvar == "`yvar'" & spec == "mshrctrl" & split_type == "`st'"
+ 51.                 if _N == 0 {
+ 52.                     restore
+ 53.                     continue
+ 54.                 }
+ 55. 
+.                 // Attach y position by group ordering; build ylabels list from
+.                 // LBL_<grp> globals (with fallback to raw group name).
+.                 gen y = .
+ 56.                 local ylabs ""
+ 57.                 local i = 0
+ 58.                 foreach g of local groups {
+ 59.                     local ++i
+ 60.                     local ypos = `n_groups' + 1 - `i'
+ 61.                     qui replace y = `ypos' if grp == "`g'"
+ 62.                     local lbl = "${LBL_`g'}"
+ 63.                     if "`lbl'" == "" local lbl "`g'"
+ 64.                     // Truncate long labels so the y-axis stays readable.
+.                     if length("`lbl'") > 40 local lbl = substr("`lbl'", 1, 37) + "..."
+ 65.                     local ylabs `ylabs' `ypos' `"`"`lbl'"'"'
+ 66.                 }
+ 67.                 drop if mi(y) | mi(post_b)
+ 68.                 if _N == 0 {
+ 69.                     restore
+ 70.                     continue
+ 71.                 }
+ 72.                 gen ub = post_b + 1.96*post_se
+ 73.                 gen lb = post_b - 1.96*post_se
+ 74. 
+.                 // Bigger canvas for panels with many rows (ic_fund has ~42;
+.                 // ic_expx has ~18; pi has ~10-14).
+.                 local ysize 6
+ 75.                 if `n_groups' > 20 local ysize 10
+ 76.                 if `n_groups' > 40 local ysize 14
+ 77.                 local labsize small
+ 78.                 if `n_groups' > 20 local labsize vsmall
+ 79. 
+.                 tw rcap ub lb y, horizontal lcolor(ebblue%70) msize(vsmall) || ///
+>                    scatter y post_b, mcolor(ebblue) msize(small) ///
+>                    , xline(0, lcolor(gs10) lpattern(solid)) ///
+>                      ylabel(`ylabs', angle(0) labsize(`labsize') noticks nogrid) ///
+>                      ytitle("") xtitle("Exposure x Post", size(small)) ///
+>                      xlabel(, labsize(small)) ///
+>                      legend(off) ///
+>                      ysize(`ysize') xsize(7) ///
+>                      plotregion(margin(sides))
+ 80.                 graph export ///
+>                     "../output/figures/`samp'/ppml_het_coefplot_`yvar'_`st'_`panel'`suf'`wsuf'.pdf", ///
+>                     replace
+ 81.                 di as text "wrote ../output/figures/`samp'/ppml_het_coefplot_`yvar'_`st'_`panel'`suf'`wsuf'.pdf"
+ 82.                 restore
+ 83.             }
+ 84.         }
+ 85.     }
+ 86. end
+
+. 
+. **
+. di as text "STUB-END"
+STUB-END
+
+. 
+end of do-file
+
+. di as text "===== PROGS DEFINED ====="
+===== PROGS DEFINED =====
+
+. gather_inst_chars
+(encoding automatically selected: ISO-8859-1)
+(4 vars, 266 obs)
+(4 observations deleted)
+ipeds_id: all characters numeric; replaced as long
+
+Duplicates in terms of all variables
+
+(0 observations are duplicates)
+file /tmp/St1875025.000002 saved as .dta format
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                               251  
+    -----------------------------------------
+  (0 bytes saved)
+file ../temp/inst_chars_pre.dta saved
+
+. define_group_labels
+
+. 
+. di as text "===== restrict_samp r1_only=0 (baseline R1+R2) ====="
+===== restrict_samp r1_only=0 (baseline R1+R2) =====
+
+. restrict_samp, samp(all_jrnls) r1r2(1) public(1)
+file ../temp/athr_any_all_jrnls_r1_r2_public.dta saved
+
+Duplicates in terms of all variables
+
+(2,201,956 observations deleted)
+file ../temp/athr_min_year_any_all_jrnls_r1_r2_public.dta saved
+(85,455 observations deleted)
+(478,708 observations deleted)
+(221,595 observations deleted)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                           130,076  
+    -----------------------------------------
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                       129,103
+        from master                   129,103  
+        from using                          0  
+
+    Matched                               973  
+    -----------------------------------------
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                           130,076  
+    -----------------------------------------
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                           130,076  
+    -----------------------------------------
+(0 real changes made)
+(129,103 missing values generated)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                           130,076  
+    -----------------------------------------
+(867 real changes made)
+(0 real changes made)
+
+                       (sum) exposure
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%    -.0867337      -.2588701
+ 5%    -.0323845      -.0867337
+10%    -.0073711       -.074481       Obs                 145
+25%     .0025054      -.0548414       Sum of wgt.         145
+
+50%     .0124005                      Mean           .0244958
+                        Largest       Std. dev.       .053603
+75%     .0355725       .1687062
+90%     .0882663        .185364       Variance       .0028733
+95%     .1148049       .1928698       Skewness       .3492498
+99%     .1928698       .2591545       Kurtosis       10.90401
+
+                           imputed
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%    -.0704284      -.2334289
+ 5%    -.0175718      -.1978788
+10%    -.0065976      -.1832206       Obs              29,173
+25%     .0055922      -.1752384       Sum of wgt.      29,173
+
+50%      .021607                      Mean           .0313405
+                        Largest       Std. dev.      .0414072
+75%     .0527971       .3817245
+90%     .0897063       .3817245       Variance       .0017146
+95%     .1111918       .3817245       Skewness       .6404487
+99%      .147719       .3817245       Kurtosis       5.546976
+
+                     (sum) mkt_spend_shr
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%     .0244392       .0100839
+ 5%     .0497882       .0244392
+10%     .0894406       .0273335       Obs                 145
+25%     .1546795        .028094       Sum of wgt.         145
+
+50%      .248092                      Mean           .2776371
+                        Largest       Std. dev.      .1635072
+75%      .361081       .6261557
+90%     .4807475        .653486       Variance       .0267346
+95%      .617501       .6841812       Skewness       .9866793
+99%     .6841812              1       Kurtosis       4.788283
+
+                    imputed_mkt_spend_shr
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%     .0911501              0
+ 5%      .141389              0
+10%     .1667989              0       Obs              29,173
+25%     .2213141              0       Sum of wgt.      29,173
+
+50%     .2868989                      Mean           .3004125
+                        Largest       Std. dev.      .1141611
+75%     .3606667              1
+90%     .4556439              1       Variance       .0130328
+95%     .5230143              1       Skewness       .6887323
+99%     .6113974              1       Kurtosis       3.807596
+file ../output/figures/all_jrnls/exposure_dist_r1_r2_public.pdf saved as PDF format
+file ../output/figures/all_jrnls/mkt_spend_shr_dist_r1_r2_public.pdf saved as PDF format
+(973 real changes made)
+(973 real changes made)
+(63,193 observations deleted)
+(5,257 observations deleted)
+file ../temp/athr_xw.dta saved
+
+Panel variable: athr (unbalanced)
+ Time variable: year, 2010 to 2019, but with gaps
+         Delta: 1 unit
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                            85,910  
+    -----------------------------------------
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                        11,619
+        from master                    11,619  
+        from using                          0  
+
+    Matched                            74,291  
+    -----------------------------------------
+(24,284 real changes made)
+(24,284 real changes made)
+(24,284 real changes made)
+(11,619 real changes made)
+(11,619 real changes made)
+(11,619 real changes made)
+(11,619 real changes made)
+(11,619 real changes made)
+(11,619 real changes made)
+(0 real changes made)
+(7,495 real changes made)
+(0 real changes made)
+(51,546 missing values generated)
+(9,340 observations deleted)
+(12,740 observations deleted)
+
+                          age_2014
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%           34             33
+ 5%           35             33
+10%           37             33       Obs              63,830
+25%           41             33       Sum of wgt.      63,830
+
+50%           47                      Mean           49.41642
+                        Largest       Std. dev.      10.64369
+75%           57             97
+90%           65             97       Variance       113.2882
+95%           69             97       Skewness       .7078964
+99%           77             97       Kurtosis       3.023889
+(0 observations deleted)
+(10 observations deleted)
+
+                          exposure
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%    -.0940665      -.2588701
+ 5%    -.0236666      -.1832206
+10%    -.0089556      -.1737478       Obs               6,382
+25%     .0051709      -.1721633       Sum of wgt.       6,382
+
+50%     .0236709                      Mean           .0316187
+                        Largest       Std. dev.      .0435809
+75%     .0564901       .1906263
+90%     .0922768       .1907633       Variance       .0018993
+95%      .111354       .1928698       Skewness       .0541479
+99%     .1379245       .2563505       Kurtosis       4.808701
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                        14,097
+        from master                    14,097  
+        from using                          0  
+
+    Matched                            49,723  
+    -----------------------------------------
+(14,097 real changes made)
+(15,214 real changes made, 15,214 to missing)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                        28,702
+        from master                    28,702  
+        from using                          0  
+
+    Matched                            35,118  
+    -----------------------------------------
+(28,702 real changes made)
+(15,214 missing values generated)
+(38,292 missing values generated)
+restrict_samp all_jrnls_r1_r2_public pre-gpp median = 1
+(40,880 missing values generated)
+restrict_samp all_jrnls_r1_r2_public pre-team median = 4
+(40,880 missing values generated)
+restrict_samp all_jrnls_r1_r2_public pre-n-coauth median = 7.75
+(58,995 missing values generated)
+(15,570 missing values generated)
+restrict_samp all_jrnls_r1_r2_public msa_size median = 11283
+(638 real changes made)
+restrict_samp all_jrnls_r1_r2_public winsorized cite_affl_wt at p99=32.31760144233704
+(403 real changes made)
+restrict_samp all_jrnls_r1_r2_public winsorized affl_wt at p99=9
+(639 real changes made)
+restrict_samp all_jrnls_r1_r2_public winsorized cite_affl_wt_any at p99=12.62329679727554
+(639 real changes made)
+restrict_samp all_jrnls_r1_r2_public winsorized affl_wt_any at p99=3.983333349227905
+(0 real changes made)
+(40,315 real changes made)
+(44,483 real changes made)
+(638 real changes made)
+restrict_samp all_jrnls_r1_r2_public winsorized cite_affl_wt_notlast at p99=3.667418718338013
+(638 real changes made)
+restrict_samp all_jrnls_r1_r2_public winsorized affl_wt_notlast at p99=1.131900668144226
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                           950
+        from master                       950  
+        from using                          0  
+
+    Matched                            62,870  
+    -----------------------------------------
+restrict_samp all_jrnls_r1_r2_public ic_contr N_pi=5295 p25=52628.75 p50=80890.5 p75=127163.75
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+restrict_samp all_jrnls_r1_r2_public ic_fdlsb N_pi=5292 p25=19555.75 p50=46231.75 p75=90474.5
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+restrict_samp all_jrnls_r1_r2_public ic_fdls N_pi=5292 p25=79783.5 p50=185661.25 p75=375520.5
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+restrict_samp all_jrnls_r1_r2_public ic_fdlsh N_pi=4984 p25=29663.25 p50=127640.25 p75=291784
+(13,980 missing values generated)
+(13,980 missing values generated)
+(13,980 missing values generated)
+(13,980 missing values generated)
+(13,980 missing values generated)
+restrict_samp all_jrnls_r1_r2_public ic_gntsf N_pi=5295 p25=167593.75 p50=370536.75 p75=652067.5
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+restrict_samp all_jrnls_r1_r2_public ic_hhlsb N_pi=5292 p25=13628 p50=38862.5 p75=84863.75
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+restrict_samp all_jrnls_r1_r2_public ic_hhls N_pi=5292 p25=35723.75 p50=142582.25 p75=349444.75
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+restrict_samp all_jrnls_r1_r2_public ic_hhlsh N_pi=4984 p25=27873.5 p50=112969.5 p75=280451.75
+(13,980 missing values generated)
+(13,980 missing values generated)
+(13,980 missing values generated)
+(13,980 missing values generated)
+(13,980 missing values generated)
+restrict_samp all_jrnls_r1_r2_public ic_nflsb N_pi=5292 p25=9873.5 p50=24880.25 p75=41632
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+restrict_samp all_jrnls_r1_r2_public ic_nfls N_pi=5292 p25=67294 p50=132330.25 p75=245432.5
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+restrict_samp all_jrnls_r1_r2_public ic_nflsh N_pi=5054 p25=17605.25 p50=80866.25 p75=156380.25
+(13,280 missing values generated)
+(13,280 missing values generated)
+(13,280 missing values generated)
+(13,280 missing values generated)
+(13,280 missing values generated)
+restrict_samp all_jrnls_r1_r2_public ic_subrf N_pi=5295 p25=26735.5 p50=61436.25 p75=80374.75
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+restrict_samp all_jrnls_r1_r2_public ic_busf N_pi=5292 p25=7569.75 p50=22350.25 p75=42177.5
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+restrict_samp all_jrnls_r1_r2_public ic_fedf N_pi=5295 p25=161566.25 p50=324887 p75=568839.5
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+restrict_samp all_jrnls_r1_r2_public ic_tfnd N_pi=5295 p25=333215 p50=672650.25 p75=870564
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+restrict_samp all_jrnls_r1_r2_public ic_instf N_pi=5295 p25=63173.75 p50=123731.75 p75=166845.25
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+restrict_samp all_jrnls_r1_r2_public ic_nonpf N_pi=5295 p25=10495.5 p50=24200 p75=66832.75
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+restrict_samp all_jrnls_r1_r2_public ic_statf N_pi=5295 p25=6304.25 p50=18645.5 p75=43992.5
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+restrict_samp all_jrnls_r1_r2_public ic_lsf N_pi=5292 p25=135969 p50=284333.75 p75=662470.25
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+restrict_samp all_jrnls_r1_r2_public ic_hsf N_pi=4981 p25=50563.25 p50=200744.75 p75=429295.5
+(14,010 missing values generated)
+(14,010 missing values generated)
+(14,010 missing values generated)
+(14,010 missing values generated)
+(14,010 missing values generated)
+restrict_samp all_jrnls_r1_r2_public ic_biof N_pi=5292 p25=32342.25 p50=71136.5 p75=141464.75
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+restrict_samp all_jrnls_r1_r2_public ic_applx N_pi=5268 p25=44570 p50=97540 p75=226048.5
+(11,140 missing values generated)
+(11,140 missing values generated)
+(11,140 missing values generated)
+(11,140 missing values generated)
+(11,140 missing values generated)
+restrict_samp all_jrnls_r1_r2_public ic_apfx N_pi=5261 p25=26377.5 p50=51055.75 p75=145965.25
+(11,210 missing values generated)
+(11,210 missing values generated)
+(11,210 missing values generated)
+(11,210 missing values generated)
+(11,210 missing values generated)
+restrict_samp all_jrnls_r1_r2_public ic_basx N_pi=5295 p25=210059 p50=473577 p75=633319.5
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+restrict_samp all_jrnls_r1_r2_public ic_bfx N_pi=5295 p25=115765.5 p50=266981 p75=393101.75
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+restrict_samp all_jrnls_r1_r2_public ic_clinx N_pi=4299 p25=3244 p50=9235.25 p75=11652.75
+(20,830 missing values generated)
+(20,830 missing values generated)
+(20,830 missing values generated)
+(20,830 missing values generated)
+(20,830 missing values generated)
+restrict_samp all_jrnls_r1_r2_public ic_devx N_pi=5261 p25=9541.5 p50=31860 p75=79459.25
+(11,210 missing values generated)
+(11,210 missing values generated)
+(11,210 missing values generated)
+(11,210 missing values generated)
+(11,210 missing values generated)
+restrict_samp all_jrnls_r1_r2_public ic_lscx N_pi=5292 p25=2990.25 p50=7132 p75=13258.5
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+restrict_samp all_jrnls_r1_r2_public ic_medx N_pi=3871 p25=163197.75 p50=251458 p75=490096
+(25,110 missing values generated)
+(25,110 missing values generated)
+(25,110 missing values generated)
+(25,110 missing values generated)
+(25,110 missing values generated)
+restrict_samp all_jrnls_r1_r2_public ic_endow N_pi=5797 p25=297933923.25 p50=717034000 p75=1914987149.5
+(5,850 missing values generated)
+(5,850 missing values generated)
+(5,850 missing values generated)
+(5,850 missing values generated)
+(5,850 missing values generated)
+restrict_samp all_jrnls_r1_r2_public pre_ppr p25=6 p75=11
+restrict_samp all_jrnls_r1_r2_public grants p25=.2000000029802322 p75=1.799999952316284
+restrict_samp all_jrnls_r1_r2_public team p25=2.900000095367432 p75=5.449999809265137
+restrict_samp all_jrnls_r1_r2_public coauth p25=5.333333492279053 p75=11.75
+restrict_samp all_jrnls_r1_r2_public msa p25=5733 p75=21195
+(15,570 missing values generated)
+(15,570 missing values generated)
+(15,570 missing values generated)
+file ../temp/es_all_jrnls_r1_r2_public.dta saved
+
+. use ../temp/es_all_jrnls_r1_r2_public, clear
+
+. count
+  63,820
+
+. gunique athr_id
+N = 63,820; 6,382 balanced groups of size 10
+
+. di as text "^ R1+R2 sample size"
+^ R1+R2 sample size
+
+. tab type if athr_indicator == 1, mi
+
+       type |      Freq.     Percent        Cum.
+------------+-----------------------------------
+         r1 |      6,031       94.50       94.50
+         r2 |        351        5.50      100.00
+------------+-----------------------------------
+      Total |      6,382      100.00
+
+. 
+. di as text "===== restrict_samp r1_only=1 (R1 only) ====="
+===== restrict_samp r1_only=1 (R1 only) =====
+
+. restrict_samp, samp(all_jrnls) r1r2(1) public(1) r1_only(1)
+file ../temp/athr_any_all_jrnls_r1_r2_public.dta saved
+
+Duplicates in terms of all variables
+
+(2,201,956 observations deleted)
+file ../temp/athr_min_year_any_all_jrnls_r1_r2_public.dta saved
+(70,622 observations deleted)
+restrict_samp all_jrnls_r1_public (r1_only=1): kept N=873434 R1-only rows
+(78,409 observations deleted)
+(445,829 observations deleted)
+(204,192 observations deleted)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                           119,150  
+    -----------------------------------------
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                       118,253
+        from master                   118,253  
+        from using                          0  
+
+    Matched                               897  
+    -----------------------------------------
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                           119,150  
+    -----------------------------------------
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                           119,150  
+    -----------------------------------------
+(0 real changes made)
+(118,253 missing values generated)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                           119,150  
+    -----------------------------------------
+(793 real changes made)
+(0 real changes made)
+
+                       (sum) exposure
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%    -.0867337      -.2588701
+ 5%    -.0381487      -.0867337
+10%     -.010387       -.074481       Obs                 130
+25%     .0019786      -.0548414       Sum of wgt.         130
+
+50%     .0094565                      Mean           .0179615
+                        Largest       Std. dev.      .0462286
+75%     .0289669       .1148049
+90%      .077096       .1451601       Variance       .0021371
+95%     .0959397       .1608318       Skewness      -.7899588
+99%     .1608318        .185364       Kurtosis       13.68875
+
+                           imputed
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%    -.0693205      -.2334289
+ 5%    -.0173423      -.1752384
+10%    -.0064988      -.1737478       Obs              26,236
+25%     .0056148      -.1721633       Sum of wgt.      26,236
+
+50%     .0214883                      Mean           .0312114
+                        Largest       Std. dev.      .0411053
+75%     .0524915       .3817245
+90%     .0893288       .3817245       Variance       .0016896
+95%     .1106991       .3817245       Skewness        .651757
+99%     .1459232       .3817245       Kurtosis       5.620031
+
+                     (sum) mkt_spend_shr
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%     .0244392       .0100839
+ 5%     .0365802       .0244392
+10%     .0864798       .0273335       Obs                 130
+25%     .1465705        .028094       Sum of wgt.         130
+
+50%     .2343486                      Mean            .258068
+                        Largest       Std. dev.      .1560998
+75%     .3445504       .6260453
+90%     .4284955        .653486       Variance       .0243671
+95%     .5716293       .6841812       Skewness       1.273788
+99%     .6841812              1       Kurtosis       6.269088
+
+                    imputed_mkt_spend_shr
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%     .0909771              0
+ 5%     .1406341              0
+10%     .1663348              0       Obs              26,236
+25%     .2203731              0       Sum of wgt.      26,236
+
+50%     .2858094                      Mean           .2990919
+                        Largest       Std. dev.      .1136584
+75%      .358903              1
+90%     .4529952              1       Variance       .0129182
+95%     .5207798              1       Skewness       .7000253
+99%      .608991              1       Kurtosis       3.869154
+file ../output/figures/all_jrnls/exposure_dist_r1_public.pdf saved as PDF format
+file ../output/figures/all_jrnls/mkt_spend_shr_dist_r1_public.pdf saved as PDF format
+(897 real changes made)
+(897 real changes made)
+(56,492 observations deleted)
+(4,548 observations deleted)
+file ../temp/athr_xw.dta saved
+
+Panel variable: athr (unbalanced)
+ Time variable: year, 2010 to 2019, but with gaps
+         Delta: 1 unit
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                            80,590  
+    -----------------------------------------

@@ -1,0 +1,629 @@
+-------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  /n/holylabs/pakes_lab/Lab/sci_eq/analysis/reduced_form/code/diag_b
+> are_sample_cuts.log
+  log type:  text
+ opened on:  10 Jul 2026, 22:03:30
+
+. 
+. *==== rebuild bare positive-exposure panel ====
+. 
+. * 1) raw last-author panel
+. use athr_id year ppr_cnt cite_affl_wt affl_wt ///
+>     using ../external/samp/athr_panel_full_year_last_all_jrnls_r1_r2_public, 
+> clear
+
+. 
+. * 2) PI appears by 2010 & restrict to 2010-2019
+. bys athr_id: egen min_year = min(year)
+
+. bys athr_id: egen max_year = max(year)
+
+. keep if min_year <= 2010
+(131,519 observations deleted)
+
+. keep if inrange(year, 2010, 2019)
+(656,392 observations deleted)
+
+. 
+. * 3) merge exposure & real FOIA exposure
+. preserve
+
+.     import delimited ../external/exposure/final_imputed_shift_share_hc_cf, cl
+> ear
+(encoding automatically selected: ISO-8859-2)
+(3 vars, 1,500,300 obs)
+
+.     rename exposure_ss imputed
+
+.     rename sum_imputed_shares imputed_mkt_spend_shr
+
+.     tempfile _expo
+
+.     save `_expo'
+file /tmp/St3154260.000002 saved as .dta format
+
+. restore
+
+. merge m:1 athr_id using `_expo', assert(1 2 3) keep(3) nogen
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                           128,110  
+    -----------------------------------------
+
+. merge m:1 athr_id using ../external/real_exposure/athr_exposure_hc, assert(1 
+> 2 3) keep(1 3) nogen
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                       127,196
+        from master                   127,196  
+        from using                          0  
+
+    Matched                               914  
+    -----------------------------------------
+
+. gen foia_athr = 1 if !mi(exposure)
+(127,196 missing values generated)
+
+. replace imputed = exposure if !mi(exposure)
+(914 real changes made)
+
+. replace imputed_mkt_spend_shr = mkt_spend_shr if !mi(mkt_spend_shr)
+(914 real changes made)
+
+. drop exposure mkt_spend_shr
+
+. rename imputed exposure
+
+. rename imputed_mkt_spend_shr mkt_spend_shr
+
+. 
+. * 4) positive exposure
+. drop if mi(exposure) | mi(mkt_spend_shr)
+(0 observations deleted)
+
+. keep if exposure > 0
+(23,264 observations deleted)
+
+. drop if mkt_spend_shr < 0
+(0 observations deleted)
+
+. 
+. * 5) balance
+. gegen athr = group(athr_id)
+
+. preserve
+
+.     contract athr athr_id exposure mkt_spend_shr min_year max_year foia_athr
+
+.     drop _freq
+
+.     tempfile _xw
+
+.     save `_xw'
+file /tmp/St3154260.000004 saved as .dta format
+
+. restore
+
+. xtset athr year
+
+Panel variable: athr (unbalanced)
+ Time variable: year, 2010 to 2019, but with gaps
+         Delta: 1 unit
+
+. tsfill, full
+
+. drop athr_id exposure mkt_spend_shr min_year max_year foia_athr
+
+. merge m:1 athr using `_xw', assert(3) keep(3) nogen
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                           293,840  
+    -----------------------------------------
+
+. foreach v in ppr_cnt cite_affl_wt affl_wt {
+  2.     replace `v' = 0 if mi(`v')
+  3. }
+(188,994 real changes made)
+(188,994 real changes made)
+(188,994 real changes made)
+
+. 
+. di as text _newline "======= BARE sample state ======="
+
+======= BARE sample state =======
+
+. bys athr_id: gen _first = _n == 1
+
+. qui count if _first == 1
+
+. di as text "  N PIs (bare): " r(N)
+  N PIs (bare): 29384
+
+. 
+. *==== build event-time interactions ====
+. gen rel = year - 2014
+
+. qui sum rel
+
+. local abs_lead = abs(r(min))
+
+. local abs_lag  = r(max)
+
+. forval i = 1/`abs_lag' {
+  2.     gen int_lag`i'  = exposure      if rel == `i'
+  3.     gen mshr_lag`i' = mkt_spend_shr if rel == `i'
+  4.     replace int_lag`i'  = 0 if mi(int_lag`i')
+  5.     replace mshr_lag`i' = 0 if mi(mshr_lag`i')
+  6. }
+(264,456 missing values generated)
+(264,456 missing values generated)
+(264,456 real changes made)
+(264,456 real changes made)
+(264,456 missing values generated)
+(264,456 missing values generated)
+(264,456 real changes made)
+(264,456 real changes made)
+(264,456 missing values generated)
+(264,456 missing values generated)
+(264,456 real changes made)
+(264,456 real changes made)
+(264,456 missing values generated)
+(264,456 missing values generated)
+(264,456 real changes made)
+(264,456 real changes made)
+(264,456 missing values generated)
+(264,456 missing values generated)
+(264,456 real changes made)
+(264,456 real changes made)
+
+. forval i = 1/`abs_lead' {
+  2.     gen int_lead`i'  = exposure      if rel == -`i'
+  3.     gen mshr_lead`i' = mkt_spend_shr if rel == -`i'
+  4.     replace int_lead`i'  = 0 if mi(int_lead`i')
+  5.     replace mshr_lead`i' = 0 if mi(mshr_lead`i')
+  6. }
+(264,456 missing values generated)
+(264,456 missing values generated)
+(264,456 real changes made)
+(264,456 real changes made)
+(264,456 missing values generated)
+(264,456 missing values generated)
+(264,456 real changes made)
+(264,456 real changes made)
+(264,456 missing values generated)
+(264,456 missing values generated)
+(264,456 real changes made)
+(264,456 real changes made)
+(264,456 missing values generated)
+(264,456 missing values generated)
+(264,456 real changes made)
+(264,456 real changes made)
+
+. gen int_lag0 = exposure if rel == 0
+(264,456 missing values generated)
+
+. replace int_lag0 = 0 if mi(int_lag0)
+(264,456 real changes made)
+
+. gen mshr_lag0 = mkt_spend_shr if rel == 0
+(264,456 missing values generated)
+
+. replace mshr_lag0 = 0 if mi(mshr_lag0)
+(264,456 real changes made)
+
+. local ileads
+
+. local ilags
+
+. local mleads
+
+. local mlags
+
+. forval i = 2/`abs_lead' {
+  2.     local ileads int_lead`i' `ileads'
+  3.     local mleads mshr_lead`i' `mleads'
+  4. }
+
+. forval i = 0/`abs_lag' {
+  2.     local ilags `ilags' int_lag`i'
+  3.     local mlags `mlags' mshr_lag`i'
+  4. }
+
+. 
+. *==== pre-period stats for cuts ====
+. gen pre_pprs = ppr_cnt if year < 2014
+(176,304 missing values generated)
+
+. bys athr_id: egen pi_pre_mean  = mean(pre_pprs)
+
+. bys athr_id: egen pi_pre_sum   = sum(pre_pprs)
+
+. bys athr_id: egen pi_pre_years_active = total(pre_pprs > 0 & !mi(pre_pprs))
+
+. gen ppr_2013 = ppr_cnt if year == 2013
+(264,456 missing values generated)
+
+. bys athr_id: egen pi_ppr_2013 = max(ppr_2013)
+
+. drop ppr_2013
+
+. 
+. *  num_place from raw last-author panel (not in bare sample)
+. preserve
+
+.     use athr_id year inst_id using ../external/samp/athr_panel_full_year_last
+> _all_jrnls_r1_r2_public, clear
+
+.     keep if inrange(year, 2010, 2019)
+(717,540 observations deleted)
+
+.     keep if !mi(inst_id)
+(0 observations deleted)
+
+.     contract athr_id inst_id
+
+.     bys athr_id: gen tmp = 1
+
+.     bys athr_id: egen num_place = total(tmp)
+
+.     keep athr_id num_place
+
+.     duplicates drop athr_id, force
+
+Duplicates in terms of athr_id
+
+(3,235 observations deleted)
+
+.     tempfile _np
+
+.     save `_np'
+file /tmp/St3154260.000006 saved as .dta format
+
+. restore
+
+. merge m:1 athr_id using `_np', keep(1 3) nogen
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                           293,840  
+    -----------------------------------------
+
+. replace num_place = 0 if mi(num_place)
+(0 real changes made)
+
+. 
+. xtile exp_q_tmp = exposure if _first == 1, n(4)
+
+. bys athr_id: egen exp_q = max(exp_q_tmp)
+
+. drop exp_q_tmp
+
+. 
+. *==== BASELINE ====
+. di as text _newline "======= BASELINE: bare positive-exposure ======="
+
+======= BASELINE: bare positive-exposure =======
+
+. qui count if _first == 1
+
+. di as text "  N_PI = " r(N)
+  N_PI = 29384
+
+. qui ppmlhdfe ppr_cnt `ileads' `ilags', absorb(athr_id year) vce(cluster athr_
+> id)
+
+. estimates store b0
+
+. qui ppmlhdfe ppr_cnt `ileads' `ilags' `mleads' `mlags', absorb(athr_id year) 
+> vce(cluster athr_id)
+
+. estimates store b0_m
+
+. 
+. *==== CUT 1: num_place == 1 ====
+. di as text _newline "======= CUT 1: num_place == 1 (single-institution) =====
+> =="
+
+======= CUT 1: num_place == 1 (single-institution) =======
+
+. qui count if _first == 1 & num_place == 1
+
+. di as text "  N_PI = " r(N)
+  N_PI = 28076
+
+. qui ppmlhdfe ppr_cnt `ileads' `ilags' if num_place == 1, absorb(athr_id year)
+>  vce(cluster athr_id)
+
+. estimates store c1
+
+. qui ppmlhdfe ppr_cnt `ileads' `ilags' `mleads' `mlags' if num_place == 1, abs
+> orb(athr_id year) vce(cluster athr_id)
+
+. estimates store c1_m
+
+. 
+. *==== CUT 2: balanced pre-period ====
+. di as text _newline "======= CUT 2: balanced pre-period (active every 2010-20
+> 13) ======="
+
+======= CUT 2: balanced pre-period (active every 2010-2013) =======
+
+. qui count if _first == 1 & pi_pre_years_active == 4
+
+. di as text "  N_PI = " r(N)
+  N_PI = 3759
+
+. qui ppmlhdfe ppr_cnt `ileads' `ilags' if pi_pre_years_active == 4, absorb(ath
+> r_id year) vce(cluster athr_id)
+
+. estimates store c2
+
+. qui ppmlhdfe ppr_cnt `ileads' `ilags' `mleads' `mlags' if pi_pre_years_active
+>  == 4, absorb(athr_id year) vce(cluster athr_id)
+
+. estimates store c2_m
+
+. 
+. *==== CUT 3: pre_mean >= 1 ====
+. di as text _newline "======= CUT 3: pre_mean >= 1 ======="
+
+======= CUT 3: pre_mean >= 1 =======
+
+. qui count if _first == 1 & pi_pre_mean >= 1
+
+. di as text "  N_PI = " r(N)
+  N_PI = 8655
+
+. qui ppmlhdfe ppr_cnt `ileads' `ilags' if pi_pre_mean >= 1, absorb(athr_id yea
+> r) vce(cluster athr_id)
+
+. estimates store c3
+
+. qui ppmlhdfe ppr_cnt `ileads' `ilags' `mleads' `mlags' if pi_pre_mean >= 1, a
+> bsorb(athr_id year) vce(cluster athr_id)
+
+. estimates store c3_m
+
+. 
+. *==== CUT 4: pre_mean >= 2 ====
+. di as text _newline "======= CUT 4: pre_mean >= 2 ======="
+
+======= CUT 4: pre_mean >= 2 =======
+
+. qui count if _first == 1 & pi_pre_mean >= 2
+
+. di as text "  N_PI = " r(N)
+  N_PI = 3142
+
+. qui ppmlhdfe ppr_cnt `ileads' `ilags' if pi_pre_mean >= 2, absorb(athr_id yea
+> r) vce(cluster athr_id)
+
+. estimates store c4
+
+. qui ppmlhdfe ppr_cnt `ileads' `ilags' `mleads' `mlags' if pi_pre_mean >= 2, a
+> bsorb(athr_id year) vce(cluster athr_id)
+
+. estimates store c4_m
+
+. 
+. *==== CUT 5: nonzero ppr in 2013 ====
+. di as text _newline "======= CUT 5: nonzero ppr in 2013 (baseline year) =====
+> =="
+
+======= CUT 5: nonzero ppr in 2013 (baseline year) =======
+
+. qui count if _first == 1 & pi_ppr_2013 > 0
+
+. di as text "  N_PI = " r(N)
+  N_PI = 11245
+
+. qui ppmlhdfe ppr_cnt `ileads' `ilags' if pi_ppr_2013 > 0, absorb(athr_id year
+> ) vce(cluster athr_id)
+
+. estimates store c5
+
+. qui ppmlhdfe ppr_cnt `ileads' `ilags' `mleads' `mlags' if pi_ppr_2013 > 0, ab
+> sorb(athr_id year) vce(cluster athr_id)
+
+. estimates store c5_m
+
+. 
+. *==== CUT 6: drop top exposure quartile ====
+. di as text _newline "======= CUT 6: exp_q <= 3 (drop top exposure quartile) =
+> ======"
+
+======= CUT 6: exp_q <= 3 (drop top exposure quartile) =======
+
+. qui count if _first == 1 & exp_q <= 3
+
+. di as text "  N_PI = " r(N)
+  N_PI = 22038
+
+. qui ppmlhdfe ppr_cnt `ileads' `ilags' if exp_q <= 3, absorb(athr_id year) vce
+> (cluster athr_id)
+
+. estimates store c6
+
+. qui ppmlhdfe ppr_cnt `ileads' `ilags' `mleads' `mlags' if exp_q <= 3, absorb(
+> athr_id year) vce(cluster athr_id)
+
+. estimates store c6_m
+
+. 
+. *==== CUT 7: drop bottom exposure quartile ====
+. di as text _newline "======= CUT 7: exp_q >= 2 (drop bottom exposure quartile
+> ) ======="
+
+======= CUT 7: exp_q >= 2 (drop bottom exposure quartile) =======
+
+. qui count if _first == 1 & exp_q >= 2
+
+. di as text "  N_PI = " r(N)
+  N_PI = 22038
+
+. qui ppmlhdfe ppr_cnt `ileads' `ilags' if exp_q >= 2, absorb(athr_id year) vce
+> (cluster athr_id)
+
+. estimates store c7
+
+. qui ppmlhdfe ppr_cnt `ileads' `ilags' `mleads' `mlags' if exp_q >= 2, absorb(
+> athr_id year) vce(cluster athr_id)
+
+. estimates store c7_m
+
+. 
+. *==== CUT 8: combined ====
+. di as text _newline "======= CUT 8: balanced + pre_mean>=1 + num_place==1 ===
+> ===="
+
+======= CUT 8: balanced + pre_mean>=1 + num_place==1 =======
+
+. qui count if _first == 1 & pi_pre_years_active == 4 & pi_pre_mean >= 1 & num_
+> place == 1
+
+. di as text "  N_PI = " r(N)
+  N_PI = 3483
+
+. qui ppmlhdfe ppr_cnt `ileads' `ilags' if pi_pre_years_active == 4 & pi_pre_me
+> an >= 1 & num_place == 1, absorb(athr_id year) vce(cluster athr_id)
+
+. estimates store c8
+
+. qui ppmlhdfe ppr_cnt `ileads' `ilags' `mleads' `mlags' if pi_pre_years_active
+>  == 4 & pi_pre_mean >= 1 & num_place == 1, absorb(athr_id year) vce(cluster a
+> thr_id)
+
+. estimates store c8_m
+
+. 
+. *==== SUMMARY ====
+. di as text _newline "======= SUMMARY: int_lead2 & int_lag2, BASE spec =======
+> "
+
+======= SUMMARY: int_lead2 & int_lag2, BASE spec =======
+
+. estimates table b0 c1 c2 c3 c4 c5 c6 c7 c8, keep(int_lead2 int_lag2) b(%9.4f)
+>  se
+
+--------------------------------------------------------------------------
+    Variable |    b0          c1          c2          c3          c4      
+-------------+------------------------------------------------------------
+   int_lead2 |   -0.2147     -0.0931     -0.0531     -0.1308      0.0497  
+             |    0.2822      0.2923      0.3364      0.3326      0.4306  
+    int_lag2 |   -0.3274     -0.1980      0.3947     -0.0819      0.3614  
+             |    0.3389      0.3484      0.5064      0.4191      0.5577  
+--------------------------------------------------------------------------
+                                                              Legend: b/se
+
+
+--------------------------------------------------------------
+    Variable |    c5          c6          c7          c8      
+-------------+------------------------------------------------
+   int_lead2 |    0.6413      1.2363     -0.4347      0.0253  
+             |    0.2938      0.7516      0.3354      0.3484  
+    int_lag2 |    0.4649      1.6030     -0.5875      0.6286  
+             |    0.3690      0.8509      0.4077      0.5195  
+--------------------------------------------------------------
+                                                  Legend: b/se
+
+. 
+. di as text _newline "======= SUMMARY: int_lead2 & int_lag2, +MSHR spec ======
+> ="
+
+======= SUMMARY: int_lead2 & int_lag2, +MSHR spec =======
+
+. estimates table b0_m c1_m c2_m c3_m c4_m c5_m c6_m c7_m c8_m, keep(int_lead2 
+> int_lag2) b(%9.4f) se
+
+--------------------------------------------------------------------------
+    Variable |   b0_m        c1_m        c2_m        c3_m        c4_m     
+-------------+------------------------------------------------------------
+   int_lead2 |   -0.1935     -0.0961     -0.2944     -0.0829     -0.1872  
+             |    0.3140      0.3248      0.3640      0.3583      0.4593  
+    int_lag2 |    0.0253      0.2416      0.4646      0.0589      0.1387  
+             |    0.3757      0.3838      0.5437      0.4541      0.6030  
+--------------------------------------------------------------------------
+                                                              Legend: b/se
+
+
+--------------------------------------------------------------
+    Variable |   c5_m        c6_m        c7_m        c8_m     
+-------------+------------------------------------------------
+   int_lead2 |    0.1926      1.2438     -0.5954     -0.2410  
+             |    0.3217      0.7569      0.3844      0.3770  
+    int_lag2 |    0.3879      1.9684     -0.3863      0.7030  
+             |    0.4044      0.8588      0.4645      0.5559  
+--------------------------------------------------------------
+                                                  Legend: b/se
+
+. 
+. di as text _newline "======= FULL event-time, base spec ======="
+
+======= FULL event-time, base spec =======
+
+. estimates table b0 c1 c2 c3 c4 c5 c8, keep(`ileads' `ilags') b(%9.4f) se
+
+--------------------------------------------------------------------------
+    Variable |    b0          c1          c2          c3          c4      
+-------------+------------------------------------------------------------
+   int_lead4 |   -0.6610     -0.6218     -0.1128     -0.5959     -0.3178  
+             |    0.2938      0.3068      0.3628      0.3605      0.4820  
+   int_lead3 |   -0.4082     -0.3391      0.0209     -0.4609     -0.1146  
+             |    0.2960      0.3081      0.3681      0.3577      0.4815  
+   int_lead2 |   -0.2147     -0.0931     -0.0531     -0.1308      0.0497  
+             |    0.2822      0.2923      0.3364      0.3326      0.4306  
+    int_lag0 |   -0.2406     -0.2328     -0.1928     -0.6098     -0.3800  
+             |    0.3013      0.3133      0.4150      0.3551      0.4635  
+    int_lag1 |   -0.5078     -0.3995     -0.2054     -0.3687     -0.3234  
+             |    0.3246      0.3347      0.4876      0.4005      0.5385  
+    int_lag2 |   -0.3274     -0.1980      0.3947     -0.0819      0.3614  
+             |    0.3389      0.3484      0.5064      0.4191      0.5577  
+    int_lag3 |   -1.0561     -0.8882     -0.2020     -0.6708     -0.2096  
+             |    0.3577      0.3724      0.5152      0.4419      0.5959  
+    int_lag4 |   -0.9298     -0.8137     -0.5100     -0.6589     -0.5722  
+             |    0.3653      0.3818      0.5543      0.4630      0.6255  
+    int_lag5 |   -0.4169     -0.4210     -0.4008     -0.5128     -0.3899  
+             |    0.3719      0.3859      0.5697      0.4529      0.5936  
+--------------------------------------------------------------------------
+                                                              Legend: b/se
+
+
+--------------------------------------
+    Variable |    c5          c8      
+-------------+------------------------
+   int_lead4 |    0.4546     -0.1080  
+             |    0.3111      0.3839  
+   int_lead3 |    0.6612     -0.0071  
+             |    0.3158      0.3861  
+   int_lead2 |    0.6413      0.0253  
+             |    0.2938      0.3484  
+    int_lag0 |    0.1777     -0.2168  
+             |    0.3125      0.4428  
+    int_lag1 |    0.3626     -0.1669  
+             |    0.3526      0.5049  
+    int_lag2 |    0.4649      0.6286  
+             |    0.3690      0.5195  
+    int_lag3 |   -0.0709      0.0622  
+             |    0.3838      0.5342  
+    int_lag4 |   -0.0936     -0.1172  
+             |    0.4072      0.5809  
+    int_lag5 |    0.3049     -0.2576  
+             |    0.4125      0.5874  
+--------------------------------------
+                          Legend: b/se
+
+. 
+. log close
+      name:  <unnamed>
+       log:  /n/holylabs/pakes_lab/Lab/sci_eq/analysis/reduced_form/code/diag_b
+> are_sample_cuts.log
+  log type:  text
+ closed on:  10 Jul 2026, 23:04:01
+-------------------------------------------------------------------------------

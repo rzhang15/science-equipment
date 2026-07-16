@@ -1,0 +1,746 @@
+[?1h=
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Unicode is supported; see help unicode_advice.
+      2. More than 2 billion observations are allowed; see help obs_advice.
+      3. Maximum number of variables is set to 120,000; see help set_maxvar.
+
+. do "build.do" 
+
+. set more off
+
+. clear all
+
+. capture log close
+
+. program drop _all
+
+. set scheme modern
+
+. pause on
+
+. set seed 8975
+
+. 
+. program main
+  1.     foreach s in all_jrnls_no_clin { //} all_jrnls_no_clin top_jrnls top_j
+> rnls_no_clin { 
+  2.         local t year
+  3.         make_panel, time(`t') last(1) samp(`s') us(1)
+  4.         merge_ipeds, time(`t') last(1) samp(`s') us(1)
+  5.         make_panel, time(`t') samp(`s') us(1)
+  6.         merge_ipeds, time(`t') samp(`s') us(1)
+  7.     }
+  8. end
+
+. 
+. program make_panel
+  1.     syntax, time(string) samp(str) [, firstlast(int 0) last(int 0) first(i
+> nt 0) us(int 0) second(int 0)]
+  2.     // route openalex-level loads to the clinical-filtered folder when sam
+> p
+.     // ends in _no_clin; sub_athrs paths stay the same
+.     local src "openalex"
+  3.     if regexm("`samp'", "_no_clin$") local src "openalex_no_clin"
+  4.     import delimited ../external/clusters/author_static_clusters_25.csv, c
+> lear
+  5.     save ../temp/clusters, replace
+  6. 
+.     // Build coauthor structures from the full-authors sample so team-size
+.     // measures are correct even when the working sample restricts to a
+.     // single author position (e.g., last=1).
+.     use pmid athr_id using ../external/`src'/cleaned_`samp', clear
+  7.     gcontract pmid athr_id
+  8.     drop _freq
+  9.     save ../temp/all_athrs_`samp', replace
+ 10.     gcontract pmid, freq(paper_team_size)
+ 11.     save ../temp/paper_team_size_`samp', replace
+ 12. 
+.     use id pmid which_athr which_affl pub_date year jrnl cite_count athr_id a
+> thr_name country_code msa_comb msa_c_world inst inst_id msacode using ../exte
+> rnal/`src'/cleaned_`samp', clear
+ 13.     local suf = "" 
+ 14.     if `firstlast' == 1 {
+ 15.         use id pmid which_athr which_affl pub_date year jrnl cite_count at
+> hr_id athr_name country_code msa_comb msa_c_world inst inst_id msacode using 
+> ../external/sub_athrs/firstlast/cleaned_`samp', clear
+ 16.         local suf = "_firstlast" 
+ 17.     }
+ 18.     if `second' == 1 {
+ 19.         use id pmid which_athr which_affl pub_date year jrnl cite_count at
+> hr_id athr_name country_code msa_comb msa_c_world inst inst_id msacode using 
+> ../external/sub_athrs/second/cleaned_`samp', clear
+ 20.         local suf = "_second" 
+ 21.     }
+ 22.     if `last' == 1 {
+ 23.         use id pmid which_athr which_affl pub_date year jrnl cite_count at
+> hr_id athr_name  country_code msa_comb msa_c_world inst inst_id msacode using
+>  ../external/sub_athrs/last/cleaned_`samp', clear
+ 24.         local suf = "_last" 
+ 25.     }
+ 26.     if `first' == 1 {
+ 27.         use id pmid which_athr which_affl pub_date year jrnl cite_count at
+> hr_id athr_name country_code msa_comb msa_c_world inst inst_id msacode using 
+> ../external/sub_athrs/first/cleaned_`samp', clear
+ 28.         local suf = "_first" 
+ 29.     }
+ 30.     if `us' == 0 local suf "`suf'_global"
+ 31.     gen cns = inlist(jrnl, "Cell", "Nature", "Science") 
+ 32.     gen ppr_cnt = 1
+ 33.     gen qrtr = qofd(pub_date)
+ 34.     merge m:1 athr_id using ../temp/clusters, assert(1 2 3) keep(3) nogen
+ 35.     merge m:1 id using ../external/patents/patent_ppr_cnt, assert(1 2 3) k
+> eep(1 3) nogen keepusing(patent_count front_only body_only)
+ 36.     merge m:1 pmid using ../temp/paper_team_size_`samp', assert(2 3) keep(
+> 3) nogen
+ 37.     rename cluster_label field
+ 38. 
+.     bys pmid athr_id (which_athr which_affl): gen author_id = _n == 1
+ 39.     bys pmid (which_athr which_affl): gen which_athr2 = sum(author_id)
+ 40.     replace which_athr = which_athr2
+ 41.     drop which_athr2
+ 42. 
+.     bys pmid which_athr: gen num_affls = _N
+ 43.     assert num_affls == 1
+ 44.     bys pmid: gegen num_athrs = max(which_athr)
+ 45.     gen affl_wt = 1/num_affls * 1/num_athrs
+ 46.     gen pat_affl_wt = patent_count * 1/num_affls * 1/num_athrs
+ 47.     gen body_affl_wt = body_only * 1/num_affls * 1/num_athrs
+ 48.     gen front_affl_wt = front_only * 1/num_affls * 1/num_athrs
+ 49.     local date  date("`c(current_date)'", "DMY")
+ 50.     if "`time'" == "qrtr" {
+ 51.         gen time_since_pub = qofd(`date') - `time'+1
+ 52.         gen avg_cite = cite_count/time_since_pub
+ 53.         gen avg_pat = patent_count/time_since_pub
+ 54.         gen avg_frnt = front_only/time_since_pub
+ 55.         gen avg_body = body_only/time_since_pub
+ 56.     }
+ 57.     if "`time'" == "year" {
+ 58.         gen time_since_pub = yofd(`date') - `time'+1
+ 59.         gen avg_cite = cite_count/time_since_pub
+ 60.         gen avg_pat = patent_count/time_since_pub
+ 61.         gen avg_frnt = front_only/time_since_pub
+ 62.         gen avg_body = body_only/time_since_pub
+ 63.     }
+ 64.     bys pmid: replace avg_cite = . if _n != 1
+ 65.     by pmid: replace avg_pat = . if _n != 1
+ 66.     by pmid: replace avg_frnt = . if _n != 1
+ 67.     by pmid: replace avg_body = . if _n != 1
+ 68.     sum avg_cite
+ 69.     gen cite_wt = avg_cite/r(sum)
+ 70.     bys jrnl: gegen tot_cite_N = total(cite_wt)
+ 71.     sum avg_pat
+ 72.     gen pat_wt = avg_pat/r(sum)
+ 73.     sum avg_frnt
+ 74.     gen frnt_wt = avg_frnt/r(sum)
+ 75.     sum avg_body
+ 76.     gen body_wt = avg_body/r(sum)
+ 77.     gsort pmid cite_wt
+ 78.     qui bys pmid: replace cite_wt = cite_wt[_n-1] if mi(cite_wt)
+ 79.     gsort pmid pat_wt
+ 80.     qui bys pmid: replace pat_wt = pat_wt[_n-1] if mi(pat_wt)
+ 81.     gsort pmid frnt_wt
+ 82.     qui bys pmid: replace frnt_wt = frnt_wt[_n-1] if mi(frnt_wt)
+ 83.     gsort pmid body_wt
+ 84.     qui bys pmid: replace body_wt = body_wt[_n-1] if mi(body_wt)
+ 85.     gunique pmid
+ 86.     local articles = r(unique)
+ 87.     qui gen pat_adj_wt = affl_wt * pat_wt * `articles'
+ 88.     qui gen cite_affl_wt = affl_wt * cite_wt * `articles'
+ 89.     qui gen frnt_adj_wt  = affl_wt * frnt_wt * `articles'
+ 90.     qui gen body_adj_wt  = affl_wt * body_wt * `articles'
+ 91.     qui bys pmid: gen pmid_cntr = _n == 1
+ 92.     qui bys jrnl: gen first_jrnl = _n == 1
+ 93.     qui by jrnl: gegen jrnl_N = total(pmid_cntr)
+ 94.     /*qui sum impact_fctr if first_jrnl == 1
+>     gen impact_shr = impact_fctr/r(sum)
+>     gen reweight_N = impact_shr * `articles'
+>     replace  tot_cite_N = tot_cite_N * `articles'
+>     gen impact_wt = reweight_N/jrnl_N
+>     gen impact_affl_wt = impact_wt * affl_wt
+>     gen impact_cite_wt = reweight_N * cite_wt / tot_cite_N * `articles'
+>     gen impact_cite_affl_wt = impact_cite_wt * affl_wt*/
+.     foreach v in affl_wt cite_affl_wt pat_adj_wt { //impact_affl_wt impact_ci
+> te_affl_wt frnt_adj_wt body_adj_wt 
+ 95.        qui sum `v'
+ 96.        assert round(r(sum)-`articles') == 0
+ 97.     }
+ 98.     // restrict to USA
+.     if `us' == 1 {
+ 99.         keep if country_code == "US" & !mi(msa_comb)
+100.     }
+101.     *gen cns_impact_cite_affl_wt = impact_cite_affl_wt if cns == 1
+.     preserve
+102.     gcontract pmid `time' athr_id msa_comb inst_id
+103.     drop _freq
+104.     rename athr_id focal_id
+105.     save ../temp/focal_list_`samp'`suf', replace
+106.     rename focal_id athr_id 
+107.     rename msa_comb coathr_msa
+108.     rename inst_id coathr_inst
+109.     save ../temp/coauthors_`samp'`suf', replace
+110.     restore
+111. 
+.     // Count distinct coauthors (self-excluded) per (focal, year) across all
+.     // of the focal's papers in the year, using the full-authors sample.
+.     preserve
+112.     use ../temp/focal_list_`samp'`suf', clear
+113.     joinby pmid using ../temp/all_athrs_`samp'
+114.     drop if focal_id == athr_id
+115.     gcontract focal_id `time' athr_id
+116.     drop _freq
+117.     gcontract focal_id `time', freq(n_coauthors_yr)
+118.     rename focal_id athr_id
+119.     save ../temp/unique_coauthors_`samp'`suf', replace
+120.     restore
+121. 
+.     if `last' != 1 & `first' != 1 {
+122.         preserve
+123.         use ../temp/focal_list_`samp'`suf',clear
+124.         joinby pmid using ../temp/coauthors_`samp'`suf'
+125.         drop if focal_id == athr_id
+126.         gcontract focal_id `time' msa_comb athr_id coathr_msa
+127.         drop _freq
+128.         keep if coathr_msa == msa_comb
+129.         gcontract focal_id `time', freq(num_coauthors_same_msa)
+130.         rename focal_id athr_id
+131.         save ../temp/coauthor_in_msa_`time'_`samp'`suf', replace
+132.         restore 
+133. 
+.         preserve
+134.         use ../temp/focal_list_`samp'`suf',clear
+135.         joinby pmid using ../temp/coauthors_`samp'`suf'
+136.         drop if focal_id == athr_id
+137.         gcontract focal_id `time' athr_id inst_id msa_comb coathr_inst coa
+> thr_msa
+138.         bys focal_id year: gen num_coauthors = _N
+139.         gen same = inst_id == coathr_inst
+140.         bys focal_id year: gegen num_coauthors_same_inst = total(same) 
+141.         replace same = msa_comb == coathr_msa
+142.         bys focal_id year: gegen num_coauthors_same_msa = total(same) 
+143.         drop _freq
+144.         gcontract focal_id year num_coauthors*
+145.         drop _freq
+146.         save ../output/num_fund_coauthors_`samp'`suf', replace
+147.         restore
+148.     }
+149.     // avg team size = mean coauthors per paper (self-excluded) across the
+.     // focal's unique pmids in the year
+.     bys athr_id pmid : gen athr_pmid_cntr = _n == 1
+150.     bys athr_id `time': gegen avg_team_size = mean(paper_team_size) if ath
+> r_pmid_cntr == 1
+151.     replace avg_team_size = avg_team_size - 1
+152. 
+.     // Paper-position metrics (only informative in the all-authors panel; in 
+> the
+.     // sub_athrs/last panel which_athr == num_athrs by construction, so
+.     // n_last_ppr = ppr_cnt and the others collapse to 0/1).
+.     //   paper_position       : the focal's slot on the paper (1 = first, num
+> _athrs = last)
+.     //   paper_position_rat   : normalized to [0,1] — 1 = last author, 0 = fi
+> rst
+.     //   paper_is_first/last/middle : dummies for role
+.     //   team_size_when_(not)last  : paper team size split by whether the foc
+> al
+.     //                               is last author on that paper
+.     // Only computed on one row per (athr, pmid) so gcollapse (sum) and (mean
+> )
+.     // aggregate paper-counts correctly rather than double-counting affiliati
+> ons.
+.     gen paper_position     = which_athr                              if athr_
+> pmid_cntr == 1
+153.     gen paper_position_rat = which_athr / num_athrs                  if at
+> hr_pmid_cntr == 1
+154.     gen paper_is_first     = (which_athr == 1)                       if at
+> hr_pmid_cntr == 1
+155.     gen paper_is_last      = (which_athr == num_athrs)               if at
+> hr_pmid_cntr == 1
+156.     gen paper_is_middle    = (which_athr > 1 & which_athr < num_athrs) if 
+> athr_pmid_cntr == 1
+157.     gen team_size_last     = paper_team_size if athr_pmid_cntr == 1 & whic
+> h_athr == num_athrs
+158.     gen team_size_notlast  = paper_team_size if athr_pmid_cntr == 1 & whic
+> h_athr <  num_athrs
+159.     preserve
+160.     if "`time'" == "year" {
+161.         gcollapse (sum) ppr_cnt cns affl_wt pat_affl_wt cite_affl_wt pat_a
+> dj_wt pat_wt patent_count body_affl_wt front_affl_wt frnt_adj_wt body_adj_wt 
+> front_only body_only ///
+>                         n_first_ppr=paper_is_first n_middle_ppr=paper_is_midd
+> le n_last_ppr=paper_is_last ///
+>                   (mean) avg_team_size ///
+>                          avg_position=paper_position avg_position_rat=paper_p
+> osition_rat ///
+>                          avg_team_size_last=team_size_last avg_team_size_notl
+> ast=team_size_notlast ///
+>                   (firstnm) field , by(athr_id msa_comb `time')
+162.         if `last' != 1 & `first' != 1 {
+163.             merge m:1 athr_id `time' using ../temp/coauthor_in_msa_`time'_
+> `samp'`suf', assert(1 3) keep(1 3) nogen
+164.         }
+165.         cap gen num_coauthors_same_msa = 0
+166.         replace num_coauthors_same_msa = 0 if mi(num_coauthors_same_msa)
+167.         merge m:1 athr_id `time' using ../temp/unique_coauthors_`samp'`suf
+> ', keep(1 3) nogen
+168.         replace n_coauthors_yr = 0 if mi(n_coauthors_yr)
+169.         merge m:1 athr_id `time' using ../external/year_insts/filled_in_pa
+> nel_all_`time', assert(1 2 3) keep(2 3) nogen
+170.     }
+171.     if "`time'" == "qrtr" {
+172.         gcollapse (sum) ppr_cnt cns affl_wt pat_affl_wt body_affl_wt front
+> _affl_wt cite_affl_wt pat_adj_wt pat_wt patent_count frnt_adj_wt body_adj_wt 
+> front_only body_only ///
+>                         n_first_ppr=paper_is_first n_middle_ppr=paper_is_midd
+> le n_last_ppr=paper_is_last ///
+>                   (mean) avg_team_size ///
+>                          avg_position=paper_position avg_position_rat=paper_p
+> osition_rat ///
+>                          avg_team_size_last=team_size_last avg_team_size_notl
+> ast=team_size_notlast ///
+>                   (firstnm) field , by(athr_id msa_comb `time' year)
+173.         if `last' != 1  & `first' != 1 {
+174.             merge m:1 athr_id `time' using ../temp/coauthor_in_msa_`time'_
+> `samp'`suf', assert(1 3) keep(1 3) nogen
+175.         }
+176.         cap gen num_coauthors_same_msa = 0
+177.         replace num_coauthors_same_msa = 0 if mi(num_coauthors_same_msa)
+178.         merge m:1 athr_id `time' using ../temp/unique_coauthors_`samp'`suf
+> ', keep(1 3) nogen
+179.         replace n_coauthors_yr = 0 if mi(n_coauthors_yr)
+180.         // make into balanced panel
+.         merge m:1 athr_id `time' using ../external/year_insts/filled_in_panel
+> _all_`time', assert(1 2 3) keep(2 3) nogen
+181.     }
+182.     bys athr_id `time': gen name_id = _n == 1
+183.     bys `time': gegen tot_authors = total(name_id)
+184.     drop name_id
+185.     bys athr_id msa_comb `time': gen name_id = _n == 1
+186.     bys msa_comb `time': gegen msa_size = total(name_id)
+187.     replace msa_size = msa_size - 1
+188.     gen cluster_shr = msa_size/tot_authors
+189.     drop name_id
+190. 
+.     gen top_15 = !mi(affl_wt)
+191.     bys athr_id year: gegen has_top_15 = max(top_15)
+192.     bys athr_id msa_comb `time': gen name_id = _n == 1 if has_top_15 == 1
+193.     bys msa_comb `time': gegen unbal_msa_size = total(name_id)
+194.     replace unbal_msa_size = unbal_msa_size - 1 if has_top_15 == 1
+195.     drop if mi(cite_affl_wt) | mi(affl_wt)
+196. 
+.     *merge 1:1 athr_id `time' using ../temp/athr_concept_`time'_`samp', asser
+> t(1 2 3) keep(1 3) nogen
+.     *merge 1:1 athr_id `time' using ../temp/athr_mesh_`time'_`samp', assert(1
+>  2 3) keep(1 3) nogen
+.     *merge 1:1 athr_id `time' using ../temp/athr_qualifier_`time'_`samp', ass
+> ert(1 2 3) keep(1 3) nogen
+. /*    foreach var in term1 term2 gen_mesh1 gen_mesh2 qualifier_name1 qualifie
+> r_name2 {
+>         bys athr_id (`time') : replace `var' = `var'[_n-1] if mi(`var') & !mi
+> (`var'[_n-1])
+>     }*/
+.     save ../output/athr_panel_full_comb_`time'`suf'_`samp', replace
+197.     restore
+198.     preserve
+199.     if "`time'" == "year" {
+200.         gcollapse (sum) ppr_cnt cns affl_wt pat_affl_wt body_affl_wt front
+> _affl_wt cite_affl_wt pat_adj_wt pat_wt patent_count front_only body_only frn
+> t_adj_wt body_adj_wt ///
+>                         n_first_ppr=paper_is_first n_middle_ppr=paper_is_midd
+> le n_last_ppr=paper_is_last ///
+>                   (mean) avg_team_size ///
+>                          avg_position=paper_position avg_position_rat=paper_p
+> osition_rat ///
+>                          avg_team_size_last=team_size_last avg_team_size_notl
+> ast=team_size_notlast ///
+>                   (firstnm) field , by(athr_id msacode msa_comb  `time')
+201.         if `last' != 1 & `first' != 1 {
+202.             merge m:1 athr_id `time' using ../temp/coauthor_in_msa_`time'_
+> `samp'`suf', assert(1 3) keep(1 3) nogen
+203.         }
+204.         cap gen num_coauthors_same_msa = 0
+205.         replace num_coauthors_same_msa = 0 if mi(num_coauthors_same_msa)
+206.         merge m:1 athr_id `time' using ../temp/unique_coauthors_`samp'`suf
+> ', keep(1 3) nogen
+207.         replace n_coauthors_yr = 0 if mi(n_coauthors_yr)
+208.         merge m:1 athr_id `time' using ../external/year_insts/filled_in_pa
+> nel_all_`time', assert(1 2 3) keep(2 3) nogen
+209.     }
+210.     if "`time'" == "qrtr" {
+211.         gcollapse (sum) ppr_cnt cns affl_wt pat_affl_wt body_affl_wt front
+> _affl_wt cite_affl_wt frnt_adj_wt body_adj_wt body_only front_only pat_adj_wt
+>  pat_wt patent_count ///
+>                         n_first_ppr=paper_is_first n_middle_ppr=paper_is_midd
+> le n_last_ppr=paper_is_last ///
+>                   (mean) avg_team_size ///
+>                          avg_position=paper_position avg_position_rat=paper_p
+> osition_rat ///
+>                          avg_team_size_last=team_size_last avg_team_size_notl
+> ast=team_size_notlast ///
+>                   (firstnm) field , by(athr_id msacode msa_comb  `time' year)
+212.         if `last' != 1 & `first' != 1 {
+213.             merge m:1 athr_id `time' using ../temp/coauthor_in_msa_`time'_
+> `samp'`suf', assert(1 3) keep(1 3) nogen
+214.         }
+215.         cap gen num_coauthors_same_msa = 0
+216.         replace num_coauthors_same_msa = 0 if mi(num_coauthors_same_msa)
+217.         merge m:1 athr_id `time' using ../temp/unique_coauthors_`samp'`suf
+> ', keep(1 3) nogen
+218.         replace n_coauthors_yr = 0 if mi(n_coauthors_yr)
+219.         // make into balanced panel
+.         merge m:1 athr_id `time' using ../external/year_insts/filled_in_panel
+> _all_`time', assert(1 2 3) keep(2 3) nogen
+220.     }
+221.     bys athr_id `time': gen name_id = _n == 1
+222.     bys `time': gegen tot_authors = total(name_id)
+223.     drop name_id
+224.     bys athr_id msa_comb `time': gen name_id = _n == 1
+225.     bys msa_comb `time': gegen msa_size = total(name_id)
+226.     replace msa_size = msa_size - 1
+227.     gen cluster_shr = msa_size/tot_authors
+228.     drop name_id
+229. 
+.     gen top_15 = !mi(affl_wt)
+230.     bys athr_id year: gegen has_top_15 = max(top_15)
+231.     bys athr_id msa_comb `time': gen name_id = _n == 1 if has_top_15 == 1
+232.     bys msa_comb `time': gegen unbal_msa_size = total(name_id)
+233.     replace unbal_msa_size = unbal_msa_size - 1 if has_top_15 == 1
+234.     drop if mi(cite_affl_wt) | mi(affl_wt)
+235.     *merge 1:1 athr_id `time' using ../temp/athr_concept_`time'_`samp', as
+> sert(1 2 3) keep(1 3) nogen
+.    * merge 1:1 athr_id `time' using ../temp/athr_mesh_`time'_`samp', assert(1
+>  2 3) keep(1 3) nogen
+.    * merge 1:1 athr_id `time' using ../temp/athr_qualifier_`time'_`samp', ass
+> ert(1 2 3) keep(1 3) nogen
+. /*    foreach var in term1 term2 gen_mesh1 gen_mesh2 qualifier_name1 qualifie
+> r_name2 {
+>         bys athr_id (`time') : replace `var' = `var'[_n-1] if mi(`var') & !mi
+> (`var'[_n-1])
+>     }*/
+.     save ../output/athr_panel_full_`time'`suf'_`samp', replace
+236.     restore
+237. end
+
+. 
+. program merge_ipeds
+  1.     syntax, time(string) samp(str) [, last(int 0) first(int 0) firstlast(i
+> nt 0) second(int 0) us(int 0)]
+  2.     local suf = "" 
+  3.     import delimited ../external/ipeds/ipeds_openalex.csv, clear 
+  4.     contract ipeds_id inst_id type
+  5.     drop _freq
+  6.     drop if mi(inst_id)
+  7.     merge 1:1 ipeds_id using ../external/ipeds/ipeds_clean, assert(2 3) ke
+> ep(3) nogen
+  8.     contract inst_id type control
+  9.     drop _freq
+ 10.     save ../temp/ipeds_inst_id, replace
+ 11.     if `last' == 1 local suf = "_last" 
+ 12.     if `firstlast' == 1 local suf = "_firstlast" 
+ 13.     if `second' == 1 local suf = "_second" 
+ 14.     if `first' == 1 local suf = "_first" 
+ 15. 
+.     use ../output/athr_panel_full_`time'`suf'_`samp',clear 
+ 16.     merge m:1 inst_id using ../temp/ipeds_inst_id, assert(1 2 3) keep(3) n
+> ogen 
+ 17.     gen public = control == 1
+ 18.     save ../output/athr_panel_full_`time'`suf'_`samp'_r1_r2, replace
+ 19.     keep if public == 1
+ 20.     save ../output/athr_panel_full_`time'`suf'_`samp'_r1_r2_public, replac
+> e
+ 21. end
+
+. **k 
+. main
+(encoding automatically selected: ISO-8859-2)
+(2 vars, 5,287,996 obs)
+file ../temp/clusters.dta saved
+file ../temp/all_athrs_all_jrnls_no_clin.dta saved
+file ../temp/paper_team_size_all_jrnls_no_clin.dta saved
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                        15,290,279  
+    -----------------------------------------
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                        15,290,279  
+    -----------------------------------------
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                        15,290,279  
+    -----------------------------------------
+(0 real changes made)
+(0 real changes made)
+(0 real changes made)
+(0 real changes made)
+(0 real changes made)
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+    avg_cite | 15,290,279    2.375229    10.62618          0   17930.17
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+     avg_pat | 15,290,279    .0429999     .827082          0   1055.595
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+    avg_frnt | 15,290,279    .0266486    .3352536          0    318.054
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+    avg_body | 15,290,279     .012176    .5298959          0   637.1081
+N = 15,290,279; 15,290,279 balanced groups of size 1
+(10,899,952 observations deleted)
+file ../temp/focal_list_all_jrnls_no_clin_last.dta saved
+file ../temp/coauthors_all_jrnls_no_clin_last.dta saved
+(4,390,327 observations deleted)
+file ../temp/unique_coauthors_all_jrnls_no_clin_last.dta saved
+(4,390,327 real changes made)
+(4,390,327 missing values generated)
+(0 real changes made)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                       379,567
+        from master                   379,567  
+        from using                          0  
+
+    Matched                         2,384,619  
+    -----------------------------------------
+(379,567 real changes made)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                   167,058,507
+        from master                         0  
+        from using                167,058,507  
+
+    Matched                         2,764,186  
+    -----------------------------------------
+(169,822,693 real changes made)
+(167,058,507 missing values generated)
+(2,764,186 real changes made)
+(167,058,507 observations deleted)
+file ../output/athr_panel_full_comb_year_last_all_jrnls_no_clin.dta saved
+(0 real changes made)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                       379,567
+        from master                   379,567  
+        from using                          0  
+
+    Matched                         2,384,619  
+    -----------------------------------------
+(379,567 real changes made)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                   167,058,507
+        from master                         0  
+        from using                167,058,507  
+
+    Matched                         2,764,186  
+    -----------------------------------------
+(169,822,693 real changes made)
+(167,058,507 missing values generated)
+(2,764,186 real changes made)
+(167,058,507 observations deleted)
+file ../output/athr_panel_full_year_last_all_jrnls_no_clin.dta saved
+(encoding automatically selected: ISO-8859-1)
+(4 vars, 266 obs)
+(4 observations deleted)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                               262  
+    -----------------------------------------
+file ../temp/ipeds_inst_id.dta saved
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                         1,552,451  
+    -----------------------------------------
+file ../output/athr_panel_full_year_last_all_jrnls_no_clin_r1_r2.dta saved
+(634,015 observations deleted)
+file ../output/athr_panel_full_year_last_all_jrnls_no_clin_r1_r2_public.dta
+    saved
+(encoding automatically selected: ISO-8859-2)
+(2 vars, 5,287,996 obs)
+file ../temp/clusters.dta saved
+file ../temp/all_athrs_all_jrnls_no_clin.dta saved
+file ../temp/paper_team_size_all_jrnls_no_clin.dta saved
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                        67,454,871  
+    -----------------------------------------
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                        67,454,871  
+    -----------------------------------------
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                        67,454,871  
+    -----------------------------------------
+(25,955,860 real changes made)
+(50,224,887 real changes made, 50,224,887 to missing)
+(50,224,887 real changes made, 50,224,887 to missing)
+(50,224,887 real changes made, 50,224,887 to missing)
+(50,224,887 real changes made, 50,224,887 to missing)
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+    avg_cite | 17,229,984    2.344048    10.33406          0   17930.17
+(50,224,887 missing values generated)
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+     avg_pat | 17,229,984    .0413926    .8167208          0   1055.595
+(50,224,887 missing values generated)
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+    avg_frnt | 17,229,984    .0255511    .3276597          0    318.054
+(50,224,887 missing values generated)
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+    avg_body | 17,229,984     .011803    .5238511          0   637.1081
+(50,224,887 missing values generated)
+N = 67,454,871; 17,229,984 unbalanced groups of sizes 1 to 100
+(49,821,039 observations deleted)
+file ../temp/focal_list_all_jrnls_no_clin.dta saved
+file ../temp/coauthors_all_jrnls_no_clin.dta saved
+(17,633,832 observations deleted)
+file ../temp/unique_coauthors_all_jrnls_no_clin.dta saved
+(17,633,832 observations deleted)
+(24,924,170 observations deleted)
+file ../temp/coauthor_in_msa_year_all_jrnls_no_clin.dta saved
+(17,633,832 observations deleted)
+(5,139,484 real changes made)
+file ../output/num_fund_coauthors_all_jrnls_no_clin.dta saved
+(17,633,832 real changes made)
+(12,742,503 missing values generated)
+(4,891,329 missing values generated)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                     1,778,206
+        from master                 1,778,206  
+        from using                          0  
+
+    Matched                         7,035,551  
+    -----------------------------------------
+(1,778,206 real changes made)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                       265,157
+        from master                   265,157  
+        from using                          0  
+
+    Matched                         8,548,600  
+    -----------------------------------------
+(265,157 real changes made)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                   161,008,936
+        from master                         0  
+        from using                161,008,936  
+
+    Matched                         8,813,757  
+    -----------------------------------------
+(169,822,693 real changes made)
+(161,008,936 missing values generated)
+(8,813,757 real changes made)
+(161,008,936 observations deleted)
+file ../output/athr_panel_full_comb_year_all_jrnls_no_clin.dta saved
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                     1,778,206
+        from master                 1,778,206  
+        from using                          0  
+
+    Matched                         7,035,551  
+    -----------------------------------------
+(1,778,206 real changes made)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                       265,157
+        from master                   265,157  
+        from using                          0  
+
+    Matched                         8,548,600  
+    -----------------------------------------
+(265,157 real changes made)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                   161,008,936
+        from master                         0  
+        from using                161,008,936  
+
+    Matched                         8,813,757  
+    -----------------------------------------
+(169,822,693 real changes made)
+(161,008,936 missing values generated)
+(8,813,757 real changes made)
+(161,008,936 observations deleted)
+file ../output/athr_panel_full_year_all_jrnls_no_clin.dta saved
+(encoding automatically selected: ISO-8859-1)
+(4 vars, 266 obs)
+(4 observations deleted)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                               262  
+    -----------------------------------------
+file ../temp/ipeds_inst_id.dta saved
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                         4,773,577  
+    -----------------------------------------
+file ../output/athr_panel_full_year_all_jrnls_no_clin_r1_r2.dta saved
+(2,000,814 observations deleted)
+file ../output/athr_panel_full_year_all_jrnls_no_clin_r1_r2_public.dta saved
+
+. 
+end of do-file
+
+
+. [?1l>

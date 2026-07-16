@@ -10,6 +10,8 @@ program main
    *raw_plots
    did
    robustness
+   balance_check
+   placebo_timing
    output_tables
    event_study
    *uni_fes
@@ -461,11 +463,175 @@ program robustness
     }
 end
 
+program balance_check
+    // Pre-treatment (2010-2013) balance on outcome levels for treated vs matched controls.
+    // Weighted mean_t, mean_c, diff, SE cluster(mkt) — matches main DiD spec weighting/clustering.
+    use ../external/merged/matched_uni_category_panel, clear
+    gegen uni_mkt = group(uni_id mkt)
+    bys uni_mkt : egen min_year = min(year)
+    bys uni_mkt : egen max_year = max(year)
+    keep if min_year < 2014 & max_year > 2014
+    keep if inrange(year, 2010, 2013)
+
+    cap mat drop balance
+    foreach var in avg_log_price log_raw_qty log_raw_spend {
+        qui sum `var' if treated == 1 [aw=spend_2013]
+        local m_t = r(mean)
+        qui sum `var' if treated == 0 [aw=spend_2013]
+        local m_c = r(mean)
+        qui reg `var' treated [aw=spend_2013], vce(cluster mkt)
+        local diff = _b[treated]
+        local se   = _se[treated]
+        local t    = `diff' / `se'
+        local N    = e(N)
+        mat balance = nullmat(balance) \ (`m_t', `m_c', `diff', `se', `t', `N')
+    }
+    mat colnames balance = mean_trt mean_ctrl diff se t N
+    mat rownames balance = avg_log_price log_raw_qty log_raw_spend
+end
+
+program placebo_timing
+    // Falsification: restrict to pre-period (2010-2013) and shift "treatment" to 2012.
+    // Same FE/weight/cluster structure as main DiD (baseline spec). Coef should be ~0.
+    use ../external/merged/matched_uni_category_panel, clear
+    gegen uni_mkt = group(uni_id mkt)
+    bys uni_mkt : egen min_year = min(year)
+    bys uni_mkt : egen max_year = max(year)
+    keep if min_year < 2014 & max_year > 2014
+    keep if inrange(year, 2010, 2013)
+    gen post_pl = (year >= 2012)
+    gen posttreat_pl = treated * post_pl
+
+    cap mat drop placebo_timing
+    foreach var in avg_log_price log_raw_qty log_raw_spend {
+        reghdfe `var' posttreat_pl [aw=spend_2013], cluster(mkt) absorb(year uni_id mkt)
+        mat placebo_timing = nullmat(placebo_timing) \ (_b[posttreat_pl], _se[posttreat_pl], e(N), e(r2))
+    }
+    mat colnames placebo_timing = b se N r2
+    mat rownames placebo_timing = avg_log_price log_raw_qty log_raw_spend
+end
+
 program output_tables
-    foreach tab in robust_avg_log_price robust_log_raw_qty robust_log_raw_spend pooled_did {
+    foreach tab in robust_avg_log_price robust_log_raw_qty robust_log_raw_spend pooled_did balance placebo_timing {
         qui matrix_to_txt, saving("../output/tables/`tab'.txt") matrix(`tab') ///
             title(<tab:`tab'>) format(%20.4f) replace
     }
+    merger_validity_tex
+end
+
+program merger_validity_tex
+    // Merger-validity .tex table. Consolidates:
+    //   (a) pre-treatment balance (`balance' matrix from balance_check)
+    //   (b) placebo-timing DiD at fake 2012 (`placebo_timing' matrix)
+    //   (c) real 2014 DiD baseline (`pooled_did' matrix, cols 1/4/7 = price/qty/spend)
+    // Uses booktabs + threeparttable to match paper style. Reads matrices from
+    // memory — must run after balance_check + placebo_timing + robustness.
+    local texfile "../output/tables/merger_validity.tex"
+    cap file close mv
+    file open mv using "`texfile'", write replace
+
+    // Column indices in pooled_did (rows 1=b, 2=se, 3=N):
+    //   price_base = 1, qty_base = 4, spend_base = 7
+    local outs "avg_log_price log_raw_qty log_raw_spend"
+    local lbl_avg_log_price "Avg.\ log price"
+    local lbl_log_raw_qty   "Log quantity"
+    local lbl_log_raw_spend "Log spending"
+
+    // Real 2014 (baseline pooled DiD)
+    local i = 0
+    foreach y of local outs {
+        local ++i
+        local col = cond("`y'" == "avg_log_price", 1, cond("`y'" == "log_raw_qty", 4, 7))
+        local b_real_`y' = pooled_did[1, `col']
+        local s_real_`y' = pooled_did[2, `col']
+        // Placebo 2012 (row = position in placebo_timing)
+        local b_pl_`y' = placebo_timing[`i', 1]
+        local s_pl_`y' = placebo_timing[`i', 2]
+        // Balance (pre-period diff)
+        local m_t_`y'  = balance[`i', 1]
+        local m_c_`y'  = balance[`i', 2]
+        local d_`y'    = balance[`i', 3]
+        local sd_`y'   = balance[`i', 4]
+    }
+
+    file write mv "% First-stage merger validity: 2010--2013 balance + placebo-timing" _n
+    file write mv "% DiD (fake treatment = 2012) vs real DiD (treatment = 2014, baseline spec)." _n
+    file write mv "\begin{table}[htbp]" _n
+    file write mv "\centering" _n
+    file write mv "\caption{First-stage merger validity: pre-treatment balance and placebo-timing DiD}" _n
+    file write mv "\label{tab:merger_validity_first_stage}" _n
+    file write mv "\begin{threeparttable}" _n
+    file write mv "\begin{tabular}{lccccccc}" _n
+    file write mv "\toprule" _n
+    file write mv " & \multicolumn{3}{c}{Pre-treatment balance (2010--2013)} & \multicolumn{2}{c}{Placebo 2012} & \multicolumn{2}{c}{Real 2014} \\" _n
+    file write mv "\cmidrule(lr){2-4} \cmidrule(lr){5-6} \cmidrule(lr){7-8}" _n
+    file write mv " & Trt.\ mean & Ctrl.\ mean & Diff & \(\hat{\beta}\) & SE & \(\hat{\beta}\) & SE \\" _n
+    file write mv "\midrule" _n
+
+    foreach y of local outs {
+        if "`y'" == "avg_log_price" local lbl "Avg.\ log price"
+        if "`y'" == "log_raw_qty"   local lbl "Log quantity"
+        if "`y'" == "log_raw_spend" local lbl "Log spending"
+
+        // Stars on balance diff (t-test from se)
+        local t_bal = .
+        if !mi(`d_`y'') & !mi(`sd_`y'') & `sd_`y'' > 0 {
+            local t_bal = abs(`d_`y'') / `sd_`y''
+        }
+        local star_bal ""
+        if !mi(`t_bal') & `t_bal' >= 1.645 local star_bal "\(^{*}\)"
+        if !mi(`t_bal') & `t_bal' >= 1.96  local star_bal "\(^{**}\)"
+        if !mi(`t_bal') & `t_bal' >= 2.576 local star_bal "\(^{***}\)"
+
+        // Stars on placebo
+        local t_pl = .
+        if !mi(`b_pl_`y'') & !mi(`s_pl_`y'') & `s_pl_`y'' > 0 {
+            local t_pl = abs(`b_pl_`y'') / `s_pl_`y''
+        }
+        local star_pl ""
+        if !mi(`t_pl') & `t_pl' >= 1.645 local star_pl "\(^{*}\)"
+        if !mi(`t_pl') & `t_pl' >= 1.96  local star_pl "\(^{**}\)"
+        if !mi(`t_pl') & `t_pl' >= 2.576 local star_pl "\(^{***}\)"
+
+        // Stars on real
+        local t_real = .
+        if !mi(`b_real_`y'') & !mi(`s_real_`y'') & `s_real_`y'' > 0 {
+            local t_real = abs(`b_real_`y'') / `s_real_`y''
+        }
+        local star_real ""
+        if !mi(`t_real') & `t_real' >= 1.645 local star_real "\(^{*}\)"
+        if !mi(`t_real') & `t_real' >= 1.96  local star_real "\(^{**}\)"
+        if !mi(`t_real') & `t_real' >= 2.576 local star_real "\(^{***}\)"
+
+        local mt : display %7.3f `m_t_`y''
+        local mc : display %7.3f `m_c_`y''
+        local d  : display %7.3f `d_`y''
+        local bp : display %7.3f `b_pl_`y''
+        local sp : display %7.3f `s_pl_`y''
+        local br : display %7.3f `b_real_`y''
+        local sr : display %7.3f `s_real_`y''
+
+        file write mv "`lbl' & `mt' & `mc' & `d'`star_bal' & `bp'`star_pl' & (`sp') & `br'`star_real' & (`sr') \\" _n
+    }
+
+    file write mv "\bottomrule" _n
+    file write mv "\end{tabular}" _n
+    file write mv "\begin{tablenotes}[flushleft]\footnotesize" _n
+    file write mv "\item Sample: matched treated/control markets, pooled across universities." _n
+    file write mv "      Balance columns report weighted means (\(\texttt{[aw=spend\_2013]}\)) of the outcome" _n
+    file write mv "      over 2010--2013 in treated and control markets, and their difference; SE from" _n
+    file write mv "      a regression of the outcome on \(\texttt{treated}\), weighted and clustered by market." _n
+    file write mv "      Placebo 2012 is a DiD on the pre-treatment panel (2010--2013) with fake" _n
+    file write mv "      post\(_t = \mathbb{1}\{t \ge 2012\}\); Real 2014 is the baseline pooled DiD on the" _n
+    file write mv "      full panel with post\(_t = \mathbb{1}\{t \ge 2014\}\). Both DiD specs use" _n
+    file write mv "      \texttt{reghdfe} with author\(\times\)market weights, year, university, and market fixed" _n
+    file write mv "      effects, and SE clustered by market." _n
+    file write mv "\item Significance: \(^{*}\) \(p<0.10\), \(^{**}\) \(p<0.05\), \(^{***}\) \(p<0.01\)." _n
+    file write mv "\end{tablenotes}" _n
+    file write mv "\end{threeparttable}" _n
+    file write mv "\end{table}" _n
+    file close mv
+    di as text "wrote `texfile'"
 end
 
 program event_study

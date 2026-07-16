@@ -7,10 +7,10 @@ pause on
 set seed 8975
 
 program main
-    foreach s in top_jrnls all_jrnls_no_clin top_jrnls_no_clin { //all_jrnls
+    foreach s in top_jrnls { //} all_jrnls_no_clin top_jrnls top_jrnls_no_clin { 
         local t year
-        *make_panel, time(`t') last(1) samp(`s') us(1)
-        *merge_ipeds, time(`t') last(1) samp(`s') us(1)
+        make_panel, time(`t') last(1) samp(`s') us(1)
+        merge_ipeds, time(`t') last(1) samp(`s') us(1)
         make_panel, time(`t') samp(`s') us(1)
         merge_ipeds, time(`t') samp(`s') us(1)
     }
@@ -194,9 +194,38 @@ program make_panel
     bys athr_id pmid : gen athr_pmid_cntr = _n == 1
     bys athr_id `time': gegen avg_team_size = mean(paper_team_size) if athr_pmid_cntr == 1
     replace avg_team_size = avg_team_size - 1
+
+    // Paper-position metrics (only informative in the all-authors panel; in the
+    // sub_athrs/last panel which_athr == num_athrs by construction, so
+    // n_last_ppr = ppr_cnt and the others collapse to 0/1).
+    //   paper_position       : the focal's slot on the paper (1 = first, num_athrs = last)
+    //   paper_position_rat   : normalized to [0,1] — 1 = last author, 0 = first
+    //   paper_is_first/last/middle : dummies for role
+    //   team_size_when_(not)last  : paper team size split by whether the focal
+    //                               is last author on that paper
+    // Only computed on one row per (athr, pmid) so gcollapse (sum) and (mean)
+    // aggregate paper-counts correctly rather than double-counting affiliations.
+    gen paper_position     = which_athr                              if athr_pmid_cntr == 1
+    gen paper_position_rat = which_athr / num_athrs                  if athr_pmid_cntr == 1
+    // Solo-author papers (num_athrs == 1): the focal is both position 1 and
+    // position N. Convention: count them as "last / senior" only (the PI is
+    // senior on their own solo work) so n_first + n_middle + n_last = ppr_cnt.
+    gen paper_is_first     = (which_athr == 1) & (num_athrs > 1)     if athr_pmid_cntr == 1
+    gen paper_is_last      = (which_athr == num_athrs)               if athr_pmid_cntr == 1
+    gen paper_is_middle    = (which_athr > 1) & (which_athr < num_athrs) if athr_pmid_cntr == 1
+    gen paper_is_solo      = (num_athrs == 1)                        if athr_pmid_cntr == 1
+    // team-size split: last includes solo (denominator = 1). notlast is
+    // strictly middle + non-senior first — well defined only when num_athrs > 1.
+    gen team_size_last     = paper_team_size if athr_pmid_cntr == 1 & which_athr == num_athrs
+    gen team_size_notlast  = paper_team_size if athr_pmid_cntr == 1 & which_athr <  num_athrs & num_athrs > 1
     preserve
     if "`time'" == "year" {
-        gcollapse (sum) ppr_cnt cns affl_wt pat_affl_wt cite_affl_wt pat_adj_wt pat_wt patent_count body_affl_wt front_affl_wt frnt_adj_wt body_adj_wt front_only body_only (mean) avg_team_size  (firstnm) field , by(athr_id msa_comb `time')
+        gcollapse (sum) ppr_cnt cns affl_wt pat_affl_wt cite_affl_wt pat_adj_wt pat_wt patent_count body_affl_wt front_affl_wt frnt_adj_wt body_adj_wt front_only body_only ///
+                        n_first_ppr=paper_is_first n_middle_ppr=paper_is_middle n_last_ppr=paper_is_last n_solo_ppr=paper_is_solo ///
+                  (mean) avg_team_size ///
+                         avg_position=paper_position avg_position_rat=paper_position_rat ///
+                         avg_team_size_last=team_size_last avg_team_size_notlast=team_size_notlast ///
+                  (firstnm) field , by(athr_id msa_comb `time')
         if `last' != 1 & `first' != 1 {
             merge m:1 athr_id `time' using ../temp/coauthor_in_msa_`time'_`samp'`suf', assert(1 3) keep(1 3) nogen
         }
@@ -207,7 +236,12 @@ program make_panel
         merge m:1 athr_id `time' using ../external/year_insts/filled_in_panel_all_`time', assert(1 2 3) keep(2 3) nogen
     }
     if "`time'" == "qrtr" {
-        gcollapse (sum) ppr_cnt cns affl_wt pat_affl_wt body_affl_wt front_affl_wt cite_affl_wt pat_adj_wt pat_wt patent_count frnt_adj_wt body_adj_wt front_only body_only (mean) avg_team_size  (firstnm) field , by(athr_id msa_comb `time' year)
+        gcollapse (sum) ppr_cnt cns affl_wt pat_affl_wt body_affl_wt front_affl_wt cite_affl_wt pat_adj_wt pat_wt patent_count frnt_adj_wt body_adj_wt front_only body_only ///
+                        n_first_ppr=paper_is_first n_middle_ppr=paper_is_middle n_last_ppr=paper_is_last n_solo_ppr=paper_is_solo ///
+                  (mean) avg_team_size ///
+                         avg_position=paper_position avg_position_rat=paper_position_rat ///
+                         avg_team_size_last=team_size_last avg_team_size_notlast=team_size_notlast ///
+                  (firstnm) field , by(athr_id msa_comb `time' year)
         if `last' != 1  & `first' != 1 {
             merge m:1 athr_id `time' using ../temp/coauthor_in_msa_`time'_`samp'`suf', assert(1 3) keep(1 3) nogen
         }
@@ -244,7 +278,12 @@ program make_panel
     restore
     preserve
     if "`time'" == "year" {
-        gcollapse (sum) ppr_cnt cns affl_wt pat_affl_wt body_affl_wt front_affl_wt cite_affl_wt pat_adj_wt pat_wt patent_count front_only body_only frnt_adj_wt body_adj_wt (mean) avg_team_size  (firstnm) field , by(athr_id msacode msa_comb  `time')
+        gcollapse (sum) ppr_cnt cns affl_wt pat_affl_wt body_affl_wt front_affl_wt cite_affl_wt pat_adj_wt pat_wt patent_count front_only body_only frnt_adj_wt body_adj_wt ///
+                        n_first_ppr=paper_is_first n_middle_ppr=paper_is_middle n_last_ppr=paper_is_last n_solo_ppr=paper_is_solo ///
+                  (mean) avg_team_size ///
+                         avg_position=paper_position avg_position_rat=paper_position_rat ///
+                         avg_team_size_last=team_size_last avg_team_size_notlast=team_size_notlast ///
+                  (firstnm) field , by(athr_id msacode msa_comb  `time')
         if `last' != 1 & `first' != 1 {
             merge m:1 athr_id `time' using ../temp/coauthor_in_msa_`time'_`samp'`suf', assert(1 3) keep(1 3) nogen
         }
@@ -255,7 +294,12 @@ program make_panel
         merge m:1 athr_id `time' using ../external/year_insts/filled_in_panel_all_`time', assert(1 2 3) keep(2 3) nogen
     }
     if "`time'" == "qrtr" {
-        gcollapse (sum) ppr_cnt cns affl_wt pat_affl_wt body_affl_wt front_affl_wt cite_affl_wt frnt_adj_wt body_adj_wt body_only front_only pat_adj_wt pat_wt patent_count (mean) avg_team_size  (firstnm) field , by(athr_id msacode msa_comb  `time' year)
+        gcollapse (sum) ppr_cnt cns affl_wt pat_affl_wt body_affl_wt front_affl_wt cite_affl_wt frnt_adj_wt body_adj_wt body_only front_only pat_adj_wt pat_wt patent_count ///
+                        n_first_ppr=paper_is_first n_middle_ppr=paper_is_middle n_last_ppr=paper_is_last n_solo_ppr=paper_is_solo ///
+                  (mean) avg_team_size ///
+                         avg_position=paper_position avg_position_rat=paper_position_rat ///
+                         avg_team_size_last=team_size_last avg_team_size_notlast=team_size_notlast ///
+                  (firstnm) field , by(athr_id msacode msa_comb  `time' year)
         if `last' != 1 & `first' != 1 {
             merge m:1 athr_id `time' using ../temp/coauthor_in_msa_`time'_`samp'`suf', assert(1 3) keep(1 3) nogen
         }

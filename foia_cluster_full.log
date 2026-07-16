@@ -1,0 +1,96 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 120,000; see help set_maxvar.
+
+. do /tmp/foia_cluster_full.do 
+
+. * All 213 FOIA PIs + cluster assignment
+. use /n/home02/cxu75/sci_eq/analysis/reduced_form/external/real_exposure/athr_
+> exposure_hc, clear
+
+. drop if mi(athr_id)
+(0 observations deleted)
+
+. merge 1:1 athr_id using /n/home02/cxu75/sci_eq/analysis/reduced_form/temp/ath
+> r_cluster30, keep(1 3)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             8
+        from master                         8  (_merge==1)
+        from using                          0  (_merge==2)
+
+    Matched                               205  (_merge==3)
+    -----------------------------------------
+
+. di as text "FOIA PIs total (real_exposure): " _N
+FOIA PIs total (real_exposure): 213
+
+. count if _merge == 3
+  205
+
+. di as text "  ... with cluster_30: " r(N)
+  ... with cluster_30: 205
+
+. count if _merge == 1
+  8
+
+. di as text "  ... without cluster_30: " r(N)
+  ... without cluster_30: 8
+
+. di as text ""
+
+
+. di as text "FOIA PIs by cluster (all FOIA universe):"
+FOIA PIs by cluster (all FOIA universe):
+
+. tab cluster_30, missing
+
+ cluster_30 |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          0 |          4        1.88        1.88
+          1 |         39       18.31       20.19
+          2 |          1        0.47       20.66
+          3 |         19        8.92       29.58
+          5 |          6        2.82       32.39
+          7 |         45       21.13       53.52
+          8 |          2        0.94       54.46
+         10 |         24       11.27       65.73
+         13 |          2        0.94       66.67
+         14 |          9        4.23       70.89
+         15 |          5        2.35       73.24
+         17 |          5        2.35       75.59
+         18 |          1        0.47       76.06
+         19 |         14        6.57       82.63
+         20 |          6        2.82       85.45
+         22 |          7        3.29       88.73
+         23 |          1        0.47       89.20
+         24 |          1        0.47       89.67
+         25 |          7        3.29       92.96
+         26 |          5        2.35       95.31
+         28 |          2        0.94       96.24
+          . |          8        3.76      100.00
+------------+-----------------------------------
+      Total |        213      100.00
+
+. 
+end of do-file

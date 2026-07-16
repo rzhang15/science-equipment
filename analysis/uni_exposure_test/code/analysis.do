@@ -6,40 +6,73 @@ set scheme modern
 preliminaries
 version 17
 
+* ============================================================
+*  ONE PLACE TO SWITCH EXPOSURE MEASURE
+*  EXPOSURE_VERSION : hc | all | treated_hc
+*    hc         : EB-shrunk DiD price coefs, hi-conf treated + hi-conf control
+*                 markets in the pre-2013 share denominator. (Default.)
+*    all        : raw (un-shrunk) DiD price coefs, hi-conf treated + hi-conf
+*                 control markets in the denominator.
+*    treated_hc : EB-shrunk DiD price coefs, denominator restricted to hi-conf
+*                 treated markets only (share concentrated on treated exposure).
+*  Selects ../external/betas/{did_coefs_eb_price | did_coefs_price}.dta and
+*  optionally re-normalizes s_jm inside build_panel.
+* ============================================================
+global EXPOSURE_VERSION "hc"
+
 program main
    build_panel
    did
+   ppml_did
    binscatter_did
    event_study
    build_uc_panel
    uc_did
+   ppml_uc_did
    binscatter_uc_did
    hi_ctrl_uc_es
    output_tables
 end
 
 program build_panel
+    // Resolve beta source + share-denominator restriction from EXPOSURE_VERSION.
+    //   hc         : did_coefs_eb_price, all hi-conf mkts in denominator
+    //   all        : did_coefs_price   , all hi-conf mkts in denominator
+    //   treated_hc : did_coefs_eb_price, only hi-conf TREATED mkts in denominator
+    local beta_file "did_coefs_eb_price"
+    if "$EXPOSURE_VERSION" == "all"        local beta_file "did_coefs_price"
+    local beta_var "b_eb"
+    if "$EXPOSURE_VERSION" == "all"        local beta_var "b"
+    local treated_only 0
+    if "$EXPOSURE_VERSION" == "treated_hc" local treated_only 1
+    di as text "build_panel using EXPOSURE_VERSION=$EXPOSURE_VERSION beta=`beta_file' (`beta_var'), treated_only=`treated_only'"
+
     use ../external/samp/full_uni_category_yr_tfidf, clear
     keep category year uni_id treated keep raw_spend raw_qty
     gen hi_conf = (keep == 1)
     // --- pre-2013 shares and exposure (computed off hi-conf only) -------------
     preserve
     keep if year <= 2013 & hi_conf == 1
+    if `treated_only' == 1 keep if treated == 1
     gcollapse (sum) raw_spend, by(uni_id category treated)
     bys uni_id: egen tot_pre_spend = total(raw_spend)
     gen s_jm = raw_spend / tot_pre_spend
     // pre-period treated and control totals (for sample restriction)
     by uni_id: egen pre_treat_spend = total(raw_spend * (treated == 1))
     by uni_id: egen pre_ctrl_spend  = total(raw_spend * (treated == 0))
-    // merge EB-shrunk price betas (only present for treated markets)
-    merge m:1 category using ../external/betas/did_coefs_eb_price, ///
-        keepusing(b_eb) keep(1 3) nogen
+    // merge beta coefs (only present for treated markets)
+    merge m:1 category using ../external/betas/`beta_file', ///
+        keepusing(`beta_var') keep(1 3) nogen
+    if "`beta_var'" != "b_eb" rename `beta_var' b_eb
     gen exp_contrib     = cond(treated == 1, s_jm * b_eb, 0)
     gen s_treat_contrib = cond(treated == 1, s_jm, 0)
     gcollapse (sum) exposure = exp_contrib s_treat = s_treat_contrib ///
               (first) pre_treat_spend pre_ctrl_spend tot_pre_spend, by(uni_id)
-    // sample restriction: positive pre-2013 spend in both hi-conf treated AND control
-    keep if pre_treat_spend > 0 & pre_ctrl_spend > 0 & !mi(exposure) & !mi(s_treat)
+    // sample restriction: positive pre-2013 spend in both hi-conf treated AND control.
+    // Under EXPOSURE_VERSION == "treated_hc" the denominator drops control mkts, so
+    // pre_ctrl_spend is 0 by construction — skip the control-spend gate in that mode.
+    keep if pre_treat_spend > 0 & !mi(exposure) & !mi(s_treat)
+    if `treated_only' == 0 keep if pre_ctrl_spend > 0
     keep uni_id exposure s_treat tot_pre_spend
     save ../temp/exposure_xw, replace
     restore
@@ -168,6 +201,75 @@ program did
 end
 
 // -----------------------------------------------------------------------------
+// ppml_did: Poisson (ppmlhdfe) analog of `did`. Runs on RAW counts (spend/qty
+// in $ / units, not log1_) because ppmlhdfe models log(E[y]) directly and
+// handles the zero-outcome cells natively.
+//   y_jt = exp( mu_j + lambda_t + beta * Post_t * Exposure_j
+//                                + gamma * Post_t * S_j )   (optional S)
+//   cluster on uni_id.
+// Coefficients are semi-elasticities (Δ log E[y] per unit Δ post_exp).
+// Same outcome loop as `did` minus the log1_tot_spend combined outcome
+// (redundant now — ppml on the two components gives the same info).
+// -----------------------------------------------------------------------------
+program ppml_did
+    use ../temp/uni_yr_panel, clear
+    gen post = year >= 2014
+    gen post_exp = post * exposure
+    gen post_s   = post * s_treat
+
+    tempname memhold
+    tempfile ppmldidres
+    postfile `memhold' str40 outcome str20 spec str40 rhs ///
+        double b se str10 stars int N using `ppmldidres', replace
+
+    // Raw-count outcomes (no log1_ prefix). Matches the outcome families in
+    // `did` but reads the underlying levels for ppmlhdfe.
+    foreach yvar in ctrl_spend ctrl_qty tot_spend treat_spend treat_qty ///
+                    lo_ctrl_spend lo_ctrl_qty lo_treat_spend lo_treat_qty ///
+                    total_ctrl_full total_treat_full ///
+                    total_full_spend total_full_qty {
+        // raw (no S control)
+        cap noi ppmlhdfe `yvar' post_exp, absorb(uni_id year) cluster(uni_id)
+        if _rc {
+            di as error "ppml_did `yvar' raw failed (rc=`_rc'); skipping."
+            continue
+        }
+        local N = e(N)
+        local b  = _b[post_exp]
+        local se = _se[post_exp]
+        local p  = 2*(1 - normal(abs(`b'/`se')))
+        local stars = cond(`p'<.01,"***",cond(`p'<.05,"**",cond(`p'<.1,"*","")))
+        post `memhold' ("`yvar'") ("raw") ("post_exp") (`b') (`se') ("`stars'") (`N')
+
+        // identified (S control)
+        cap noi ppmlhdfe `yvar' post_exp post_s, absorb(uni_id year) cluster(uni_id)
+        if _rc {
+            di as error "ppml_did `yvar' with_S failed (rc=`_rc'); skipping."
+            continue
+        }
+        local N = e(N)
+        local b  = _b[post_exp]
+        local se = _se[post_exp]
+        local p  = 2*(1 - normal(abs(`b'/`se')))
+        local stars = cond(`p'<.01,"***",cond(`p'<.05,"**",cond(`p'<.1,"*","")))
+        post `memhold' ("`yvar'") ("with_S") ("post_exp") (`b') (`se') ("`stars'") (`N')
+
+        // also save Post×S from the identified spec
+        local b  = _b[post_s]
+        local se = _se[post_s]
+        local p  = 2*(1 - normal(abs(`b'/`se')))
+        local stars = cond(`p'<.01,"***",cond(`p'<.05,"**",cond(`p'<.1,"*","")))
+        post `memhold' ("`yvar'") ("with_S") ("post_s") (`b') (`se') ("`stars'") (`N')
+    }
+    postclose `memhold'
+
+    use `ppmldidres', clear
+    save ../output/estimates/uniyr_ppml_did, replace
+    export delimited using ../output/estimates/uniyr_ppml_did.csv, replace
+    list, sepby(outcome) noobs
+end
+
+// -----------------------------------------------------------------------------
 // event_study: continuous-treatment event study.
 //   y_jt = mu_j + lambda_t + sum_n beta_n [1{rel=n} * Exposure_j]
 //                          + sum_n gamma_n [1{rel=n} * S_j]   (optional)
@@ -278,13 +380,14 @@ program build_uc_panel
     save ../temp/uni_exposure_xw, replace
 
     use ../external/samp/uni_category_yr_tfidf, clear
-    keep category year uni_id treated raw_spend log_raw_spend log_raw_qty avg_log_price
+    keep category year uni_id treated raw_spend raw_qty ///
+         log_raw_spend log_raw_qty avg_log_price
     merge m:1 uni_id using ../temp/uni_exposure_xw, keep(3) nogen
 
     // pre-2013 dollar spend per category, summed across all unis — category-size
-    // weight (agnostic to which uni purchased)
+    // weight (agnostic to which uni purchased). raw_spend/raw_qty retained for
+    // the PPML uc panel spec (ppml_uc_did); log_raw_* still feed reghdfe.
     bys category: egen w_pre = total(raw_spend * (year <= 2013))
-    drop raw_spend
 
     egen uc = group(uni_id category)
     save ../temp/uni_cat_yr_panel, replace
@@ -354,6 +457,70 @@ program uc_did
             uc_es, yvar(`yvar') spec(`spec')
         }
     }
+end
+
+// -----------------------------------------------------------------------------
+// ppml_uc_did: Poisson (ppmlhdfe) analog of uc_did on RAW counts (raw_spend /
+// raw_qty). Skips avg_log_price — log-price is a conditional mean, not a count,
+// and doesn't belong in a ppmlhdfe log-link. Same FE / cluster / weight
+// structure as uc_did (uc, year FE; aw=w_pre; two-way cluster on uni_id, cat).
+// Coefficients are semi-elasticities: Δlog E[y] per unit Δ regressor.
+//   post_exp     = exposure semielasticity in control cells
+//   post_tr      = average treated log-response (price / spend increase in $)
+//   post_exp_tr  = differential exposure effect, treated minus control
+// -----------------------------------------------------------------------------
+program ppml_uc_did
+    use ../temp/uni_cat_yr_panel, clear
+    gen post        = year >= 2014
+    gen post_exp    = post * exposure
+    gen post_tr     = post * treated
+    gen post_exp_tr = post * exposure * treated
+    gen post_s      = post * s_treat
+    gen post_s_tr   = post * s_treat * treated
+
+    tempname memhold
+    postfile `memhold' str20 yvar str10 spec str20 rhs ///
+        double b se str10 stars int N using ../temp/uc_ppml_didres, replace
+
+    foreach yvar in raw_spend raw_qty {
+        // raw
+        cap noi ppmlhdfe `yvar' post_exp post_tr post_exp_tr [aw = w_pre], ///
+            absorb(uc year) cluster(uni_id category)
+        if _rc {
+            di as error "ppml_uc_did `yvar' raw failed (rc=`_rc'); skipping."
+            continue
+        }
+        local N = e(N)
+        foreach rhs in post_exp post_tr post_exp_tr {
+            local b  = _b[`rhs']
+            local se = _se[`rhs']
+            local p  = 2*(1 - normal(abs(`b'/`se')))
+            local stars = cond(`p'<.01,"***",cond(`p'<.05,"**",cond(`p'<.1,"*","")))
+            post `memhold' ("`yvar'") ("raw") ("`rhs'") (`b') (`se') ("`stars'") (`N')
+        }
+
+        // with_S
+        cap noi ppmlhdfe `yvar' post_exp post_tr post_exp_tr post_s post_s_tr [aw = w_pre], ///
+            absorb(uc year) cluster(uni_id category)
+        if _rc {
+            di as error "ppml_uc_did `yvar' with_S failed (rc=`_rc'); skipping."
+            continue
+        }
+        local N = e(N)
+        foreach rhs in post_exp post_tr post_exp_tr post_s post_s_tr {
+            local b  = _b[`rhs']
+            local se = _se[`rhs']
+            local p  = 2*(1 - normal(abs(`b'/`se')))
+            local stars = cond(`p'<.01,"***",cond(`p'<.05,"**",cond(`p'<.1,"*","")))
+            post `memhold' ("`yvar'") ("with_S") ("`rhs'") (`b') (`se') ("`stars'") (`N')
+        }
+    }
+    postclose `memhold'
+
+    use ../temp/uc_ppml_didres, clear
+    save ../output/estimates/uc_ppml_did, replace
+    export delimited using ../output/estimates/uc_ppml_did.csv, replace
+    list, sepby(yvar) noobs
 end
 
 // -----------------------------------------------------------------------------
@@ -792,6 +959,74 @@ program output_tables
     qui matrix_to_txt, saving("../output/tables/budget_binds.txt") ///
         matrix(budget_binds) title(<tab:budget_binds>) format(%20.4f) replace
     mat list budget_binds
+
+    // ---- PPML companion: same 3-row structure, ppmlhdfe on raw counts ------
+    // Row 1: total_full_spend ~ post_exp [+ post_s]        (uni-yr)
+    // Row 2: hi_ctrl_qty      ~ post_exp [+ post_s]        (uni-yr)
+    // Row 3: raw_spend        ~ post_tr full triple interaction (uni-cat-yr)
+    // avg_log_price row from the reghdfe table is intentionally NOT ported —
+    // PPML on a log-mean price is nonsense; raw_spend is the count-scale test.
+    cap mat drop budget_binds_ppml
+    mat budget_binds_ppml = J(3, 6, .)
+    mat colnames budget_binds_ppml = b_raw se_raw N_raw b_with_S se_with_S N_with_S
+    mat rownames budget_binds_ppml = total_full_spend hi_ctrl_qty raw_spend_tr
+
+    use ../temp/uni_yr_panel, clear
+    gen post     = year >= 2014
+    gen post_exp = post * exposure
+    gen post_s   = post * s_treat
+
+    cap noi qui ppmlhdfe total_full_spend post_exp, absorb(uni_id year) cluster(uni_id)
+    if _rc == 0 {
+        mat budget_binds_ppml[1,1] = _b[post_exp]
+        mat budget_binds_ppml[1,2] = _se[post_exp]
+        mat budget_binds_ppml[1,3] = e(N)
+    }
+    cap noi qui ppmlhdfe total_full_spend post_exp post_s, absorb(uni_id year) cluster(uni_id)
+    if _rc == 0 {
+        mat budget_binds_ppml[1,4] = _b[post_exp]
+        mat budget_binds_ppml[1,5] = _se[post_exp]
+        mat budget_binds_ppml[1,6] = e(N)
+    }
+
+    cap noi qui ppmlhdfe hi_ctrl_qty post_exp, absorb(uni_id year) cluster(uni_id)
+    if _rc == 0 {
+        mat budget_binds_ppml[2,1] = _b[post_exp]
+        mat budget_binds_ppml[2,2] = _se[post_exp]
+        mat budget_binds_ppml[2,3] = e(N)
+    }
+    cap noi qui ppmlhdfe hi_ctrl_qty post_exp post_s, absorb(uni_id year) cluster(uni_id)
+    if _rc == 0 {
+        mat budget_binds_ppml[2,4] = _b[post_exp]
+        mat budget_binds_ppml[2,5] = _se[post_exp]
+        mat budget_binds_ppml[2,6] = e(N)
+    }
+
+    use ../temp/uni_cat_yr_panel, clear
+    gen post        = year >= 2014
+    gen post_exp    = post * exposure
+    gen post_tr     = post * treated
+    gen post_exp_tr = post * exposure * treated
+    gen post_s      = post * s_treat
+    gen post_s_tr   = post * s_treat * treated
+    cap noi qui ppmlhdfe raw_spend post_exp post_tr post_exp_tr [aw=w_pre], ///
+        absorb(uc year) cluster(uni_id category)
+    if _rc == 0 {
+        mat budget_binds_ppml[3,1] = _b[post_tr]
+        mat budget_binds_ppml[3,2] = _se[post_tr]
+        mat budget_binds_ppml[3,3] = e(N)
+    }
+    cap noi qui ppmlhdfe raw_spend post_exp post_tr post_exp_tr post_s post_s_tr [aw=w_pre], ///
+        absorb(uc year) cluster(uni_id category)
+    if _rc == 0 {
+        mat budget_binds_ppml[3,4] = _b[post_tr]
+        mat budget_binds_ppml[3,5] = _se[post_tr]
+        mat budget_binds_ppml[3,6] = e(N)
+    }
+
+    qui matrix_to_txt, saving("../output/tables/budget_binds_ppml.txt") ///
+        matrix(budget_binds_ppml) title(<tab:budget_binds_ppml>) format(%20.4f) replace
+    mat list budget_binds_ppml
 end
 
 **

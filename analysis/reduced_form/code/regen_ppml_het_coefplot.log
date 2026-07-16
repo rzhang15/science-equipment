@@ -1,0 +1,1084 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 120,000; see help set_maxvar.
+
+. do /tmp/regen_ppml_het_coefplot.do 
+
+. // Standalone regenerator for ppml_het_coefplot_<yvar>_r1_r2_public[_msimwt].
+> pdf
+. // Runs the split-form PPML heterogeneity regressions on the existing
+. // ../temp/es_<samp>_r1_r2_public.dta panels (no restrict_samp / event_study
+. // rerun needed), overwrites ../temp/phet_results_<samp>...dta, and calls a
+. // local copy of ppml_het_coefplot.
+. 
+. cd /n/home02/cxu75/sci_eq/analysis/reduced_form/code
+/n/holylabs/pakes_lab/Lab/sci_eq/analysis/reduced_form/code
+
+. set more off
+
+. clear all
+
+. set matsize 11000
+set matsize ignored.
+    Matrix sizes are no longer limited by c(matsize) in modern Statas.
+    Matrix sizes are now limited by edition of Stata.  See limits for more
+    details.
+
+. 
+. // ---------------- inlined copy of ppml_het_coefplot from analysis.do ------
+> ---
+. program ppml_het_coefplot
+  1.     syntax, samp(string) [, r1r2(int 0) public(int 0)]
+  2.     local suf ""
+  3.     if (`r1r2' == 1 & `public' == 0) local suf "_r1_r2"
+  4.     if (`r1r2' == 1 & `public' == 1) local suf "_r1_r2_public"
+  5.     local wsuf ""
+  6.     if "$WEIGHT_MSIM" == "1" local wsuf "_msimwt"
+  7. 
+.     cap confirm file "../temp/phet_results_`samp'`suf'`wsuf'.dta"
+  8.     if _rc {
+  9.         di as error "ppml_het_coefplot: ../temp/phet_results_`samp'`suf'`w
+> suf'.dta not found — skipping"
+ 10.         exit 0
+ 11.     }
+ 12.     local ppml_het_yvars ppr_cnt cite_affl_wt ppr_cnt_any cite_affl_wt_any
+>  ///
+>                         ppr_cnt_notlast cite_affl_wt_notlast ///
+>                         avg_num_coathrs num_grants grants_per_paper grant_den
+> sity ///
+>                         n_first_ppr n_middle_ppr n_last_ppr
+ 13.     local groups young old high_pre_ppr low_pre_ppr high_grants low_grants
+>  ///
+>                  big_team small_team
+ 14.     local n_groups : word count `groups'
+ 15.     local lbl_young        "Young"
+ 16.     local lbl_old          "Old"
+ 17.     local lbl_high_pre_ppr "More Productive at Baseline"
+ 18.     local lbl_low_pre_ppr  "Less Productive at Baseline"
+ 19.     local lbl_high_grants  "More Grants per Paper at Baseline"
+ 20.     local lbl_low_grants   "Fewer Grants per Paper at Baseline"
+ 21.     local lbl_big_team     "Larger Team Size"
+ 22.     local lbl_small_team   "Smaller Team Size"
+ 23. 
+.     foreach yvar of local ppml_het_yvars {
+ 24.         preserve
+ 25.         use "../temp/phet_results_`samp'`suf'`wsuf'.dta", clear
+ 26.         keep if yvar == "`yvar'" & spec == "mshrctrl"
+ 27.         if _N == 0 {
+ 28.             di as error "ppml_het_coefplot: no rows for `yvar' mshrctrl — 
+> skipping"
+ 29.             restore
+ 30.             continue
+ 31.         }
+ 32.         gen y = .
+ 33.         local ylabs ""
+ 34.         local i = 0
+ 35.         foreach g of local groups {
+ 36.             local ++i
+ 37.             local ypos = `n_groups' + 1 - `i'
+ 38.             qui replace y = `ypos' if grp == "`g'"
+ 39.             local ylabs `ylabs' `ypos' "`lbl_`g''"
+ 40.         }
+ 41.         drop if mi(y) | mi(post_b)
+ 42.         if _N == 0 {
+ 43.             di as error "ppml_het_coefplot: `yvar' had rows but no non-mis
+> sing post_b — skipping"
+ 44.             restore
+ 45.             continue
+ 46.         }
+ 47.         gen ub = post_b + 1.96*post_se
+ 48.         gen lb = post_b - 1.96*post_se
+ 49.         tw rcap ub lb y, horizontal lcolor(ebblue%70) msize(vsmall) || ///
+>            scatter y post_b, mcolor(ebblue) msize(small) ///
+>            , xline(0, lcolor(gs10) lpattern(solid)) ///
+>              ylabel(`ylabs', angle(0) labsize(small) noticks nogrid) ///
+>              ytitle("") xtitle("Exposure x Post", size(small)) ///
+>              xlabel(, labsize(small)) ///
+>              legend(off) ///
+>              plotregion(margin(sides))
+ 50.         graph export "../output/figures/`samp'/ppml_het_coefplot_`yvar'`su
+> f'`wsuf'.pdf", replace
+ 51.         di as text "wrote ../output/figures/`samp'/ppml_het_coefplot_`yvar
+> '`suf'`wsuf'.pdf"
+ 52.         restore
+ 53.     }
+ 54. end
+
+. 
+. // ---------------- one-shot PPML het regeneration --------------------------
+> ---
+. program repop_phet_results
+  1.     syntax, samp(string)
+  2.     local suf "_r1_r2_public"
+  3.     local wsuf ""
+  4.     local wt ""
+  5.     if "$WEIGHT_MSIM" == "1" {
+  6.         local wt "[pw=max_sim]"
+  7.         local wsuf "_msimwt"
+  8.     }
+  9.     di as text _newline "=========================================="
+ 10.     di as text "  repop_phet_results samp=`samp' WEIGHT_MSIM=$WEIGHT_MSIM"
+ 11.     di as text "=========================================="
+ 12. 
+.     use ../temp/es_`samp'`suf', clear
+ 13.     gen rel = year - 2014
+ 14.     qui sum rel, d
+ 15.     local abs_lag  = abs(r(max))
+ 16.     local abs_lead = abs(r(min))
+ 17.     local timeframe = max(`abs_lag', `abs_lead')
+ 18.     forval i = 1/`timeframe' {
+ 19.         gen int_lag`i'   = exposure       if rel ==  `i'
+ 20.         gen int_lead`i'  = exposure       if rel == -`i'
+ 21.         gen mshr_lag`i'  = mkt_spend_shr  if rel ==  `i'
+ 22.         gen mshr_lead`i' = mkt_spend_shr  if rel == -`i'
+ 23.     }
+ 24.     gen int_lag0  = exposure      if rel == 0
+ 25.     gen mshr_lag0 = mkt_spend_shr if rel == 0
+ 26.     ds int_lead* int_lag* mshr_lead* mshr_lag*
+ 27.     foreach v in `r(varlist)' {
+ 28.         qui replace `v' = 0 if mi(`v')
+ 29.     }
+ 30.     local int_leads
+ 31.     local int_lags
+ 32.     local mshr_leads
+ 33.     local mshr_lags
+ 34.     forval i = 2/`abs_lead' {
+ 35.         local int_leads  int_lead`i'  `int_leads'
+ 36.         local mshr_leads mshr_lead`i' `mshr_leads'
+ 37.     }
+ 38.     forval i = 0/`abs_lag' {
+ 39.         local int_lags  `int_lags'  int_lag`i'
+ 40.         local mshr_lags `mshr_lags' mshr_lag`i'
+ 41.     }
+ 42.     // Group-suffixed interactions for the 8 groups (4 pairs) we plot.
+.     foreach grp in young old high_pre_ppr low_pre_ppr high_grants low_grants 
+> big_team small_team {
+ 43.         foreach v of local int_leads {
+ 44.             gen `v'_`grp' = `v' * `grp'
+ 45.         }
+ 46.         foreach v of local int_lags {
+ 47.             gen `v'_`grp' = `v' * `grp'
+ 48.         }
+ 49.         foreach v of local mshr_leads {
+ 50.             gen `v'_`grp' = `v' * `grp'
+ 51.         }
+ 52.         foreach v of local mshr_lags {
+ 53.             gen `v'_`grp' = `v' * `grp'
+ 54.         }
+ 55.         local leads_`grp'
+ 56.         local lags_`grp'
+ 57.         local mleads_`grp'
+ 58.         local mlags_`grp'
+ 59.         foreach v of local int_leads {
+ 60.             local leads_`grp' `leads_`grp'' `v'_`grp'
+ 61.         }
+ 62.         foreach v of local int_lags {
+ 63.             local lags_`grp' `lags_`grp'' `v'_`grp'
+ 64.         }
+ 65.         foreach v of local mshr_leads {
+ 66.             local mleads_`grp' `mleads_`grp'' `v'_`grp'
+ 67.         }
+ 68.         foreach v of local mshr_lags {
+ 69.             local mlags_`grp' `mlags_`grp'' `v'_`grp'
+ 70.         }
+ 71.     }
+ 72. 
+.     // Fresh phet_results collector (overwrite any stale file).
+.     cap postclose ph_handle
+ 73.     tempname ph_handle
+ 74.     postfile `ph_handle' str30 yvar str16 grp str12 spec ///
+>         double(post_b post_se pre_b pre_se N r2_p) ///
+>         using "../temp/phet_results_`samp'`suf'`wsuf'", replace
+ 75. 
+.     local dummy_pairs `" "young old" "high_pre_ppr low_pre_ppr" "high_grants 
+> low_grants" "big_team small_team" "'
+ 76.     local ppml_het_yvars ppr_cnt cite_affl_wt ppr_cnt_any cite_affl_wt_any
+>  ///
+>                          ppr_cnt_notlast cite_affl_wt_notlast ///
+>                          avg_num_coathrs num_grants grants_per_paper grant_de
+> nsity ///
+>                          n_first_ppr n_middle_ppr n_last_ppr
+ 77. 
+.     foreach yvar of local ppml_het_yvars {
+ 78.         cap confirm variable `yvar'
+ 79.         if _rc {
+ 80.             di as text "skip `yvar' (not in panel)"
+ 81.             continue
+ 82.         }
+ 83.         foreach pair of local dummy_pairs {
+ 84.             local g1 : word 1 of `pair'
+ 85.             local g2 : word 2 of `pair'
+ 86.             local ppml_specs mshrctrl
+ 87.             if "`yvar'" == "ppr_cnt" local ppml_specs base mshrctrl
+ 88.             foreach spec of local ppml_specs {
+ 89.                 local mshr_ctrls
+ 90.                 if "`spec'" == "mshrctrl" {
+ 91.                     local mshr_ctrls `mleads_`g1'' `mlags_`g1'' `mleads_`g
+> 2'' `mlags_`g2''
+ 92.                 }
+ 93.                 cap noi ppmlhdfe `yvar' `leads_`g1'' `lags_`g1'' `leads_`g
+> 2'' `lags_`g2'' ///
+>                                `mshr_ctrls' `wt', ///
+>                                absorb(athr_id year) vce(cluster athr_id)
+ 94.                 if _rc {
+ 95.                     di as error "regen: `samp' `yvar' `g1'/`g2' `spec' fai
+> led (rc=`_rc'); skipping"
+ 96.                     continue
+ 97.                 }
+ 98.                 local Nppml  = e(N)
+ 99.                 local r2ppml = e(r2_p)
+100.                 foreach grp in `g1' `g2' {
+101.                     local n_post = `abs_lag' + 1
+102.                     local n_pre  = `abs_lead' - 1
+103.                     local sum_post
+104.                     foreach v of local lags_`grp' {
+105.                         local sum_post `sum_post' + `v'
+106.                     }
+107.                     local sum_post = substr("`sum_post'", 3, .)
+108.                     local sum_pre
+109.                     foreach v of local leads_`grp' {
+110.                         local sum_pre `sum_pre' + `v'
+111.                     }
+112.                     local sum_pre = substr("`sum_pre'", 3, .)
+113.                     local b_post = .
+114.                     local se_post = .
+115.                     local b_pre = .
+116.                     local se_pre = .
+117.                     cap qui lincom (`sum_post') / `n_post'
+118.                     if _rc == 0 {
+119.                         local b_post = r(estimate)
+120.                         local se_post = r(se)
+121.                     }
+122.                     cap qui lincom (`sum_pre') / `n_pre'
+123.                     if _rc == 0 {
+124.                         local b_pre = r(estimate)
+125.                         local se_pre = r(se)
+126.                     }
+127.                     post `ph_handle' ("`yvar'") ("`grp'") ("`spec'") ///
+>                         (`b_post') (`se_post') (`b_pre') (`se_pre') (`Nppml')
+>  (`r2ppml')
+128.                 }
+129.             }
+130.         }
+131.     }
+132.     postclose `ph_handle'
+133.     di as text "wrote ../temp/phet_results_`samp'`suf'`wsuf'.dta"
+134. end
+
+. 
+. // ---------------- driver: 2 samples x 2 wmodes ----------------------------
+> --
+. foreach s in all_jrnls top_jrnls {
+  2.     foreach wmode in 0 1 {
+  3.         global WEIGHT_MSIM `wmode'
+  4.         repop_phet_results, samp(`s')
+  5.         ppml_het_coefplot,  samp(`s') r1r2(1) public(1)
+  6.     }
+  7. }
+
+==========================================
+  repop_phet_results samp=all_jrnls WEIGHT_MSIM=0
+==========================================
+(57,438 missing values generated)
+(57,438 missing values generated)
+(57,438 missing values generated)
+(57,438 missing values generated)
+(57,438 missing values generated)
+(57,438 missing values generated)
+(57,438 missing values generated)
+(57,438 missing values generated)
+(57,438 missing values generated)
+(57,438 missing values generated)
+(57,438 missing values generated)
+(57,438 missing values generated)
+(57,438 missing values generated)
+(57,438 missing values generated)
+(57,438 missing values generated)
+(57,438 missing values generated)
+(57,438 missing values generated)
+(63,820 missing values generated)
+(57,438 missing values generated)
+(63,820 missing values generated)
+(57,438 missing values generated)
+(57,438 missing values generated)
+int_lead1   int_lead5   int_lag4    mshr_lead2  mshr_lag1   mshr_lag5
+int_lead2   int_lag1    int_lag5    mshr_lead3  mshr_lag2   mshr_lag0
+int_lead3   int_lag2    int_lag0    mshr_lead4  mshr_lag3
+int_lead4   int_lag3    mshr_lead1  mshr_lead5  mshr_lag4
+Iteration 1:   deviance = 7.3227e+04  eps = .         iters = 3    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.47  P   
+Iteration 2:   deviance = 7.1337e+04  eps = 2.65e-02  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.75      
+Iteration 3:   deviance = 7.1322e+04  eps = 2.07e-04  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.80      
+Iteration 4:   deviance = 7.1322e+04  eps = 9.52e-08  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.80      
+Iteration 5:   deviance = 7.1322e+04  eps = 2.80e-13  iters = 1    tol = 1.0e-0
+> 5                                                                            
+>    min(eta) =  -1.80   S  
+Iteration 6:   deviance = 7.1322e+04  eps = 1.94e-16  iters = 2    tol = 1.0e-0
+> 9                                                                            
+>    min(eta) =  -1.80   S O
+-------------------------------------------------------------------------------
+> -----------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon 
+> below tolerance)
+Converged in 6 iterations and 12 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =     63,820
+Absorbing 2 HDFE groups                           Residual df     =      6,381
+Statistics robust to heteroskedasticity           Wald chi2(18)   =      39.67
+Deviance             =  71321.80633               Prob > chi2     =     0.0023
+Log pseudolikelihood = -99615.40935               Pseudo R2       =     0.1865
+
+Number of clusters (athr_id)=      6,382
+                            (Std. err. adjusted for 6,382 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+int_lead4_~g |  -.8425242   .3361059    -2.51   0.012     -1.50128   -.1837687
+int_lead3_~g |   -.888736   .3239677    -2.74   0.006    -1.523701    -.253771
+int_lead2_~g |  -.2991958   .2982822    -1.00   0.316    -.8838182    .2854265
+int_lag0_y~g |  -.4389157   .3394365    -1.29   0.196    -1.104199    .2263676
+int_lag1_y~g |  -.8327145   .3582827    -2.32   0.020    -1.534936   -.1304933
+int_lag2_y~g |  -.0476583   .3765815    -0.13   0.899    -.7857444    .6904279
+int_lag3_y~g |   -.994089   .3990073    -2.49   0.013    -1.776129   -.2120491
+int_lag4_y~g |  -.5642624   .4255021    -1.33   0.185    -1.398231    .2697063
+int_lag5_y~g |    -.94511   .4369076    -2.16   0.031    -1.801433   -.0887868
+int_lead4_~d |   .8088354   .3726908     2.17   0.030     .0783749    1.539296
+int_lead3_~d |   .0930344   .3487684     0.27   0.790    -.5905392     .776608
+int_lead2_~d |   .6081174   .3395496     1.79   0.073    -.0573877    1.273622
+int_lag0_old |  -.1059841    .363448    -0.29   0.771    -.8183292    .6063609
+int_lag1_old |   .0098744   .4030716     0.02   0.980    -.7801314    .7998802
+int_lag2_old |   -.199952   .4371827    -0.46   0.647    -1.056814    .6569103
+int_lag3_old |  -.3113257   .4774946    -0.65   0.514    -1.247198    .6245466
+int_lag4_old |  -.7323932   .4853411    -1.51   0.131    -1.683644    .2188579
+int_lag5_old |  -.8431308   .4726337    -1.78   0.074    -1.769476    .0832142
+       _cons |   .8295955    .005572   148.89   0.000     .8186746    .8405164
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      6382        6382           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+Iteration 1:   deviance = 7.3092e+04  eps = .         iters = 3    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.48  P   
+Iteration 2:   deviance = 7.1206e+04  eps = 2.65e-02  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.77      
+Iteration 3:   deviance = 7.1191e+04  eps = 2.06e-04  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.81      
+Iteration 4:   deviance = 7.1191e+04  eps = 9.55e-08  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.81      
+Iteration 5:   deviance = 7.1191e+04  eps = 3.31e-13  iters = 2    tol = 1.0e-0
+> 5                                                                            
+>    min(eta) =  -1.81   S  
+Iteration 6:   deviance = 7.1191e+04  eps = 0.00e+00  iters = 2    tol = 1.0e-0
+> 9                                                                            
+>    min(eta) =  -1.81   S O
+-------------------------------------------------------------------------------
+> -----------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon 
+> below tolerance)
+Converged in 6 iterations and 13 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =     63,820
+Absorbing 2 HDFE groups                           Residual df     =      6,381
+Statistics robust to heteroskedasticity           Wald chi2(36)   =     117.18
+Deviance             =   71191.0919               Prob > chi2     =     0.0000
+Log pseudolikelihood = -99550.05214               Pseudo R2       =     0.1870
+
+Number of clusters (athr_id)=      6,382
+                            (Std. err. adjusted for 6,382 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+int_lead4_~g |   .0160512   .3764173     0.04   0.966    -.7217132    .7538155
+int_lead3_~g |  -.4141747   .3577629    -1.16   0.247    -1.115377    .2870278
+int_lead2_~g |   .0736626   .3281645     0.22   0.822    -.5695279    .7168531
+int_lag0_y~g |  -.3964921   .3733171    -1.06   0.288     -1.12818     .335196
+int_lag1_y~g |  -.7384432   .3834729    -1.93   0.054    -1.490036    .0131498
+int_lag2_y~g |  -.3547555   .4150866    -0.85   0.393     -1.16831    .4587993
+int_lag3_y~g |  -1.187465   .4277322    -2.78   0.006    -2.025805   -.3491257
+int_lag4_y~g |  -.8268316   .4435309    -1.86   0.062    -1.696136     .042473
+int_lag5_y~g |  -1.416795   .4600604    -3.08   0.002    -2.318497   -.5150934
+int_lead4_~d |  -.0975711   .3937066    -0.25   0.804    -.8692218    .6740795
+int_lead3_~d |  -.4366737   .3709812    -1.18   0.239    -1.163783     .290436
+int_lead2_~d |   .1611874   .3609146     0.45   0.655    -.5461923    .8685671
+int_lag0_old |  -.2466595   .3928608    -0.63   0.530    -1.016652    .5233335
+int_lag1_old |  -.1998523   .4220179    -0.47   0.636    -1.026992    .6272877
+int_lag2_old |   .1576021   .4817453     0.33   0.744    -.7866014    1.101806
+int_lag3_old |  -.0836495   .5183134    -0.16   0.872    -1.099525    .9322262
+int_lag4_old |   -.454363   .5417342    -0.84   0.402    -1.516143    .6074164
+int_lag5_old |  -.3210695   .5193753    -0.62   0.536    -1.339026    .6968874
+mshr_lead4~g |  -.1571667   .1132231    -1.39   0.165    -.3790798    .0647464
+mshr_lead3~g |  -.0636893   .1052758    -0.60   0.545    -.2700261    .1426475
+mshr_lead2~g |  -.0027025   .1035538    -0.03   0.979    -.2056642    .2002593
+mshr_lag0_~g |   .1576851   .1163393     1.36   0.175    -.0703358    .3857061
+mshr_lag1_~g |   .1754613    .119791     1.46   0.143    -.0593247    .4102473
+mshr_lag2_~g |   .0631959    .132429     0.48   0.633    -.1963601     .322752
+mshr_lag3_~g |    .047181   .1448703     0.33   0.745    -.2367597    .3311216
+mshr_lag4_~g |   .0879163   .1524737     0.58   0.564    -.2109267    .3867592
+mshr_lag5_~g |   .1891002   .1539087     1.23   0.219    -.1125554    .4907557
+mshr_lead4~d |   .3432237   .1122821     3.06   0.002     .1231549    .5632926
+mshr_lead3~d |   .2243344   .1066075     2.10   0.035     .0153876    .4332812
+mshr_lead2~d |   .2314452   .1038965     2.23   0.026     .0278118    .4350785
+mshr_lag0_~d |    .217299   .1162962     1.87   0.062    -.0106375    .4452354
+mshr_lag1_~d |   .2701054   .1211668     2.23   0.026     .0326229     .507588
+mshr_lag2_~d |  -.1246456   .1316621    -0.95   0.344    -.3826986    .1334074
+mshr_lag3_~d |   -.074535   .1423694    -0.52   0.601    -.3535738    .2045038
+mshr_lag4_~d |  -.0676579    .154412    -0.44   0.661    -.3702998    .2349841
+mshr_lag5_~d |  -.0965813   .1613962    -0.60   0.550     -.412912    .2197495
+       _cons |   .8047749   .0226201    35.58   0.000     .7604404    .8491094
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      6382        6382           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+Iteration 1:   deviance = 7.3266e+04  eps = .         iters = 3    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.41  P   
+Iteration 2:   deviance = 7.1347e+04  eps = 2.69e-02  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.66      
+Iteration 3:   deviance = 7.1332e+04  eps = 2.15e-04  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.72      
+Iteration 4:   deviance = 7.1332e+04  eps = 9.07e-08  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.72      
+Iteration 5:   deviance = 7.1332e+04  eps = 1.81e-13  iters = 2    tol = 1.0e-0
+> 5                                                                            
+>    min(eta) =  -1.72   S  
+Iteration 6:   deviance = 7.1332e+04  eps = 0.00e+00  iters = 2    tol = 1.0e-0
+> 9                                                                            
+>    min(eta) =  -1.72   S O
+-------------------------------------------------------------------------------
+> -----------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon 
+> below tolerance)
+Converged in 6 iterations and 13 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =     63,820
+Absorbing 2 HDFE groups                           Residual df     =      6,381
+Statistics robust to heteroskedasticity           Wald chi2(18)   =      27.02
+Deviance             =  71331.69208               Prob > chi2     =     0.0786
+Log pseudolikelihood = -99620.35223               Pseudo R2       =     0.1864
+
+Number of clusters (athr_id)=      6,382
+                            (Std. err. adjusted for 6,382 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+int_lead4_.. |   .0148626   .2926885     0.05   0.960    -.5587963    .5885215
+int_lead3_.. |  -.3599348   .2797803    -1.29   0.198    -.9082942    .1884245
+int_lead2_.. |   .1165797   .2635579     0.44   0.658    -.3999842    .6331436
+int_lag0_h~r |  -.3759795   .2924534    -1.29   0.199    -.9491776    .1972186
+int_lag1_h~r |  -.5233362   .3161988    -1.66   0.098    -1.143074    .0964021
+int_lag2_h~r |  -.2548423   .3389233    -0.75   0.452    -.9191198    .4094352
+int_lag3_h~r |  -.9319338   .3636717    -2.56   0.010    -1.644717   -.2191503
+int_lag4_h~r |  -.7238841   .3751183    -1.93   0.054    -1.459102    .0113342
+int_lag5_h~r |  -1.041811   .3797149    -2.74   0.006    -1.786038   -.2975833
+int_lead4_.. |  -.7058059   .4952942    -1.43   0.154    -1.676565    .2649529
+int_lead3_.. |  -.9277759   .4618039    -2.01   0.045    -1.832895   -.0226569
+int_lead2_.. |    .019357   .4546333     0.04   0.966    -.8717079    .9104219
+int_lag0_l~r |   .0992108   .5202531     0.19   0.849    -.9204666    1.118888
+int_lag1_l~r |  -.1658491   .5307901    -0.31   0.755    -1.206179    .8744803
+int_lag2_l~r |   .5569233   .5781882     0.96   0.335    -.5763048    1.690151
+int_lag3_l~r |   .4119093   .6114125     0.67   0.501    -.7864372    1.610256
+int_lag4_l~r |  -.2287623   .6478702    -0.35   0.724    -1.498564     1.04104
+int_lag5_l~r |  -.2401579   .6302307    -0.38   0.703    -1.475387    .9950716
+       _cons |   .8306346   .0054946   151.17   0.000     .8198653    .8414039
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      6382        6382           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+Iteration 1:   deviance = 7.3251e+04  eps = .         iters = 3    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.38  P   
+Iteration 2:   deviance = 7.1309e+04  eps = 2.72e-02  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.69      
+Iteration 3:   deviance = 7.1293e+04  eps = 2.20e-04  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.75      
+Iteration 4:   deviance = 7.1293e+04  eps = 8.37e-08  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.75      
+Iteration 5:   deviance = 7.1293e+04  eps = 1.10e-13  iters = 2    tol = 1.0e-0
+> 5                                                                            
+>    min(eta) =  -1.75   S  
+Iteration 6:   deviance = 7.1293e+04  eps = 0.00e+00  iters = 2    tol = 1.0e-0
+> 9                                                                            
+>    min(eta) =  -1.75   S O
+-------------------------------------------------------------------------------
+> -----------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon 
+> below tolerance)
+Converged in 6 iterations and 13 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =     63,820
+Absorbing 2 HDFE groups                           Residual df     =      6,381
+Statistics robust to heteroskedasticity           Wald chi2(36)   =      53.20
+Deviance             =  71293.26537               Prob > chi2     =     0.0323
+Log pseudolikelihood = -99601.13887               Pseudo R2       =     0.1866
+
+Number of clusters (athr_id)=      6,382
+                            (Std. err. adjusted for 6,382 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+int_lead4_.. |  -.0292686   .3045769    -0.10   0.923    -.6262283    .5676912
+int_lead3_.. |  -.4461754   .2891498    -1.54   0.123    -1.012899    .1205479
+int_lead2_.. |   .0602655   .2711545     0.22   0.824    -.4711877    .5917186
+int_lag0_h~r |  -.2925965   .3045447    -0.96   0.337     -.889493    .3043001
+int_lag1_h~r |  -.4192707   .3233736    -1.30   0.195    -1.053071    .2145299
+int_lag2_h~r |  -.1060783    .353613    -0.30   0.764    -.7991471    .5869906
+int_lag3_h~r |  -.7833078   .3761228    -2.08   0.037    -1.520495   -.0461206
+int_lag4_h~r |  -.5798704   .3883187    -1.49   0.135    -1.340961    .1812202
+int_lag5_h~r |  -.8147785   .3954913    -2.06   0.039    -1.589927   -.0396298
+int_lead4_.. |  -.6329945   .5679054    -1.11   0.265    -1.746069    .4800797
+int_lead3_.. |  -.6380795    .531745    -1.20   0.230     -1.68028    .4041215
+int_lead2_.. |   .1211486   .5465794     0.22   0.825    -.9501273    1.192424
+int_lag0_l~r |  -.5228698   .5907446    -0.89   0.376    -1.680708    .6349684
+int_lag1_l~r |  -.9014754   .5875042    -1.53   0.125    -2.052962    .2500116
+int_lag2_l~r |  -.0750782   .6953773    -0.11   0.914    -1.437993    1.287836
+int_lag3_l~r |  -.2563182   .7207523    -0.36   0.722    -1.668967     1.15633
+int_lag4_l~r |  -.9018394   .7550573    -1.19   0.232    -2.381725    .5780458
+int_lag5_l~r |  -1.309639   .7069001    -1.85   0.064    -2.695137    .0758602
+mshr_lead4.. |   .0820963   .1057099     0.78   0.437    -.1250914     .289284
+mshr_lead3.. |   .0797678   .0996111     0.80   0.423    -.1154664    .2750021
+mshr_lead2.. |   .1069019   .0969528     1.10   0.270    -.0831222    .2969259
+mshr_lag0_.. |   .1540363   .1088353     1.42   0.157     -.059277    .3673495
+mshr_lag1_.. |    .177622   .1135576     1.56   0.118    -.0449467    .4001908
+mshr_lag2_.. |  -.0492371    .123672    -0.40   0.691    -.2916297    .1931556
+mshr_lag3_.. |  -.0446462   .1351628    -0.33   0.741    -.3095603     .220268
+mshr_lag4_.. |  -.0130641   .1453007    -0.09   0.928    -.2978482      .27172
+mshr_lag5_.. |    .008628   .1487078     0.06   0.954    -.2828339    .3000899
+mshr_lead4.. |   .0509798   .1311042     0.39   0.697    -.2059796    .3079392
+mshr_lead3.. |  -.0219498   .1240038    -0.18   0.860    -.2649928    .2210933
+mshr_lead2.. |   .0674396   .1277107     0.53   0.597    -.1828688    .3177479
+mshr_lag0_.. |   .3443511    .139892     2.46   0.014     .0701678    .6185344
+mshr_lag1_.. |   .4054862   .1419717     2.86   0.004     .1272269    .6837456
+mshr_lag2_.. |   .1569891    .161975     0.97   0.332    -.1604761    .4744543
+mshr_lag3_.. |   .1725265   .1725495     1.00   0.317    -.1656643    .5107172
+mshr_lag4_.. |   .2053152   .1783651     1.15   0.250     -.144274    .5549044
+mshr_lag5_.. |   .3585282   .1863027     1.92   0.054    -.0066184    .7236749
+       _cons |   .8065504   .0225115    35.83   0.000     .7624288    .8506721
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      6382        6382           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+Iteration 1:   deviance = 7.3239e+04  eps = .         iters = 3    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.56  P   
+Iteration 2:   deviance = 7.1341e+04  eps = 2.66e-02  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.83      
+Iteration 3:   deviance = 7.1326e+04  eps = 2.11e-04  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.87      
+Iteration 4:   deviance = 7.1326e+04  eps = 1.01e-07  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.88      
+Iteration 5:   deviance = 7.1326e+04  eps = 3.10e-13  iters = 2    tol = 1.0e-0
+> 5                                                                            
+>    min(eta) =  -1.88   S  
+Iteration 6:   deviance = 7.1326e+04  eps = 1.94e-16  iters = 2    tol = 1.0e-0
+> 8                                                                            
+>    min(eta) =  -1.88   S O
+-------------------------------------------------------------------------------
+> -----------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon 
+> below tolerance)
+Converged in 6 iterations and 13 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =     63,820
+Absorbing 2 HDFE groups                           Residual df     =      6,381
+Statistics robust to heteroskedasticity           Wald chi2(18)   =      35.86
+Deviance             =  71326.39157               Prob > chi2     =     0.0074
+Log pseudolikelihood = -99617.70198               Pseudo R2       =     0.1864
+
+Number of clusters (athr_id)=      6,382
+                            (Std. err. adjusted for 6,382 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+int_lead4_.. |   .6092919   .3537633     1.72   0.085    -.0840714    1.302655
+int_lead3_.. |  -.3878072   .3532902    -1.10   0.272    -1.080243    .3046289
+int_lead2_.. |   .0934419   .3239233     0.29   0.773    -.5414361    .7283199
+int_lag0_h~s |   .0146873   .3568674     0.04   0.967    -.6847601    .7141346
+int_lag1_h~s |  -.3172579    .378948    -0.84   0.402    -1.059982    .4254667
+int_lag2_h~s |   .0309213   .3998199     0.08   0.938    -.7527112    .8145539
+int_lag3_h~s |  -.0966711   .4333503    -0.22   0.823    -.9460221    .7526799
+int_lag4_h~s |  -.1095336   .4243674    -0.26   0.796    -.9412783    .7222112
+int_lag5_h~s |  -.0526052   .4622845    -0.11   0.909    -.9586661    .8534557
+int_lead4_.. |  -.6717798   .3489823    -1.92   0.054    -1.355773    .0122129
+int_lead3_.. |  -.5036395    .317774    -1.58   0.113    -1.126465    .1191861
+int_lead2_.. |   .1042099   .3076912     0.34   0.735    -.4988538    .7072735
+int_lag0_l~s |  -.5328096    .344006    -1.55   0.121    -1.207049    .1414298
+int_lag1_l~s |  -.5703531    .373362    -1.53   0.127    -1.302129     .161423
+int_lag2_l~s |  -.2239353   .4009932    -0.56   0.577    -1.009868    .5619969
+int_lag3_l~s |  -1.170666   .4380221    -2.67   0.008    -2.029173    -.312158
+int_lag4_l~s |  -1.056863   .4703284    -2.25   0.025     -1.97869   -.1350362
+int_lag5_l~s |  -1.594643   .4492791    -3.55   0.000    -2.475214   -.7140723
+       _cons |   .8304999   .0054982   151.05   0.000     .8197237    .8412761
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      6382        6382           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+Iteration 1:   deviance = 7.3218e+04  eps = .         iters = 3    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.55  P   
+Iteration 2:   deviance = 7.1316e+04  eps = 2.67e-02  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.82      
+Iteration 3:   deviance = 7.1301e+04  eps = 2.14e-04  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.86      
+Iteration 4:   deviance = 7.1301e+04  eps = 1.07e-07  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.87      
+Iteration 5:   deviance = 7.1301e+04  eps = 3.51e-13  iters = 2    tol = 1.0e-0
+> 5                                                                            
+>    min(eta) =  -1.87   S  
+Iteration 6:   deviance = 7.1301e+04  eps = 0.00e+00  iters = 2    tol = 1.0e-0
+> 8                                                                            
+>    min(eta) =  -1.87   S O
+-------------------------------------------------------------------------------
+> -----------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon 
+> below tolerance)
+Converged in 6 iterations and 13 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =     63,820
+Absorbing 2 HDFE groups                           Residual df     =      6,381
+Statistics robust to heteroskedasticity           Wald chi2(36)   =      62.34
+Deviance             =  71300.76729               Prob > chi2     =     0.0042
+Log pseudolikelihood = -99604.88983               Pseudo R2       =     0.1865
+
+Number of clusters (athr_id)=      6,382
+                            (Std. err. adjusted for 6,382 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+int_lead4_.. |   .3020606   .3752193     0.81   0.421    -.4333557    1.037477
+int_lead3_.. |  -.8094761   .3744397    -2.16   0.031    -1.543364   -.0755878
+int_lead2_.. |    .024867   .3476478     0.07   0.943    -.6565101    .7062441
+int_lag0_h~s |  -.2866607   .3816123    -0.75   0.453    -1.034607    .4612856
+int_lag1_h~s |  -.6760955   .3935125    -1.72   0.086    -1.447366    .0951748
+int_lag2_h~s |  -.2376651   .4348784    -0.55   0.585    -1.090011    .6146808
+int_lag3_h~s |  -.3085814   .4684212    -0.66   0.510     -1.22667    .6095073
+int_lag4_h~s |  -.5367532   .4513974    -1.19   0.234    -1.421476    .3479695
+int_lag5_h~s |  -.5045593   .4858874    -1.04   0.299    -1.456881    .4477625
+int_lead4_.. |  -.4385031   .3867532    -1.13   0.257    -1.196525    .3195192
+int_lead3_.. |  -.1244072   .3456107    -0.36   0.719    -.8017917    .5529774
+int_lead2_.. |   .1183829   .3388225     0.35   0.727     -.545697    .7824627
+int_lag0_l~s |  -.3376661   .3846441    -0.88   0.380    -1.091555    .4162224
+int_lag1_l~s |  -.3193453   .4007656    -0.80   0.426    -1.104831    .4661408
+int_lag2_l~s |   .0351902   .4493256     0.08   0.938    -.8454718    .9158523
+int_lag3_l~s |  -.9848348   .4739191    -2.08   0.038    -1.913699   -.0559704
+int_lag4_l~s |  -.6689575   .5154912    -1.30   0.194    -1.679302    .3413867
+int_lag5_l~s |  -1.208945   .4908721    -2.46   0.014    -2.171037   -.2468533
+mshr_lead4.. |   .2438998   .1194825     2.04   0.041     .0097184    .4780813
+mshr_lead3.. |   .2417032   .1143904     2.11   0.035     .0175022    .4659042
+mshr_lead2.. |   .1316989   .1115709     1.18   0.238     -.086976    .3503738
+mshr_lag0_.. |   .3259824    .123526     2.64   0.008     .0838759    .5680889
+mshr_lag1_.. |   .3728573   .1265485     2.95   0.003     .1248268    .6208879
+mshr_lag2_.. |   .0946871   .1345542     0.70   0.482    -.1690343    .3584086
+mshr_lag3_.. |   .1033576    .149336     0.69   0.489    -.1893357    .3960508
+mshr_lag4_.. |   .2203187   .1574871     1.40   0.162    -.0883505    .5289878
+mshr_lag5_.. |   .2934676   .1627495     1.80   0.071    -.0255156    .6124508
+mshr_lead4.. |   .0675626   .1095268     0.62   0.537     -.147106    .2822313
+mshr_lead3.. |  -.0046178   .1019375    -0.05   0.964    -.2044117     .195176
+mshr_lead2.. |   .0907809   .0998578     0.91   0.363    -.1049368    .2864987
+mshr_lag0_.. |   .1488555   .1130096     1.32   0.188    -.0726392    .3703502
+mshr_lag1_.. |    .157729   .1160145     1.36   0.174    -.0696552    .3851131
+mshr_lag2_.. |  -.0572072   .1298814    -0.44   0.660    -.3117701    .1973556
+mshr_lag3_.. |  -.0156959   .1391007    -0.11   0.910    -.2883283    .2569365
+mshr_lag4_.. |  -.0265571   .1511236    -0.18   0.861    -.3227538    .2696396
+mshr_lag5_.. |   .0298214   .1544888     0.19   0.847     -.272971    .3326138
+       _cons |   .7942993   .0227355    34.94   0.000     .7497386      .83886
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      6382        6382           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+Iteration 1:   deviance = 7.3246e+04  eps = .         iters = 3    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.47  P   
+Iteration 2:   deviance = 7.1353e+04  eps = 2.65e-02  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.76      
+Iteration 3:   deviance = 7.1338e+04  eps = 2.08e-04  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.80      
+Iteration 4:   deviance = 7.1338e+04  eps = 9.60e-08  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.80      
+Iteration 5:   deviance = 7.1338e+04  eps = 2.91e-13  iters = 2    tol = 1.0e-0
+> 5                                                                            
+>    min(eta) =  -1.80   S O
+-------------------------------------------------------------------------------
+> -----------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon 
+> below tolerance)
+Converged in 5 iterations and 11 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =     63,820
+Absorbing 2 HDFE groups                           Residual df     =      6,381
+Statistics robust to heteroskedasticity           Wald chi2(18)   =      27.65
+Deviance             =   71338.4427               Prob > chi2     =     0.0677
+Log pseudolikelihood = -99623.72754               Pseudo R2       =     0.1864
+
+Number of clusters (athr_id)=      6,382
+                            (Std. err. adjusted for 6,382 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+int_lead4_b~ |  -.3542719   .3695305    -0.96   0.338    -1.078538    .3699946
+int_lead3_b~ |  -.3467509   .3482502    -1.00   0.319    -1.029309    .3358069
+int_lead2_b~ |   .0197678   .3282869     0.06   0.952    -.6236627    .6631983
+int_lag0_b~m |  -.3970057   .3646641    -1.09   0.276    -1.111734    .3177227
+int_lag1_b~m |  -.3074247   .3961316    -0.78   0.438    -1.083828    .4689789
+int_lag2_b~m |  -.3558448   .4346902    -0.82   0.413    -1.207822    .4961324
+int_lag3_b~m |  -.1458861   .4629085    -0.32   0.753     -1.05317     .761398
+int_lag4_b~m |  -.4613537   .4754631    -0.97   0.332    -1.393244     .470537
+int_lag5_b~m |  -.9102603    .462468    -1.97   0.049    -1.816681   -.0038396
+int_lead4_s~ |   .0933312   .3369823     0.28   0.782    -.5671421    .7538044
+int_lead3_s~ |  -.5442442   .3238568    -1.68   0.093    -1.178992    .0905034
+int_lead2_s~ |   .1649536   .3072577     0.54   0.591    -.4372604    .7671676
+int_lag0_s~m |  -.2110468   .3390831    -0.62   0.534    -.8756374    .4535438
+int_lag1_s~m |  -.5883043   .3640814    -1.62   0.106    -1.301891     .125282
+int_lag2_s~m |   .0799396   .3789572     0.21   0.833     -.662803    .8226821
+int_lag3_s~m |  -1.153579   .4091266    -2.82   0.005    -1.955453    -.351706
+int_lag4_s~m |  -.7834661   .4348029    -1.80   0.072    -1.635664    .0687318
+int_lag5_s~m |  -.8955077   .4456938    -2.01   0.045    -1.769052   -.0219639
+       _cons |   .8307614   .0055524   149.62   0.000      .819879    .8416439
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      6382        6382           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+Iteration 1:   deviance = 7.3227e+04  eps = .         iters = 3    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.48  P   
+Iteration 2:   deviance = 7.1333e+04  eps = 2.66e-02  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.76      
+Iteration 3:   deviance = 7.1318e+04  eps = 2.09e-04  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.81      
+Iteration 4:   deviance = 7.1318e+04  eps = 9.97e-08  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.81      
+Iteration 5:   deviance = 7.1318e+04  eps = 3.26e-13  iters = 2    tol = 1.0e-0
+> 5                                                                            
+>    min(eta) =  -1.81   S O
+-------------------------------------------------------------------------------
+> -----------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon 
+> below tolerance)
+Converged in 5 iterations and 11 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =     63,820
+Absorbing 2 HDFE groups                           Residual df     =      6,381
+Statistics robust to heteroskedasticity           Wald chi2(36)   =      43.17
+Deviance             =  71318.04228               Prob > chi2     =     0.1915
+Log pseudolikelihood = -99613.52733               Pseudo R2       =     0.1865
+
+Number of clusters (athr_id)=      6,382
+                            (Std. err. adjusted for 6,382 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+int_lead4_b~ |  -.5000212   .4059668    -1.23   0.218    -1.295701    .2956591
+int_lead3_b~ |  -.2441877   .3840451    -0.64   0.525    -.9969024    .5085269
+int_lead2_b~ |   .0641645   .3633205     0.18   0.860    -.6479306    .7762596
+int_lag0_b~m |  -.6364606   .4039111    -1.58   0.115    -1.428112    .1551907
+int_lag1_b~m |  -.3862976   .4225634    -0.91   0.361    -1.214507    .4419113
+int_lag2_b~m |  -.5433075   .4835687    -1.12   0.261    -1.491085    .4044698
+int_lag3_b~m |  -.3707824   .5047307    -0.73   0.463    -1.360036    .6184717
+int_lag4_b~m |  -.8108657   .5143112    -1.58   0.115    -1.818897    .1971657
+int_lag5_b~m |  -1.208458   .4907992    -2.46   0.014    -2.170407   -.2465092
+int_lead4_s~ |    .171289   .3624068     0.47   0.636    -.5390152    .8815933
+int_lead3_s~ |    -.65343   .3426205    -1.91   0.057    -1.324954    .0180938
+int_lead2_s~ |   .0807623   .3252877     0.25   0.804    -.5567898    .7183145
+int_lag0_s~m |  -.1048039   .3672096    -0.29   0.775    -.8245215    .6149137
+int_lag1_s~m |  -.6223485   .3817317    -1.63   0.103    -1.370529    .1258318
+int_lag2_s~m |      .2406   .4135091     0.58   0.561     -.569863    1.051063
+int_lag3_s~m |  -.9856932   .4384838    -2.25   0.025    -1.845106   -.1262808
+int_lag4_s~m |  -.5210279   .4668775    -1.12   0.264    -1.436091    .3940352
+int_lag5_s~m |  -.6903759   .4856471    -1.42   0.155    -1.642227     .261475
+mshr_lead4.. |   .1164797    .117153     0.99   0.320     -.113136    .3460955
+mshr_lead3.. |    .032966   .1112059     0.30   0.767    -.1849936    .2509256
+mshr_lead2.. |   .0807862   .1062068     0.76   0.447    -.1273754    .2889477
+m~0_big_team |   .2478421   .1223505     2.03   0.043     .0080394    .4876447
+m~1_big_team |   .2306927   .1256091     1.84   0.066    -.0154967     .476882
+mshr_lag2_b~ |   .0352955   .1398127     0.25   0.801    -.2387323    .3093234
+mshr_lag3_b~ |    .066971   .1511167     0.44   0.658    -.2292123    .3631544
+mshr_lag4_b~ |   .1321213   .1613504     0.82   0.413    -.1841196    .4483622
+m~5_big_team |    .154729   .1604574     0.96   0.335    -.1597617    .4692197
+mshr_lead4.. |   .0495676   .1097685     0.45   0.652    -.1655746    .2647099
+mshr_lead3.. |   .0899192   .1026999     0.88   0.381    -.1113689    .2912072
+mshr_lead2.. |   .1109866   .1018448     1.09   0.276    -.0886256    .3105987
+mshr_lag0_s~ |   .1398023   .1123506     1.24   0.213    -.0804008    .3600054
+mshr_lag1_s~ |    .206876   .1167457     1.77   0.076    -.0219414    .4356935
+mshr_lag2_s~ |  -.0603787   .1272378    -0.47   0.635    -.3097601    .1890027
+mshr_lag3_s~ |  -.0451511    .137933    -0.33   0.743    -.3154948    .2251925
+mshr_lag4_s~ |  -.0433132   .1481219    -0.29   0.770    -.3336268    .2470004
+mshr_lag5_s~ |   .0072915    .154566     0.05   0.962    -.2956524    .3102354
+       _cons |   .8065689   .0226555    35.60   0.000     .7621648    .8509729
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      6382        6382           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+Iteration 1:   deviance = 1.9908e+05  eps = .         iters = 4    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -2.40  P   
+Iteration 2:   deviance = 1.8558e+05  eps = 7.27e-02  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -3.37      
+Iteration 3:   deviance = 1.8521e+05  eps = 2.00e-03  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -4.24      
+Iteration 4:   deviance = 1.8521e+05  eps = 3.81e-05  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -4.92      
+Iteration 5:   deviance = 1.8521e+05  eps = 1.36e-06  iters = 2    tol = 1.0e-0
+> 5                                                                            
+>    min(eta) =  -5.30      
+Iteration 6:   deviance = 1.8521e+05  eps = 2.69e-08  iters = 2    tol = 1.0e-0
+> 6                                                                            
+>    min(eta) =  -5.39      
+Iteration 7:   deviance = 1.8521e+05  eps = 4.11e-11  iters = 2    tol = 1.0e-0
+> 7                                                                            
+>    min(eta) =  -5.39   S O
+-------------------------------------------------------------------------------
+> -----------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon 
+> below tolerance)
+Converged in 7 iterations and 16 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =     63,820
+Absorbing 2 HDFE groups                           Residual df     =      6,381
+Statistics robust to heteroskedasticity           Wald chi2(36)   =      71.92
+Deviance             =  185206.7362               Prob > chi2     =     0.0003
+Log pseudolikelihood = -161776.3954               Pseudo R2       =     0.3599
+
+Number of clusters (athr_id)=      6,382
+                            (Std. err. adjusted for 6,382 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+cite_affl_wt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+int_lead4_~g |  -.1334076    .595311    -0.22   0.823    -1.300196    1.033381
+int_lead3_~g |  -.4440873   .5677801    -0.78   0.434    -1.556916    .6687412
+int_lead2_~g |  -.8187216   .5564854    -1.47   0.141    -1.909413    .2719697
+int_lag0_y~g |    -.44764    .593779    -0.75   0.451    -1.611425    .7161455
+int_lag1_y~g |  -1.055242   .6318676    -1.67   0.095     -2.29368    .1831952
+int_lag2_y~g |  -.7255809   .6841079    -1.06   0.289    -2.066408    .6152459
+int_lag3_y~g |  -.4074928   .6360648    -0.64   0.522    -1.654157    .8391712
+int_lag4_y~g |  -.7350336   .6363242    -1.16   0.248    -1.982206     .512139
+int_lag5_y~g |  -1.358999   .6787286    -2.00   0.045    -2.689283   -.0287155
+int_lead4_~d |   .2667527   .6005426     0.44   0.657    -.9102892    1.443794
+int_lead3_~d |   .1582645   .5747352     0.28   0.783    -.9681959    1.284725
+int_lead2_~d |  -.7559715   .5665398    -1.33   0.182    -1.866369    .3544261
+int_lag0_old |  -.1452338   .5785564    -0.25   0.802    -1.279184    .9887159
+int_lag1_old |  -.7701641   .6396783    -1.20   0.229    -2.023911    .4835822
+int_lag2_old |  -.1970145   .6664047    -0.30   0.768    -1.503144    1.109115
+int_lag3_old |   .3472914   .7114093     0.49   0.625    -1.047045    1.741628
+int_lag4_old |   .1315758   .7485266     0.18   0.860    -1.335509    1.598661
+int_lag5_old |  -.2483495   .8356577    -0.30   0.766    -1.886208     1.38951
+mshr_lead4~g |  -.0672063   .1692765    -0.40   0.691    -.3989821    .2645695
+mshr_lead3~g |   .0258229   .1648447     0.16   0.876    -.2972667    .3489125
+mshr_lead2~g |  -.0622391   .1597386    -0.39   0.697    -.3753211    .2508428
+mshr_lag0_~g |   .0425495   .1768385     0.24   0.810    -.3040476    .3891466
+mshr_lag1_~g |   .1952648   .1844896     1.06   0.290    -.1663282    .5568578
+mshr_lag2_~g |   -.023273   .2039194    -0.11   0.909    -.4229477    .3764017
+mshr_lag3_~g |   -.028432   .2091893    -0.14   0.892    -.4384355    .3815715
+mshr_lag4_~g |   -.182725    .205147    -0.89   0.373    -.5848057    .2193557
+mshr_lag5_~g |   .2927547   .2134004     1.37   0.170    -.1255024    .7110118
+mshr_lead4~d |   .5072486   .1682278     3.02   0.003     .1775282    .8369689
+mshr_lead3~d |   .3922833   .1637697     2.40   0.017     .0713006    .7132661
+mshr_lead2~d |   .1852783   .1617661     1.15   0.252    -.1317775    .5023341
+mshr_lag0_~d |   .2793692    .179912     1.55   0.120    -.0732519    .6319903
+mshr_lag1_~d |   .5214021   .1852815     2.81   0.005      .158257    .8845472
+mshr_lag2_~d |  -.0616386   .1976739    -0.31   0.755    -.4490723    .3257951
+mshr_lag3_~d |   .1069748   .2138917     0.50   0.617    -.3122452    .5261948
+mshr_lag4_~d |  -.2269443   .2170012    -1.05   0.296    -.6522588    .1983702
+mshr_lag5_~d |   .2852203   .2405724     1.19   0.236     -.186293    .7567336
+       _cons |   1.628889   .0338045    48.19   0.000     1.562634    1.695145
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      6382        6382           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+Iteration 1:   deviance = 1.9932e+05  eps = .         iters = 4    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -2.36  P   
+Iteration 2:   deviance = 1.8576e+05  eps = 7.30e-02  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -3.34      
+Iteration 3:   deviance = 1.8539e+05  eps = 2.01e-03  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -4.20      
+Iteration 4:   deviance = 1.8538e+05  eps = 3.76e-05  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -4.89      
+Iteration 5:   deviance = 1.8538e+05  eps = 1.34e-06  iters = 2    tol = 1.0e-0
+> 5                                                                            
+>    min(eta) =  -5.26      
+Iteration 6:   deviance = 1.8538e+05  eps = 2.64e-08  iters = 2    tol = 1.0e-0
+> 6                                                                            
+>    min(eta) =  -5.35      
+Iteration 7:   deviance = 1.8538e+05  eps = 3.96e-11  iters = 2    tol = 1.0e-0
+> 7                                                                            
+>    min(eta) =  -5.35   S O
+-------------------------------------------------------------------------------
+> -----------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon 
+> below tolerance)
+Converged in 7 iterations and 16 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =     63,820
+Absorbing 2 HDFE groups                           Residual df     =      6,381
+Statistics robust to heteroskedasticity           Wald chi2(36)   =      36.44
+Deviance             =   185378.721               Prob > chi2     =     0.4482
+Log pseudolikelihood = -161862.3879               Pseudo R2       =     0.3596
+
+Number of clusters (athr_id)=      6,382
+                            (Std. err. adjusted for 6,382 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+cite_affl_wt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+int_lead4_.. |  -.0721837    .460489    -0.16   0.875    -.9747255    .8303581
+int_lead3_.. |  -.1064124   .4363913    -0.24   0.807    -.9617237    .7488989
+int_lead2_.. |  -.8487354   .4212185    -2.01   0.044    -1.674308   -.0231624
+int_lag0_h~r |  -.2516907   .4568874    -0.55   0.582    -1.147174    .6437921
+int_lag1_h~r |  -.8124471   .4792423    -1.70   0.090    -1.751745    .1268506
+int_lag2_h~r |  -.5626767   .5331918    -1.06   0.291    -1.607713    .4823601
+int_lag3_h~r |  -.4060845   .5180684    -0.78   0.433     -1.42148    .6093109
+int_lag4_h~r |  -.5869534   .5325581    -1.10   0.270    -1.630748    .4568412
+int_lag5_h~r |  -.7981613   .5732435    -1.39   0.164    -1.921698    .3253754
+int_lead4_.. |  -.1474886   1.090994    -0.14   0.892    -2.285798     1.99082
+int_lead3_.. |  -1.116643   1.082356    -1.03   0.302    -3.238023    1.004736
+int_lead2_.. |  -.8662751   1.183969    -0.73   0.464    -3.186811     1.45426
+int_lag0_l~r |  -1.020215   1.046186    -0.98   0.329    -3.070701    1.030272
+int_lag1_l~r |  -2.018004   1.282967    -1.57   0.116    -4.532573    .4965658
+int_lag2_l~r |  -.2246124   1.170341    -0.19   0.848    -2.518438    2.069213
+int_lag3_l~r |   1.342644   1.205683     1.11   0.265    -1.020451    3.705739
+int_lag4_l~r |   .6995237    1.18477     0.59   0.555    -1.622582     3.02163
+int_lag5_l~r |  -1.391552   1.418453    -0.98   0.327    -4.171669    1.388566
+mshr_lead4.. |   .1990744   .1586461     1.25   0.210    -.1118663    .5100151
+mshr_lead3.. |   .1812666   .1528127     1.19   0.236    -.1182408    .4807739
+mshr_lead2.. |   .0629315   .1490623     0.42   0.673    -.2292252    .3550881
+mshr_lag0_.. |   .1395863   .1668732     0.84   0.403    -.1874791    .4666517
+mshr_lag1_.. |   .3215005   .1708285     1.88   0.060    -.0133173    .6563183
+mshr_lag2_.. |  -.0177083   .1879223    -0.09   0.925    -.3860292    .3506126
+mshr_lag3_.. |   .0397791   .1971124     0.20   0.840    -.3465541    .4261123
+mshr_lag4_.. |  -.1878163   .1955219    -0.96   0.337    -.5710322    .1953997
+mshr_lag5_.. |   .2477359   .2057467     1.20   0.229    -.1555203     .650992
+mshr_lead4.. |   .0158801   .2087862     0.08   0.939    -.3933333    .4250934
+mshr_lead3.. |    .088937   .2154875     0.41   0.680    -.3334106    .5112847
+mshr_lead2.. |  -.1386251   .2231268    -0.62   0.534    -.5759457    .2986954
+mshr_lag0_.. |   .0915909   .2280673     0.40   0.688    -.3554129    .5385946
+mshr_lag1_.. |   .3393206   .2582686     1.31   0.189    -.1668766    .8455178
+mshr_lag2_.. |  -.2149475   .2490942    -0.86   0.388    -.7031632    .2732681
+mshr_lag3_.. |  -.1471344   .2722784    -0.54   0.589    -.6807902    .3865214
+mshr_lag4_.. |    -.35279   .2654713    -1.33   0.184    -.8731043    .1675242
+mshr_lag5_.. |   .4356432   .3117717     1.40   0.162     -.175418    1.046704
+       _cons |   1.640754   .0335484    48.91   0.000        1.575    1.706508
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      6382        6382           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation

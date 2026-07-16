@@ -1,0 +1,429 @@
+-------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  /n/holylabs/pakes_lab/Lab/sci_eq/analysis/reduced_form/code/diag_2
+> 016_outliers.log
+  log type:  text
+ opened on:  10 Jul 2026, 18:07:39
+
+. 
+. use ../temp/es_all_jrnls_r1_r2_public.dta, clear
+
+. keep if exposure > 0
+(13,290 observations deleted)
+
+. gen rel = year - 2014
+
+. 
+. *---- build lead/lag ----*
+. qui sum rel
+
+. local abs_lead = abs(r(min))
+
+. local abs_lag  = r(max)
+
+. forval i = 1/`abs_lag' {
+  2.     gen int_lag`i' = exposure if rel == `i'
+  3.     replace int_lag`i' = 0 if mi(int_lag`i')
+  4.     gen mshr_lag`i' = mkt_spend_shr if rel == `i'
+  5.     replace mshr_lag`i' = 0 if mi(mshr_lag`i')
+  6. }
+(51,561 missing values generated)
+(51,561 real changes made)
+(51,561 missing values generated)
+(51,561 real changes made)
+(51,561 missing values generated)
+(51,561 real changes made)
+(51,561 missing values generated)
+(51,561 real changes made)
+(51,561 missing values generated)
+(51,561 real changes made)
+(51,561 missing values generated)
+(51,561 real changes made)
+(51,561 missing values generated)
+(51,561 real changes made)
+(51,561 missing values generated)
+(51,561 real changes made)
+(51,561 missing values generated)
+(51,561 real changes made)
+(51,561 missing values generated)
+(51,561 real changes made)
+
+. forval i = 1/`abs_lead' {
+  2.     gen int_lead`i' = exposure if rel == -`i'
+  3.     replace int_lead`i' = 0 if mi(int_lead`i')
+  4.     gen mshr_lead`i' = mkt_spend_shr if rel == -`i'
+  5.     replace mshr_lead`i' = 0 if mi(mshr_lead`i')
+  6. }
+(51,561 missing values generated)
+(51,561 real changes made)
+(51,561 missing values generated)
+(51,561 real changes made)
+(51,561 missing values generated)
+(51,561 real changes made)
+(51,561 missing values generated)
+(51,561 real changes made)
+(51,561 missing values generated)
+(51,561 real changes made)
+(51,561 missing values generated)
+(51,561 real changes made)
+(51,561 missing values generated)
+(51,561 real changes made)
+(51,561 missing values generated)
+(51,561 real changes made)
+
+. gen int_lag0 = exposure if rel == 0
+(51,561 missing values generated)
+
+. replace int_lag0 = 0 if mi(int_lag0)
+(51,561 real changes made)
+
+. gen mshr_lag0 = mkt_spend_shr if rel == 0
+(51,561 missing values generated)
+
+. replace mshr_lag0 = 0 if mi(mshr_lag0)
+(51,561 real changes made)
+
+. local ileads
+
+. local ilags
+
+. local mleads
+
+. local mlags
+
+. forval i = 2/`abs_lead' {
+  2.     local ileads int_lead`i' `ileads'
+  3.     local mleads mshr_lead`i' `mleads'
+  4. }
+
+. forval i = 0/`abs_lag' {
+  2.     local ilags `ilags' int_lag`i'
+  3.     local mlags `mlags' mshr_lag`i'
+  4. }
+
+. 
+. *---- 1) distribution of ppr_cnt in 2016 ----*
+. di as text _newline "======= 1) ppr_cnt distribution by year, positive-exposu
+> re subsample ======="
+
+======= 1) ppr_cnt distribution by year, positive-exposure subsample =======
+
+. sum ppr_cnt if rel == 2, d
+
+                        (sum) ppr_cnt
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            0              0
+ 5%            0              0
+10%            0              0       Obs               5,729
+25%            0              0       Sum of wgt.       5,729
+
+50%            1                      Mean           1.379473
+                        Largest       Std. dev.      1.669383
+75%            2             14
+90%            3             15       Variance       2.786841
+95%            5             15       Skewness       2.076866
+99%            7             18       Kurtosis       10.70744
+
+. di as text "--- upper tail counts ---"
+--- upper tail counts ---
+
+. count if rel == 2 & ppr_cnt >= 5
+  293
+
+. count if rel == 2 & ppr_cnt >= 10
+  15
+
+. count if rel == 2 & ppr_cnt >= 15
+  3
+
+. count if rel == 2 & ppr_cnt >= 20
+  0
+
+. count if rel == 2 & ppr_cnt >= 30
+  0
+
+. list athr_id ppr_cnt exposure if rel == 2 & ppr_cnt >= 15
+
+       +----------------------------------+
+       |     athr_id   ppr_cnt   exposure |
+       |----------------------------------|
+19557. | A5035633946        18    .048552 |
+23997. | A5043879863        15   .0252527 |
+40947. | A5073846446        15   .0348906 |
+       +----------------------------------+
+
+. 
+. *---- 2) baseline (positive-exposure, no outlier treatment) ----*
+. di as text _newline "======= 2) BASELINE: positive exposure, no trim ======="
+
+======= 2) BASELINE: positive exposure, no trim =======
+
+. di as text "--- base PPML ---"
+--- base PPML ---
+
+. qui ppmlhdfe ppr_cnt `ileads' `ilags', absorb(athr_id year) vce(cluster athr_
+> id)
+
+. estimates store base_none
+
+. di as text "--- +mshr controls ---"
+--- +mshr controls ---
+
+. qui ppmlhdfe ppr_cnt `ileads' `ilags' `mleads' `mlags', absorb(athr_id year) 
+> vce(cluster athr_id)
+
+. estimates store base_mshr
+
+. 
+. *---- 3) winsorize ppr_cnt at various percentiles ----*
+. foreach p in 99 97 95 {
+  2.     preserve
+  3.     qui sum ppr_cnt, d
+  4.     local cap = r(p`p')
+  5.     di as text "  winsorize ppr_cnt at p`p' = " `cap'
+  6.     replace ppr_cnt = `cap' if ppr_cnt > `cap' & !mi(ppr_cnt)
+  7.     di as text "--- winsor p`p' base ---"
+  8.     qui ppmlhdfe ppr_cnt `ileads' `ilags', absorb(athr_id year) vce(cluste
+> r athr_id)
+  9.     estimates store wp`p'_base
+ 10.     di as text "--- winsor p`p' +mshr ---"
+ 11.     qui ppmlhdfe ppr_cnt `ileads' `ilags' `mleads' `mlags', absorb(athr_id
+>  year) vce(cluster athr_id)
+ 12.     estimates store wp`p'_mshr
+ 13.     restore
+ 14. }
+  winsorize ppr_cnt at p99 = 8
+(541 real changes made)
+--- winsor p99 base ---
+--- winsor p99 +mshr ---
+  winsorize ppr_cnt at p97 = .
+(0 real changes made)
+--- winsor p97 base ---
+--- winsor p97 +mshr ---
+  winsorize ppr_cnt at p95 = 5
+(2,493 real changes made)
+--- winsor p95 base ---
+--- winsor p95 +mshr ---
+
+. 
+. *---- 4) trim top N PIs by leverage on int_lag2 ----*
+. gen pre_pprs = ppr_cnt if year < 2014
+(34,374 missing values generated)
+
+. bys athr_id: egen pi_pre_mean = mean(pre_pprs)
+
+. gen dev_2016 = ppr_cnt - pi_pre_mean if rel == 2
+(51,561 missing values generated)
+
+. gen leverage_2016 = exposure * dev_2016 if rel == 2
+(51,561 missing values generated)
+
+. bys athr_id: egen leverage_pi = max(leverage_2016)
+
+. gsort -leverage_pi athr_id
+
+. 
+. * Rank PIs by leverage_pi and try dropping top 10 / 25 / 50 / 100.
+. bys athr_id: gen _first = _n == 1
+
+. gen lev_rank = .
+(57,290 missing values generated)
+
+. qui replace lev_rank = sum(_first) if _first == 1
+
+. bys athr_id: egen pi_lev_rank = max(lev_rank)
+
+. 
+. foreach n in 10 25 50 100 {
+  2.     preserve
+  3.     di as text _newline "======= 4) drop top `n' PIs by leverage on int_la
+> g2 ======="
+  4.     drop if pi_lev_rank <= `n'
+  5.     di as text "--- base ---"
+  6.     qui ppmlhdfe ppr_cnt `ileads' `ilags', absorb(athr_id year) vce(cluste
+> r athr_id)
+  7.     estimates store trim`n'_base
+  8.     di as text "--- +mshr ---"
+  9.     qui ppmlhdfe ppr_cnt `ileads' `ilags' `mleads' `mlags', absorb(athr_id
+>  year) vce(cluster athr_id)
+ 10.     estimates store trim`n'_mshr
+ 11.     restore
+ 12. }
+
+======= 4) drop top 10 PIs by leverage on int_lag2 =======
+(100 observations deleted)
+--- base ---
+--- +mshr ---
+
+======= 4) drop top 25 PIs by leverage on int_lag2 =======
+(250 observations deleted)
+--- base ---
+--- +mshr ---
+
+======= 4) drop top 50 PIs by leverage on int_lag2 =======
+(500 observations deleted)
+--- base ---
+--- +mshr ---
+
+======= 4) drop top 100 PIs by leverage on int_lag2 =======
+(1,000 observations deleted)
+--- base ---
+--- +mshr ---
+
+. 
+. *---- 5) drop PIs whose 2016 ppr_cnt exceeds 3x their pre-period mean (Cook-s
+> tyle) ----*
+. gen mult_2016 = ppr_cnt / pi_pre_mean if rel == 2 & pi_pre_mean > 0
+(51,561 missing values generated)
+
+. bys athr_id: egen pi_mult = max(mult_2016)
+
+. foreach thresh in 5 3 2 {
+  2.     preserve
+  3.     di as text _newline "======= 5) drop PIs with 2016/pre_mean >= `thresh
+> ' ======="
+  4.     count if pi_mult >= `thresh' & _first == 1
+  5.     drop if pi_mult >= `thresh'
+  6.     di as text "--- base ---"
+  7.     qui ppmlhdfe ppr_cnt `ileads' `ilags', absorb(athr_id year) vce(cluste
+> r athr_id)
+  8.     estimates store mult`thresh'_base
+  9.     di as text "--- +mshr ---"
+ 10.     qui ppmlhdfe ppr_cnt `ileads' `ilags' `mleads' `mlags', absorb(athr_id
+>  year) vce(cluster athr_id)
+ 11.     estimates store mult`thresh'_mshr
+ 12.     restore
+ 13. }
+
+======= 5) drop PIs with 2016/pre_mean >= 5 =======
+  2
+(20 observations deleted)
+--- base ---
+--- +mshr ---
+
+======= 5) drop PIs with 2016/pre_mean >= 3 =======
+  49
+(490 observations deleted)
+--- base ---
+--- +mshr ---
+
+======= 5) drop PIs with 2016/pre_mean >= 2 =======
+  304
+(3,040 observations deleted)
+--- base ---
+--- +mshr ---
+
+. 
+. *---- 6) side-by-side coefficient table on int_lag2 across all variants ----*
+. di as text _newline "======= 6) int_lag2 across variants (base spec) ======="
+
+======= 6) int_lag2 across variants (base spec) =======
+
+. estimates table base_none wp99_base wp97_base wp95_base trim10_base trim25_ba
+> se trim50_base trim100_base mult5_base mult3_base mult2_base, keep(int_lag2) 
+> b(%9.4f) se
+
+--------------------------------------------------------------------------
+    Variable | base_none   wp99_base   wp97_base   wp95_base   trim10_~e  
+-------------+------------------------------------------------------------
+    int_lag2 |    0.6270      0.7377      0.6270      0.7788      0.6324  
+             |    0.4464      0.4325      0.4464      0.3979      0.4470  
+--------------------------------------------------------------------------
+                                                              Legend: b/se
+
+
+--------------------------------------------------------------------------
+    Variable | trim25_~e   trim50_~e   trim100~e   mult5_b~e   mult3_b~e  
+-------------+------------------------------------------------------------
+    int_lag2 |    0.6182      0.5494      0.6517      0.6254      0.6244  
+             |    0.4488      0.4493      0.4473      0.4465      0.4404  
+--------------------------------------------------------------------------
+                                                              Legend: b/se
+
+
+--------------------------
+    Variable | mult2_b~e  
+-------------+------------
+    int_lag2 |    0.5429  
+             |    0.4392  
+--------------------------
+              Legend: b/se
+
+. 
+. di as text _newline "======= 7) int_lag2 across variants (mshrctrl spec) ====
+> ==="
+
+======= 7) int_lag2 across variants (mshrctrl spec) =======
+
+. estimates table base_mshr wp99_mshr wp97_mshr wp95_mshr trim10_mshr trim25_ms
+> hr trim50_mshr trim100_mshr mult5_mshr mult3_mshr mult2_mshr, keep(int_lag2) 
+> b(%9.4f) se
+
+--------------------------------------------------------------------------
+    Variable | base_mshr   wp99_mshr   wp97_mshr   wp95_mshr   trim10_~r  
+-------------+------------------------------------------------------------
+    int_lag2 |    0.7393      0.8786      0.7393      0.8920      0.7431  
+             |    0.4798      0.4627      0.4798      0.4267      0.4802  
+--------------------------------------------------------------------------
+                                                              Legend: b/se
+
+
+--------------------------------------------------------------------------
+    Variable | trim25_~r   trim50_~r   trim100~r   mult5_m~r   mult3_m~r  
+-------------+------------------------------------------------------------
+    int_lag2 |    0.7321      0.6605      0.7664      0.7307      0.6129  
+             |    0.4815      0.4821      0.4800      0.4797      0.4742  
+--------------------------------------------------------------------------
+                                                              Legend: b/se
+
+
+--------------------------
+    Variable | mult2_m~r  
+-------------+------------
+    int_lag2 |    0.4184  
+             |    0.4759  
+--------------------------
+              Legend: b/se
+
+. 
+. di as text _newline "======= 8) full event-time coeffs, best trim variant ===
+> ===="
+
+======= 8) full event-time coeffs, best trim variant =======
+
+. estimates table base_none trim25_base trim50_base trim100_base wp95_base, kee
+> p(`ileads' `ilags') b(%9.4f) se
+
+--------------------------------------------------------------------------
+    Variable | base_none   trim25_~e   trim50_~e   trim100~e   wp95_base  
+-------------+------------------------------------------------------------
+   int_lead4 |   -0.5196     -0.5185     -0.5347     -0.5042     -0.4216  
+             |    0.3782      0.3791      0.3789      0.3770      0.3380  
+   int_lead3 |   -0.2925     -0.2845     -0.3202     -0.3125     -0.2030  
+             |    0.3594      0.3604      0.3616      0.3594      0.3191  
+   int_lead2 |    0.1350      0.1074      0.0445     -0.0064      0.1408  
+             |    0.3357      0.3366      0.3378      0.3390      0.3062  
+    int_lag0 |   -0.4258     -0.4052     -0.4338     -0.4513     -0.3220  
+             |    0.3749      0.3763      0.3772      0.3793      0.3406  
+    int_lag1 |   -0.2919     -0.2407     -0.3000     -0.2467     -0.2929  
+             |    0.4265      0.4270      0.4284      0.4300      0.3739  
+    int_lag2 |    0.6270      0.6182      0.5494      0.6517      0.7788  
+             |    0.4464      0.4488      0.4493      0.4473      0.3979  
+    int_lag3 |   -0.0815     -0.0800     -0.1479     -0.0951     -0.0094  
+             |    0.4831      0.4852      0.4869      0.4886      0.4237  
+    int_lag4 |   -0.6042     -0.6389     -0.6831     -0.6208     -0.5172  
+             |    0.5083      0.5113      0.5125      0.5139      0.4637  
+    int_lag5 |   -0.3356     -0.3095     -0.3541     -0.3614     -0.1864  
+             |    0.4997      0.5014      0.5007      0.5045      0.4649  
+--------------------------------------------------------------------------
+                                                              Legend: b/se
+
+. 
+. log close
+      name:  <unnamed>
+       log:  /n/holylabs/pakes_lab/Lab/sci_eq/analysis/reduced_form/code/diag_2
+> 016_outliers.log
+  log type:  text
+ closed on:  10 Jul 2026, 18:43:46
+-------------------------------------------------------------------------------

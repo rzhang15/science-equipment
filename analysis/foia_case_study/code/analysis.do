@@ -12,7 +12,7 @@ end
 
 program boe
     use ../external/samp/merged_foias_with_pis,  clear
-    keep if inlist(uni , "utdallas", "umich")
+   * keep if inlist(uni , "utdallas", "umich")
     drop if mi(athr_id)
     gen year = year(date(date, "YMD"))
     drop if year > 2013

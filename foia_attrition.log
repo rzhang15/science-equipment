@@ -1,0 +1,327 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 120,000; see help set_maxvar.
+
+. do /tmp/foia_attrition.do 
+
+. * How many FOIA PIs total in real_exposure?
+. use /n/home02/cxu75/sci_eq/analysis/reduced_form/external/real_exposure/athr_
+> exposure_hc, clear
+
+. count
+  213
+
+. di as text "Total FOIA-anchored PIs in athr_exposure_hc.dta: " r(N)
+Total FOIA-anchored PIs in athr_exposure_hc.dta: 213
+
+. count if mi(athr_id)
+  0
+
+. di as text "  ... missing athr_id: " r(N)
+  ... missing athr_id: 0
+
+. count if !mi(athr_id)
+  213
+
+. di as text "  ... with athr_id: " r(N)
+  ... with athr_id: 213
+
+. save /tmp/foia_full, replace
+(file /tmp/foia_full.dta not found)
+file /tmp/foia_full.dta saved
+
+. 
+. * How many appear in the last-author panel base?
+. use athr_id year using /n/home02/cxu75/sci_eq/analysis/reduced_form/external/
+> samp/athr_panel_full_year_last_all_jrnls_r1_r2_public, clear
+
+. duplicates drop athr_id, force
+
+Duplicates in terms of athr_id
+
+(691,102 observations deleted)
+
+. merge 1:1 athr_id using /tmp/foia_full, keep(2 3)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                            21
+        from master                         0  (_merge==1)
+        from using                         21  (_merge==2)
+
+    Matched                               192  (_merge==3)
+    -----------------------------------------
+
+. count if _merge == 3
+  192
+
+. di as text "FOIA PIs present in last-author panel (all_jrnls_r1_r2_public): "
+>  r(N)
+FOIA PIs present in last-author panel (all_jrnls_r1_r2_public): 192
+
+. count if _merge == 2
+  21
+
+. di as text "FOIA PIs NOT in last-author panel: " r(N)
+FOIA PIs NOT in last-author panel: 21
+
+. drop _merge
+
+. 
+. * Now apply sample restrictions step-by-step
+. use /n/home02/cxu75/sci_eq/analysis/reduced_form/external/samp/athr_panel_ful
+> l_year_last_all_jrnls_r1_r2_public, clear
+
+. merge m:1 athr_id using /tmp/foia_full, keep(3) nogen
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                             2,894  
+    -----------------------------------------
+
+. bys athr_id: gen _first = _n == 1
+
+. count if _first
+  192
+
+. di as text "== Step 0: FOIA PIs in raw panel: " r(N)
+== Step 0: FOIA PIs in raw panel: 192
+
+. 
+. bys athr_id: egen max_year = max(year)
+
+. bys athr_id: egen min_year = min(year) 
+
+. keep if min_year <= 2013
+(113 observations deleted)
+
+. bys athr_id: replace _first = _n == 1
+(0 real changes made)
+
+. count if _first
+  174
+
+. di as text "== Step 1: after min_year<=2013: " r(N)
+== Step 1: after min_year<=2013: 174
+
+. 
+. keep if max_year >= 2015 
+(243 observations deleted)
+
+. bys athr_id: replace _first = _n == 1
+(0 real changes made)
+
+. count if _first
+  145
+
+. di as text "== Step 2: after max_year>=2015: " r(N)
+== Step 2: after max_year>=2015: 145
+
+. 
+. keep if inrange(year, 2010, 2019)
+(1,565 observations deleted)
+
+. bys athr_id: replace _first = _n == 1
+(78 real changes made)
+
+. count if _first
+  145
+
+. di as text "== Step 3: after year in [2010,2019]: " r(N)
+== Step 3: after year in [2010,2019]: 145
+
+. 
+. * imputation merge (would drop PIs not in _cf-filtered imputed file)
+. merge m:1 athr_id using /n/home02/cxu75/sci_eq/analysis/reduced_form/temp/exp
+> osure, keep(1 3)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                               973  (_merge==3)
+    -----------------------------------------
+
+. count if _first & _merge == 3
+  145
+
+. di as text "== Step 4a: also in imputed file (_cf): " r(N)
+== Step 4a: also in imputed file (_cf): 145
+
+. count if _first & _merge == 1
+  0
+
+. di as text "== Step 4b: FOIA PIs NOT in _cf-imputed file (dropped by cf): " r
+> (N)
+== Step 4b: FOIA PIs NOT in _cf-imputed file (dropped by cf): 0
+
+. * keep only merged (matching assert(1 2 3) keep(3)) 
+. keep if _merge == 3
+(0 observations deleted)
+
+. drop _merge
+
+. bys athr_id: replace _first = _n == 1
+(0 real changes made)
+
+. 
+. count if _first
+  145
+
+. di as text "== Step 5: after imputation merge keep(3): " r(N)
+== Step 5: after imputation merge keep(3): 145
+
+. 
+. * single-institution restriction
+. bys athr_id inst_id: gen plc_cntr = _n == 1
+
+. bys athr_id : egen num_place = total(plc_cntr)
+
+. count if _first & num_place == 1
+  133
+
+. di as text "== Step 6: single-institution PIs: " r(N)
+== Step 6: single-institution PIs: 133
+
+. keep if num_place == 1
+(95 observations deleted)
+
+. bys athr_id: replace _first = _n == 1
+(214 real changes made)
+
+. 
+. * pre_ppr filters
+. gen pre_ppr_cnt = ppr_cnt if year < 2014
+(510 missing values generated)
+
+. bys athr_id: egen pre_ppr_cnt_sum = sum(pre_ppr_cnt)
+
+. bys athr_id: egen pre_ppr_cnt_avg = mean(pre_ppr_cnt)
+(4 missing values generated)
+
+. sum pre_ppr_cnt_avg, d
+
+                       pre_ppr_cnt_avg
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            1              1
+ 5%            1              1
+10%            1              1       Obs                 874
+25%     1.333333              1       Sum of wgt.         874
+
+50%     1.666667                      Mean           1.957666
+                        Largest       Std. dev.      1.050504
+75%         2.25              7
+90%         2.75              7       Variance       1.103558
+95%          3.5              7       Skewness        2.70105
+99%          6.5              7       Kurtosis        11.9039
+
+. drop if pre_ppr_cnt_avg <= r(p5)  
+(126 observations deleted)
+
+. sum pre_ppr_cnt_sum, d
+
+                       pre_ppr_cnt_sum
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            2              0
+ 5%            3              0
+10%            3              0       Obs                 752
+25%            4              0       Sum of wgt.         752
+
+50%            6                      Mean           6.768617
+                        Largest       Std. dev.      4.046951
+75%            8             26
+90%           10             26       Variance       16.37782
+95%           14             26       Skewness       2.742823
+99%           26             26       Kurtosis       12.73017
+
+. drop if pre_ppr_cnt_sum <= r(p5)  
+(77 observations deleted)
+
+. bys athr_id: replace _first = _n == 1
+(0 real changes made)
+
+. count if _first
+  90
+
+. di as text "== Step 7: after pre-ppr p5 drops: " r(N)
+== Step 7: after pre-ppr p5 drops: 90
+
+. 
+. * Final check — what clusters do the remaining FOIA PIs live in?
+. merge m:1 athr_id using /n/home02/cxu75/sci_eq/analysis/reduced_form/temp/ath
+> r_cluster30, keep(1 3) nogen
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                               675  
+    -----------------------------------------
+
+. count if _first & !mi(cluster_30)
+  90
+
+. di as text "== FOIA PIs with a cluster_30 assignment: " r(N)
+== FOIA PIs with a cluster_30 assignment: 90
+
+. count if _first & mi(cluster_30)
+  0
+
+. di as text "== FOIA PIs with NO cluster_30 (unmapped): " r(N)
+== FOIA PIs with NO cluster_30 (unmapped): 0
+
+. 
+. di as text ""
+
+
+. di as text "FOIA cluster distribution:"
+FOIA cluster distribution:
+
+. tab cluster_30 if _first, missing
+
+ cluster_30 |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          0 |          2        2.22        2.22
+          1 |         19       21.11       23.33
+          3 |         10       11.11       34.44
+          5 |          3        3.33       37.78
+          7 |         18       20.00       57.78
+          8 |          1        1.11       58.89
+         10 |          9       10.00       68.89
+         13 |          2        2.22       71.11
+         14 |          3        3.33       74.44
+         15 |          2        2.22       76.67
+         17 |          2        2.22       78.89
+         19 |          6        6.67       85.56
+         20 |          3        3.33       88.89
+         22 |          2        2.22       91.11
+         23 |          1        1.11       92.22
+         24 |          1        1.11       93.33
+         25 |          4        4.44       97.78
+         26 |          2        2.22      100.00
+------------+-----------------------------------
+      Total |         90      100.00
+
+. 
+. 
+end of do-file

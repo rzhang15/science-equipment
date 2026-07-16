@@ -13,11 +13,18 @@ program main
     save ../temp/pi_ppr, replace
     merge 1:m pmid using ../external/pubmed/grants, assert(1 2 3) keep(1 3)
     tab _merge
-    drop n _merge
+    cap drop n 
+    cap drop _merge
+
+    preserve
     contract athr_id year grant_id acronym agency country
     drop _freq
     drop if mi(grant_id)
     save ../output/pi_grants, replace
+    restore
+
+    gduplicates drop
+    save ../output/pi_ppr_grants, replace
 end
 **
 main
