@@ -1,0 +1,73 @@
+
+. set more off
+
+. clear all
+
+. set scheme modern
+
+. log using /tmp/kd_ppr_yr.log, replace
+(file /tmp/kd_ppr_yr.log not found)
+-------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  /tmp/kd_ppr_yr.log
+  log type:  text
+ opened on:  19 Jul 2026, 22:40:50
+
+. foreach samp_suf in _r1_r2_public _r1_public {
+  2.     di as text _n "=== `samp_suf' ==="
+  3.     use ../temp/es_all_jrnls`samp_suf', clear
+  4.     gcollapse (sum) ppr_cnt (mean) hiw_tfnd ic_tfnd, by(inst_id year)
+  5.     gcollapse (mean) ppr_cnt (mean) hiw_tfnd ic_tfnd, by(inst_id)
+  6.     drop if mi(hiw_tfnd)
+  7.     gen double ln_ppr = ln(1 + ppr_cnt)
+  8. 
+.     qui count if hiw_tfnd == 1
+  9.     local n_hi = r(N)
+ 10.     qui count if hiw_tfnd == 0
+ 11.     local n_lo = r(N)
+ 12.     qui sum ppr_cnt if hiw_tfnd == 1
+ 13.     local mu_hi : dis %8.1fc r(mean)
+ 14.     qui sum ppr_cnt if hiw_tfnd == 0
+ 15.     local mu_lo : dis %8.1fc r(mean)
+ 16. 
+.     tw kdensity ln_ppr if hiw_tfnd == 1, lcolor(ebblue) lwidth(medthick) || /
+> //
+>        kdensity ln_ppr if hiw_tfnd == 0, lcolor(dkorange) lwidth(medthick) //
+> /
+>        , xtitle("ln(1 + Avg Papers per Year at Institution)") ytitle("Density
+> ") ///
+>          legend(order(1 "Hi Total R&D (N=`n_hi', mean=`mu_hi'/yr)" ///
+>                       2 "Lo Total R&D (N=`n_lo', mean=`mu_lo'/yr)") ///
+>                 pos(6) ring(1) rows(1) span size(small)) ///
+>          plotregion(margin(sides))
+ 17.     graph export ../output/figures/all_jrnls/diag_kd_ln_ppr_per_yr_by_hiw_
+> tfnd`samp_suf'.pdf, replace
+ 18.     di as text "  Hi tfnd: N=`n_hi' mean=`mu_hi'/yr"
+ 19.     di as text "  Lo tfnd: N=`n_lo' mean=`mu_lo'/yr"
+ 20. }
+
+=== _r1_r2_public ===
+(27 observations deleted)
+file
+    ../output/figures/all_jrnls/diag_kd_ln_ppr_per_yr_by_hiw_tfnd_r1_r2_publi
+    > c.pdf saved as PDF format
+  Hi tfnd: N=13 mean=   403.6/yr
+  Lo tfnd: N=92 mean=    52.9/yr
+
+=== _r1_public ===
+(20 observations deleted)
+file
+    ../output/figures/all_jrnls/diag_kd_ln_ppr_per_yr_by_hiw_tfnd_r1_public.p
+    > df saved as PDF format
+  Hi tfnd: N=12 mean=   427.3/yr
+  Lo tfnd: N=49 mean=    92.0/yr
+
+. log close
+      name:  <unnamed>
+       log:  /tmp/kd_ppr_yr.log
+  log type:  text
+ closed on:  19 Jul 2026, 22:40:58
+-------------------------------------------------------------------------------
+
+. 
+end of do-file

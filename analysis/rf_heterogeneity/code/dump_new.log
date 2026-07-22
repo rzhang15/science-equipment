@@ -1,0 +1,108 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 120,000; see help set_maxvar.
+
+. do /tmp/dump_new.do 
+
+. use ../temp/phet_results_all_jrnls_r1_r2_public_ppr_cnt.dta, clear
+
+. keep if yvar == "ppr_cnt" & spec == "mshrctrl" & inlist(split_type, "joint_ae
+> _prppr", "joint_ae_coath")
+(108 observations deleted)
+
+. keep grp split_type post_b post_se N
+
+. sort split_type grp
+
+. list, sep(0) noobs abbrev(20)
+
+  +---------------------------------------------------------------+
+  |         grp       split_type       post_b     post_se       N |
+  |---------------------------------------------------------------|
+  | fc_hi_applx   joint_ae_coath   -.71969259   .34807148   52680 |
+  |  fc_hi_basx   joint_ae_coath   -.27966735    .3625058   52950 |
+  | fc_hi_endow   joint_ae_coath    .04942558   .34808965   57970 |
+  |  fc_hi_fdls   joint_ae_coath   -.46914063   .38014975   52920 |
+  |  fc_hi_fedf   joint_ae_coath   -.21189559   .33480223   52950 |
+  | fc_hi_instf   joint_ae_coath   -.04816001   .34831358   52950 |
+  |   fc_hi_lsf   joint_ae_coath   -.46914063   .38014975   52920 |
+  |  fc_hi_tfnd   joint_ae_coath    -.4713903   .34179897   52950 |
+  | fc_lo_applx   joint_ae_coath    .20933696    .3800932   52680 |
+  |  fc_lo_basx   joint_ae_coath   -.11796685   .37054504   52950 |
+  | fc_lo_endow   joint_ae_coath   -.38179494   .36451791   57970 |
+  |  fc_lo_fdls   joint_ae_coath   -.06815288   .35240434   52920 |
+  |  fc_lo_fedf   joint_ae_coath   -.20815504   .40656623   52950 |
+  | fc_lo_instf   joint_ae_coath   -.37058536   .39072539   52950 |
+  |   fc_lo_lsf   joint_ae_coath   -.06815288   .35240434   52920 |
+  |  fc_lo_tfnd   joint_ae_coath    .01725862   .38625974   52950 |
+  | mc_hi_applx   joint_ae_coath   -.66062467   .34910431   52680 |
+  |  mc_hi_basx   joint_ae_coath   -.47606659   .32685561   52950 |
+  | mc_hi_endow   joint_ae_coath   -.63601941   .34413164   57970 |
+  |  mc_hi_fdls   joint_ae_coath   -.61062184   .34205455   52920 |
+  |  mc_hi_fedf   joint_ae_coath   -.35521596   .32854224   52950 |
+  | mc_hi_instf   joint_ae_coath   -.42158301   .36897465   52950 |
+  |   mc_hi_lsf   joint_ae_coath   -.61062184   .34205455   52920 |
+  |  mc_hi_tfnd   joint_ae_coath   -.50446996   .33581402   52950 |
+  | mc_lo_applx   joint_ae_coath   -.18146503   .42576807   52680 |
+  |  mc_lo_basx   joint_ae_coath   -.38705162   .47594174   52950 |
+  | mc_lo_endow   joint_ae_coath   -.23724446   .40713967   57970 |
+  |  mc_lo_fdls   joint_ae_coath   -.22592907   .43618239   52920 |
+  |  mc_lo_fedf   joint_ae_coath   -.60770894   .47377523   52950 |
+  | mc_lo_instf   joint_ae_coath   -.50427003    .4037797   52950 |
+  |   mc_lo_lsf   joint_ae_coath   -.22592907   .43618239   52920 |
+  |  mc_lo_tfnd   joint_ae_coath   -.34462799   .44810041   52950 |
+  | hp_hi_applx   joint_ae_prppr   -.92217158   .28576432   52680 |
+  |  hp_hi_basx   joint_ae_prppr   -.48044693   .27952637   52950 |
+  | hp_hi_endow   joint_ae_prppr   -.40366174   .29009393   57970 |
+  |  hp_hi_fdls   joint_ae_prppr   -.77613811   .29697191   52920 |
+  |  hp_hi_fedf   joint_ae_prppr   -.43097981   .26914971   52950 |
+  | hp_hi_instf   joint_ae_prppr   -.44639609   .29253052   52950 |
+  |   hp_hi_lsf   joint_ae_prppr   -.77613811   .29697191   52920 |
+  |  hp_hi_tfnd   joint_ae_prppr   -.70388235   .27692866   52950 |
+  | hp_lo_applx   joint_ae_prppr    .20986966   .34023159   52680 |
+  |  hp_lo_basx   joint_ae_prppr   -.13683075   .35759658   52950 |
+  | hp_lo_endow   joint_ae_prppr    -.2072497   .33190054   57970 |
+  |  hp_lo_fdls   joint_ae_prppr    .04688712   .32641514   52920 |
+  |  hp_lo_fedf   joint_ae_prppr   -.22264409   .38190326   52950 |
+  | hp_lo_instf   joint_ae_prppr   -.22797818   .34073187   52950 |
+  |   hp_lo_lsf   joint_ae_prppr    .04688712   .32641514   52920 |
+  |  hp_lo_tfnd   joint_ae_prppr     .0610604   .35442913   52950 |
+  | lp_hi_applx   joint_ae_prppr   -.00204114     .499863   52680 |
+  |  lp_hi_basx   joint_ae_prppr   -.12616231   .48843698   52950 |
+  | lp_hi_endow   joint_ae_prppr   -.03603112   .45579219   57970 |
+  |  lp_hi_fdls   joint_ae_prppr    .15235586   .48738489   52920 |
+  |  lp_hi_fedf   joint_ae_prppr    .13346009   .48414208   52950 |
+  | lp_hi_instf   joint_ae_prppr     .4291406   .49401696   52950 |
+  |   lp_hi_lsf   joint_ae_prppr    .15235586   .48738489   52920 |
+  |  lp_hi_tfnd   joint_ae_prppr    .20377702   .48328864   52950 |
+  | lp_lo_applx   joint_ae_prppr   -.34445216    .4989138   52680 |
+  |  lp_lo_basx   joint_ae_prppr   -.28589248   .50373108   52950 |
+  | lp_lo_endow   joint_ae_prppr   -.45902484   .46289755   57970 |
+  |  lp_lo_fdls   joint_ae_prppr   -.55189178   .49901648   52920 |
+  |  lp_lo_fedf   joint_ae_prppr   -.56570465    .5115372   52950 |
+  | lp_lo_instf   joint_ae_prppr   -.85986585   .48888582   52950 |
+  |   lp_lo_lsf   joint_ae_prppr   -.55189178   .49901648   52920 |
+  |  lp_lo_tfnd   joint_ae_prppr   -.56724378   .50556917   52950 |
+  +---------------------------------------------------------------+
+
+. 
+end of do-file

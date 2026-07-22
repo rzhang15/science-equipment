@@ -1,0 +1,2326 @@
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  /n/holylabs/pakes_lab/Lab/sci_eq/analysis/rf_heterogeneity/code/diag.log
+  log type:  text
+ opened on:  19 Jul 2026, 23:37:31
+
+. 
+. * Combined heterogeneity diagnostics. Two parts:
+. *   Part A: PI-level (LPM, R1/R2 composition, baseline productivity kdensity,
+. *           age dist by hi/lo institutional characteristic)
+. *   Part B: panel-level joint 2x2 pooled-DiD PPML (young x hi_char) across
+. *           the reduced ic-char set, plus figures.
+. *
+. * PI-weighted median cutoffs by default. Set DIAG_INSTWTD 1 to also emit the
+. * inst-weighted variants alongside for comparison.
+. global DIAG_INSTWTD 0
+
+. 
+. * Reduced ic set (matches IC_ALIASES in analysis.do; keep in sync).
+. local ic_aliases tfnd lsf endow
+
+. 
+. * IC display labels (match `ic_lbl_*' in analysis.do; keep in sync).
+. local lbl_tfnd  "Total R&D Funding"
+
+. local lbl_lsf   "Life-Sci Funding"
+
+. local lbl_endow "Endowment"
+
+. 
+. * Loop over both samples: R1+R2+public and R1-only-public. All output PDFs and
+. * tempfile paths get the sample suffix appended.
+. foreach samp_suf in _r1_r2_public _r1_public {
+  2. di as text _n(3) "============================================================" ///
+>     _n "=== SAMPLE: `samp_suf'"                                                 ///
+>     _n "============================================================" _n
+  3. 
+. use ../temp/es_all_jrnls`samp_suf', clear
+  4. qui gunique athr_id
+  5. di as text "Unique PIs in panel = " r(unique)
+  6. 
+. * ============================================================
+. * Part A: PI-level diagnostics (preserve for the joint 2x2 in Part B)
+. * ============================================================
+. preserve
+  7. keep if athr_indicator == 1
+  8. qui count
+  9. di as text _n "Unique PIs after athr_indicator filter = " r(N)
+ 10. 
+. * --- A1: R1 x young cross-tab + bar chart + age histogram by R1 ---
+. di as text _n(2) "=== R1 x young cross-tab ==="
+ 11. tabulate r1 young, row col
+ 12. 
+. qui count if r1 == 1
+ 13. local n_r1 = r(N)
+ 14. qui count if r1 == 0
+ 15. local n_r2 = r(N)
+ 16. 
+. graph bar (mean) young, ///
+>     over(r1, relabel(1 `"R2 (N=`n_r2')"' 2 `"R1 (N=`n_r1')"')) ///
+>     ytitle("Share Young") bar(1, color(ebblue)) ///
+>     blabel(bar, format(%4.3f) size(medium)) ///
+>     plotregion(margin(sides))
+ 17. graph export ../output/figures/all_jrnls/diag_share_young_by_r1`samp_suf'.pdf, replace
+ 18. 
+. tw histogram age_2014 if r1 == 1, freq lcolor(ebblue) fcolor(ebblue%30) width(2) || ///
+>    histogram age_2014 if r1 == 0, freq lcolor(dkorange) fcolor(dkorange%30) width(2) ///
+>    , xtitle("Age in 2014") ytitle("Frequency") ///
+>      legend(order(1 "R1 (N=`n_r1')" 2 "R2 (N=`n_r2')") pos(2) ring(0) rows(2) size(small)) ///
+>      plotregion(margin(sides))
+ 19. graph export ../output/figures/all_jrnls/diag_age_hist_by_r1`samp_suf'.pdf, replace
+ 20. 
+. * --- A2: baseline productivity kdensity (young vs old) ---
+. qui count if young == 1
+ 21. local n_y = r(N)
+ 22. qui count if young == 0
+ 23. local n_o = r(N)
+ 24. qui sum pre_ppr_cnt_sum if young == 1
+ 25. local mu_y : dis %5.1f r(mean)
+ 26. qui sum pre_ppr_cnt_sum if young == 0
+ 27. local mu_o : dis %5.1f r(mean)
+ 28. gen double ln_pre_ppr = ln(1 + pre_ppr_cnt_sum)
+ 29. tw kdensity ln_pre_ppr if young == 1, lcolor(ebblue) lwidth(medthick) || ///
+>    kdensity ln_pre_ppr if young == 0, lcolor(dkorange) lwidth(medthick) ///
+>    , xtitle("ln(1 + Pre-Period Paper Count, 2009-2013)") ///
+>      ytitle("Density") ///
+>      legend(order(1 "Young (N=`n_y', mean=`mu_y')" 2 "Old (N=`n_o', mean=`mu_o')") ///
+>             pos(2) ring(0) rows(2) size(small)) ///
+>      plotregion(margin(sides))
+ 30. graph export ../output/figures/all_jrnls/diag_kd_pre_ppr_ln`samp_suf'.pdf, replace
+ 31. 
+. * --- A3: LPM of young on characteristics ---
+. di as text _n(2) "=== Characteristic means by young / old ==="
+ 32. tabstat pre_ppr_cnt_sum pre_gpp pre_team_avg pre_coauth_avg ///
+>         age_2014 msa_size_at r1 ic_tfnd ic_fedf ic_endow, ///
+>         by(young) stats(mean sd n) col(stats)
+ 33. 
+. * Direct test: are young PIs different on baseline productivity / coauthors /
+. * team size / grants-per-paper? Regress each char on the young dummy. Positive
+. * young coef = young PIs have MORE of that char; negative = LESS.
+. di as text _n(2) "=== Char ~ young (per-char reversed regression, cluster inst_id) ==="
+ 34. foreach c in pre_ppr_cnt_sum pre_coauth_avg pre_team_avg pre_gpp msa_size_at {
+ 35.     di as text _n "--- reg `c' young, vce(cluster inst_id) ---"
+ 36.     reg `c' young, vce(cluster inst_id)
+ 37. }
+ 38. foreach a of local ic_aliases {
+ 39.     cap confirm variable ic_`a'
+ 40.     if _rc continue
+ 41.     di as text _n "--- reg ic_`a' young, vce(cluster inst_id) ---"
+ 42.     reg ic_`a' young, vce(cluster inst_id)
+ 43. }
+ 44. 
+. * Standardize PI-level and ic vars so coefficients are directly comparable.
+. foreach v of varlist pre_ppr_cnt_sum pre_gpp pre_team_avg pre_coauth_avg ///
+>                      msa_size_at {
+ 45.     qui sum `v'
+ 46.     gen double z_`v' = (`v' - r(mean)) / r(sd)
+ 47. }
+ 48. foreach a of local ic_aliases {
+ 49.     cap confirm variable ic_`a'
+ 50.     if _rc continue
+ 51.     qui sum ic_`a'
+ 52.     gen double z_ic_`a' = (ic_`a' - r(mean)) / r(sd)
+ 53. }
+ 54. 
+. * Per-char LPMs: one regression per ic char so each uses its own max sample
+. * (PIs missing that specific ic char drop; PIs with other missing chars stay).
+. di as text _n "--- Per-char LPMs of young on standardized chars ---"
+ 55. foreach a of local ic_aliases {
+ 56.     cap confirm variable z_ic_`a'
+ 57.     if _rc continue
+ 58.     qui count if !mi(z_ic_`a')
+ 59.     di as text _n "-- young ~ PI chars + z_ic_`a' (N with z_ic_`a' non-mi = " r(N) ") --"
+ 60.     reg young z_pre_ppr_cnt_sum z_pre_gpp z_pre_team_avg z_pre_coauth_avg ///
+>               z_msa_size_at r1 z_ic_`a', vce(cluster inst_id)
+ 61.     di as text _n "-- same, R1 only --"
+ 62.     reg young z_pre_ppr_cnt_sum z_pre_gpp z_pre_team_avg z_pre_coauth_avg ///
+>               z_msa_size_at z_ic_`a' if r1 == 1, vce(cluster inst_id)
+ 63. }
+ 64. 
+. * Kitchen-sink LPM using all standardized ic chars (subset with all non-missing).
+. di as text _n "--- Kitchen-sink LPM: all 8 ic chars simultaneously (common sample) ---"
+ 65. local all_z
+ 66. foreach a of local ic_aliases {
+ 67.     cap confirm variable z_ic_`a'
+ 68.     if !_rc local all_z `all_z' z_ic_`a'
+ 69. }
+ 70. reg young z_pre_ppr_cnt_sum z_pre_gpp z_pre_team_avg z_pre_coauth_avg ///
+>           z_msa_size_at r1 `all_z', vce(cluster inst_id)
+ 71. 
+. * --- A4a: Age distribution by hi/lo baseline productivity ---
+. * Tests whether "high_pre_ppr" is secretly an age proxy.
+. local pi_split_specs `" "high_pre_ppr Baseline_Productivity" "'
+ 72. foreach spec of local pi_split_specs {
+ 73.     tokenize `"`spec'"'
+ 74.     local dvar `1'
+ 75.     local dlbl_raw `2'
+ 76.     local dlbl : subinstr local dlbl_raw "_" " ", all
+ 77.     cap confirm variable `dvar'
+ 78.     if _rc continue
+ 79.     qui count if `dvar' == 1
+ 80.     local n_hi = r(N)
+ 81.     qui count if `dvar' == 0 & !mi(`dvar')
+ 82.     local n_lo = r(N)
+ 83.     qui sum age_2014 if `dvar' == 1
+ 84.     local mu_hi : dis %5.1f r(mean)
+ 85.     qui sum age_2014 if `dvar' == 0
+ 86.     local mu_lo : dis %5.1f r(mean)
+ 87.     qui sum young if `dvar' == 1
+ 88.     local sh_yh : dis %4.2f r(mean)
+ 89.     qui sum young if `dvar' == 0
+ 90.     local sh_yl : dis %4.2f r(mean)
+ 91.     tw kdensity age_2014 if `dvar' == 1, lcolor(ebblue) lwidth(medthick) || ///
+>        kdensity age_2014 if `dvar' == 0, lcolor(dkorange) lwidth(medthick) ///
+>        , xtitle("Age in 2014") ytitle("Density") ///
+>          subtitle("`dlbl' split (share young: Hi=`sh_yh', Lo=`sh_yl')", size(small)) ///
+>          legend(order(1 "High `dlbl' (N=`n_hi', mean=`mu_hi')" ///
+>                       2 "Low `dlbl' (N=`n_lo', mean=`mu_lo')") ///
+>                 pos(6) ring(1) rows(1) size(small)) ///
+>          plotregion(margin(sides))
+ 92.     graph export ../output/figures/all_jrnls/diag_age_dist_by_`dvar'`samp_suf'.pdf, replace
+ 93.     di as text _n "-- age composition by `dvar' --" ///
+>         _n "  High `dlbl': N=`n_hi' mean_age=`mu_hi' share_young=`sh_yh'" ///
+>         _n "  Low  `dlbl': N=`n_lo' mean_age=`mu_lo' share_young=`sh_yl'"
+ 94. }
+ 95. 
+. * --- A4: Age distribution by hi/lo institutions (per char) ---
+. local wt_list piwtd
+ 96. if "$DIAG_INSTWTD" == "1" local wt_list instwtd piwtd
+ 97. foreach wt of local wt_list {
+ 98.     if "`wt'" == "instwtd" {
+ 99.         local hi hi
+100.         local wt_lbl "inst-wtd median"
+101.     }
+102.     else {
+103.         local hi hiw
+104.         local wt_lbl "PI-wtd median"
+105.     }
+106.     foreach a of local ic_aliases {
+107.         cap confirm variable `hi'_`a'
+108.         if _rc continue
+109.         qui count if `hi'_`a' == 1
+110.         local n_hi = r(N)
+111.         qui count if `hi'_`a' == 0 & !mi(`hi'_`a')
+112.         local n_lo = r(N)
+113.         qui sum age_2014 if `hi'_`a' == 1
+114.         local mu_hi : dis %5.1f r(mean)
+115.         qui sum age_2014 if `hi'_`a' == 0
+116.         local mu_lo : dis %5.1f r(mean)
+117.         tw kdensity age_2014 if `hi'_`a' == 1, lcolor(ebblue) lwidth(medthick) || ///
+>            kdensity age_2014 if `hi'_`a' == 0, lcolor(dkorange) lwidth(medthick) ///
+>            , xtitle("Age in 2014") ytitle("Density") ///
+>              subtitle("Cutoff: `wt_lbl' of ic_`a'", size(small)) ///
+>              legend(order(1 "Hi `a' (N=`n_hi', mean=`mu_hi')" ///
+>                           2 "Lo `a' (N=`n_lo', mean=`mu_lo')") ///
+>                     pos(2) ring(0) rows(2) size(small)) ///
+>              plotregion(margin(sides))
+118.         graph export ../output/figures/all_jrnls/diag_age_dist_by_`a'_`wt'`samp_suf'.pdf, replace
+119.     }
+120. }
+121. 
+. * --- A4b: Baseline-productivity distribution by hi/lo institutions (per char) ---
+. * Are HP PIs concentrated at hi-resource institutions? If so, "HP x hi" isn't
+. * a distinct cell -- it's mostly a relabeling of the HP margin.
+. foreach wt of local wt_list {
+122.     if "`wt'" == "instwtd" {
+123.         local hi hi
+124.         local wt_lbl "inst-wtd median"
+125.     }
+126.     else {
+127.         local hi hiw
+128.         local wt_lbl "PI-wtd median"
+129.     }
+130.     foreach a of local ic_aliases {
+131.         cap confirm variable `hi'_`a'
+132.         if _rc continue
+133.         qui count if `hi'_`a' == 1
+134.         local n_hi = r(N)
+135.         qui count if `hi'_`a' == 0 & !mi(`hi'_`a')
+136.         local n_lo = r(N)
+137.         qui sum pre_ppr_cnt_sum if `hi'_`a' == 1
+138.         local mu_hi : dis %5.1f r(mean)
+139.         qui sum pre_ppr_cnt_sum if `hi'_`a' == 0
+140.         local mu_lo : dis %5.1f r(mean)
+141.         qui sum high_pre_ppr if `hi'_`a' == 1
+142.         local sh_hph : dis %4.2f r(mean)
+143.         qui sum high_pre_ppr if `hi'_`a' == 0
+144.         local sh_hpl : dis %4.2f r(mean)
+145.         tw kdensity ln_pre_ppr if `hi'_`a' == 1, lcolor(ebblue) lwidth(medthick) || ///
+>            kdensity ln_pre_ppr if `hi'_`a' == 0, lcolor(dkorange) lwidth(medthick) ///
+>            , xtitle("ln(1 + Pre-Period Paper Count, 2009-2013)") ytitle("Density") ///
+>              subtitle("Cutoff: `wt_lbl' of ic_`a' (share HP: Hi=`sh_hph', Lo=`sh_hpl')", size(small)) ///
+>              legend(order(1 "Hi `a' (N=`n_hi', mean=`mu_hi')" ///
+>                           2 "Lo `a' (N=`n_lo', mean=`mu_lo')") ///
+>                     pos(2) ring(0) rows(2) size(small)) ///
+>              plotregion(margin(sides))
+146.         graph export ../output/figures/all_jrnls/diag_pre_ppr_dist_by_`a'_`wt'`samp_suf'.pdf, replace
+147.         di as text _n "-- pre_ppr by `hi'_`a' (`wt') --" ///
+>             _n "  Hi `a': N=`n_hi' mean_prppr=`mu_hi' share_HP=`sh_hph'" ///
+>             _n "  Lo `a': N=`n_lo' mean_prppr=`mu_lo' share_HP=`sh_hpl'"
+148.     }
+149. }
+150. 
+. * --- A5: Exposure distribution across the 4 productivity × inst-char cells ---
+. * Tests whether HP × hi_char PIs simply live at higher exposure than the other
+. * three cells (confound with capacity × input-class story). One kdensity + one
+. * summary log-block per inst char. PI-wtd hiw_<a> cutoff.
+. cap confirm variable exposure
+151. if !_rc {
+152.     di as text _n(2) "=== Exposure distribution by high_pre_ppr x hiw_<char> ==="
+153.     foreach a of local ic_aliases {
+154.         cap confirm variable hiw_`a'
+155.         if _rc continue
+156.         cap drop _cell
+157.         gen byte _cell = .
+158.         replace _cell = 1 if high_pre_ppr == 1 & hiw_`a' == 1
+159.         replace _cell = 2 if high_pre_ppr == 1 & hiw_`a' == 0
+160.         replace _cell = 3 if high_pre_ppr == 0 & hiw_`a' == 1
+161.         replace _cell = 4 if high_pre_ppr == 0 & hiw_`a' == 0
+162. 
+.         forvalues c = 1/4 {
+163.             qui sum exposure if _cell == `c', d
+164.             local n_`c' = r(N)
+165.             local mu_`c' : dis %5.3f r(mean)
+166.             local p50_`c' : dis %5.3f r(p50)
+167.             local p90_`c' : dis %5.3f r(p90)
+168.         }
+169. 
+.         tw kdensity exposure if _cell == 1, lcolor(ebblue) lwidth(medthick) || ///
+>            kdensity exposure if _cell == 2, lcolor(ebblue%50) lwidth(medthick) lpattern(dash) || ///
+>            kdensity exposure if _cell == 3, lcolor(dkorange) lwidth(medthick) || ///
+>            kdensity exposure if _cell == 4, lcolor(dkorange%50) lwidth(medthick) lpattern(dash) ///
+>            , xtitle("Exposure") ytitle("Density") ///
+>              subtitle("Cell composition on hiw_`a' x high_pre_ppr", size(small)) ///
+>              legend(order(1 "HP x Hi `a' (N=`n_1', mean=`mu_1')" ///
+>                           2 "HP x Lo `a' (N=`n_2', mean=`mu_2')" ///
+>                           3 "LP x Hi `a' (N=`n_3', mean=`mu_3')" ///
+>                           4 "LP x Lo `a' (N=`n_4', mean=`mu_4')") ///
+>                     pos(6) ring(1) rows(2) span size(vsmall)) ///
+>              plotregion(margin(sides))
+170.         graph export ../output/figures/all_jrnls/diag_exposure_dist_by_`a'`samp_suf'.pdf, replace
+171. 
+.         di as text _n "-- exposure by prppr x hiw_`a' --" ///
+>             _n "  HP x Hi:  N=`n_1' mean=`mu_1' p50=`p50_1' p90=`p90_1'" ///
+>             _n "  HP x Lo:  N=`n_2' mean=`mu_2' p50=`p50_2' p90=`p90_2'" ///
+>             _n "  LP x Hi:  N=`n_3' mean=`mu_3' p50=`p50_3' p90=`p90_3'" ///
+>             _n "  LP x Lo:  N=`n_4' mean=`mu_4' p50=`p50_4' p90=`p90_4'"
+172.         drop _cell
+173.     }
+174. }
+175. else di as error "diag A5: exposure variable not found; skipping."
+176. 
+. restore
+177. 
+. * --- A6: Institution-level distribution of AVG papers PER YEAR, split by hiw_tfnd ---
+. * For each institution, sum ppr_cnt across PIs by year, then average across
+. * years so we get one number per institution (avg annual paper output),
+. * independent of how many years each inst is observed. Compare log(1+.) across
+. * hi_tfnd vs lo_tfnd institutions.
+. preserve
+178. cap confirm variable hiw_tfnd
+179. if !_rc {
+180.     gcollapse (sum) ppr_cnt (mean) hiw_tfnd ic_tfnd, by(inst_id year)
+181.     gcollapse (mean) ppr_cnt (mean) hiw_tfnd ic_tfnd, by(inst_id)
+182.     drop if mi(hiw_tfnd)
+183.     gen double ln_ppr = ln(1 + ppr_cnt)
+184. 
+.     qui count if hiw_tfnd == 1
+185.     local n_hi = r(N)
+186.     qui count if hiw_tfnd == 0
+187.     local n_lo = r(N)
+188.     qui sum ppr_cnt if hiw_tfnd == 1
+189.     local mu_hi : dis %8.1fc r(mean)
+190.     qui sum ppr_cnt if hiw_tfnd == 0
+191.     local mu_lo : dis %8.1fc r(mean)
+192. 
+.     tw kdensity ln_ppr if hiw_tfnd == 1, lcolor(ebblue) lwidth(medthick) || ///
+>        kdensity ln_ppr if hiw_tfnd == 0, lcolor(dkorange) lwidth(medthick) ///
+>        , xtitle("ln(1 + Avg Papers per Year at Institution)") ytitle("Density") ///
+>          legend(order(1 "Hi Total R&D (N=`n_hi', mean=`mu_hi'/yr)" ///
+>                       2 "Lo Total R&D (N=`n_lo', mean=`mu_lo'/yr)") ///
+>                 pos(6) ring(1) rows(1) span size(small)) ///
+>          plotregion(margin(sides))
+193.     graph export ../output/figures/all_jrnls/diag_kd_ln_ppr_per_yr_by_hiw_tfnd`samp_suf'.pdf, replace
+194.     di as text _n "-- inst-level avg papers per year by hiw_tfnd --" ///
+>         _n "  Hi tfnd: N=`n_hi' mean=`mu_hi'/yr" ///
+>         _n "  Lo tfnd: N=`n_lo' mean=`mu_lo'/yr"
+195. }
+196. else di as error "diag A6: hiw_tfnd not found; skipping."
+197. restore
+198. 
+. * ============================================================
+. * Part B: Joint 2x2 pooled-DiD PPML across ic chars
+. * ============================================================
+. gen post       = year >= 2014
+199. gen Z_it       = exposure      * post
+200. gen Z_share_it = mkt_spend_shr * post
+201. 
+. foreach wt of local wt_list {
+202.     if "`wt'" == "instwtd" local hi hi
+203.     else                    local hi hiw
+204. 
+.     tempname res
+205.     postfile `res' str8 alias ///
+>         double(n_yhi n_ylo n_ohi n_olo ///
+>                b_yhi se_yhi b_ylo se_ylo b_ohi se_ohi b_olo se_olo ///
+>                b_diff_hi se_diff_hi b_diff_ylo se_diff_ylo N ///
+>                b_yhi_ns se_yhi_ns b_ylo_ns se_ylo_ns b_ohi_ns se_ohi_ns b_olo_ns se_olo_ns) ///
+>         using ../temp/joint_split_`wt'_ppr_cnt`samp_suf'.dta, replace
+206. 
+.     foreach a of local ic_aliases {
+207.         cap confirm variable `hi'_`a'
+208.         if _rc {
+209.             di as text "SKIP `a' `wt' -- `hi'_`a' unavailable"
+210.             continue
+211.         }
+212.         cap drop y_hi y_lo o_hi o_lo Z_y_hi Z_y_lo Z_o_hi Z_o_lo S_y_hi S_y_lo S_o_hi S_o_lo
+213.         gen byte y_hi = (young == 1 & `hi'_`a' == 1) if !mi(young) & !mi(`hi'_`a')
+214.         gen byte y_lo = (young == 1 & `hi'_`a' == 0) if !mi(young) & !mi(`hi'_`a')
+215.         gen byte o_hi = (young == 0 & `hi'_`a' == 1) if !mi(young) & !mi(`hi'_`a')
+216.         gen byte o_lo = (young == 0 & `hi'_`a' == 0) if !mi(young) & !mi(`hi'_`a')
+217. 
+.         qui gunique athr_id if y_hi == 1
+218.         local nyhi = r(unique)
+219.         qui gunique athr_id if y_lo == 1
+220.         local nylo = r(unique)
+221.         qui gunique athr_id if o_hi == 1
+222.         local nohi = r(unique)
+223.         qui gunique athr_id if o_lo == 1
+224.         local nolo = r(unique)
+225. 
+.         if `nyhi' < 100 | `nylo' < 100 | `nohi' < 100 | `nolo' < 100 {
+226.             di as text "SKIP `a' `wt' -- thin cell (`nyhi'/`nylo'/`nohi'/`nolo')"
+227.             continue
+228.         }
+229. 
+.         gen Z_y_hi = Z_it       * y_hi
+230.         gen Z_y_lo = Z_it       * y_lo
+231.         gen Z_o_hi = Z_it       * o_hi
+232.         gen Z_o_lo = Z_it       * o_lo
+233.         gen S_y_hi = Z_share_it * y_hi
+234.         gen S_y_lo = Z_share_it * y_lo
+235.         gen S_o_hi = Z_share_it * o_hi
+236.         gen S_o_lo = Z_share_it * o_lo
+237. 
+.         cap noi qui ppmlhdfe ppr_cnt Z_y_hi Z_y_lo Z_o_hi Z_o_lo S_y_hi S_y_lo S_o_hi S_o_lo, ///
+>             absorb(athr_id year) vce(cluster athr_id)
+238.         if _rc {
+239.             di as error "FAIL `a' `wt' main -- rc=`_rc'"
+240.             continue
+241.         }
+242.         local Nppml = e(N)
+243.         local byhi  = _b[Z_y_hi]
+244.         local seyhi = _se[Z_y_hi]
+245.         local bylo  = _b[Z_y_lo]
+246.         local seylo = _se[Z_y_lo]
+247.         local bohi  = _b[Z_o_hi]
+248.         local seohi = _se[Z_o_hi]
+249.         local bolo  = _b[Z_o_lo]
+250.         local seolo = _se[Z_o_lo]
+251.         qui lincom Z_y_hi - Z_o_hi
+252.         local bdh  = r(estimate)
+253.         local sedh = r(se)
+254.         qui lincom Z_y_hi - Z_y_lo
+255.         local bdy  = r(estimate)
+256.         local sedy = r(se)
+257. 
+.         cap noi qui ppmlhdfe ppr_cnt Z_y_hi Z_y_lo Z_o_hi Z_o_lo, ///
+>             absorb(athr_id year) vce(cluster athr_id)
+258.         local byhi_ns  = _b[Z_y_hi]
+259.         local seyhi_ns = _se[Z_y_hi]
+260.         local bylo_ns  = _b[Z_y_lo]
+261.         local seylo_ns = _se[Z_y_lo]
+262.         local bohi_ns  = _b[Z_o_hi]
+263.         local seohi_ns = _se[Z_o_hi]
+264.         local bolo_ns  = _b[Z_o_lo]
+265.         local seolo_ns = _se[Z_o_lo]
+266. 
+.         di as text "`a' `wt': y_hi=" %6.3f `byhi' " y_lo=" %6.3f `bylo' ///
+>                   " o_hi=" %6.3f `bohi' " o_lo=" %6.3f `bolo' ///
+>                   "  [no-S] o_lo=" %6.3f `bolo_ns' " (se=" %5.3f `seolo_ns' ")"
+267. 
+.         post `res' ("`a'") (`nyhi') (`nylo') (`nohi') (`nolo') ///
+>             (`byhi') (`seyhi') (`bylo') (`seylo') ///
+>             (`bohi') (`seohi') (`bolo') (`seolo') ///
+>             (`bdh') (`sedh') (`bdy') (`sedy') (`Nppml') ///
+>             (`byhi_ns') (`seyhi_ns') (`bylo_ns') (`seylo_ns') ///
+>             (`bohi_ns') (`seohi_ns') (`bolo_ns') (`seolo_ns')
+268.     }
+269.     postclose `res'
+270. 
+.     * ---- Figures for this weighting scheme ----
+.     preserve
+271.     use ../temp/joint_split_`wt'_ppr_cnt`samp_suf'.dta, clear
+272.     gen ub_yhi = b_yhi + 1.96*se_yhi
+273.     gen lb_yhi = b_yhi - 1.96*se_yhi
+274.     gen ub_ohi = b_ohi + 1.96*se_ohi
+275.     gen lb_ohi = b_ohi - 1.96*se_ohi
+276.     gen ub_ylo = b_ylo + 1.96*se_ylo
+277.     gen lb_ylo = b_ylo - 1.96*se_ylo
+278.     gen ub_olo = b_olo + 1.96*se_olo
+279.     gen lb_olo = b_olo - 1.96*se_olo
+280. 
+.     gsort b_diff_hi
+281.     gen y_pos = _N + 1 - _n
+282.     gen y_pos_off = y_pos - 0.2
+283.     local ylabs
+284.     forvalues i = 1/`=_N' {
+285.         local aa = alias[`i']
+286.         local pos = y_pos[`i']
+287.         local ylabs `"`ylabs' `pos' "`aa'""'
+288.     }
+289.     local nrow = _N
+290. 
+.     * Cross-char coefplot: Young x Hi vs Old x Hi
+.     tw rcap ub_yhi lb_yhi y_pos, horizontal lcolor(ebblue%60) msize(vsmall)     || ///
+>        scatter y_pos b_yhi, mcolor(ebblue) msize(small)                          || ///
+>        rcap ub_ohi lb_ohi y_pos_off, horizontal lcolor(dkorange%60) msize(vsmall)|| ///
+>        scatter y_pos_off b_ohi, mcolor(dkorange) msymbol(D) msize(small) ///
+>        , xline(0, lcolor(gs10) lpattern(solid)) ///
+>          ylabel(`ylabs', angle(0) labsize(small) noticks nogrid) ///
+>          ytitle("") xtitle("β on Exposure x Post (ppr_cnt)", size(small)) ///
+>          legend(order(2 "Young x Hi" 4 "Old x Hi") pos(11) ring(0) rows(2) size(small)) ///
+>          ysize(`=max(6, `nrow'*0.5)') xsize(7) ///
+>          plotregion(margin(sides))
+291.     graph export ../output/figures/all_jrnls/diag_joint_`wt'_yhi_vs_ohi`samp_suf'.pdf, replace
+292. 
+.     * All 4 cells overlaid, one row per char
+.     gen y_yhi = y_pos + 0.30
+293.     gen y_ylo = y_pos + 0.10
+294.     gen y_ohi = y_pos - 0.10
+295.     gen y_olo = y_pos - 0.30
+296.     tw rcap ub_yhi lb_yhi y_yhi, horizontal lcolor(ebblue%60) msize(vsmall)      || ///
+>        scatter y_yhi b_yhi, mcolor(ebblue) msize(small)                           || ///
+>        rcap ub_ylo lb_ylo y_ylo, horizontal lcolor(navy%60) msize(vsmall)         || ///
+>        scatter y_ylo b_ylo, mcolor(navy) msymbol(T) msize(small)                  || ///
+>        rcap ub_ohi lb_ohi y_ohi, horizontal lcolor(dkorange%60) msize(vsmall)     || ///
+>        scatter y_ohi b_ohi, mcolor(dkorange) msymbol(D) msize(small)              || ///
+>        rcap ub_olo lb_olo y_olo, horizontal lcolor(cranberry%60) msize(vsmall)    || ///
+>        scatter y_olo b_olo, mcolor(cranberry) msymbol(S) msize(small)             ///
+>        , xline(0, lcolor(gs10) lpattern(solid)) ///
+>          ylabel(`ylabs', angle(0) labsize(small) noticks nogrid) ///
+>          ytitle("") xtitle("β on Exposure x Post (ppr_cnt)", size(small)) ///
+>          legend(order(2 "Young x Hi" 4 "Young x Lo" 6 "Old x Hi" 8 "Old x Lo") ///
+>                 pos(11) ring(0) rows(4) size(small)) ///
+>          ysize(`=max(6, `nrow'*0.7)') xsize(8) ///
+>          plotregion(margin(sides))
+297.     graph export ../output/figures/all_jrnls/diag_joint_`wt'_4cells`samp_suf'.pdf, replace
+298. 
+.     * Per-char 4-cell coefplot (paper-ready, one PDF per char).
+.     * Reloading results .dta each iteration to avoid nested preserve.
+.     foreach a of local ic_aliases {
+299.         qui use ../temp/joint_split_`wt'_ppr_cnt`samp_suf'.dta, clear
+300.         qui keep if alias == "`a'"
+301.         if _N == 0 continue
+302.         local byhi  = b_yhi[1]
+303.         local seyhi = se_yhi[1]
+304.         local bylo  = b_ylo[1]
+305.         local seylo = se_ylo[1]
+306.         local bohi  = b_ohi[1]
+307.         local seohi = se_ohi[1]
+308.         local bolo  = b_olo[1]
+309.         local seolo = se_olo[1]
+310.         local nyhi  = n_yhi[1]
+311.         local nylo  = n_ylo[1]
+312.         local nohi  = n_ohi[1]
+313.         local nolo  = n_olo[1]
+314.         clear
+315.         set obs 4
+316.         gen y  = 5 - _n
+317.         gen b  = .
+318.         gen se = .
+319.         replace b  = `byhi'  if y == 4
+320.         replace se = `seyhi' if y == 4
+321.         replace b  = `bylo'  if y == 3
+322.         replace se = `seylo' if y == 3
+323.         replace b  = `bohi'  if y == 2
+324.         replace se = `seohi' if y == 2
+325.         replace b  = `bolo'  if y == 1
+326.         replace se = `seolo' if y == 1
+327.         gen ub = b + 1.96*se
+328.         gen lb = b - 1.96*se
+329. 
+.         tw rcap ub lb y if inlist(y, 4, 3), horizontal lcolor(ebblue%70) msize(vsmall)   || ///
+>            scatter y b if inlist(y, 4, 3), mcolor(ebblue) msize(medium)                   || ///
+>            rcap ub lb y if inlist(y, 2, 1), horizontal lcolor(dkorange%70) msize(vsmall) || ///
+>            scatter y b if inlist(y, 2, 1), mcolor(dkorange) msymbol(D) msize(medium)      ///
+>            , xline(0, lcolor(gs10) lpattern(solid)) ///
+>              ylabel(4 `"Young × Hi (N=`nyhi')"' ///
+>                     3 `"Young × Lo (N=`nylo')"' ///
+>                     2 `"Old × Hi (N=`nohi')"'   ///
+>                     1 `"Old × Lo (N=`nolo')"',  ///
+>                     angle(0) labsize(small) noticks nogrid) ///
+>              ytitle("") xtitle("Exposure x Post", size(small)) ///
+>              subtitle("Split on `hi'_`a'", size(small)) ///
+>              legend(order(2 "Young" 4 "Old") pos(11) ring(0) rows(2) size(small)) ///
+>              xsize(7) ysize(4) ///
+>              plotregion(margin(sides))
+330.         graph export ../output/figures/all_jrnls/coef_age_x_`a'_`wt'`samp_suf'.pdf, replace
+331.     }
+332.     restore
+333. }
+334. 
+. * ============================================================
+. * Part C: prppr x inst-char joint 2x2 -- hypothesis tests for
+. * the "crossover" (LP x lo) cell.
+. *   1. Is LP x lo_char coefficient significantly < 0 alone?
+. *      If not, the crossover claim is not established.
+. *   2. Blue-vs-orange at Lo row: HP x Lo - LP x Lo = 0 ?
+. *      Tests whether HP differs from LP at low-intensity institutions.
+. *   3. Blue-vs-orange at Hi row: HP x Hi - LP x Hi = 0 ?
+. *   4. Triple interaction: (HP-LP)_Hi - (HP-LP)_Lo = 0 ?
+. * Uses analytical cluster-robust SEs on athr_id via lincom. If these p-values
+. * are non-significant, the wild-cluster bootstrap will not save them.
+. * ============================================================
+. 
+. di as text _n(2) "=== Part C: crossover-test lincoms per inst char (PI-wtd cutoff) ==="
+335. 
+. foreach a of local ic_aliases {
+336.     cap confirm variable hp_hi_`a'
+337.     if _rc {
+338.         di as error "  hp_hi_`a' not found; skipping."
+339.         continue
+340.     }
+341.     foreach grp in hp_hi_`a' hp_lo_`a' lp_hi_`a' lp_lo_`a' {
+342.         cap drop Z_`grp' S_`grp'
+343.         gen Z_`grp' = Z_it       * `grp'
+344.         gen S_`grp' = Z_share_it * `grp'
+345.     }
+346.     cap noi qui ppmlhdfe ppr_cnt Z_hp_hi_`a' Z_hp_lo_`a' Z_lp_hi_`a' Z_lp_lo_`a' ///
+>                                  S_hp_hi_`a' S_hp_lo_`a' S_lp_hi_`a' S_lp_lo_`a', ///
+>                                  absorb(athr_id year) vce(cluster athr_id)
+347.     if _rc {
+348.         di as error "  ppmlhdfe failed for `a'; skipping."
+349.         continue
+350.     }
+351. 
+.     di as text _n "-- `a' --"
+352.     di as text "  H0: LP x Lo = 0    (is the crossover cell itself significant?)"
+353.     qui lincom Z_lp_lo_`a'
+354.     local b1 = r(estimate)
+355.     local se1 = r(se)
+356.     local t1 = `b1'/`se1'
+357.     local p1 = 2*ttail(1e9, abs(`t1'))
+358.     di as text "    b=" %8.4f `b1' "  se=" %6.4f `se1' "  t=" %6.2f `t1' "  p=" %5.3f `p1'
+359. 
+.     di as text "  H0: HP x Lo - LP x Lo = 0    (blue-vs-orange at Lo row)"
+360.     qui lincom Z_hp_lo_`a' - Z_lp_lo_`a'
+361.     local b2 = r(estimate)
+362.     local se2 = r(se)
+363.     local t2 = `b2'/`se2'
+364.     local p2 = 2*ttail(1e9, abs(`t2'))
+365.     di as text "    b=" %8.4f `b2' "  se=" %6.4f `se2' "  t=" %6.2f `t2' "  p=" %5.3f `p2'
+366. 
+.     di as text "  H0: HP x Hi - LP x Hi = 0    (blue-vs-orange at Hi row)"
+367.     qui lincom Z_hp_hi_`a' - Z_lp_hi_`a'
+368.     local b3 = r(estimate)
+369.     local se3 = r(se)
+370.     local t3 = `b3'/`se3'
+371.     local p3 = 2*ttail(1e9, abs(`t3'))
+372.     di as text "    b=" %8.4f `b3' "  se=" %6.4f `se3' "  t=" %6.2f `t3' "  p=" %5.3f `p3'
+373. 
+.     di as text "  H0: (HP-LP)_Hi - (HP-LP)_Lo = 0    (triple interaction)"
+374.     qui lincom (Z_hp_hi_`a' - Z_lp_hi_`a') - (Z_hp_lo_`a' - Z_lp_lo_`a')
+375.     local b4 = r(estimate)
+376.     local se4 = r(se)
+377.     local t4 = `b4'/`se4'
+378.     local p4 = 2*ttail(1e9, abs(`t4'))
+379.     di as text "    b=" %8.4f `b4' "  se=" %6.4f `se4' "  t=" %6.2f `t4' "  p=" %5.3f `p4'
+380. }
+381. 
+. * ============================================================
+. * Part D: prppr x age x inst-char joint 8-cell pooled-DiD PPML.
+. * y-axis has Hi/Lo <char> rows (as in the joint_ae_prppr paired
+. * coefplot); each row carries 4 dots -- LP x young, LP x old,
+. * HP x young, HP x old -- from a single 8-way interaction fit.
+. * ============================================================
+. di as text _n(2) "=== Part D: prppr x age x inst-char 8-cell PPML (PI-wtd cutoff) ==="
+382. 
+. tempname resD
+383. postfile `resD' str8 alias ///
+>     double(n_yhphi n_ylphi n_ohphi n_olphi n_yhplo n_ylplo n_ohplo n_olplo ///
+>            b_yhphi se_yhphi b_ylphi se_ylphi b_ohphi se_ohphi b_olphi se_olphi ///
+>            b_yhplo se_yhplo b_ylplo se_ylplo b_ohplo se_ohplo b_olplo se_olplo ///
+>            N) ///
+>     using ../temp/joint_split_piwtd_prppr_age_ppr_cnt`samp_suf'.dta, replace
+384. 
+. foreach a of local ic_aliases {
+385.     cap confirm variable hiw_`a'
+386.     if _rc {
+387.         di as text "SKIP `a' -- hiw_`a' unavailable"
+388.         continue
+389.     }
+390.     foreach cell in yhphi ylphi ohphi olphi yhplo ylplo ohplo olplo {
+391.         cap drop _`cell' Z_`cell' S_`cell'
+392.     }
+393.     gen byte _yhphi = (young == 1 & high_pre_ppr == 1 & hiw_`a' == 1) if !mi(young) & !mi(high_pre_ppr) & !mi(hiw_`a')
+394.     gen byte _ylphi = (young == 1 & high_pre_ppr == 0 & hiw_`a' == 1) if !mi(young) & !mi(high_pre_ppr) & !mi(hiw_`a')
+395.     gen byte _ohphi = (young == 0 & high_pre_ppr == 1 & hiw_`a' == 1) if !mi(young) & !mi(high_pre_ppr) & !mi(hiw_`a')
+396.     gen byte _olphi = (young == 0 & high_pre_ppr == 0 & hiw_`a' == 1) if !mi(young) & !mi(high_pre_ppr) & !mi(hiw_`a')
+397.     gen byte _yhplo = (young == 1 & high_pre_ppr == 1 & hiw_`a' == 0) if !mi(young) & !mi(high_pre_ppr) & !mi(hiw_`a')
+398.     gen byte _ylplo = (young == 1 & high_pre_ppr == 0 & hiw_`a' == 0) if !mi(young) & !mi(high_pre_ppr) & !mi(hiw_`a')
+399.     gen byte _ohplo = (young == 0 & high_pre_ppr == 1 & hiw_`a' == 0) if !mi(young) & !mi(high_pre_ppr) & !mi(hiw_`a')
+400.     gen byte _olplo = (young == 0 & high_pre_ppr == 0 & hiw_`a' == 0) if !mi(young) & !mi(high_pre_ppr) & !mi(hiw_`a')
+401. 
+.     local skip 0
+402.     foreach cell in yhphi ylphi ohphi olphi yhplo ylplo ohplo olplo {
+403.         qui gunique athr_id if _`cell' == 1
+404.         local n_`cell' = r(unique)
+405.         if `n_`cell'' < 30 local skip 1
+406.     }
+407.     if `skip' {
+408.         di as text "SKIP `a' -- thin cell " ///
+>             "(y_hp_hi=`n_yhphi' y_lp_hi=`n_ylphi' o_hp_hi=`n_ohphi' o_lp_hi=`n_olphi' " ///
+>             "y_hp_lo=`n_yhplo' y_lp_lo=`n_ylplo' o_hp_lo=`n_ohplo' o_lp_lo=`n_olplo')"
+409.         continue
+410.     }
+411. 
+.     foreach cell in yhphi ylphi ohphi olphi yhplo ylplo ohplo olplo {
+412.         gen Z_`cell' = Z_it       * _`cell'
+413.         gen S_`cell' = Z_share_it * _`cell'
+414.     }
+415. 
+.     cap noi qui ppmlhdfe ppr_cnt Z_yhphi Z_ylphi Z_ohphi Z_olphi ///
+>                                   Z_yhplo Z_ylplo Z_ohplo Z_olplo ///
+>                                   S_yhphi S_ylphi S_ohphi S_olphi ///
+>                                   S_yhplo S_ylplo S_ohplo S_olplo, ///
+>                                   absorb(athr_id year) vce(cluster athr_id)
+416.     if _rc {
+417.         di as error "FAIL `a' 8-cell ppml (rc=`_rc'); skipping."
+418.         continue
+419.     }
+420.     local Nppml = e(N)
+421.     foreach cell in yhphi ylphi ohphi olphi yhplo ylplo ohplo olplo {
+422.         local b_`cell'  = _b[Z_`cell']
+423.         local se_`cell' = _se[Z_`cell']
+424.     }
+425. 
+.     di as text "`a': [Hi `a'] y_hp=" %6.3f `b_yhphi' " y_lp=" %6.3f `b_ylphi' ///
+>               " o_hp=" %6.3f `b_ohphi' " o_lp=" %6.3f `b_olphi' _n ///
+>               _col(11) "[Lo `a'] y_hp=" %6.3f `b_yhplo' " y_lp=" %6.3f `b_ylplo' ///
+>               " o_hp=" %6.3f `b_ohplo' " o_lp=" %6.3f `b_olplo'
+426. 
+.     post `resD' ("`a'") ///
+>         (`n_yhphi') (`n_ylphi') (`n_ohphi') (`n_olphi') ///
+>         (`n_yhplo') (`n_ylplo') (`n_ohplo') (`n_olplo') ///
+>         (`b_yhphi') (`se_yhphi') (`b_ylphi') (`se_ylphi') ///
+>         (`b_ohphi') (`se_ohphi') (`b_olphi') (`se_olphi') ///
+>         (`b_yhplo') (`se_yhplo') (`b_ylplo') (`se_ylplo') ///
+>         (`b_ohplo') (`se_ohplo') (`b_olplo') (`se_olplo') ///
+>         (`Nppml')
+427. }
+428. postclose `resD'
+429. 
+. preserve
+430. use ../temp/joint_split_piwtd_prppr_age_ppr_cnt`samp_suf'.dta, clear
+431. if _N == 0 {
+432.     di as error "Part D: no rows in joint_split_piwtd_prppr_age file; skipping plot."
+433. }
+434. else {
+435.     gen char_idx = _n
+436.     qui sum char_idx
+437.     local nchars = r(max)
+438.     gen double y_group = (`nchars' + 1 - char_idx) * 4.5
+439. 
+.     expand 8
+440.     sort char_idx
+441.     by char_idx: gen combo_idx = _n
+442. 
+.     gen double b_plot  = .
+443.     gen double se_plot = .
+444.     gen double y_plot  = .
+445.     gen str3   series  = ""
+446. 
+.     * Two side-by-side panels split by baseline productivity (HP left, LP right);
+.     * within each panel Young is blue and Old is orange, offset ±0.25 within
+.     * each Hi/Lo row (young above, old below).
+.     replace b_plot = b_yhphi   if combo_idx == 1
+447.     replace se_plot = se_yhphi if combo_idx == 1
+448.     replace y_plot = y_group + 1.2 + 0.25 if combo_idx == 1
+449.     replace series = "yHP"     if combo_idx == 1
+450. 
+.     replace b_plot = b_ohphi   if combo_idx == 2
+451.     replace se_plot = se_ohphi if combo_idx == 2
+452.     replace y_plot = y_group + 1.2 - 0.25 if combo_idx == 2
+453.     replace series = "oHP"     if combo_idx == 2
+454. 
+.     replace b_plot = b_ylphi   if combo_idx == 3
+455.     replace se_plot = se_ylphi if combo_idx == 3
+456.     replace y_plot = y_group + 1.2 + 0.25 if combo_idx == 3
+457.     replace series = "yLP"     if combo_idx == 3
+458. 
+.     replace b_plot = b_olphi   if combo_idx == 4
+459.     replace se_plot = se_olphi if combo_idx == 4
+460.     replace y_plot = y_group + 1.2 - 0.25 if combo_idx == 4
+461.     replace series = "oLP"     if combo_idx == 4
+462. 
+.     replace b_plot = b_yhplo   if combo_idx == 5
+463.     replace se_plot = se_yhplo if combo_idx == 5
+464.     replace y_plot = y_group - 1.2 + 0.25 if combo_idx == 5
+465.     replace series = "yHP"     if combo_idx == 5
+466. 
+.     replace b_plot = b_ohplo   if combo_idx == 6
+467.     replace se_plot = se_ohplo if combo_idx == 6
+468.     replace y_plot = y_group - 1.2 - 0.25 if combo_idx == 6
+469.     replace series = "oHP"     if combo_idx == 6
+470. 
+.     replace b_plot = b_ylplo   if combo_idx == 7
+471.     replace se_plot = se_ylplo if combo_idx == 7
+472.     replace y_plot = y_group - 1.2 + 0.25 if combo_idx == 7
+473.     replace series = "yLP"     if combo_idx == 7
+474. 
+.     replace b_plot = b_olplo   if combo_idx == 8
+475.     replace se_plot = se_olplo if combo_idx == 8
+476.     replace y_plot = y_group - 1.2 - 0.25 if combo_idx == 8
+477.     replace series = "oLP"     if combo_idx == 8
+478. 
+.     gen double ub = b_plot + 1.96*se_plot
+479.     gen double lb = b_plot - 1.96*se_plot
+480. 
+.     local ylabs
+481.     qui levelsof char_idx, local(cids)
+482.     foreach cid of local cids {
+483.         qui levelsof alias if char_idx == `cid' & combo_idx == 1, local(aa) clean
+484.         local clbl = "`lbl_`aa''"
+485.         if "`clbl'" == "" local clbl "`aa'"
+486.         local base = (`nchars' + 1 - `cid') * 4.5
+487.         local pos_hi = `base' + 1.2
+488.         local pos_lo = `base' - 1.2
+489.         local ylabs `"`ylabs' `pos_hi' "High `clbl'""'
+490.         local ylabs `"`ylabs' `pos_lo' "Low `clbl'""'
+491.     }
+492. 
+.     qui sum lb
+493.     local xmin = floor(r(min)/0.5)*0.5
+494.     qui sum ub
+495.     local xmax = ceil(r(max)/0.5)*0.5
+496. 
+.     * Left panel: High Baseline Productivity PIs (Young blue, Old orange).
+.     tw rcap ub lb y_plot if series == "yHP", horizontal lcolor(ebblue%50) msize(vsmall)   || ///
+>        scatter y_plot b_plot if series == "yHP", mcolor(ebblue) msymbol(O) msize(small)   || ///
+>        rcap ub lb y_plot if series == "oHP", horizontal lcolor(dkorange%50) msize(vsmall) || ///
+>        scatter y_plot b_plot if series == "oHP", mcolor(dkorange) msymbol(O) msize(small)  ///
+>        , xline(0, lcolor(gs10) lpattern(solid)) ///
+>          ylabel(`ylabs', angle(0) labsize(small) noticks nogrid) ///
+>          ytitle("") xtitle("Exposure x Post", size(small)) ///
+>          xlabel(`xmin'(0.5)`xmax', labsize(small)) ///
+>          subtitle("High Baseline Productivity", size(small)) ///
+>          legend(off) ///
+>          yscale(range(3.04 .)) ///
+>          plotregion(margin(l=zero r=zero b=zero t=vsmall)) ///
+>          graphregion(margin(r=0)) ///
+>          name(g_hp, replace) nodraw
+497. 
+.     * Right panel: Low Baseline Productivity PIs (Young blue, Old orange).
+.     * Invisible (white) y-labels reserve the same horizontal space as the left
+.     * panel so plot widths match; graphregion(margin(l=0)) pulls the reserved
+.     * strip flush to the cell edge to minimise the visible gap between panels.
+.     tw rcap ub lb y_plot if series == "yLP", horizontal lcolor(ebblue%50) msize(vsmall)   || ///
+>        scatter y_plot b_plot if series == "yLP", mcolor(ebblue) msymbol(O) msize(small)   || ///
+>        rcap ub lb y_plot if series == "oLP", horizontal lcolor(dkorange%50) msize(vsmall) || ///
+>        scatter y_plot b_plot if series == "oLP", mcolor(dkorange) msymbol(O) msize(small)  ///
+>        , xline(0, lcolor(gs10) lpattern(solid)) ///
+>          ylabel(`ylabs', angle(0) labsize(small) labcolor(white) noticks nogrid) ///
+>          ytitle("") xtitle("Exposure x Post", size(small)) ///
+>          xlabel(`xmin'(0.5)`xmax', labsize(small)) ///
+>          subtitle("Low Baseline Productivity", size(small)) ///
+>          legend(order(2 "Early-Career" 4 "Late-Career") ///
+>                 pos(6) ring(1) rows(1) span size(small)) ///
+>          yscale(noline range(3.04 .)) ///
+>          plotregion(margin(l=zero r=zero b=zero t=vsmall)) ///
+>          graphregion(margin(l=0)) ///
+>          name(g_lp, replace) nodraw
+498. 
+.     grc1leg g_hp g_lp, ///
+>         cols(2) xcommon ycommon imargin(0 0 0 0) ///
+>         legendfrom(g_lp) position(6) ring(1) ///
+>         ysize(`=max(10, `nchars'*2.5)') xsize(12)
+499.     graph export ../output/figures/all_jrnls/diag_joint_piwtd_prppr_age_8cells`samp_suf'.pdf, replace
+500.     di as text "wrote diag_joint_piwtd_prppr_age_8cells.pdf"
+501. }
+502. restore
+503. 
+. }  // close foreach samp_suf
+
+
+
+============================================================
+=== SAMPLE: _r1_r2_public
+============================================================
+
+Unique PIs in panel = 6382
+(57,438 observations deleted)
+
+Unique PIs after athr_indicator filter = 6382
+
+
+=== R1 x young cross-tab ===
+
++-------------------+
+| Key               |
+|-------------------|
+|     frequency     |
+|  row percentage   |
+| column percentage |
++-------------------+
+
+           |         young
+        r1 |         0          1 |     Total
+-----------+----------------------+----------
+         0 |       141        210 |       351 
+           |     40.17      59.83 |    100.00 
+           |      4.19       6.96 |      5.50 
+-----------+----------------------+----------
+         1 |     3,225      2,806 |     6,031 
+           |     53.47      46.53 |    100.00 
+           |     95.81      93.04 |     94.50 
+-----------+----------------------+----------
+     Total |     3,366      3,016 |     6,382 
+           |     52.74      47.26 |    100.00 
+           |    100.00     100.00 |    100.00 
+file ../output/figures/all_jrnls/diag_share_young_by_r1_r1_r2_public.pdf saved as PDF format
+file ../output/figures/all_jrnls/diag_age_hist_by_r1_r1_r2_public.pdf saved as PDF format
+file ../output/figures/all_jrnls/diag_kd_pre_ppr_ln_r1_r2_public.pdf saved as PDF format
+
+
+=== Characteristic means by young / old ===
+
+Summary for variables: pre_ppr_cnt_sum pre_gpp pre_team_avg pre_coauth_avg age_2014 msa_size_at r1 ic_tfnd ic_fedf ic_endow
+Group variable: young 
+
+   young |      Mean        SD         N
+---------+------------------------------
+       0 |  9.634878  5.726668      3366
+         |  1.362854  1.313632      3366
+         |  5.484069  2.204209      3366
+         |  4.177249  2.089862      3366
+         |  57.47594  8.113012      3366
+         |  17392.75  17340.06      2517
+         |  .9581105  .2003664      3366
+         |    655800  359598.4      2813
+         |  397690.9  247622.6      2813
+         |  1.35e+09  1.62e+09      3071
+---------+------------------------------
+       1 |  9.084881  5.120578      3016
+         |  1.054457  1.155516      3016
+         |  5.309536  2.249082      3016
+         |  4.003498  2.130235      3016
+         |  40.42706  3.596108      3016
+         |  17089.47  17885.83      2308
+         |  .9303714  .2545623      3016
+         |  597585.8  370489.3      2482
+         |  358527.4    246691      2482
+         |  1.31e+09  1.70e+09      2726
+---------+------------------------------
+   Total |  9.374961  5.455146      6382
+         |  1.217112   1.25084      6382
+         |  5.401588  2.227059      6382
+         |  4.095138  2.110656      6382
+         |  49.41899  10.64329      6382
+         |  17247.68  17602.06      4825
+         |  .9450016  .2279951      6382
+         |  628512.5  365864.8      5295
+         |  379333.2  247934.6      5295
+         |  1.33e+09  1.66e+09      5797
+----------------------------------------
+
+
+=== Char ~ young (per-char reversed regression, cluster inst_id) ===
+
+--- reg pre_ppr_cnt_sum young, vce(cluster inst_id) ---
+
+Linear regression                               Number of obs     =      6,382
+                                                F(1, 131)         =      13.14
+                                                Prob > F          =     0.0004
+                                                R-squared         =     0.0025
+                                                Root MSE          =     5.4487
+
+                              (Std. err. adjusted for 132 clusters in inst_id)
+------------------------------------------------------------------------------
+             |               Robust
+pre_ppr_cn~m | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+       young |  -.5499976   .1517274    -3.62   0.000    -.8501506   -.2498445
+       _cons |   9.634878   .1531389    62.92   0.000     9.331933    9.937824
+------------------------------------------------------------------------------
+
+--- reg pre_coauth_avg young, vce(cluster inst_id) ---
+
+Linear regression                               Number of obs     =      6,382
+                                                F(1, 131)         =      19.45
+                                                Prob > F          =     0.0000
+                                                R-squared         =     0.0017
+                                                Root MSE          =      2.109
+
+                              (Std. err. adjusted for 132 clusters in inst_id)
+------------------------------------------------------------------------------
+             |               Robust
+pre_coauth~g | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+       young |  -.1737507   .0393972    -4.41   0.000    -.2516877   -.0958137
+       _cons |   4.177249   .0797133    52.40   0.000     4.019557    4.334941
+------------------------------------------------------------------------------
+
+--- reg pre_team_avg young, vce(cluster inst_id) ---
+
+Linear regression                               Number of obs     =      6,382
+                                                F(1, 131)         =      15.09
+                                                Prob > F          =     0.0002
+                                                R-squared         =     0.0015
+                                                Root MSE          =     2.2255
+
+                              (Std. err. adjusted for 132 clusters in inst_id)
+------------------------------------------------------------------------------
+             |               Robust
+pre_team_avg | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+       young |  -.1745337   .0449319    -3.88   0.000    -.2634197   -.0856478
+       _cons |   5.484069   .0872137    62.88   0.000      5.31154    5.656599
+------------------------------------------------------------------------------
+
+--- reg pre_gpp young, vce(cluster inst_id) ---
+
+Linear regression                               Number of obs     =      6,382
+                                                F(1, 131)         =     128.36
+                                                Prob > F          =     0.0000
+                                                R-squared         =     0.0152
+                                                Root MSE          =     1.2414
+
+                              (Std. err. adjusted for 132 clusters in inst_id)
+------------------------------------------------------------------------------
+             |               Robust
+     pre_gpp | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+       young |  -.3083967   .0272206   -11.33   0.000    -.3622455   -.2545478
+       _cons |   1.362854   .0762538    17.87   0.000     1.212006    1.513702
+------------------------------------------------------------------------------
+
+--- reg msa_size_at young, vce(cluster inst_id) ---
+
+Linear regression                               Number of obs     =      4,825
+                                                F(1, 131)         =       0.21
+                                                Prob > F          =     0.6473
+                                                R-squared         =     0.0001
+                                                Root MSE          =      17603
+
+                              (Std. err. adjusted for 132 clusters in inst_id)
+------------------------------------------------------------------------------
+             |               Robust
+ msa_size_at | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+       young |  -303.2778   661.3061    -0.46   0.647    -1611.499    1004.943
+       _cons |   17392.75   2386.366     7.29   0.000     12671.95    22113.55
+------------------------------------------------------------------------------
+
+--- reg ic_tfnd young, vce(cluster inst_id) ---
+
+Linear regression                               Number of obs     =      5,295
+                                                F(1, 104)         =      11.87
+                                                Prob > F          =     0.0008
+                                                R-squared         =     0.0063
+                                                Root MSE          =     3.6e+05
+
+                              (Std. err. adjusted for 105 clusters in inst_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ic_tfnd | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+       young |  -58214.17   16898.69    -3.44   0.001    -91724.91   -24703.43
+       _cons |     655800   64788.18    10.12   0.000     527322.6    784277.4
+------------------------------------------------------------------------------
+
+--- reg ic_lsf young, vce(cluster inst_id) ---
+
+Linear regression                               Number of obs     =      5,292
+                                                F(1, 103)         =      15.59
+                                                Prob > F          =     0.0001
+                                                R-squared         =     0.0075
+                                                Root MSE          =     2.6e+05
+
+                              (Std. err. adjusted for 104 clusters in inst_id)
+------------------------------------------------------------------------------
+             |               Robust
+      ic_lsf | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+       young |   -45577.1   11543.27    -3.95   0.000    -68470.45   -22683.74
+       _cons |   398496.5   45991.53     8.66   0.000     307283.1    489709.9
+------------------------------------------------------------------------------
+
+--- reg ic_endow young, vce(cluster inst_id) ---
+
+Linear regression                               Number of obs     =      5,797
+                                                F(1, 122)         =       0.70
+                                                Prob > F          =     0.4041
+                                                R-squared         =     0.0002
+                                                Root MSE          =     1.7e+09
+
+                              (Std. err. adjusted for 123 clusters in inst_id)
+------------------------------------------------------------------------------
+             |               Robust
+    ic_endow | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+       young |  -4.34e+07   5.19e+07    -0.84   0.404    -1.46e+08    5.92e+07
+       _cons |   1.35e+09   3.28e+08     4.11   0.000     7.00e+08    2.00e+09
+------------------------------------------------------------------------------
+(1,557 missing values generated)
+(1,087 missing values generated)
+(1,090 missing values generated)
+(585 missing values generated)
+
+--- Per-char LPMs of young on standardized chars ---
+
+-- young ~ PI chars + z_ic_tfnd (N with z_ic_tfnd non-mi = 5295) --
+
+Linear regression                               Number of obs     =      4,019
+                                                F(7, 104)         =      22.52
+                                                Prob > F          =     0.0000
+                                                R-squared         =     0.0251
+                                                Root MSE          =     .49342
+
+                                   (Std. err. adjusted for 105 clusters in inst_id)
+-----------------------------------------------------------------------------------
+                  |               Robust
+            young | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+------------------+----------------------------------------------------------------
+z_pre_ppr_cnt_sum |   -.026067   .0086487    -3.01   0.003    -.0432177   -.0089163
+        z_pre_gpp |  -.0607456   .0086909    -6.99   0.000      -.07798   -.0435111
+   z_pre_team_avg |   .0064868   .0293303     0.22   0.825    -.0516763    .0646498
+ z_pre_coauth_avg |  -.0030201   .0276018    -0.11   0.913    -.0577555    .0517152
+    z_msa_size_at |   .0183931   .0099375     1.85   0.067    -.0013134    .0380995
+               r1 |  -.1542391   .0435586    -3.54   0.001    -.2406174   -.0678609
+        z_ic_tfnd |  -.0141451   .0174641    -0.81   0.420    -.0487771    .0204869
+            _cons |   .6245593   .0443614    14.08   0.000      .536589    .7125296
+-----------------------------------------------------------------------------------
+
+-- same, R1 only --
+
+Linear regression                               Number of obs     =      3,814
+                                                F(6, 60)          =      20.64
+                                                Prob > F          =     0.0000
+                                                R-squared         =     0.0195
+                                                Root MSE          =     .49417
+
+                                    (Std. err. adjusted for 61 clusters in inst_id)
+-----------------------------------------------------------------------------------
+                  |               Robust
+            young | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+------------------+----------------------------------------------------------------
+z_pre_ppr_cnt_sum |   -.026772   .0089987    -2.98   0.004     -.044772   -.0087719
+        z_pre_gpp |  -.0614051   .0088446    -6.94   0.000    -.0790969   -.0437132
+   z_pre_team_avg |    .020865   .0299082     0.70   0.488    -.0389603    .0806902
+ z_pre_coauth_avg |   -.016534   .0283848    -0.58   0.562    -.0733121     .040244
+    z_msa_size_at |   .0232759   .0106519     2.19   0.033     .0019689    .0445829
+        z_ic_tfnd |  -.0155576   .0179306    -0.87   0.389    -.0514241     .020309
+            _cons |   .4704705   .0117079    40.18   0.000     .4470512    .4938899
+-----------------------------------------------------------------------------------
+
+-- young ~ PI chars + z_ic_lsf (N with z_ic_lsf non-mi = 5292) --
+
+Linear regression                               Number of obs     =      4,016
+                                                F(7, 103)         =      22.98
+                                                Prob > F          =     0.0000
+                                                R-squared         =     0.0257
+                                                Root MSE          =     .49326
+
+                                   (Std. err. adjusted for 104 clusters in inst_id)
+-----------------------------------------------------------------------------------
+                  |               Robust
+            young | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+------------------+----------------------------------------------------------------
+z_pre_ppr_cnt_sum |  -.0261324   .0085613    -3.05   0.003    -.0431117   -.0091531
+        z_pre_gpp |  -.0589372   .0088003    -6.70   0.000    -.0763905   -.0414839
+   z_pre_team_avg |   .0098091   .0291508     0.34   0.737    -.0480047    .0676228
+ z_pre_coauth_avg |  -.0050458   .0272078    -0.19   0.853    -.0590061    .0489144
+    z_msa_size_at |   .0183591   .0094492     1.94   0.055     -.000381    .0370993
+               r1 |  -.1509795   .0420669    -3.59   0.001    -.2344092   -.0675497
+         z_ic_lsf |  -.0200916     .01542    -1.30   0.195    -.0506736    .0104903
+            _cons |   .6214423   .0422528    14.71   0.000     .5376438    .7052407
+-----------------------------------------------------------------------------------
+
+-- same, R1 only --
+
+Linear regression                               Number of obs     =      3,814
+                                                F(6, 60)          =      21.62
+                                                Prob > F          =     0.0000
+                                                R-squared         =     0.0203
+                                                Root MSE          =     .49395
+
+                                    (Std. err. adjusted for 61 clusters in inst_id)
+-----------------------------------------------------------------------------------
+                  |               Robust
+            young | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+------------------+----------------------------------------------------------------
+z_pre_ppr_cnt_sum |  -.0268661   .0088984    -3.02   0.004    -.0446656   -.0090667
+        z_pre_gpp |  -.0592594   .0089752    -6.60   0.000    -.0772124   -.0413063
+   z_pre_team_avg |   .0231025   .0297278     0.78   0.440     -.036362    .0825671
+ z_pre_coauth_avg |  -.0175823   .0279445    -0.63   0.532    -.0734796    .0383151
+    z_msa_size_at |   .0232271   .0102707     2.26   0.027     .0026826    .0437717
+         z_ic_lsf |  -.0219286    .015847    -1.38   0.172    -.0536273      .00977
+            _cons |   .4706012   .0118735    39.63   0.000     .4468507    .4943517
+-----------------------------------------------------------------------------------
+
+-- young ~ PI chars + z_ic_endow (N with z_ic_endow non-mi = 5797) --
+
+Linear regression                               Number of obs     =      4,374
+                                                F(7, 122)         =      20.47
+                                                Prob > F          =     0.0000
+                                                R-squared         =     0.0240
+                                                Root MSE          =     .49389
+
+                                   (Std. err. adjusted for 123 clusters in inst_id)
+-----------------------------------------------------------------------------------
+                  |               Robust
+            young | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+------------------+----------------------------------------------------------------
+z_pre_ppr_cnt_sum |  -.0248047   .0077742    -3.19   0.002    -.0401945   -.0094148
+        z_pre_gpp |   -.069072   .0080805    -8.55   0.000    -.0850683   -.0530758
+   z_pre_team_avg |  -.0069066   .0268878    -0.26   0.798    -.0601337    .0463205
+ z_pre_coauth_avg |   .0119747   .0263345     0.45   0.650    -.0401572    .0641065
+    z_msa_size_at |   .0023057   .0084358     0.27   0.785    -.0143938    .0190052
+               r1 |  -.1560561    .038696    -4.03   0.000    -.2326586   -.0794536
+       z_ic_endow |   .0161692   .0076893     2.10   0.038     .0009474     .031391
+            _cons |   .6264745   .0371026    16.88   0.000     .5530262    .6999227
+-----------------------------------------------------------------------------------
+
+-- same, R1 only --
+
+Linear regression                               Number of obs     =      4,138
+                                                F(6, 74)          =      18.39
+                                                Prob > F          =     0.0000
+                                                R-squared         =     0.0194
+                                                Root MSE          =     .49452
+
+                                    (Std. err. adjusted for 75 clusters in inst_id)
+-----------------------------------------------------------------------------------
+                  |               Robust
+            young | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+------------------+----------------------------------------------------------------
+z_pre_ppr_cnt_sum |  -.0264538   .0080455    -3.29   0.002    -.0424849   -.0104228
+        z_pre_gpp |  -.0704176   .0082484    -8.54   0.000     -.086853   -.0539822
+   z_pre_team_avg |   .0042337   .0274689     0.15   0.878    -.0504994    .0589667
+ z_pre_coauth_avg |   .0022291   .0271507     0.08   0.935    -.0518698     .056328
+    z_msa_size_at |   .0042759   .0090636     0.47   0.638    -.0137837    .0223356
+       z_ic_endow |   .0161902   .0077183     2.10   0.039     .0008111    .0315692
+            _cons |   .4706479   .0098856    47.61   0.000     .4509504    .4903455
+-----------------------------------------------------------------------------------
+
+--- Kitchen-sink LPM: all 8 ic chars simultaneously (common sample) ---
+
+Linear regression                               Number of obs     =      3,632
+                                                F(9, 97)          =      16.12
+                                                Prob > F          =     0.0000
+                                                R-squared         =     0.0300
+                                                Root MSE          =     .49226
+
+                                    (Std. err. adjusted for 98 clusters in inst_id)
+-----------------------------------------------------------------------------------
+                  |               Robust
+            young | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+------------------+----------------------------------------------------------------
+z_pre_ppr_cnt_sum |  -.0208938   .0088998    -2.35   0.021    -.0385575   -.0032301
+        z_pre_gpp |  -.0572776   .0092776    -6.17   0.000    -.0756911   -.0388642
+   z_pre_team_avg |   .0024424   .0307575     0.08   0.937    -.0586028    .0634875
+ z_pre_coauth_avg |   .0060021   .0301354     0.20   0.843    -.0538082    .0658125
+    z_msa_size_at |   .0178866   .0094321     1.90   0.061    -.0008335    .0366067
+               r1 |  -.1542084   .0434106    -3.55   0.001    -.2403664   -.0680503
+        z_ic_tfnd |   .0074549   .0301459     0.25   0.805    -.0523763    .0672861
+         z_ic_lsf |  -.0547363   .0302634    -1.81   0.074    -.1148008    .0053283
+       z_ic_endow |   .0377974   .0077506     4.88   0.000     .0224146    .0531803
+            _cons |   .6202941   .0413383    15.01   0.000      .538249    .7023391
+-----------------------------------------------------------------------------------
+file ../output/figures/all_jrnls/diag_age_dist_by_high_pre_ppr_r1_r2_public.pdf saved as PDF format
+
+-- age composition by high_pre_ppr --
+  High Baseline Productivity: N=3268 mean_age= 50.0 share_young=0.45
+  Low  Baseline Productivity: N=3114 mean_age= 48.8 share_young=0.49
+file ../output/figures/all_jrnls/diag_age_dist_by_tfnd_piwtd_r1_r2_public.pdf saved as PDF format
+file ../output/figures/all_jrnls/diag_age_dist_by_lsf_piwtd_r1_r2_public.pdf saved as PDF format
+file ../output/figures/all_jrnls/diag_age_dist_by_endow_piwtd_r1_r2_public.pdf saved as PDF format
+file ../output/figures/all_jrnls/diag_pre_ppr_dist_by_tfnd_piwtd_r1_r2_public.pdf saved as PDF format
+
+-- pre_ppr by hiw_tfnd (piwtd) --
+  Hi tfnd: N=2658 mean_prppr=  9.7 share_HP=0.55
+  Lo tfnd: N=2637 mean_prppr=  9.3 share_HP=0.51
+file ../output/figures/all_jrnls/diag_pre_ppr_dist_by_lsf_piwtd_r1_r2_public.pdf saved as PDF format
+
+-- pre_ppr by hiw_lsf (piwtd) --
+  Hi lsf: N=2656 mean_prppr=  9.6 share_HP=0.53
+  Lo lsf: N=2636 mean_prppr=  9.5 share_HP=0.52
+file ../output/figures/all_jrnls/diag_pre_ppr_dist_by_endow_piwtd_r1_r2_public.pdf saved as PDF format
+
+-- pre_ppr by hiw_endow (piwtd) --
+  Hi endow: N=2899 mean_prppr=  9.6 share_HP=0.54
+  Lo endow: N=2898 mean_prppr=  9.2 share_HP=0.49
+
+
+=== Exposure distribution by high_pre_ppr x hiw_<char> ===
+(6,382 missing values generated)
+(1,454 real changes made)
+(1,338 real changes made)
+(1,204 real changes made)
+(1,299 real changes made)
+file ../output/figures/all_jrnls/diag_exposure_dist_by_tfnd_r1_r2_public.pdf saved as PDF format
+
+-- exposure by prppr x hiw_tfnd --
+  HP x Hi:  N=1454 mean=0.032 p50=0.024 p90=0.095
+  HP x Lo:  N=1338 mean=0.033 p50=0.025 p90=0.094
+  LP x Hi:  N=1204 mean=0.031 p50=0.023 p90=0.087
+  LP x Lo:  N=1299 mean=0.031 p50=0.022 p90=0.090
+(6,382 missing values generated)
+(1,413 real changes made)
+(1,378 real changes made)
+(1,243 real changes made)
+(1,258 real changes made)
+file ../output/figures/all_jrnls/diag_exposure_dist_by_lsf_r1_r2_public.pdf saved as PDF format
+
+-- exposure by prppr x hiw_lsf --
+  HP x Hi:  N=1413 mean=0.031 p50=0.025 p90=0.091
+  HP x Lo:  N=1378 mean=0.034 p50=0.024 p90=0.097
+  LP x Hi:  N=1243 mean=0.030 p50=0.022 p90=0.084
+  LP x Lo:  N=1258 mean=0.031 p50=0.022 p90=0.092
+(6,382 missing values generated)
+(1,563 real changes made)
+(1,406 real changes made)
+(1,336 real changes made)
+(1,492 real changes made)
+file ../output/figures/all_jrnls/diag_exposure_dist_by_endow_r1_r2_public.pdf saved as PDF format
+
+-- exposure by prppr x hiw_endow --
+  HP x Hi:  N=1563 mean=0.031 p50=0.024 p90=0.095
+  HP x Lo:  N=1406 mean=0.034 p50=0.027 p90=0.096
+  LP x Hi:  N=1336 mean=0.031 p50=0.023 p90=0.091
+  LP x Lo:  N=1492 mean=0.030 p50=0.021 p90=0.089
+(27 observations deleted)
+file ../output/figures/all_jrnls/diag_kd_ln_ppr_per_yr_by_hiw_tfnd_r1_r2_public.pdf saved as PDF format
+
+-- inst-level avg papers per year by hiw_tfnd --
+  Hi tfnd: N=13 mean=   403.6/yr
+  Lo tfnd: N=92 mean=    52.9/yr
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+tfnd piwtd: y_hi=-0.788 y_lo=-0.298 o_hi=-0.287 o_lo= 0.015  [no-S] o_lo=-0.782 (se=0.415)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+lsf piwtd: y_hi=-0.730 y_lo=-0.412 o_hi=-0.465 o_lo= 0.204  [no-S] o_lo=-0.595 (se=0.400)
+(5,850 missing values generated)
+(5,850 missing values generated)
+(5,850 missing values generated)
+(5,850 missing values generated)
+(5,850 missing values generated)
+(5,850 missing values generated)
+(5,850 missing values generated)
+(5,850 missing values generated)
+(5,850 missing values generated)
+(5,850 missing values generated)
+(5,850 missing values generated)
+(5,850 missing values generated)
+endow piwtd: y_hi=-0.708 y_lo=-0.465 o_hi=-0.002 o_lo=-0.189  [no-S] o_lo=-0.768 (se=0.380)
+file ../output/figures/all_jrnls/diag_joint_piwtd_yhi_vs_ohi_r1_r2_public.pdf saved as PDF format
+file ../output/figures/all_jrnls/diag_joint_piwtd_4cells_r1_r2_public.pdf saved as PDF format
+Number of observations (_N) was 0, now 4.
+(4 missing values generated)
+(4 missing values generated)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+file ../output/figures/all_jrnls/coef_age_x_tfnd_piwtd_r1_r2_public.pdf saved as PDF format
+Number of observations (_N) was 0, now 4.
+(4 missing values generated)
+(4 missing values generated)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+file ../output/figures/all_jrnls/coef_age_x_lsf_piwtd_r1_r2_public.pdf saved as PDF format
+Number of observations (_N) was 0, now 4.
+(4 missing values generated)
+(4 missing values generated)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+file ../output/figures/all_jrnls/coef_age_x_endow_piwtd_r1_r2_public.pdf saved as PDF format
+
+
+=== Part C: crossover-test lincoms per inst char (PI-wtd cutoff) ===
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+
+-- tfnd --
+  H0: LP x Lo = 0    (is the crossover cell itself significant?)
+    b= -0.5672  se=0.5056  t= -1.12  p=0.262
+  H0: HP x Lo - LP x Lo = 0    (blue-vs-orange at Lo row)
+    b=  0.6283  se=0.6158  t=  1.02  p=0.308
+  H0: HP x Hi - LP x Hi = 0    (blue-vs-orange at Hi row)
+    b= -0.9077  se=0.5548  t= -1.64  p=0.102
+  H0: (HP-LP)_Hi - (HP-LP)_Lo = 0    (triple interaction)
+    b= -1.5360  se=0.8286  t= -1.85  p=0.064
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+
+-- lsf --
+  H0: LP x Lo = 0    (is the crossover cell itself significant?)
+    b= -0.5519  se=0.4990  t= -1.11  p=0.269
+  H0: HP x Lo - LP x Lo = 0    (blue-vs-orange at Lo row)
+    b=  0.5988  se=0.5947  t=  1.01  p=0.314
+  H0: HP x Hi - LP x Hi = 0    (blue-vs-orange at Hi row)
+    b= -0.9285  se=0.5685  t= -1.63  p=0.102
+  H0: (HP-LP)_Hi - (HP-LP)_Lo = 0    (triple interaction)
+    b= -1.5273  se=0.8225  t= -1.86  p=0.063
+(5,850 missing values generated)
+(5,850 missing values generated)
+(5,850 missing values generated)
+(5,850 missing values generated)
+(5,850 missing values generated)
+(5,850 missing values generated)
+(5,850 missing values generated)
+(5,850 missing values generated)
+
+-- endow --
+  H0: LP x Lo = 0    (is the crossover cell itself significant?)
+    b= -0.4590  se=0.4629  t= -0.99  p=0.321
+  H0: HP x Lo - LP x Lo = 0    (blue-vs-orange at Lo row)
+    b=  0.2518  se=0.5685  t=  0.44  p=0.658
+  H0: HP x Hi - LP x Hi = 0    (blue-vs-orange at Hi row)
+    b= -0.3676  se=0.5377  t= -0.68  p=0.494
+  H0: (HP-LP)_Hi - (HP-LP)_Lo = 0    (triple interaction)
+    b= -0.6194  se=0.7825  t= -0.79  p=0.429
+
+
+=== Part D: prppr x age x inst-char 8-cell PPML (PI-wtd cutoff) ===
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+tfnd: [Hi tfnd] y_hp=-0.863 y_lp=-0.744 o_hp=-0.617 o_lp= 0.846
+          [Lo tfnd] y_hp=-0.187 y_lp=-0.570 o_hp= 0.392 o_lp=-0.677
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+lsf: [Hi lsf] y_hp=-0.859 y_lp=-0.535 o_hp=-0.761 o_lp= 0.552
+          [Lo lsf] y_hp=-0.273 y_lp=-0.791 o_hp= 0.496 o_lp=-0.336
+(5,850 missing values generated)
+(5,850 missing values generated)
+(5,850 missing values generated)
+(5,850 missing values generated)
+(5,850 missing values generated)
+(5,850 missing values generated)
+(5,850 missing values generated)
+(5,850 missing values generated)
+(5,850 missing values generated)
+(5,850 missing values generated)
+(5,850 missing values generated)
+(5,850 missing values generated)
+(5,850 missing values generated)
+(5,850 missing values generated)
+(5,850 missing values generated)
+(5,850 missing values generated)
+(5,850 missing values generated)
+(5,850 missing values generated)
+(5,850 missing values generated)
+(5,850 missing values generated)
+(5,850 missing values generated)
+(5,850 missing values generated)
+(5,850 missing values generated)
+(5,850 missing values generated)
+endow: [Hi endow] y_hp=-0.629 y_lp=-1.100 o_hp=-0.293 o_lp= 0.875
+          [Lo endow] y_hp=-0.430 y_lp=-0.485 o_hp= 0.025 o_lp=-0.582
+(21 observations created)
+(24 missing values generated)
+(24 missing values generated)
+(24 missing values generated)
+(24 missing values generated)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(note:  named style cme not found in class gsize, default attributes used)
+(note:  named style o not found in class gsize, default attributes used)
+(note:  named style cme not found in class gsize, default attributes used)
+(note:  named style o not found in class gsize, default attributes used)
+(note:  named style cme not found in class gsize, default attributes used)
+(note:  named style o not found in class gsize, default attributes used)
+(note:  named style vsma not found in class gsize, default attributes used)
+(note:  named style cme not found in class gsize, default attributes used)
+(note:  named style o not found in class gsize, default attributes used)
+(note:  named style cme not found in class gsize, default attributes used)
+(note:  named style o not found in class gsize, default attributes used)
+(note:  named style cme not found in class gsize, default attributes used)
+(note:  named style o not found in class gsize, default attributes used)
+(note:  named style vsma not found in class gsize, default attributes used)
+(note:  named style cme not found in class gsize, default attributes used)
+(note:  named style o not found in class gsize, default attributes used)
+(note:  named style cme not found in class gsize, default attributes used)
+(note:  named style o not found in class gsize, default attributes used)
+(note:  named style cme not found in class gsize, default attributes used)
+(note:  named style o not found in class gsize, default attributes used)
+(note:  named style vsma not found in class gsize, default attributes used)
+(note:  named style cme not found in class gsize, default attributes used)
+(note:  named style o not found in class gsize, default attributes used)
+(note:  named style cme not found in class gsize, default attributes used)
+(note:  named style o not found in class gsize, default attributes used)
+(note:  named style cme not found in class gsize, default attributes used)
+(note:  named style o not found in class gsize, default attributes used)
+(note:  named style vsma not found in class gsize, default attributes used)
+file ../output/figures/all_jrnls/diag_joint_piwtd_prppr_age_8cells_r1_r2_public.pdf saved as PDF format
+wrote diag_joint_piwtd_prppr_age_8cells.pdf
+
+
+
+============================================================
+=== SAMPLE: _r1_public
+============================================================
+
+Unique PIs in panel = 6047
+(54,423 observations deleted)
+
+Unique PIs after athr_indicator filter = 6047
+
+
+=== R1 x young cross-tab ===
+
++-------------------+
+| Key               |
+|-------------------|
+|     frequency     |
+|  row percentage   |
+| column percentage |
++-------------------+
+
+           |         young
+        r1 |         0          1 |     Total
+-----------+----------------------+----------
+         1 |     3,041      3,006 |     6,047 
+           |     50.29      49.71 |    100.00 
+           |    100.00     100.00 |    100.00 
+-----------+----------------------+----------
+     Total |     3,041      3,006 |     6,047 
+           |     50.29      49.71 |    100.00 
+           |    100.00     100.00 |    100.00 
+file ../output/figures/all_jrnls/diag_share_young_by_r1_r1_public.pdf saved as PDF format
+file ../output/figures/all_jrnls/diag_age_hist_by_r1_r1_public.pdf saved as PDF format
+file ../output/figures/all_jrnls/diag_kd_pre_ppr_ln_r1_public.pdf saved as PDF format
+
+
+=== Characteristic means by young / old ===
+
+Summary for variables: pre_ppr_cnt_sum pre_gpp pre_team_avg pre_coauth_avg age_2014 msa_size_at r1 ic_tfnd ic_fedf ic_endow
+Group variable: young 
+
+   young |      Mean        SD         N
+---------+------------------------------
+       0 |  9.689576  5.712836      3041
+         |  1.395026  1.337967      3041
+         |  5.507367   2.21297      3041
+         |   4.20687  2.093766      3041
+         |  58.12989  7.941764      3041
+         |  17690.99  17171.15      2290
+         |         1         0      3041
+         |  679807.6  349348.6      2549
+         |  412296.6  243066.9      2549
+         |  1.41e+09  1.64e+09      2770
+---------+------------------------------
+       1 |  9.136394  5.172372      3006
+         |  1.076325  1.161079      3006
+         |  5.321632  2.243944      3006
+         |  4.015893   2.12911      3006
+         |  40.81404  3.848333      3006
+         |  17669.68  17858.55      2308
+         |         1         0      3006
+         |  639165.1  352683.2      2454
+         |  384324.6  238961.4      2454
+         |  1.39e+09  1.72e+09      2697
+---------+------------------------------
+   Total |  9.414586  5.457435      6047
+         |  1.236598  1.263149      6047
+         |  5.415037  2.230171      6047
+         |  4.111934  2.113394      6047
+         |  49.52208  10.67911      6047
+         |  17680.29  17517.66      4598
+         |         1         0      6047
+         |  659872.2  351540.8      5003
+         |  398576.2  241443.1      5003
+         |  1.40e+09  1.68e+09      5467
+----------------------------------------
+
+
+=== Char ~ young (per-char reversed regression, cluster inst_id) ===
+
+--- reg pre_ppr_cnt_sum young, vce(cluster inst_id) ---
+
+Linear regression                               Number of obs     =      6,047
+                                                F(1, 80)          =      11.87
+                                                Prob > F          =     0.0009
+                                                R-squared         =     0.0026
+                                                Root MSE          =     5.4509
+
+                               (Std. err. adjusted for 81 clusters in inst_id)
+------------------------------------------------------------------------------
+             |               Robust
+pre_ppr_cn~m | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+       young |  -.5531819   .1605873    -3.44   0.001    -.8727609   -.2336029
+       _cons |   9.689576   .1631245    59.40   0.000     9.364948     10.0142
+------------------------------------------------------------------------------
+
+--- reg pre_coauth_avg young, vce(cluster inst_id) ---
+
+Linear regression                               Number of obs     =      6,047
+                                                F(1, 80)          =      16.88
+                                                Prob > F          =     0.0001
+                                                R-squared         =     0.0020
+                                                Root MSE          =     2.1114
+
+                               (Std. err. adjusted for 81 clusters in inst_id)
+------------------------------------------------------------------------------
+             |               Robust
+pre_coauth~g | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+       young |   -.190977   .0464771    -4.11   0.000    -.2834695   -.0984846
+       _cons |    4.20687   .0831996    50.56   0.000     4.041298    4.372443
+------------------------------------------------------------------------------
+
+--- reg pre_team_avg young, vce(cluster inst_id) ---
+
+Linear regression                               Number of obs     =      6,047
+                                                F(1, 80)          =      12.99
+                                                Prob > F          =     0.0005
+                                                R-squared         =     0.0017
+                                                Root MSE          =     2.2284
+
+                               (Std. err. adjusted for 81 clusters in inst_id)
+------------------------------------------------------------------------------
+             |               Robust
+pre_team_avg | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+       young |  -.1857346   .0515315    -3.60   0.001    -.2882857   -.0831836
+       _cons |   5.507367    .090631    60.77   0.000     5.327005    5.687728
+------------------------------------------------------------------------------
+
+--- reg pre_gpp young, vce(cluster inst_id) ---
+
+Linear regression                               Number of obs     =      6,047
+                                                F(1, 80)          =     116.76
+                                                Prob > F          =     0.0000
+                                                R-squared         =     0.0159
+                                                Root MSE          =     1.2532
+
+                               (Std. err. adjusted for 81 clusters in inst_id)
+------------------------------------------------------------------------------
+             |               Robust
+     pre_gpp | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+       young |  -.3187017   .0294938   -10.81   0.000    -.3773961   -.2600072
+       _cons |   1.395026    .080141    17.41   0.000     1.235541    1.554512
+------------------------------------------------------------------------------
+
+--- reg msa_size_at young, vce(cluster inst_id) ---
+
+Linear regression                               Number of obs     =      4,598
+                                                F(1, 80)          =       0.00
+                                                Prob > F          =     0.9750
+                                                R-squared         =     0.0000
+                                                Root MSE          =      17520
+
+                               (Std. err. adjusted for 81 clusters in inst_id)
+------------------------------------------------------------------------------
+             |               Robust
+ msa_size_at | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+       young |  -21.31451   679.2718    -0.03   0.975    -1373.108    1330.479
+       _cons |   17690.99   2460.054     7.19   0.000     12795.33    22586.66
+------------------------------------------------------------------------------
+
+--- reg ic_tfnd young, vce(cluster inst_id) ---
+
+Linear regression                               Number of obs     =      5,003
+                                                F(1, 60)          =       6.60
+                                                Prob > F          =     0.0127
+                                                R-squared         =     0.0033
+                                                Root MSE          =     3.5e+05
+
+                               (Std. err. adjusted for 61 clusters in inst_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ic_tfnd | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+       young |  -40642.42   15820.59    -2.57   0.013    -72288.32   -8996.524
+       _cons |   679807.6   65879.48    10.32   0.000       548029    811586.2
+------------------------------------------------------------------------------
+
+--- reg ic_lsf young, vce(cluster inst_id) ---
+
+Linear regression                               Number of obs     =      5,003
+                                                F(1, 60)          =       9.15
+                                                Prob > F          =     0.0037
+                                                R-squared         =     0.0049
+                                                Root MSE          =     2.6e+05
+
+                               (Std. err. adjusted for 61 clusters in inst_id)
+------------------------------------------------------------------------------
+             |               Robust
+      ic_lsf | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+       young |  -36042.02   11914.79    -3.02   0.004    -59875.15   -12208.89
+       _cons |     413434      46666     8.86   0.000     320088.1    506779.9
+------------------------------------------------------------------------------
+
+--- reg ic_endow young, vce(cluster inst_id) ---
+
+Linear regression                               Number of obs     =      5,467
+                                                F(1, 74)          =       0.10
+                                                Prob > F          =     0.7528
+                                                R-squared         =     0.0000
+                                                Root MSE          =     1.7e+09
+
+                               (Std. err. adjusted for 75 clusters in inst_id)
+------------------------------------------------------------------------------
+             |               Robust
+    ic_endow | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+       young |  -1.58e+07   5.00e+07    -0.32   0.753    -1.15e+08    8.38e+07
+       _cons |   1.41e+09   3.45e+08     4.07   0.000     7.19e+08    2.10e+09
+------------------------------------------------------------------------------
+(1,449 missing values generated)
+(1,044 missing values generated)
+(1,044 missing values generated)
+(580 missing values generated)
+
+--- Per-char LPMs of young on standardized chars ---
+
+-- young ~ PI chars + z_ic_tfnd (N with z_ic_tfnd non-mi = 5003) --
+note: r1 omitted because of collinearity.
+
+Linear regression                               Number of obs     =      3,825
+                                                F(6, 60)          =      22.78
+                                                Prob > F          =     0.0000
+                                                R-squared         =     0.0203
+                                                Root MSE          =     .49531
+
+                                    (Std. err. adjusted for 61 clusters in inst_id)
+-----------------------------------------------------------------------------------
+                  |               Robust
+            young | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+------------------+----------------------------------------------------------------
+z_pre_ppr_cnt_sum |  -.0272842   .0089169    -3.06   0.003    -.0451207   -.0094478
+        z_pre_gpp |  -.0653431   .0090745    -7.20   0.000    -.0834949   -.0471914
+   z_pre_team_avg |   .0262452   .0316107     0.83   0.410    -.0369857    .0894761
+ z_pre_coauth_avg |  -.0176904   .0307647    -0.58   0.567    -.0792289    .0438481
+    z_msa_size_at |   .0210487   .0101723     2.07   0.043     .0007011    .0413964
+               r1 |          0  (omitted)
+        z_ic_tfnd |  -.0159704   .0158938    -1.00   0.319    -.0477628    .0158219
+            _cons |   .4993815    .012222    40.86   0.000     .4749338    .5238291
+-----------------------------------------------------------------------------------
+
+-- same, R1 only --
+
+Linear regression                               Number of obs     =      3,825
+                                                F(6, 60)          =      22.78
+                                                Prob > F          =     0.0000
+                                                R-squared         =     0.0203
+                                                Root MSE          =     .49531
+
+                                    (Std. err. adjusted for 61 clusters in inst_id)
+-----------------------------------------------------------------------------------
+                  |               Robust
+            young | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+------------------+----------------------------------------------------------------
+z_pre_ppr_cnt_sum |  -.0272842   .0089169    -3.06   0.003    -.0451207   -.0094478
+        z_pre_gpp |  -.0653431   .0090745    -7.20   0.000    -.0834949   -.0471914
+   z_pre_team_avg |   .0262452   .0316107     0.83   0.410    -.0369857    .0894761
+ z_pre_coauth_avg |  -.0176904   .0307647    -0.58   0.567    -.0792289    .0438481
+    z_msa_size_at |   .0210487   .0101723     2.07   0.043     .0007011    .0413964
+        z_ic_tfnd |  -.0159704   .0158938    -1.00   0.319    -.0477628    .0158219
+            _cons |   .4993815    .012222    40.86   0.000     .4749338    .5238291
+-----------------------------------------------------------------------------------
+
+-- young ~ PI chars + z_ic_lsf (N with z_ic_lsf non-mi = 5003) --
+note: r1 omitted because of collinearity.
+
+Linear regression                               Number of obs     =      3,825
+                                                F(6, 60)          =      23.00
+                                                Prob > F          =     0.0000
+                                                R-squared         =     0.0212
+                                                Root MSE          =     .49509
+
+                                    (Std. err. adjusted for 61 clusters in inst_id)
+-----------------------------------------------------------------------------------
+                  |               Robust
+            young | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+------------------+----------------------------------------------------------------
+z_pre_ppr_cnt_sum |  -.0274108   .0088507    -3.10   0.003    -.0451148   -.0097068
+        z_pre_gpp |  -.0631927   .0093095    -6.79   0.000    -.0818145    -.044571
+   z_pre_team_avg |   .0284713   .0314423     0.91   0.369    -.0344227    .0913652
+ z_pre_coauth_avg |  -.0186895   .0304134    -0.61   0.541    -.0795253    .0421463
+    z_msa_size_at |   .0208638   .0095132     2.19   0.032     .0018345    .0398931
+               r1 |          0  (omitted)
+         z_ic_lsf |  -.0223063    .014984    -1.49   0.142    -.0522788    .0076662
+            _cons |    .499328   .0122106    40.89   0.000     .4749032    .5237528
+-----------------------------------------------------------------------------------
+
+-- same, R1 only --
+
+Linear regression                               Number of obs     =      3,825
+                                                F(6, 60)          =      23.00
+                                                Prob > F          =     0.0000
+                                                R-squared         =     0.0212
+                                                Root MSE          =     .49509
+
+                                    (Std. err. adjusted for 61 clusters in inst_id)
+-----------------------------------------------------------------------------------
+                  |               Robust
+            young | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+------------------+----------------------------------------------------------------
+z_pre_ppr_cnt_sum |  -.0274108   .0088507    -3.10   0.003    -.0451148   -.0097068
+        z_pre_gpp |  -.0631927   .0093095    -6.79   0.000    -.0818145    -.044571
+   z_pre_team_avg |   .0284713   .0314423     0.91   0.369    -.0344227    .0913652
+ z_pre_coauth_avg |  -.0186895   .0304134    -0.61   0.541    -.0795253    .0421463
+    z_msa_size_at |   .0208638   .0095132     2.19   0.032     .0018345    .0398931
+         z_ic_lsf |  -.0223063    .014984    -1.49   0.142    -.0522788    .0076662
+            _cons |    .499328   .0122106    40.89   0.000     .4749032    .5237528
+-----------------------------------------------------------------------------------
+
+-- young ~ PI chars + z_ic_endow (N with z_ic_endow non-mi = 5467) --
+note: r1 omitted because of collinearity.
+
+Linear regression                               Number of obs     =      4,152
+                                                F(6, 74)          =      18.74
+                                                Prob > F          =     0.0000
+                                                R-squared         =     0.0216
+                                                Root MSE          =     .49497
+
+                                    (Std. err. adjusted for 75 clusters in inst_id)
+-----------------------------------------------------------------------------------
+                  |               Robust
+            young | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+------------------+----------------------------------------------------------------
+z_pre_ppr_cnt_sum |  -.0262306   .0082924    -3.16   0.002    -.0427536   -.0097076
+        z_pre_gpp |  -.0765543   .0085375    -8.97   0.000    -.0935656   -.0595431
+   z_pre_team_avg |   .0135439   .0302199     0.45   0.655    -.0466706    .0737584
+ z_pre_coauth_avg |  -.0058425   .0304051    -0.19   0.848    -.0664259     .054741
+    z_msa_size_at |   .0037191   .0088024     0.42   0.674    -.0138202    .0212583
+               r1 |          0  (omitted)
+       z_ic_endow |   .0127904   .0077505     1.65   0.103    -.0026527    .0282335
+            _cons |   .5006686     .01009    49.62   0.000     .4805638    .5207733
+-----------------------------------------------------------------------------------
+
+-- same, R1 only --
+
+Linear regression                               Number of obs     =      4,152
+                                                F(6, 74)          =      18.74
+                                                Prob > F          =     0.0000
+                                                R-squared         =     0.0216
+                                                Root MSE          =     .49497
+
+                                    (Std. err. adjusted for 75 clusters in inst_id)
+-----------------------------------------------------------------------------------
+                  |               Robust
+            young | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+------------------+----------------------------------------------------------------
+z_pre_ppr_cnt_sum |  -.0262306   .0082924    -3.16   0.002    -.0427536   -.0097076
+        z_pre_gpp |  -.0765543   .0085375    -8.97   0.000    -.0935656   -.0595431
+   z_pre_team_avg |   .0135439   .0302199     0.45   0.655    -.0466706    .0737584
+ z_pre_coauth_avg |  -.0058425   .0304051    -0.19   0.848    -.0664259     .054741
+    z_msa_size_at |   .0037191   .0088024     0.42   0.674    -.0138202    .0212583
+       z_ic_endow |   .0127904   .0077505     1.65   0.103    -.0026527    .0282335
+            _cons |   .5006686     .01009    49.62   0.000     .4805638    .5207733
+-----------------------------------------------------------------------------------
+
+--- Kitchen-sink LPM: all 8 ic chars simultaneously (common sample) ---
+note: r1 omitted because of collinearity.
+
+Linear regression                               Number of obs     =      3,442
+                                                F(8, 55)          =      14.98
+                                                Prob > F          =     0.0000
+                                                R-squared         =     0.0253
+                                                Root MSE          =     .49416
+
+                                    (Std. err. adjusted for 56 clusters in inst_id)
+-----------------------------------------------------------------------------------
+                  |               Robust
+            young | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+------------------+----------------------------------------------------------------
+z_pre_ppr_cnt_sum |  -.0228562   .0093955    -2.43   0.018    -.0416852   -.0040271
+        z_pre_gpp |  -.0618284    .009497    -6.51   0.000    -.0808609    -.042796
+   z_pre_team_avg |   .0252214    .034271     0.74   0.465    -.0434593    .0939021
+ z_pre_coauth_avg |  -.0132448   .0345937    -0.38   0.703    -.0825721    .0560824
+    z_msa_size_at |   .0210075   .0089895     2.34   0.023     .0029922    .0390228
+               r1 |          0  (omitted)
+        z_ic_tfnd |   .0123572   .0301812     0.41   0.684    -.0481272    .0728416
+         z_ic_lsf |  -.0609503       .031    -1.97   0.054    -.1230757    .0011752
+       z_ic_endow |   .0349707    .007525     4.65   0.000     .0198903     .050051
+            _cons |   .4932386   .0093627    52.68   0.000     .4744754    .5120018
+-----------------------------------------------------------------------------------
+file ../output/figures/all_jrnls/diag_age_dist_by_high_pre_ppr_r1_public.pdf saved as PDF format
+
+-- age composition by high_pre_ppr --
+  High Baseline Productivity: N=3119 mean_age= 50.1 share_young=0.48
+  Low  Baseline Productivity: N=2928 mean_age= 48.9 share_young=0.52
+file ../output/figures/all_jrnls/diag_age_dist_by_tfnd_piwtd_r1_public.pdf saved as PDF format
+file ../output/figures/all_jrnls/diag_age_dist_by_lsf_piwtd_r1_public.pdf saved as PDF format
+file ../output/figures/all_jrnls/diag_age_dist_by_endow_piwtd_r1_public.pdf saved as PDF format
+file ../output/figures/all_jrnls/diag_pre_ppr_dist_by_tfnd_piwtd_r1_public.pdf saved as PDF format
+
+-- pre_ppr by hiw_tfnd (piwtd) --
+  Hi tfnd: N=2603 mean_prppr=  9.7 share_HP=0.54
+  Lo tfnd: N=2400 mean_prppr=  9.4 share_HP=0.52
+file ../output/figures/all_jrnls/diag_pre_ppr_dist_by_lsf_piwtd_r1_public.pdf saved as PDF format
+
+-- pre_ppr by hiw_lsf (piwtd) --
+  Hi lsf: N=2559 mean_prppr=  9.6 share_HP=0.53
+  Lo lsf: N=2444 mean_prppr=  9.5 share_HP=0.53
+file ../output/figures/all_jrnls/diag_pre_ppr_dist_by_endow_piwtd_r1_public.pdf saved as PDF format
+
+-- pre_ppr by hiw_endow (piwtd) --
+  Hi endow: N=2741 mean_prppr=  9.6 share_HP=0.54
+  Lo endow: N=2726 mean_prppr=  9.3 share_HP=0.49
+
+
+=== Exposure distribution by high_pre_ppr x hiw_<char> ===
+(6,047 missing values generated)
+(1,417 real changes made)
+(1,245 real changes made)
+(1,186 real changes made)
+(1,155 real changes made)
+file ../output/figures/all_jrnls/diag_exposure_dist_by_tfnd_r1_public.pdf saved as PDF format
+
+-- exposure by prppr x hiw_tfnd --
+  HP x Hi:  N=1417 mean=0.031 p50=0.024 p90=0.094
+  HP x Lo:  N=1245 mean=0.034 p50=0.025 p90=0.095
+  LP x Hi:  N=1186 mean=0.031 p50=0.022 p90=0.087
+  LP x Lo:  N=1155 mean=0.031 p50=0.022 p90=0.089
+(6,047 missing values generated)
+(1,365 real changes made)
+(1,297 real changes made)
+(1,194 real changes made)
+(1,147 real changes made)
+file ../output/figures/all_jrnls/diag_exposure_dist_by_lsf_r1_public.pdf saved as PDF format
+
+-- exposure by prppr x hiw_lsf --
+  HP x Hi:  N=1365 mean=0.031 p50=0.025 p90=0.091
+  HP x Lo:  N=1297 mean=0.034 p50=0.024 p90=0.097
+  LP x Hi:  N=1194 mean=0.030 p50=0.022 p90=0.084
+  LP x Lo:  N=1147 mean=0.031 p50=0.022 p90=0.092
+(6,047 missing values generated)
+(1,479 real changes made)
+(1,344 real changes made)
+(1,262 real changes made)
+(1,382 real changes made)
+file ../output/figures/all_jrnls/diag_exposure_dist_by_endow_r1_public.pdf saved as PDF format
+
+-- exposure by prppr x hiw_endow --
+  HP x Hi:  N=1479 mean=0.031 p50=0.023 p90=0.095
+  HP x Lo:  N=1344 mean=0.034 p50=0.026 p90=0.095
+  LP x Hi:  N=1262 mean=0.031 p50=0.023 p90=0.091
+  LP x Lo:  N=1382 mean=0.030 p50=0.022 p90=0.087
+(20 observations deleted)
+file ../output/figures/all_jrnls/diag_kd_ln_ppr_per_yr_by_hiw_tfnd_r1_public.pdf saved as PDF format
+
+-- inst-level avg papers per year by hiw_tfnd --
+  Hi tfnd: N=12 mean=   427.3/yr
+  Lo tfnd: N=49 mean=    92.0/yr
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+tfnd piwtd: y_hi=-0.808 y_lo=-0.145 o_hi=-0.337 o_lo= 0.016  [no-S] o_lo=-0.708 (se=0.448)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+lsf piwtd: y_hi=-0.767 y_lo=-0.238 o_hi=-0.532 o_lo= 0.240  [no-S] o_lo=-0.535 (se=0.429)
+(5,800 missing values generated)
+(5,800 missing values generated)
+(5,800 missing values generated)
+(5,800 missing values generated)
+(5,800 missing values generated)
+(5,800 missing values generated)
+(5,800 missing values generated)
+(5,800 missing values generated)
+(5,800 missing values generated)
+(5,800 missing values generated)
+(5,800 missing values generated)
+(5,800 missing values generated)
+endow piwtd: y_hi=-0.690 y_lo=-0.380 o_hi=-0.003 o_lo=-0.201  [no-S] o_lo=-0.740 (se=0.406)
+file ../output/figures/all_jrnls/diag_joint_piwtd_yhi_vs_ohi_r1_public.pdf saved as PDF format
+file ../output/figures/all_jrnls/diag_joint_piwtd_4cells_r1_public.pdf saved as PDF format
+Number of observations (_N) was 0, now 4.
+(4 missing values generated)
+(4 missing values generated)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+file ../output/figures/all_jrnls/coef_age_x_tfnd_piwtd_r1_public.pdf saved as PDF format
+Number of observations (_N) was 0, now 4.
+(4 missing values generated)
+(4 missing values generated)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+file ../output/figures/all_jrnls/coef_age_x_lsf_piwtd_r1_public.pdf saved as PDF format
+Number of observations (_N) was 0, now 4.
+(4 missing values generated)
+(4 missing values generated)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+file ../output/figures/all_jrnls/coef_age_x_endow_piwtd_r1_public.pdf saved as PDF format
+
+
+=== Part C: crossover-test lincoms per inst char (PI-wtd cutoff) ===
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+
+-- tfnd --
+  H0: LP x Lo = 0    (is the crossover cell itself significant?)
+    b= -0.3047  se=0.5412  t= -0.56  p=0.573
+  H0: HP x Lo - LP x Lo = 0    (blue-vs-orange at Lo row)
+    b=  0.3956  se=0.6506  t=  0.61  p=0.543
+  H0: HP x Hi - LP x Hi = 0    (blue-vs-orange at Hi row)
+    b= -0.8911  se=0.5608  t= -1.59  p=0.112
+  H0: (HP-LP)_Hi - (HP-LP)_Lo = 0    (triple interaction)
+    b= -1.2867  se=0.8589  t= -1.50  p=0.134
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+
+-- lsf --
+  H0: LP x Lo = 0    (is the crossover cell itself significant?)
+    b= -0.2302  se=0.5225  t= -0.44  p=0.660
+  H0: HP x Lo - LP x Lo = 0    (blue-vs-orange at Lo row)
+    b=  0.3319  se=0.6207  t=  0.53  p=0.593
+  H0: HP x Hi - LP x Hi = 0    (blue-vs-orange at Hi row)
+    b= -0.9110  se=0.5860  t= -1.55  p=0.120
+  H0: (HP-LP)_Hi - (HP-LP)_Lo = 0    (triple interaction)
+    b= -1.2430  se=0.8536  t= -1.46  p=0.145
+(5,800 missing values generated)
+(5,800 missing values generated)
+(5,800 missing values generated)
+(5,800 missing values generated)
+(5,800 missing values generated)
+(5,800 missing values generated)
+(5,800 missing values generated)
+(5,800 missing values generated)
+
+-- endow --
+  H0: LP x Lo = 0    (is the crossover cell itself significant?)
+    b= -0.2085  se=0.4947  t= -0.42  p=0.673
+  H0: HP x Lo - LP x Lo = 0    (blue-vs-orange at Lo row)
+    b= -0.0298  se=0.6028  t= -0.05  p=0.961
+  H0: HP x Hi - LP x Hi = 0    (blue-vs-orange at Hi row)
+    b= -0.3061  se=0.5465  t= -0.56  p=0.575
+  H0: (HP-LP)_Hi - (HP-LP)_Lo = 0    (triple interaction)
+    b= -0.2762  se=0.8138  t= -0.34  p=0.734
+
+
+=== Part D: prppr x age x inst-char 8-cell PPML (PI-wtd cutoff) ===
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+tfnd: [Hi tfnd] y_hp=-0.903 y_lp=-0.549 o_hp=-0.686 o_lp= 0.795
+          [Lo tfnd] y_hp=-0.079 y_lp=-0.303 o_hp= 0.276 o_lp=-0.485
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+(10,440 missing values generated)
+lsf: [Hi lsf] y_hp=-0.941 y_lp=-0.287 o_hp=-0.820 o_lp= 0.405
+          [Lo lsf] y_hp=-0.139 y_lp=-0.502 o_hp= 0.387 o_lp= 0.036
+(5,800 missing values generated)
+(5,800 missing values generated)
+(5,800 missing values generated)
+(5,800 missing values generated)
+(5,800 missing values generated)
+(5,800 missing values generated)
+(5,800 missing values generated)
+(5,800 missing values generated)
+(5,800 missing values generated)
+(5,800 missing values generated)
+(5,800 missing values generated)
+(5,800 missing values generated)
+(5,800 missing values generated)
+(5,800 missing values generated)
+(5,800 missing values generated)
+(5,800 missing values generated)
+(5,800 missing values generated)
+(5,800 missing values generated)
+(5,800 missing values generated)
+(5,800 missing values generated)
+(5,800 missing values generated)
+(5,800 missing values generated)
+(5,800 missing values generated)
+(5,800 missing values generated)
+endow: [Hi endow] y_hp=-0.613 y_lp=-0.998 o_hp=-0.336 o_lp= 0.993
+          [Lo endow] y_hp=-0.425 y_lp=-0.198 o_hp=-0.071 o_lp=-0.404
+(21 observations created)
+(24 missing values generated)
+(24 missing values generated)
+(24 missing values generated)
+(24 missing values generated)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(3 real changes made)
+(note:  named style cme not found in class gsize, default attributes used)
+(note:  named style o not found in class gsize, default attributes used)
+(note:  named style cme not found in class gsize, default attributes used)
+(note:  named style o not found in class gsize, default attributes used)
+(note:  named style cme not found in class gsize, default attributes used)
+(note:  named style o not found in class gsize, default attributes used)
+(note:  named style vsma not found in class gsize, default attributes used)
+(note:  named style cme not found in class gsize, default attributes used)
+(note:  named style o not found in class gsize, default attributes used)
+(note:  named style cme not found in class gsize, default attributes used)
+(note:  named style o not found in class gsize, default attributes used)
+(note:  named style cme not found in class gsize, default attributes used)
+(note:  named style o not found in class gsize, default attributes used)
+(note:  named style vsma not found in class gsize, default attributes used)
+(note:  named style cme not found in class gsize, default attributes used)
+(note:  named style o not found in class gsize, default attributes used)
+(note:  named style cme not found in class gsize, default attributes used)
+(note:  named style o not found in class gsize, default attributes used)
+(note:  named style cme not found in class gsize, default attributes used)
+(note:  named style o not found in class gsize, default attributes used)
+(note:  named style vsma not found in class gsize, default attributes used)
+(note:  named style cme not found in class gsize, default attributes used)
+(note:  named style o not found in class gsize, default attributes used)
+(note:  named style cme not found in class gsize, default attributes used)
+(note:  named style o not found in class gsize, default attributes used)
+(note:  named style cme not found in class gsize, default attributes used)
+(note:  named style o not found in class gsize, default attributes used)
+(note:  named style vsma not found in class gsize, default attributes used)
+file ../output/figures/all_jrnls/diag_joint_piwtd_prppr_age_8cells_r1_public.pdf saved as PDF format
+wrote diag_joint_piwtd_prppr_age_8cells.pdf
+
+. 
+. log close
+      name:  <unnamed>
+       log:  /n/holylabs/pakes_lab/Lab/sci_eq/analysis/rf_heterogeneity/code/diag.log
+  log type:  text
+ closed on:  19 Jul 2026, 23:38:58
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

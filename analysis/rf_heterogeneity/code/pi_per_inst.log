@@ -1,0 +1,67 @@
+
+. use ../temp/es_all_jrnls_r1_r2_public, clear
+
+. * First: total papers and total PIs by inst, computed correctly
+. preserve
+
+. keep if athr_indicator == 1
+(57,438 observations deleted)
+
+. gcontract inst_id hiw_tfnd if !mi(hiw_tfnd)
+
+. rename _freq n_pis
+
+. qui sum n_pis if hiw_tfnd == 1
+
+. di as text _n "Hi tfnd insts: N_inst=" r(N) "  mean PIs/inst=" %5.1f r(mean) 
+> "  total PIs=" %8.0f r(sum)
+
+Hi tfnd insts: N_inst=13  mean PIs/inst=204.5  total PIs=    2658
+
+. qui sum n_pis if hiw_tfnd == 0
+
+. di as text "Lo tfnd insts: N_inst=" r(N) "  mean PIs/inst=" %5.1f r(mean) "  
+> total PIs=" %8.0f r(sum)
+Lo tfnd insts: N_inst=92  mean PIs/inst= 28.7  total PIs=    2637
+
+. restore
+
+. 
+. * Per-PI mean pre-period paper count
+. qui sum pre_ppr_cnt_sum if athr_indicator == 1 & hiw_tfnd == 1
+
+. di as text _n "Pre-period papers PER PI (2009-2013):"
+
+Pre-period papers PER PI (2009-2013):
+
+. di as text "  Hi tfnd: mean=" %5.2f r(mean) "  p50=" %5.0f
+  Hi tfnd: mean= 9.73  p50=
+
+. qui sum pre_ppr_cnt_sum if athr_indicator == 1 & hiw_tfnd == 1, d
+
+. di as text "  Hi tfnd: mean=" %5.2f r(mean) "  p50=" %5.1f r(p50)
+  Hi tfnd: mean= 9.73  p50=  8.0
+
+. qui sum pre_ppr_cnt_sum if athr_indicator == 1 & hiw_tfnd == 0, d
+
+. di as text "  Lo tfnd: mean=" %5.2f r(mean) "  p50=" %5.1f r(p50)
+  Lo tfnd: mean= 9.30  p50=  8.0
+
+. 
+. * Share HP at each type of inst
+. di as text _n "Share HP (above overall PI-level median) by inst type:"
+
+Share HP (above overall PI-level median) by inst type:
+
+. qui sum high_pre_ppr if athr_indicator == 1 & hiw_tfnd == 1
+
+. di as text "  Hi tfnd: share HP=" %5.3f r(mean)
+  Hi tfnd: share HP=0.547
+
+. qui sum high_pre_ppr if athr_indicator == 1 & hiw_tfnd == 0
+
+. di as text "  Lo tfnd: share HP=" %5.3f r(mean)
+  Lo tfnd: share HP=0.507
+
+. 
+end of do-file

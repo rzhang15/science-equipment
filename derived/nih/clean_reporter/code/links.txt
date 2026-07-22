@@ -1,0 +1,2 @@
+./nih/ | /n/netscratch/pakes_lab/Lab/sci_eq/grants/reporter 
+

@@ -1,0 +1,12 @@
+Cleared: `../output/`
+Cleared: `../temp/`
+Removed: `/n/holylabs/pakes_lab/Lab/sci_eq/derived/nih/clean_reporter/external`
+Starting makelog file at: `/n/holylabs/pakes_lab/Lab/sci_eq/derived/nih/clean_reporter/output/make.log`
+External links successfully created!
+Executing command: `stata-mp -e do \"/n/holylabs/pakes_lab/Lab/sci_eq/derived/nih/clean_reporter/code/build\.do\"`
+Ending makelog file at: `/n/holylabs/pakes_lab/Lab/sci_eq/derived/nih/clean_reporter/output/make.log`
+
+ Press <Enter> to exit.Traceback (most recent call last):
+  File "/n/holylabs/pakes_lab/Lab/sci_eq/derived/nih/clean_reporter/code/make.py", line 23, in <module>
+    input('\n Press <Enter> to exit.')
+EOFError: EOF when reading a line

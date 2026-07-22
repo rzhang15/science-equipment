@@ -1,0 +1,43 @@
+
+. foreach f in "/n/holylabs/pakes_lab/Lab/sci_eq/derived/openalex/clean_athr_in
+> st_hist/output/list_of_us_athrs.dta" "/n/holylabs/pakes_lab/Lab/sci_eq/derive
+> d/openalex/scrape_athr_inst_hist/output/list_of_insts.dta" {
+  2.     cap use "`f'", clear
+  3.     di as text _n "===  `f' ==="
+  4.     if _rc di as error "cannot open"
+  5.     else desc, fullnames
+  6. }
+
+===  /n/holylabs/pakes_lab/Lab/sci_eq/derived/openalex/clean_athr_inst_hist/out
+> put/list_of_us_athrs.dta ===
+
+Contains data from /n/holylabs/pakes_lab/Lab/sci_eq/derived/openalex/clean_athr
+> _inst_hist/output/list_of_us_athrs.dta
+ Observations:     4,405,269                  
+    Variables:             1                  22 Jan 2026 01:37
+-------------------------------------------------------------------------------
+Variable      Storage   Display    Value
+    name         type    format    label      Variable label
+-------------------------------------------------------------------------------
+athr_id         str11   %11s                  
+-------------------------------------------------------------------------------
+Sorted by: athr_id
+
+===  /n/holylabs/pakes_lab/Lab/sci_eq/derived/openalex/scrape_athr_inst_hist/ou
+> tput/list_of_insts.dta ===
+
+Contains data from /n/holylabs/pakes_lab/Lab/sci_eq/derived/openalex/scrape_ath
+> r_inst_hist/output/list_of_insts.dta
+ Observations:        23,668                  
+    Variables:             2                  14 Jan 2026 16:52
+-------------------------------------------------------------------------------
+Variable      Storage   Display    Value
+    name         type    format    label      Variable label
+-------------------------------------------------------------------------------
+inst_id         str11   %11s                  
+_merge          byte    %8.0g                 
+-------------------------------------------------------------------------------
+Sorted by: 
+
+. 
+end of do-file

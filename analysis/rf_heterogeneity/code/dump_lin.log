@@ -1,0 +1,87 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 120,000; see help set_maxvar.
+
+. do /tmp/dump_lin.do 
+
+. use ../temp/phet_results_all_jrnls_r1_r2_public_ppr_cnt.dta, clear
+
+. keep if yvar == "ppr_cnt" & spec == "mshrctrl" & substr(split_type,1,15) == "
+> joint_ae_prppr_"
+(168 observations deleted)
+
+. keep grp post_b post_se
+
+. gen coef = substr(grp, 1, 3)
+
+. gen char = substr(grp, 5, .)
+
+. sort char coef
+
+. list char coef post_b post_se, sep(4) noobs abbrev(20)
+
+  +---------------------------------------+
+  |  char   coef       post_b     post_se |
+  |---------------------------------------|
+  | applx    bas   -.34445216    .4989138 |
+  | applx    hid    .34241101   .70529267 |
+  | applx    hpd    .55432182   .60211543 |
+  | applx    tpl   -1.4744523   .83163297 |
+  |---------------------------------------|
+  |  basx    bas   -.28589248   .50373108 |
+  |  basx    hid    .15973017   .70058519 |
+  |  basx    hpd    .14906173   .61589607 |
+  |  basx    tpl   -.50334635   .83284288 |
+  |---------------------------------------|
+  | endow    bas   -.45902484   .46289755 |
+  | endow    hid    .42299371   .64846945 |
+  | endow    hpd    .25177514   .56845951 |
+  | endow    tpl   -.61940575   .78246953 |
+  |---------------------------------------|
+  |  fdls    bas   -.55189178   .49901648 |
+  |  fdls    hid    .70424763   .69645517 |
+  |  fdls    hpd    .59877889   .59469457 |
+  |  fdls    tpl   -1.5272729   .82246574 |
+  |---------------------------------------|
+  |  fedf    bas   -.56570465    .5115372 |
+  |  fedf    hid    .69916475    .7034494 |
+  |  fedf    hpd    .34306056    .6360091 |
+  |  fedf    tpl   -.90750046   .84247774 |
+  |---------------------------------------|
+  | instf    bas   -.85986585   .48888582 |
+  | instf    hid    1.2890065   .69401897 |
+  | instf    hpd    .63188767   .59432433 |
+  | instf    tpl   -1.5074244   .82435242 |
+  |---------------------------------------|
+  |   lsf    bas   -.55189178   .49901648 |
+  |   lsf    hid    .70424763   .69645517 |
+  |   lsf    hpd    .59877889   .59469457 |
+  |   lsf    tpl   -1.5272729   .82246574 |
+  |---------------------------------------|
+  |  tfnd    bas   -.56724378   .50556917 |
+  |  tfnd    hid     .7710208   .69830648 |
+  |  tfnd    hpd    .62830418   .61584098 |
+  |  tfnd    tpl   -1.5359636   .82864789 |
+  +---------------------------------------+
+
+. 
+end of do-file

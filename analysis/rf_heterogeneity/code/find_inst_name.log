@@ -1,0 +1,44 @@
+
+. use "/n/holylabs/pakes_lab/Lab/sci_eq/derived/inst_chars/temp/herd_all.dta", 
+> clear
+
+. desc, fullnames
+
+Contains data from /n/holylabs/pakes_lab/Lab/sci_eq/derived/inst_chars/temp/her
+> d_all.dta
+ Observations:       953,405                  
+    Variables:            23                  16 Jul 2026 09:51
+-------------------------------------------------------------------------------
+Variable      Storage   Display    Value
+    name         type    format    label      Variable label
+-------------------------------------------------------------------------------
+inst_id         long    %12.0g                
+year            int     %8.0g                 
+ncses_inst_id   str8    %9s                   
+ipeds_unitid    long    %12.0g                
+hbcu_flag       byte    %8.0g                 
+med_sch_flag    str1    %9s                   
+hhe_flag        byte    %8.0g                 
+toi_code        byte    %8.0g                 
+hdg_code        byte    %8.0g                 
+toc_code        byte    %8.0g                 
+inst_name_long  str100  %100s                 
+inst_city       str20   %20s                  
+inst_state_code str2    %9s                   
+inst_zip        str10   %10s                  
+questionnaire_no
+                str5    %9s                   
+question        str54   %54s                  
+row             str90   %90s                  
+column          str26   %26s                  
+data            float   %9.0g                 
+status          str1    %9s                   
+othinfo         strL    %9s                   
+othinfo_s       str1    %9s                   
+standardized_agency_names
+                str48   %48s                  
+-------------------------------------------------------------------------------
+Sorted by: 
+
+. 
+end of do-file

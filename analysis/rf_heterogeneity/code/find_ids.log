@@ -1,0 +1,29 @@
+
+. * Check if I27837315 exists in any openalex geo file
+. forvalues i = 1/5 {
+  2.     use "/n/holylabs/pakes_lab/Lab/sci_eq/derived/openalex/scrape_athr_ins
+> t_hist/output/inst_geo_chars`i'.dta", clear
+  3.     di as text "geo`i': N=" _N
+  4.     qui count if inst_id == "I27837315"
+  5.     di as text "  I27837315 found: " r(N)
+  6.     qui count if strpos(inst_id, "27837315") > 0
+  7.     di as text "  substr 27837315 found: " r(N)
+  8. }
+geo1: N=5432
+  I27837315 found: 0
+  substr 27837315 found: 0
+geo2: N=5362
+  I27837315 found: 0
+  substr 27837315 found: 0
+geo3: N=5264
+  I27837315 found: 0
+  substr 27837315 found: 0
+geo4: N=5307
+  I27837315 found: 0
+  substr 27837315 found: 0
+geo5: N=3911
+  I27837315 found: 0
+  substr 27837315 found: 0
+
+. 
+end of do-file

@@ -1,0 +1,162 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 120,000; see help set_maxvar.
+
+. do /tmp/probe_endow2.do 
+
+. set more off
+
+. program drop _all
+
+. 
+. di as text "-- 6 missing insts in R1 panel — do their ipeds ids exist in eith
+> er file? --"
+-- 6 missing insts in R1 panel — do their ipeds ids exist in either file? --
+
+. preserve
+
+. import delimited ../external/college/ipeds_openalex.csv, clear varn(1) string
+> cols(_all)
+(encoding automatically selected: ISO-8859-1)
+(4 vars, 266 obs)
+
+. keep if inlist(inst_id, "I130769515", "I170201317", "I188538660", "I84392919"
+> , "I86501945", "I921990950")
+(259 observations deleted)
+
+. list ipeds_id inst_id name type, sep(0) noobs abbreviate(60)
+
+  +--------------------------------------------------------------+
+  |          ipeds_id           |              inst_id           |
+  |            214777           |           I130769515           |
+  |--------------------------------------------------------------|
+  |                                                  name | type |
+  |             Pennsylvania State University-Main Campus |   r1 |
+  +--------------------------------------------------------------+
+
+  +--------------------------------------------------------------+
+  |          ipeds_id           |              inst_id           |
+  |            216339           |            I84392919           |
+  |--------------------------------------------------------------|
+  |                                                  name | type |
+  |                                     Temple University |   r1 |
+  +--------------------------------------------------------------+
+
+  +--------------------------------------------------------------+
+  |          ipeds_id           |              inst_id           |
+  |            495767           |           I130769515           |
+  |--------------------------------------------------------------|
+  |                                                  name | type |
+  |                     The Pennsylvania State University |   r1 |
+  +--------------------------------------------------------------+
+
+  +--------------------------------------------------------------+
+  |          ipeds_id           |              inst_id           |
+  |            126614           |           I188538660           |
+  |--------------------------------------------------------------|
+  |                                                  name | type |
+  |                        University of Colorado Boulder |   r1 |
+  +--------------------------------------------------------------+
+
+  +--------------------------------------------------------------+
+  |          ipeds_id           |              inst_id           |
+  |            126562           |           I921990950           |
+  |--------------------------------------------------------------|
+  |                                                  name | type |
+  | University of Colorado Denver/Anschutz Medical Campus |   r1 |
+  +--------------------------------------------------------------+
+
+  +--------------------------------------------------------------+
+  |          ipeds_id           |              inst_id           |
+  |            130943           |            I86501945           |
+  |--------------------------------------------------------------|
+  |                                                  name | type |
+  |                                University of Delaware |   r1 |
+  +--------------------------------------------------------------+
+
+  +--------------------------------------------------------------+
+  |          ipeds_id           |              inst_id           |
+  |            215293           |           I170201317           |
+  |--------------------------------------------------------------|
+  |                                                  name | type |
+  |            University of Pittsburgh-Pittsburgh Campus |   r1 |
+  +--------------------------------------------------------------+
+
+. save ../temp/probe_6missing_xw, replace
+(file ../temp/probe_6missing_xw.dta not found)
+file ../temp/probe_6missing_xw.dta saved
+
+. levelsof ipeds_id, local(missing_ipeds) clean
+126562 126614 130943 214777 215293 216339 495767
+
+. restore
+
+. 
+. di as text ""
+
+
+. di as text "  do these ipeds ids appear in combined_pre?"
+  do these ipeds ids appear in combined_pre?
+
+. use ../external/inst_chars/combined_pre, clear
+
+. foreach id of local missing_ipeds {
+  2.     qui count if ipeds_id == `id'
+  3.     local ncomb = r(N)
+  4.     qui count if ipeds_id == `id' & !mi(endownment)
+  5.     di as text "    ipeds_id=`id': in combined_pre = `ncomb', endownment n
+> on-mi = " r(N)
+  6. }
+    ipeds_id=126562: in combined_pre = 0, endownment non-mi = 0
+    ipeds_id=126614: in combined_pre = 1, endownment non-mi = 0
+    ipeds_id=130943: in combined_pre = 1, endownment non-mi = 0
+    ipeds_id=214777: in combined_pre = 1, endownment non-mi = 0
+    ipeds_id=215293: in combined_pre = 1, endownment non-mi = 0
+    ipeds_id=216339: in combined_pre = 1, endownment non-mi = 0
+    ipeds_id=495767: in combined_pre = 0, endownment non-mi = 0
+
+. 
+. di as text ""
+
+
+. di as text "  do these ipeds ids appear in endownment_pre?"
+  do these ipeds ids appear in endownment_pre?
+
+. use ../external/inst_chars/endownment_pre, clear
+
+. foreach id of local missing_ipeds {
+  2.     qui count if ipeds_id == `id'
+  3.     local nend = r(N)
+  4.     qui count if ipeds_id == `id' & !mi(endownment)
+  5.     di as text "    ipeds_id=`id': in endownment_pre = `nend', endownment 
+> non-mi = " r(N)
+  6. }
+    ipeds_id=126562: in endownment_pre = 0, endownment non-mi = 0
+    ipeds_id=126614: in endownment_pre = 0, endownment non-mi = 0
+    ipeds_id=130943: in endownment_pre = 0, endownment non-mi = 0
+    ipeds_id=214777: in endownment_pre = 0, endownment non-mi = 0
+    ipeds_id=215293: in endownment_pre = 0, endownment non-mi = 0
+    ipeds_id=216339: in endownment_pre = 0, endownment non-mi = 0
+    ipeds_id=495767: in endownment_pre = 0, endownment non-mi = 0
+
+. 
+end of do-file

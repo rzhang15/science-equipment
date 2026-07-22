@@ -1,0 +1,142 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 120,000; see help set_maxvar.
+
+. do /tmp/dump_herd_vars.do 
+
+. use /n/netscratch/pakes_lab/Lab/sci_eq/HERD/herd_2010_2022, clear
+
+. keep if inrange(year, 2010, 2013)
+(5,142 observations deleted)
+
+. describe *fund *expend, fullnames
+
+Variable      Storage   Display    Value
+    name         type    format    label      Variable label
+-------------------------------------------------------------------------------
+contracts_fund  long    %10.0g                contracts_fund data
+fed_ls_bio_fund long    %10.0g                fed_ls_bio_fund data
+fed_ls_fund     long    %10.0g                fed_ls_fund data
+fed_ls_hs_fund  long    %10.0g                fed_ls_hs_fund data
+grants_fund     long    %10.0g                grants_fund data
+hhs_ls_bio_fund long    %10.0g                hhs_ls_bio_fund data
+hhs_ls_fund     long    %10.0g                hhs_ls_fund data
+hhs_ls_hs_fund  long    %10.0g                hhs_ls_hs_fund data
+nonfed_ls_bio_fund
+                long    %10.0g                nonfed_ls_bio_fund data
+nonfed_ls_fund  long    %10.0g                nonfed_ls_fund data
+nonfed_ls_hs_fund
+                long    %10.0g                nonfed_ls_hs_fund data
+subrecipient_fund
+                long    %10.0g                subrecipient_fund data
+tot_bus_fund    long    %10.0g                tot_bus_fund data
+tot_fed_fund    long    %10.0g                tot_fed_fund data
+tot_fund        long    %10.0g                tot_fund data
+tot_inst_fund   long    %10.0g                tot_inst_fund data
+tot_nonprof_fund
+                long    %10.0g                tot_nonprof_fund data
+tot_state_fund  long    %10.0g                tot_state_fund data
+ls_fund         float   %9.0g                 
+hs_fund         float   %9.0g                 
+bio_fund        float   %9.0g                 
+applied_expend  long    %10.0g                applied_expend data
+applied_fed_expend
+                long    %10.0g                applied_fed_expend data
+basic_expend    long    %10.0g                basic_expend data
+basic_fed_expend
+                long    %10.0g                basic_fed_expend data
+clin_trial_expend
+                long    %10.0g                clin_trial_expend data
+dev_expend      long    %10.0g                dev_expend data
+ls_cap_expend   long    %10.0g                ls_cap_expend data
+med_sch_expend  long    %10.0g                med_sch_expend data
+
+. di as text _n "--- summary stats (10th, 50th, 90th pctile, mean, N) ---"
+
+--- summary stats (10th, 50th, 90th pctile, mean, N) ---
+
+. foreach v of varlist *fund *expend {
+  2.     qui sum `v', d
+  3.     di as text %-25s "`v'" ": p10=" %14.0fc r(p10) " p50=" %14.0fc r(p50) 
+> " p90=" %14.0fc r(p90) " mean=" %14.0fc r(mean) " N=" r(N)
+  4. }
+contracts_fund           : p10=            50 p50=         1,959 p90=        54
+> ,152 mean=        19,594 N=2060
+fed_ls_bio_fund          : p10=            64 p50=           810 p90=        42
+> ,896 mean=        13,362 N=2112
+fed_ls_fund              : p10=            83 p50=         1,239 p90=       106
+> ,566 mean=        35,674 N=2251
+fed_ls_hs_fund           : p10=            45 p50=         3,442 p90=       159
+> ,626 mean=        44,705 N=991
+grants_fund              : p10=           360 p50=         4,198 p90=       176
+> ,754 mean=        56,736 N=2532
+hhs_ls_bio_fund          : p10=             0 p50=           300 p90=        35
+> ,759 mean=        10,973 N=2112
+hhs_ls_fund              : p10=             0 p50=           509 p90=        91
+> ,739 mean=        30,331 N=2251
+hhs_ls_hs_fund           : p10=            23 p50=         2,668 p90=       154
+> ,094 mean=        41,621 N=991
+nonfed_ls_bio_fund       : p10=            21 p50=           384 p90=        22
+> ,070 mean=         6,635 N=2063
+nonfed_ls_fund           : p10=            35 p50=           703 p90=        78
+> ,285 mean=        23,004 N=2207
+nonfed_ls_hs_fund        : p10=            14 p50=         1,652 p90=        82
+> ,188 mean=        24,769 N=1099
+subrecipient_fund        : p10=            53 p50=           966 p90=        27
+> ,954 mean=         9,472 N=2348
+tot_bus_fund             : p10=            13 p50=           556 p90=        15
+> ,499 mean=         5,926 N=1927
+tot_fed_fund             : p10=           299 p50=         3,902 p90=       159
+> ,084 mean=        55,970 N=2533
+tot_fund                 : p10=           683 p50=         7,110 p90=       295
+> ,339 mean=        90,702 N=2548
+tot_inst_fund            : p10=            95 p50=         1,897 p90=        75
+> ,180 mean=        20,864 N=2257
+tot_nonprof_fund         : p10=            25 p50=           480 p90=        18
+> ,864 mean=         6,618 N=2126
+tot_state_fund           : p10=            23 p50=           720 p90=        14
+> ,555 mean=         6,072 N=2046
+ls_fund                  : p10=           199 p50=         2,602 p90=       213
+> ,475 mean=        62,755 N=2086
+hs_fund                  : p10=           217 p50=        11,324 p90=       260
+> ,059 mean=        79,648 N=897
+bio_fund                 : p10=           148 p50=         1,513 p90=        71
+> ,928 mean=        21,750 N=1920
+applied_expend           : p10=           154 p50=         2,898 p90=        75
+> ,409 mean=        25,738 N=2178
+applied_fed_expend       : p10=            94 p50=         1,845 p90=        44
+> ,537 mean=        16,768 N=2067
+basic_expend             : p10=           282 p50=         4,143 p90=       220
+> ,261 mean=        65,041 N=2387
+basic_fed_expend         : p10=           151 p50=         2,471 p90=       127
+> ,087 mean=        41,504 N=2334
+clin_trial_expend        : p10=            67 p50=         2,213 p90=        20
+> ,363 mean=        10,652 N=591
+dev_expend               : p10=            61 p50=         1,426 p90=        32
+> ,558 mean=        12,007 N=1649
+ls_cap_expend            : p10=            11 p50=           240 p90=         5
+> ,685 mean=         1,735 N=1745
+med_sch_expend           : p10=         2,491 p50=        88,302 p90=       439
+> ,717 mean=       158,943 N=504
+
+. 
+end of do-file

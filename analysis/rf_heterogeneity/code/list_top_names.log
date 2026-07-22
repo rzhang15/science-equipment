@@ -1,0 +1,19 @@
+
+. use ../temp/es_all_jrnls_r1_r2_public, clear
+
+. keep if athr_indicator == 1
+(57,438 observations deleted)
+
+. qui sum ic_tfnd, d
+
+. local med = r(p50)
+
+. di as text "PI-weighted median ic_tfnd = " %10.0fc `med'
+PI-weighted median ic_tfnd =    672,650
+
+. desc inst_name inst*, fullname
+variable inst_name not found
+r(111);
+
+end of do-file
+r(111);

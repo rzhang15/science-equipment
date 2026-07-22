@@ -1,0 +1,195 @@
+
+. set more off
+
+. clear all
+
+. set scheme modern
+
+. log using /tmp/partC_only.log, replace
+(file /tmp/partC_only.log not found)
+-------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  /tmp/partC_only.log
+  log type:  text
+ opened on:  19 Jul 2026, 17:12:33
+
+. 
+. local ic_aliases tfnd fedf instf lsf fdls endow basx applx
+
+. 
+. use ../temp/es_all_jrnls_r1_r2_public, clear
+
+. gen post       = year >= 2014
+
+. gen Z_it       = exposure      * post
+
+. gen Z_share_it = mkt_spend_shr * post
+
+. 
+. di as text _n(2) "=== Part C: crossover-test lincoms per inst char (PI-wtd cu
+> toff) ==="
+
+
+=== Part C: crossover-test lincoms per inst char (PI-wtd cutoff) ===
+
+. 
+. foreach a of local ic_aliases {
+  2.     cap confirm variable hp_hi_`a'
+  3.     if _rc {
+  4.         di as error "  hp_hi_`a' not found; skipping."
+  5.         continue
+  6.     }
+  7.     foreach grp in hp_hi_`a' hp_lo_`a' lp_hi_`a' lp_lo_`a' {
+  8.         cap drop Z_`grp' S_`grp'
+  9.         gen Z_`grp' = Z_it       * `grp'
+ 10.         gen S_`grp' = Z_share_it * `grp'
+ 11.     }
+ 12.     cap noi qui ppmlhdfe ppr_cnt Z_hp_hi_`a' Z_hp_lo_`a' Z_lp_hi_`a' Z_lp_
+> lo_`a' ///
+>                                  S_hp_hi_`a' S_hp_lo_`a' S_lp_hi_`a' S_lp_lo_
+> `a', ///
+>                                  absorb(athr_id year) vce(cluster athr_id)
+ 13.     if _rc {
+ 14.         di as error "  ppmlhdfe failed for `a'; skipping."
+ 15.         continue
+ 16.     }
+ 17.     di as text _n "-- `a' --"
+ 18.     qui lincom Z_lp_lo_`a'
+ 19.     di as text "  H0: LP x Lo = 0             b=" %8.4f r(estimate) "  se=
+> " %6.4f r(se) "  t=" %6.2f r(estimate)/r(se) "  p=" %5.3f 2*ttail(1e9, abs(r(
+> estimate)/r(se)))
+ 20.     qui lincom Z_hp_lo_`a' - Z_lp_lo_`a'
+ 21.     di as text "  H0: HP-LP at Lo = 0         b=" %8.4f r(estimate) "  se=
+> " %6.4f r(se) "  t=" %6.2f r(estimate)/r(se) "  p=" %5.3f 2*ttail(1e9, abs(r(
+> estimate)/r(se)))
+ 22.     qui lincom Z_hp_hi_`a' - Z_lp_hi_`a'
+ 23.     di as text "  H0: HP-LP at Hi = 0         b=" %8.4f r(estimate) "  se=
+> " %6.4f r(se) "  t=" %6.2f r(estimate)/r(se) "  p=" %5.3f 2*ttail(1e9, abs(r(
+> estimate)/r(se)))
+ 24.     qui lincom (Z_hp_hi_`a' - Z_lp_hi_`a') - (Z_hp_lo_`a' - Z_lp_lo_`a')
+ 25.     di as text "  H0: triple = 0              b=" %8.4f r(estimate) "  se=
+> " %6.4f r(se) "  t=" %6.2f r(estimate)/r(se) "  p=" %5.3f 2*ttail(1e9, abs(r(
+> estimate)/r(se)))
+ 26. }
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+
+-- tfnd --
+  H0: LP x Lo = 0             b= -0.5672  se=0.5056  t= -1.12  p=0.262
+  H0: HP-LP at Lo = 0         b=  0.6283  se=0.6158  t=  1.02  p=0.308
+  H0: HP-LP at Hi = 0         b= -0.9077  se=0.5548  t= -1.64  p=0.102
+  H0: triple = 0              b= -1.5360  se=0.8286  t= -1.85  p=0.064
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+
+-- fedf --
+  H0: LP x Lo = 0             b= -0.5657  se=0.5115  t= -1.11  p=0.269
+  H0: HP-LP at Lo = 0         b=  0.3431  se=0.6360  t=  0.54  p=0.590
+  H0: HP-LP at Hi = 0         b= -0.5644  se=0.5528  t= -1.02  p=0.307
+  H0: triple = 0              b= -0.9075  se=0.8425  t= -1.08  p=0.281
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+
+-- instf --
+  H0: LP x Lo = 0             b= -0.8599  se=0.4889  t= -1.76  p=0.079
+  H0: HP-LP at Lo = 0         b=  0.6319  se=0.5943  t=  1.06  p=0.288
+  H0: HP-LP at Hi = 0         b= -0.8755  se=0.5719  t= -1.53  p=0.126
+  H0: triple = 0              b= -1.5074  se=0.8244  t= -1.83  p=0.067
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+
+-- lsf --
+  H0: LP x Lo = 0             b= -0.5519  se=0.4990  t= -1.11  p=0.269
+  H0: HP-LP at Lo = 0         b=  0.5988  se=0.5947  t=  1.01  p=0.314
+  H0: HP-LP at Hi = 0         b= -0.9285  se=0.5685  t= -1.63  p=0.102
+  H0: triple = 0              b= -1.5273  se=0.8225  t= -1.86  p=0.063
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+(10,900 missing values generated)
+
+-- fdls --
+  H0: LP x Lo = 0             b= -0.5519  se=0.4990  t= -1.11  p=0.269
+  H0: HP-LP at Lo = 0         b=  0.5988  se=0.5947  t=  1.01  p=0.314
+  H0: HP-LP at Hi = 0         b= -0.9285  se=0.5685  t= -1.63  p=0.102
+  H0: triple = 0              b= -1.5273  se=0.8225  t= -1.86  p=0.063
+(5,850 missing values generated)
+(5,850 missing values generated)
+(5,850 missing values generated)
+(5,850 missing values generated)
+(5,850 missing values generated)
+(5,850 missing values generated)
+(5,850 missing values generated)
+(5,850 missing values generated)
+
+-- endow --
+  H0: LP x Lo = 0             b= -0.4590  se=0.4629  t= -0.99  p=0.321
+  H0: HP-LP at Lo = 0         b=  0.2518  se=0.5685  t=  0.44  p=0.658
+  H0: HP-LP at Hi = 0         b= -0.3676  se=0.5377  t= -0.68  p=0.494
+  H0: triple = 0              b= -0.6194  se=0.7825  t= -0.79  p=0.429
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+(10,870 missing values generated)
+
+-- basx --
+  H0: LP x Lo = 0             b= -0.2859  se=0.5037  t= -0.57  p=0.570
+  H0: HP-LP at Lo = 0         b=  0.1491  se=0.6159  t=  0.24  p=0.809
+  H0: HP-LP at Hi = 0         b= -0.3543  se=0.5609  t= -0.63  p=0.528
+  H0: triple = 0              b= -0.5033  se=0.8328  t= -0.60  p=0.546
+(11,140 missing values generated)
+(11,140 missing values generated)
+(11,140 missing values generated)
+(11,140 missing values generated)
+(11,140 missing values generated)
+(11,140 missing values generated)
+(11,140 missing values generated)
+(11,140 missing values generated)
+
+-- applx --
+  H0: LP x Lo = 0             b= -0.3445  se=0.4989  t= -0.69  p=0.490
+  H0: HP-LP at Lo = 0         b=  0.5543  se=0.6021  t=  0.92  p=0.357
+  H0: HP-LP at Hi = 0         b= -0.9201  se=0.5739  t= -1.60  p=0.109
+  H0: triple = 0              b= -1.4745  se=0.8316  t= -1.77  p=0.076
+
+. log close
+      name:  <unnamed>
+       log:  /tmp/partC_only.log
+  log type:  text
+ closed on:  19 Jul 2026, 17:44:45
+-------------------------------------------------------------------------------
+
+. 
+end of do-file

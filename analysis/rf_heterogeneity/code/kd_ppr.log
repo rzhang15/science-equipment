@@ -1,0 +1,70 @@
+
+. set more off
+
+. clear all
+
+. set scheme modern
+
+. log using /tmp/kd_ppr.log, replace
+(file /tmp/kd_ppr.log not found)
+-------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  /tmp/kd_ppr.log
+  log type:  text
+ opened on:  19 Jul 2026, 22:24:00
+
+. 
+. foreach samp_suf in _r1_r2_public _r1_public {
+  2.     di as text _n "=== `samp_suf' ==="
+  3.     use ../temp/es_all_jrnls`samp_suf', clear
+  4.     gcollapse (sum) ppr_cnt (mean) hiw_tfnd ic_tfnd, by(inst_id)
+  5.     drop if mi(hiw_tfnd)
+  6.     gen double ln_ppr = ln(1 + ppr_cnt)
+  7. 
+.     qui count if hiw_tfnd == 1
+  8.     local n_hi = r(N)
+  9.     qui count if hiw_tfnd == 0
+ 10.     local n_lo = r(N)
+ 11.     qui sum ppr_cnt if hiw_tfnd == 1
+ 12.     local mu_hi : dis %8.0fc r(mean)
+ 13.     qui sum ppr_cnt if hiw_tfnd == 0
+ 14.     local mu_lo : dis %8.0fc r(mean)
+ 15. 
+.     tw kdensity ln_ppr if hiw_tfnd == 1, lcolor(ebblue) lwidth(medthick) || /
+> //
+>        kdensity ln_ppr if hiw_tfnd == 0, lcolor(dkorange) lwidth(medthick) //
+> /
+>        , xtitle("ln(1 + Total Papers at Institution)") ytitle("Density") ///
+>          legend(order(1 "Hi Total R&D (N=`n_hi', mean papers=`mu_hi')" ///
+>                       2 "Lo Total R&D (N=`n_lo', mean papers=`mu_lo')") ///
+>                 pos(6) ring(1) rows(1) span size(small)) ///
+>          plotregion(margin(sides))
+ 16.     graph export ../output/figures/all_jrnls/diag_kd_ln_ppr_by_hiw_tfnd`sa
+> mp_suf'.pdf, replace
+ 17.     di as text "  Hi tfnd: N=`n_hi' mean_papers=`mu_hi'"
+ 18.     di as text "  Lo tfnd: N=`n_lo' mean_papers=`mu_lo'"
+ 19. }
+
+=== _r1_r2_public ===
+(27 observations deleted)
+file ../output/figures/all_jrnls/diag_kd_ln_ppr_by_hiw_tfnd_r1_r2_public.pdf
+    saved as PDF format
+  Hi tfnd: N=13 mean_papers=   4,036
+  Lo tfnd: N=92 mean_papers=     529
+
+=== _r1_public ===
+(20 observations deleted)
+file ../output/figures/all_jrnls/diag_kd_ln_ppr_by_hiw_tfnd_r1_public.pdf
+    saved as PDF format
+  Hi tfnd: N=12 mean_papers=   4,273
+  Lo tfnd: N=49 mean_papers=     920
+
+. log close
+      name:  <unnamed>
+       log:  /tmp/kd_ppr.log
+  log type:  text
+ closed on:  19 Jul 2026, 22:24:15
+-------------------------------------------------------------------------------
+
+. 
+end of do-file

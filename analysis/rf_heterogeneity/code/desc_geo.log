@@ -1,0 +1,58 @@
+
+. use "/n/holylabs/pakes_lab/Lab/sci_eq/derived/openalex/scrape_athr_inst_hist/
+> output/inst_geo_chars1.dta", clear
+
+. desc, fullnames
+
+Contains data from /n/holylabs/pakes_lab/Lab/sci_eq/derived/openalex/scrape_ath
+> r_inst_hist/output/inst_geo_chars1.dta
+ Observations:         5,432                  
+    Variables:            14                  15 Jan 2026 00:36
+-------------------------------------------------------------------------------
+Variable      Storage   Display    Value
+    name         type    format    label      Variable label
+-------------------------------------------------------------------------------
+inst_id         str11   %-9s                  
+inst            str119  %-9s                  
+country_code    str2    %-9s                  
+country         str32   %-9s                  
+city            str58   %-9s                  
+region          str28   %-9s                  
+type            str10   %-9s                  
+which_inst      long    %12.0g                
+associated      str100  %-9s                  
+associated_id   str11   %-9s                  
+associated_country
+                str2    %-9s                  
+associated_type str10   %-9s                  
+associated_rel  str11   %-9s                  
+which_assoc     long    %12.0g                
+-------------------------------------------------------------------------------
+Sorted by: 
+
+. list in 1/2
+
+     +--------------------------------------------------------------------+
+  1. | inst_id     | inst                                     | countr~e  |
+     | I4210136188 | European Corporate Governance Institute  | BE        |
+     |--------------------------------------------------------------------|
+     | country   | city        | region | type      | which_~t | assoc~ed |
+     | Belgium   | Brussels    |        | nonprofit |        1 |          |
+     |--------------------------------------------------------------------|
+     |  assoc~id  |  associ~y   |  associ~e   |  associ~l   |  which_~c   |
+     |            |             |             |             |         1   |
+     +--------------------------------------------------------------------+
+
+     +--------------------------------------------------------------------+
+  2. | inst_id     | inst                                     | countr~e  |
+     | I4394709093 | UIN SATU Tulungagung                     |           |
+     |--------------------------------------------------------------------|
+     | country   | city        | region | type      | which_~t | assoc~ed |
+     | Indonesia | Tulungagung |        | education |        2 |          |
+     |--------------------------------------------------------------------|
+     |  assoc~id  |  associ~y   |  associ~e   |  associ~l   |  which_~c   |
+     |            |             |             |             |         1   |
+     +--------------------------------------------------------------------+
+
+. 
+end of do-file

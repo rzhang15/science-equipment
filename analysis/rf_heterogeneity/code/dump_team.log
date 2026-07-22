@@ -1,0 +1,76 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 120,000; see help set_maxvar.
+
+. do /tmp/dump_team.do 
+
+. use ../temp/phet_results_all_jrnls_r1_r2_public_ppr_cnt.dta, clear
+
+. keep if yvar == "ppr_cnt" & spec == "mshrctrl" & split_type == "joint_ae_team
+> "
+(140 observations deleted)
+
+. keep grp split_type post_b post_se N
+
+. sort grp
+
+. list, sep(0) noobs abbrev(20)
+
+  +--------------------------------------------------------------+
+  |         grp      split_type       post_b     post_se       N |
+  |--------------------------------------------------------------|
+  | bt_hi_applx   joint_ae_team   -.61681796   .35971235   52680 |
+  |  bt_hi_basx   joint_ae_team   -.40002083   .33383061   52950 |
+  | bt_hi_endow   joint_ae_team   -.42832673    .3603626   57970 |
+  |  bt_hi_fdls   joint_ae_team   -.55339152    .3483235   52920 |
+  |  bt_hi_fedf   joint_ae_team   -.27090277   .33523957   52950 |
+  | bt_hi_instf   joint_ae_team   -.35028302   .38148121   52950 |
+  |   bt_hi_lsf   joint_ae_team   -.55339152    .3483235   52920 |
+  |  bt_hi_tfnd   joint_ae_team    -.4046664    .3409773   52950 |
+  | bt_lo_applx   joint_ae_team     -.049228   .43950972   52680 |
+  |  bt_lo_basx   joint_ae_team   -.29209471   .49515376   52950 |
+  | bt_lo_endow   joint_ae_team   -.28747007   .41855008   57970 |
+  |  bt_lo_fdls   joint_ae_team   -.11637453   .45351697   52920 |
+  |  bt_lo_fedf   joint_ae_team   -.53367993   .49520801   52950 |
+  | bt_lo_instf   joint_ae_team   -.41559975   .41538915   52950 |
+  |   bt_lo_lsf   joint_ae_team   -.11637453   .45351697   52920 |
+  |  bt_lo_tfnd   joint_ae_team    -.2818085   .46790946   52950 |
+  | sm_hi_applx   joint_ae_team   -.78412037   .33863269   52680 |
+  |  sm_hi_basx   joint_ae_team   -.42410415   .35389896   52950 |
+  | sm_hi_endow   joint_ae_team    -.1788884   .33409195   57970 |
+  |  sm_hi_fdls   joint_ae_team   -.59116721   .37197262   52920 |
+  |  sm_hi_fedf   joint_ae_team   -.35097557   .32887785   52950 |
+  | sm_hi_instf   joint_ae_team   -.16083942   .33990338   52950 |
+  |   sm_hi_lsf   joint_ae_team   -.59116721   .37197262   52920 |
+  |  sm_hi_tfnd   joint_ae_team   -.60374761   .33734918   52950 |
+  | sm_lo_applx   joint_ae_team    .08142225   .37145749   52680 |
+  |  sm_lo_basx   joint_ae_team   -.18792368   .36191933   52950 |
+  | sm_lo_endow   joint_ae_team   -.33194068   .35652247   57970 |
+  |  sm_lo_fdls   joint_ae_team   -.14855161   .34355481   52920 |
+  |  sm_lo_fedf   joint_ae_team   -.27589396   .39423017   52950 |
+  | sm_lo_instf   joint_ae_team    -.4474289   .37987745   52950 |
+  |   sm_lo_lsf   joint_ae_team   -.14855161   .34355481   52920 |
+  |  sm_lo_tfnd   joint_ae_team   -.04590878   .37452283   52950 |
+  +--------------------------------------------------------------+
+
+. 
+end of do-file

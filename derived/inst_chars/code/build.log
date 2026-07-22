@@ -1,0 +1,214 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 120,000; see help set_maxvar.
+
+. do build.do 
+
+. set more off
+
+. clear all
+
+. capture log close
+
+. program drop _all
+
+. set scheme modern
+
+. pause on
+
+. set seed 8975
+
+. set maxvar 120000
+
+
+. 
+. program main
+  1.     herd
+  2.     endowment
+  3.     combine
+  4. end
+
+. 
+. program herd
+  1.     forval y =  2010/2013 {
+  2.         import delimited using ../external/herd/herd_`y', clear
+  3.         save ../temp/herd_`y', replace
+  4.     }
+  5.     clear
+  6.     save ../temp/herd_all, replace emptyok
+  7.     forval y = 2010/2013 {
+  8.         append using ../temp/herd_`y', force
+  9.     }
+ 10.     save ../temp/herd_all, replace
+ 11. 
+.     gcontract inst_id ipeds_unitid
+ 12.     drop _freq
+ 13.     rename ipeds_unitid ipeds_id
+ 14.     save ../temp/ipeds_xw, replace
+ 15. 
+.     use ../external/herd/herd_2010_2022, clear
+ 16.     keep if inrange(year, 2010,2013)
+ 17.     merge m:1 inst_id using ../temp/ipeds_xw, keep(3) nogen
+ 18.     collapse (mean) *fund *expend , by(ipeds_id)
+ 19.     save ../output/herd_pre , replace
+ 20. end
+
+. 
+. program endowment
+  1.     * f1endmft = endowment/FTE, GASB (public); f2endmft = endowment/FTE, F
+> ASB (private-nonprofit).
+.     * Institutions report one or the other; coalesce into a single per-FTE en
+> dowment.
+.     forval y = 2010/2013 {
+  2.         import delimited using ../external/ipeds/endowment_`y', clear stri
+> ngcols(_all)
+  3.         rename unitid ipeds_id
+  4.         destring ipeds_id f1endmft f2endmft, replace force
+  5.         gen endowment = f1endmft
+  6.         replace endowment = f2endmft if mi(endowment) & !mi(f2endmft)
+  7.         gen byte endow_src = 1 if !mi(f1endmft)
+  8.         replace endow_src = 2 if mi(f1endmft) & !mi(f2endmft)
+  9.         keep ipeds_id year endowment endow_src
+ 10.         save ../temp/endowment_`y', replace
+ 11.     }
+ 12. 
+.     clear
+ 13.     forval y = 2010/2013 {
+ 14.         append using ../temp/endowment_`y', force
+ 15.     }
+ 16.     save ../temp/endowment_all, replace
+ 17.     gcollapse (mean) endowment (max) endow_src, by(ipeds_id)
+ 18.     save ../output/endowment_pre, replace
+ 19. end
+
+. 
+. program combine
+  1.     use ../output/herd_pre, clear
+  2.     merge 1:1 ipeds_id using ../output/endowment_pre, nogen
+  3.     drop if mi(ipeds_id)
+  4.     save ../output/combined_pre, replace
+  5. end
+
+. main
+(encoding automatically selected: ISO-8859-1)
+(23 vars, 231,499 obs)
+file ../temp/herd_2010.dta saved
+(encoding automatically selected: ISO-8859-1)
+(23 vars, 264,087 obs)
+file ../temp/herd_2011.dta saved
+(encoding automatically selected: ISO-8859-1)
+(23 vars, 231,425 obs)
+file ../temp/herd_2012.dta saved
+(encoding automatically selected: ISO-8859-1)
+(23 vars, 226,394 obs)
+file ../temp/herd_2013.dta saved
+(dataset contains 0 observations)
+file ../temp/herd_all.dta saved
+(note: variable othinfo_s was byte in the using data, but will be str1 now)
+(variable inst_name_long was str84, now str97 to accommodate using data's
+       values)
+(note: variable othinfo_s was byte in the using data, but will be str1 now)
+(variable inst_name_long was str97, now str100 to accommodate using data's
+       values)
+(variable standardized_agency_names was str47, now str48 to accommodate using
+       data's values)
+(note: variable othinfo_s was byte in the using data, but will be str1 now)
+file ../temp/herd_all.dta saved
+file ../temp/ipeds_xw.dta saved
+(5,142 observations deleted)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                             2,548  
+    -----------------------------------------
+file ../output/herd_pre.dta saved
+(encoding automatically selected: ISO-8859-1)
+(5 vars, 5,912 obs)
+ipeds_id: all characters numeric; replaced as long
+f1endmft: all characters numeric; replaced as long
+(4714 missing values generated)
+f2endmft: all characters numeric; replaced as long
+(4660 missing values generated)
+(4,714 missing values generated)
+(1,252 real changes made)
+(4,714 missing values generated)
+(1,252 real changes made)
+(file ../temp/endowment_2010.dta not found)
+file ../temp/endowment_2010.dta saved
+(encoding automatically selected: ISO-8859-1)
+(5 vars, 5,912 obs)
+ipeds_id: all characters numeric; replaced as long
+f1endmft: all characters numeric; replaced as long
+(4733 missing values generated)
+f2endmft: all characters numeric; replaced as long
+(4670 missing values generated)
+(4,733 missing values generated)
+(1,242 real changes made)
+(4,733 missing values generated)
+(1,242 real changes made)
+(file ../temp/endowment_2011.dta not found)
+file ../temp/endowment_2011.dta saved
+(encoding automatically selected: ISO-8859-1)
+(5 vars, 5,912 obs)
+ipeds_id: all characters numeric; replaced as long
+f1endmft: all characters numeric; replaced as long
+(4726 missing values generated)
+f2endmft: all characters numeric; replaced as long
+(4637 missing values generated)
+(4,726 missing values generated)
+(1,275 real changes made)
+(4,726 missing values generated)
+(1,275 real changes made)
+(file ../temp/endowment_2012.dta not found)
+file ../temp/endowment_2012.dta saved
+(encoding automatically selected: ISO-8859-1)
+(5 vars, 5,912 obs)
+ipeds_id: all characters numeric; replaced as long
+f1endmft: all characters numeric; replaced as long
+(4714 missing values generated)
+f2endmft: all characters numeric; replaced as long
+(4622 missing values generated)
+(4,714 missing values generated)
+(1,290 real changes made)
+(4,714 missing values generated)
+(1,290 real changes made)
+(file ../temp/endowment_2013.dta not found)
+file ../temp/endowment_2013.dta saved
+(file ../temp/endowment_all.dta not found)
+file ../temp/endowment_all.dta saved
+(file ../output/endowment_pre.dta not found)
+file ../output/endowment_pre.dta saved
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                         5,199
+        from master                        23  
+        from using                      5,176  
+
+    Matched                               736  
+    -----------------------------------------
+(1 observation deleted)
+file ../output/combined_pre.dta saved
+
+. 
+end of do-file

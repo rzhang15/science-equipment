@@ -16,7 +16,7 @@ OUT_DIR = "../../output"
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--tag", default="restricted")
+    ap.add_argument("--tag", default="")
     args = ap.parse_args()
     tag = args.tag
     if tag and not tag.startswith("_"):

@@ -9,6 +9,8 @@ set maxvar 120000
 
 program main
     herd
+    endowment
+    combine
 end
 
 program herd
@@ -35,26 +37,33 @@ program herd
     save ../output/herd_pre , replace
 end
 
-program endownment
+program endowment
+    * f1endmft = endowment/FTE, GASB (public); f2endmft = endowment/FTE, FASB (private-nonprofit).
+    * Institutions report one or the other; coalesce into a single per-FTE endowment.
     forval y = 2010/2013 {
-        import delimited using ../external/ipeds/endownment_`y', clear
+        import delimited using ../external/ipeds/endowment_`y', clear stringcols(_all)
         rename unitid ipeds_id
-        rename f1h01 endownment
-        save ../temp/endownment_`y', replace
+        destring ipeds_id f1endmft f2endmft, replace force
+        gen endowment = f1endmft
+        replace endowment = f2endmft if mi(endowment) & !mi(f2endmft)
+        gen byte endow_src = 1 if !mi(f1endmft)
+        replace endow_src = 2 if mi(f1endmft) & !mi(f2endmft)
+        keep ipeds_id year endowment endow_src
+        save ../temp/endowment_`y', replace
     }
 
     clear
     forval y = 2010/2013 {
-        append using ../temp/endownment_`y', force
+        append using ../temp/endowment_`y', force
     }
-    save ../temp/endownment_all, replace
-    gcollapse (mean) endownment, by(ipeds_id)
-    save ../output/endownment_pre, replace
+    save ../temp/endowment_all, replace
+    gcollapse (mean) endowment (max) endow_src, by(ipeds_id)
+    save ../output/endowment_pre, replace
 end
 
 program combine
     use ../output/herd_pre, clear
-    merge 1:1 ipeds_id using ../output/endownment_pre, nogen
+    merge 1:1 ipeds_id using ../output/endowment_pre, nogen
     drop if mi(ipeds_id)
     save ../output/combined_pre, replace
 end
