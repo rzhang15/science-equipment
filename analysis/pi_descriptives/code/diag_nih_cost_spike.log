@@ -1,0 +1,194 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 120,000; see help set_maxvar.
+
+. do diag_nih_cost_spike.do 
+
+. clear all
+
+. set more off
+
+. 
+. use ../output/prepped_samples/pi_desc_all_jrnls_r1_r2, clear
+
+. 
+. gen byte pos = nih_cost_raw > 0 & !mi(nih_cost_raw)
+
+. gen double cost_pos = nih_cost_raw if pos
+(89,651 missing values generated)
+
+. gen double cost_per_grant = nih_cost_raw / n_grants_raw if n_grants_raw > 0
+(89,651 missing values generated)
+
+. 
+. qui sum cost_pos, d
+
+. local p99 = r(p99)
+
+. gen double cost_w = min(nih_cost_raw, `p99')
+
+. gen double cost_trim = nih_cost_raw if nih_cost_raw <= `p99'
+(73,277 missing values generated)
+
+. 
+. di "p99 of positive cost = " `p99'
+p99 of positive cost = 3292211
+
+. 
+. table year, stat(mean nih_cost_raw) stat(mean cost_w) stat(mean cost_trim) //
+> /
+>     stat(mean pos) stat(mean cost_pos) stat(p50 cost_pos) stat(p90 cost_pos) 
+> ///
+>     stat(mean n_grants_raw) stat(mean cost_per_grant) nformat(%12.0f) nototal
+> s
+
+--------------------------------------------------------------------------------------------------------------------------------------
+       |                                            Mean                                             50th percentile   90th percentile
+       |  (sum) res_cost    cost_w   cost_trim   pos   cost_pos   (sum) res_grant   cost_per_grant          cost_pos          cost_pos
+-------+------------------------------------------------------------------------------------------------------------------------------
+year   |                                                                                                                              
+  2010 |          492589   2144676      475430     0     648258                 1           375116            490785           1213277
+  2011 |          452841   2128871      436634     0     631373                 1           376271            451440           1183806
+  2012 |          470623   2132595      445211     0     658898                 1           385324            472410           1208802
+  2013 |          454353   2123969      421746     0     663568                 1           381685            482262           1166257
+  2014 |          480622   2131727      435119     0     718582                 1           411084            513303           1290005
+  2015 |          479952   2132374      434430     0     734789                 1           424045            537814           1361587
+  2016 |          501069   2138813      449161     0     774882                 1           441652            560110           1399825
+  2017 |          514747   2142144      452832     0     814007                 1           464889            594302           1438565
+  2018 |          528782   2147546      462205     0     866076                 1           500071            632206           1572482
+  2019 |          536802   2151455      469040     0     896686                 1           526853            646412           1667099
+--------------------------------------------------------------------------------------------------------------------------------------
+
+. 
+. * top-tail share of the total each year
+. bys year: egen double tot = total(nih_cost_raw)
+
+. gsort year -nih_cost_raw
+
+. by year: gen rk = _n
+
+. by year: gen double top10 = sum(nih_cost_raw)
+
+. gen double shr_top10 = top10 / tot if rk == 10
+(123,360 missing values generated)
+
+. gen double top50 = top10 if rk == 50
+(123,360 missing values generated)
+
+. table year, stat(max shr_top10) stat(max tot) nformat(%14.4f) nototals
+
+--------------------------------
+       |  shr_top10          tot
+-------+------------------------
+year   |                        
+  2010 |     0.0281   2.4841e+09
+  2011 |     0.0284   2.2837e+09
+  2012 |     0.0443   2.3733e+09
+  2013 |     0.0549   2.2913e+09
+  2014 |     0.0601   2.4238e+09
+  2015 |     0.0566   2.4204e+09
+  2016 |     0.0626   2.5269e+09
+  2017 |     0.0709   2.5959e+09
+  2018 |     0.0648   2.6666e+09
+  2019 |     0.0583   2.7071e+09
+--------------------------------
+
+. 
+. * grant-level: where do the dollars come from
+. use athr_id year grant_key row_key research total_cost start_year activity //
+> /
+>     using ../external/nih_panel/nih_grants_by_athr_id, clear
+
+. drop if mi(year)
+(0 observations deleted)
+
+. keep if inrange(year, 2010, 2019)
+(0 observations deleted)
+
+. duplicates drop athr_id year row_key, force
+
+Duplicates in terms of athr_id year row_key
+
+(73 observations deleted)
+
+. keep if research
+(16,457 observations deleted)
+
+. egen byte tag_res = tag(athr_id year grant_key)
+
+. keep if tag_res
+(13,633 observations deleted)
+
+. gen byte mi_cost = mi(total_cost)
+
+. table year, stat(mean total_cost) stat(p50 total_cost) stat(p99 total_cost) /
+> //
+>     stat(max total_cost) stat(mean mi_cost) stat(count grant_key) nformat(%14
+> .0f) nototals
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+                                     |          Mean           50th percentile   99th percentile   Maximum value                   Number of non-missing values
+                                     |  TOTAL_COST   mi_cost        TOTAL_COST        TOTAL_COST      TOTAL_COST   unique award (core project num + subproject)
+-------------------------------------+-------------------------------------------------------------------------------------------------------------------------
+fiscal year of the grant-year record |                                                                                                                         
+  2010                               |      383284         0            330690           1602519        16140000                                              0
+  2011                               |      387910         0            333825           1635950        16564020                                              0
+  2012                               |      397084         0            339003           1797076        22685614                                              0
+  2013                               |      388950         0            331637           1759913        29580100                                              0
+  2014                               |      416070         0            348046           1925664        30331870                                              0
+  2015                               |      421171         0            355352           1863488        31949949                                              0
+  2016                               |      451326         0            373044           2253095        31901976                                              0
+  2017                               |      472409         0            382730           2366079        33697405                                              0
+  2018                               |      487280         0            391600           2423825        29600000                                              0
+  2019                               |      512367         0            403189           2805110        30170000                                              0
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+. 
+. gen str3 act3 = substr(activity, 1, 3)
+
+. gen byte big = total_cost > 2000000 & !mi(total_cost)
+
+. table year, stat(mean big) stat(sum total_cost) nformat(%16.0f) nototals
+
+----------------------------------------------------------
+                                     |  Mean         Total
+                                     |   big    TOTAL_COST
+-------------------------------------+--------------------
+fiscal year of the grant-year record |                    
+  2010                               |     0    9754565203
+  2011                               |     0    8988267148
+  2012                               |     0    9398590191
+  2013                               |     0    9042697025
+  2014                               |     0    9609143625
+  2015                               |     0    9796860687
+  2016                               |     0   10806549569
+  2017                               |     0   11536235526
+  2018                               |     0   12428077547
+  2019                               |     0   13575667562
+----------------------------------------------------------
+
+. table act3 year if big, stat(count grant_key) nformat(%9.0f) nototals
+string variables not allowed in layout; act3 is a string variable
+r(109);
+
+end of do-file
+r(109);

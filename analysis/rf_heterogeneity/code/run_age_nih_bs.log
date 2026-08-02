@@ -1,0 +1,457 @@
+-------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  /n/holylabs/pakes_lab/Lab/sci_eq/analysis/rf_heterogeneity/code/ru
+> n_age_nih_bs.log
+  log type:  text
+ opened on:  30 Jul 2026, 14:05:34
+
+. 
+. local samp   all_jrnls
+
+. local suf    _r1_r2
+
+. local fes    athr_id year
+
+. local vce_cl athr_id
+
+. local yvars  n_grants nih_total_cost
+
+. local pairs  `" "young old" "young_nih old_nih" "'
+
+. 
+. use ../temp/es_`samp'`suf', clear
+
+. gen post       = year >= 2014
+
+. gen Z_it       = exposure      * post
+
+. gen Z_share_it = mkt_spend_shr * post
+
+. 
+. cap mkdir "../output/figures/`samp'/ppml_pdid_het_bs"
+
+. 
+. foreach yvar of local yvars {
+  2.     local bs_lbl "`yvar'"
+  3.     if "`yvar'" == "n_grants"       local bs_lbl "Active NIH Research Gran
+> ts"
+  4.     if "`yvar'" == "nih_total_cost" local bs_lbl "NIH Award Dollars"
+  5. 
+.     foreach pair of local pairs {
+  6.         local g1 : word 1 of `pair'
+  7.         local g2 : word 2 of `pair'
+  8. 
+.         foreach v in Z_`g1' Z_`g2' S_`g1' S_`g2' PT_`g1' _mu _z_work _dvar _f
+> wlw _y_r _Z_r {
+  9.             cap drop `v'
+ 10.         }
+ 11.         gen Z_`g1'  = Z_it       * `g1'
+ 12.         gen Z_`g2'  = Z_it       * `g2'
+ 13.         gen S_`g1'  = Z_share_it * `g1'
+ 14.         gen S_`g2'  = Z_share_it * `g2'
+ 15.         gen PT_`g1' = post       * `g1'
+ 16. 
+.         di as text _n "==== pdid binscatter fit: `yvar' `g1' vs `g2' ===="
+ 17.         cap noi ppmlhdfe `yvar' Z_`g1' Z_`g2' S_`g1' S_`g2' PT_`g1', ///
+>             absorb(`fes') vce(cluster `vce_cl') d(_dvar)
+ 18.         if _rc {
+ 19.             di as error "run_age_nih_bs: `yvar' `g1'/`g2' joint fit failed
+> ; skipping."
+ 20.             continue
+ 21.         }
+ 22.         local b_`g1'  = _b[Z_`g1']
+ 23.         local se_`g1' = _se[Z_`g1']
+ 24.         local b_`g2'  = _b[Z_`g2']
+ 25.         local se_`g2' = _se[Z_`g2']
+ 26. 
+.         predict double _mu, mu
+ 27.         gen double _z_work = ln(_mu) + (`yvar' - _mu)/_mu if !mi(_mu) & _m
+> u > 0
+ 28.         gen double _fwlw   = _mu                          if !mi(_mu) & _m
+> u > 0
+ 29. 
+.         foreach grp in `g1' `g2' {
+ 30.             local other = cond("`grp'" == "`g1'", "`g2'", "`g1'")
+ 31.             foreach v in _y_r _Z_r {
+ 32.                 cap drop `v'
+ 33.             }
+ 34.             cap noi qui reghdfe _z_work Z_`other' S_`g1' S_`g2' PT_`g1' if
+>  !mi(_fwlw) [pw=_fwlw], ///
+>                 absorb(`fes') residuals(_y_r)
+ 35.             if _rc == 0 cap noi qui reghdfe Z_`grp' Z_`other' S_`g1' S_`g2
+> ' PT_`g1' if !mi(_fwlw) [pw=_fwlw], ///
+>                 absorb(`fes') residuals(_Z_r)
+ 36.             if _rc {
+ 37.                 di as error "run_age_nih_bs FWL `grp' failed; skipping plo
+> t."
+ 38.                 continue
+ 39.             }
+ 40.             gunique athr_id if `grp' == 1 & !mi(_y_r) & !mi(_Z_r)
+ 41.             local n_pis = r(unique)
+ 42.             gunique inst_id if `grp' == 1 & !mi(_y_r) & !mi(_Z_r)
+ 43.             local n_insts = r(unique)
+ 44.             local b_str  : dis %7.3f `b_`grp''
+ 45.             local se_str : dis %7.3f `se_`grp''
+ 46.             di as text "BS `yvar' `grp': beta=`b_str' se=`se_str' PIs=`n_p
+> is' Insts=`n_insts'"
+ 47.             binscatter _y_r _Z_r [aw=_fwlw] if `grp' == 1 & !mi(_y_r) & !m
+> i(_Z_r), n(30) ///
+>                 xtitle("Exposure x Post") ///
+>                 ytitle("{&Delta} Log Expected `bs_lbl'") ///
+>                 xlab(-0.06(0.015)0.06, format(%5.3f)) ///
+>                 msymbol(O) mcolor(ebblue) ///
+>                 note("Num. PIs: `n_pis'   Num. Insts: `n_insts'" "{&beta} = `
+> b_str' (SE: `se_str')", ///
+>                      size(small) pos(7) ring(1) justification(left)) ///
+>                 plotregion(margin(sides))
+ 48.             graph export ///
+>                 ../output/figures/`samp'/ppml_pdid_het_bs/ppml_pdid_`yvar'_`g
+> rp'_agenih`suf'.pdf, replace
+ 49.         }
+ 50.     }
+ 51. }
+
+==== pdid binscatter fit: n_grants young vs old ====
+(dropped 1100 observations that are either singletons or separated by a fixed e
+> ffect)
+Iteration 1:   deviance = 4.0559e+04  eps = .         iters = 4    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.92  P   
+Iteration 2:   deviance = 3.8773e+04  eps = 4.61e-02  iters = 3    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -2.56      
+Iteration 3:   deviance = 3.8710e+04  eps = 1.62e-03  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -2.83      
+Iteration 4:   deviance = 3.8709e+04  eps = 2.06e-05  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -2.88      
+Iteration 5:   deviance = 3.8709e+04  eps = 9.27e-09  iters = 2    tol = 1.0e-0
+> 5                                                                            
+>    min(eta) =  -2.88      
+Iteration 6:   deviance = 3.8709e+04  eps = 2.22e-15  iters = 2    tol = 1.0e-0
+> 6                                                                            
+>    min(eta) =  -2.88   S O
+-------------------------------------------------------------------------------
+> -----------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon 
+> below tolerance)
+Converged in 6 iterations and 15 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =     49,120
+Absorbing 2 HDFE groups                           Residual df     =      4,911
+Statistics robust to heteroskedasticity           Wald chi2(5)    =     107.33
+Deviance             =  38709.38541               Prob > chi2     =     0.0000
+Log pseudolikelihood = -51915.06326               Pseudo R2       =     0.2346
+
+Number of clusters (athr_id)=      4,912
+                            (Std. err. adjusted for 4,912 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+    n_grants | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+     Z_young |   .7007438   .3932605     1.78   0.075    -.0700326     1.47152
+       Z_old |   .5839415   .4041039     1.45   0.148    -.2080877    1.375971
+     S_young |   .1615219   .1652585     0.98   0.328    -.1623789    .4854227
+       S_old |  -.1389567   .1442218    -0.96   0.335    -.4216262    .1437129
+    PT_young |   .1518628    .073303     2.07   0.038     .0081915    .2955342
+       _cons |   .2639078   .0238134    11.08   0.000     .2172345    .3105812
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      4912        4912           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+(74,250 missing values generated)
+(74,250 missing values generated)
+Warning: Variance matrix is nonsymmetric or highly singular.
+N = 21,880; 2,188 balanced groups of size 10
+N = 21,880; 151 unbalanced groups of sizes 10 to 1,340
+BS n_grants young: beta=  0.701 se=  0.393 PIs=2188 Insts=151
+file
+    ../output/figures/all_jrnls/ppml_pdid_het_bs/ppml_pdid_n_grants_young_age
+    > nih_r1_r2.pdf saved as PDF format
+Warning: Variance matrix is nonsymmetric or highly singular.
+N = 27,240; 2,724 balanced groups of size 10
+N = 27,240; 136 unbalanced groups of sizes 10 to 1,680
+BS n_grants old: beta=  0.584 se=  0.404 PIs=2724 Insts=136
+file
+    ../output/figures/all_jrnls/ppml_pdid_het_bs/ppml_pdid_n_grants_old_ageni
+    > h_r1_r2.pdf saved as PDF format
+(72,940 missing values generated)
+(72,940 missing values generated)
+(72,940 missing values generated)
+(72,940 missing values generated)
+(72,940 missing values generated)
+
+==== pdid binscatter fit: n_grants young_nih vs old_nih ====
+(dropped 1100 observations that are either singletons or separated by a fixed e
+> ffect)
+Iteration 1:   deviance = 4.0559e+04  eps = .         iters = 4    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.92  P   
+Iteration 2:   deviance = 3.8773e+04  eps = 4.61e-02  iters = 3    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -2.56      
+Iteration 3:   deviance = 3.8710e+04  eps = 1.62e-03  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -2.83      
+Iteration 4:   deviance = 3.8709e+04  eps = 2.06e-05  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -2.88      
+Iteration 5:   deviance = 3.8709e+04  eps = 9.27e-09  iters = 2    tol = 1.0e-0
+> 5                                                                            
+>    min(eta) =  -2.88      
+Iteration 6:   deviance = 3.8709e+04  eps = 2.22e-15  iters = 2    tol = 1.0e-0
+> 6                                                                            
+>    min(eta) =  -2.88   S O
+-------------------------------------------------------------------------------
+> -----------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon 
+> below tolerance)
+Converged in 6 iterations and 15 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =     49,120
+Absorbing 2 HDFE groups                           Residual df     =      4,911
+Statistics robust to heteroskedasticity           Wald chi2(5)    =     107.33
+Deviance             =  38709.38541               Prob > chi2     =     0.0000
+Log pseudolikelihood = -51915.06326               Pseudo R2       =     0.2346
+
+Number of clusters (athr_id)=      4,912
+                            (Std. err. adjusted for 4,912 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+    n_grants | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+ Z_young_nih |   .7007438   .3932605     1.78   0.075    -.0700326     1.47152
+   Z_old_nih |   .5839415   .4041039     1.45   0.148    -.2080877    1.375971
+ S_young_nih |   .1615219   .1652585     0.98   0.328    -.1623789    .4854227
+   S_old_nih |  -.1389567   .1442218    -0.96   0.335    -.4216262    .1437129
+PT_young_nih |   .1518628    .073303     2.07   0.038     .0081915    .2955342
+       _cons |   .2639078   .0238134    11.08   0.000     .2172345    .3105812
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      4912        4912           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+(72,940 missing values generated)
+(74,250 missing values generated)
+(74,250 missing values generated)
+Warning: Variance matrix is nonsymmetric or highly singular.
+N = 21,880; 2,188 balanced groups of size 10
+N = 21,880; 151 unbalanced groups of sizes 10 to 1,340
+BS n_grants young_nih: beta=  0.701 se=  0.393 PIs=2188 Insts=151
+file
+    ../output/figures/all_jrnls/ppml_pdid_het_bs/ppml_pdid_n_grants_young_nih
+    > _agenih_r1_r2.pdf saved as PDF format
+Warning: Variance matrix is nonsymmetric or highly singular.
+N = 27,240; 2,724 balanced groups of size 10
+N = 27,240; 136 unbalanced groups of sizes 10 to 1,680
+BS n_grants old_nih: beta=  0.584 se=  0.404 PIs=2724 Insts=136
+file
+    ../output/figures/all_jrnls/ppml_pdid_het_bs/ppml_pdid_n_grants_old_nih_a
+    > genih_r1_r2.pdf saved as PDF format
+
+==== pdid binscatter fit: nih_total_cost young vs old ====
+(dropped 1100 observations that are either singletons or separated by a fixed e
+> ffect)
+Iteration 1:   deviance = 1.9427e+10  eps = .         iters = 4    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -2.63  P   
+Iteration 2:   deviance = 1.7556e+10  eps = 1.07e-01  iters = 3    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -3.61      
+Iteration 3:   deviance = 1.7420e+10  eps = 7.78e-03  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -4.62      
+Iteration 4:   deviance = 1.7414e+10  eps = 3.51e-04  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -5.62      
+Iteration 5:   deviance = 1.7414e+10  eps = 1.65e-05  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -6.62      
+Iteration 6:   deviance = 1.7414e+10  eps = 2.56e-06  iters = 2    tol = 1.0e-0
+> 5                                                                            
+>    min(eta) =  -7.62      
+Iteration 7:   deviance = 1.7414e+10  eps = 7.69e-07  iters = 2    tol = 1.0e-0
+> 6                                                                            
+>    min(eta) =  -8.62      
+Iteration 8:   deviance = 1.7414e+10  eps = 2.77e-07  iters = 2    tol = 1.0e-0
+> 7                                                                            
+>    min(eta) =  -9.62   S  
+Iteration 9:   deviance = 1.7414e+10  eps = 1.02e-07  iters = 2    tol = 1.0e-0
+> 7                                                                            
+>    min(eta) = -10.62   S  
+Iteration 10:  deviance = 1.7414e+10  eps = 3.73e-08  iters = 2    tol = 1.0e-0
+> 7                                                                            
+>    min(eta) = -11.61   S  
+Iteration 11:  deviance = 1.7414e+10  eps = 1.36e-08  iters = 2    tol = 1.0e-0
+> 9                                                                            
+>    min(eta) = -12.60   S  
+Iteration 12:  deviance = 1.7414e+10  eps = 4.85e-09  iters = 2    tol = 1.0e-0
+> 9                                                                            
+>    min(eta) = -13.58   S O
+-------------------------------------------------------------------------------
+> -----------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon 
+> below tolerance)
+Converged in 12 iterations and 27 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =     49,120
+Absorbing 2 HDFE groups                           Residual df     =      4,911
+Statistics robust to heteroskedasticity           Wald chi2(5)    =      68.97
+Deviance             =  1.74138e+10               Prob > chi2     =     0.0000
+Log pseudolikelihood =  -8707092070               Pseudo R2       =     0.5497
+
+Number of clusters (athr_id)=      4,912
+                            (Std. err. adjusted for 4,912 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+nih_total_~t | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+     Z_young |   .5420722   .5421097     1.00   0.317    -.5204433    1.604588
+       Z_old |   1.081772   .5136389     2.11   0.035     .0750587    2.088486
+     S_young |   .3158598    .256098     1.23   0.217    -.1860831    .8178028
+       S_old |  -.8058328   .3703202    -2.18   0.030    -1.531647   -.0800185
+    PT_young |  -.0840501   .1513776    -0.56   0.579    -.3807447    .2126445
+       _cons |   13.51719    .066268   203.98   0.000      13.3873    13.64707
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      4912        4912           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+(74,250 missing values generated)
+(74,250 missing values generated)
+Warning: Variance matrix is nonsymmetric or highly singular.
+N = 21,880; 2,188 balanced groups of size 10
+N = 21,880; 151 unbalanced groups of sizes 10 to 1,340
+BS nih_total_cost young: beta=  0.542 se=  0.542 PIs=2188 Insts=151
+file
+    ../output/figures/all_jrnls/ppml_pdid_het_bs/ppml_pdid_nih_total_cost_you
+    > ng_agenih_r1_r2.pdf saved as PDF format
+Warning: Variance matrix is nonsymmetric or highly singular.
+N = 27,240; 2,724 balanced groups of size 10
+N = 27,240; 136 unbalanced groups of sizes 10 to 1,680
+BS nih_total_cost old: beta=  1.082 se=  0.514 PIs=2724 Insts=136
+file
+    ../output/figures/all_jrnls/ppml_pdid_het_bs/ppml_pdid_nih_total_cost_old
+    > _agenih_r1_r2.pdf saved as PDF format
+(72,940 missing values generated)
+(72,940 missing values generated)
+(72,940 missing values generated)
+(72,940 missing values generated)
+(72,940 missing values generated)
+
+==== pdid binscatter fit: nih_total_cost young_nih vs old_nih ====
+(dropped 1100 observations that are either singletons or separated by a fixed e
+> ffect)
+Iteration 1:   deviance = 1.9427e+10  eps = .         iters = 4    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -2.63  P   
+Iteration 2:   deviance = 1.7556e+10  eps = 1.07e-01  iters = 3    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -3.61      
+Iteration 3:   deviance = 1.7420e+10  eps = 7.78e-03  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -4.62      
+Iteration 4:   deviance = 1.7414e+10  eps = 3.51e-04  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -5.62      
+Iteration 5:   deviance = 1.7414e+10  eps = 1.65e-05  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -6.62      
+Iteration 6:   deviance = 1.7414e+10  eps = 2.56e-06  iters = 2    tol = 1.0e-0
+> 5                                                                            
+>    min(eta) =  -7.62      
+Iteration 7:   deviance = 1.7414e+10  eps = 7.69e-07  iters = 2    tol = 1.0e-0
+> 6                                                                            
+>    min(eta) =  -8.62      
+Iteration 8:   deviance = 1.7414e+10  eps = 2.77e-07  iters = 2    tol = 1.0e-0
+> 7                                                                            
+>    min(eta) =  -9.62   S  
+Iteration 9:   deviance = 1.7414e+10  eps = 1.02e-07  iters = 2    tol = 1.0e-0
+> 7                                                                            
+>    min(eta) = -10.62   S  
+Iteration 10:  deviance = 1.7414e+10  eps = 3.73e-08  iters = 2    tol = 1.0e-0
+> 7                                                                            
+>    min(eta) = -11.61   S  
+Iteration 11:  deviance = 1.7414e+10  eps = 1.36e-08  iters = 2    tol = 1.0e-0
+> 9                                                                            
+>    min(eta) = -12.60   S  
+Iteration 12:  deviance = 1.7414e+10  eps = 4.85e-09  iters = 2    tol = 1.0e-0
+> 9                                                                            
+>    min(eta) = -13.58   S O
+-------------------------------------------------------------------------------
+> -----------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon 
+> below tolerance)
+Converged in 12 iterations and 27 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =     49,120
+Absorbing 2 HDFE groups                           Residual df     =      4,911
+Statistics robust to heteroskedasticity           Wald chi2(5)    =      68.97
+Deviance             =  1.74138e+10               Prob > chi2     =     0.0000
+Log pseudolikelihood =  -8707092070               Pseudo R2       =     0.5497
+
+Number of clusters (athr_id)=      4,912
+                            (Std. err. adjusted for 4,912 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+nih_total_~t | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+ Z_young_nih |   .5420722   .5421097     1.00   0.317    -.5204433    1.604588
+   Z_old_nih |   1.081772   .5136389     2.11   0.035     .0750587    2.088486
+ S_young_nih |   .3158598    .256098     1.23   0.217    -.1860831    .8178028
+   S_old_nih |  -.8058328   .3703202    -2.18   0.030    -1.531647   -.0800185
+PT_young_nih |  -.0840501   .1513776    -0.56   0.579    -.3807447    .2126445
+       _cons |   13.51719    .066268   203.98   0.000      13.3873    13.64707
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      4912        4912           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+(72,940 missing values generated)
+(74,250 missing values generated)
+(74,250 missing values generated)
+Warning: Variance matrix is nonsymmetric or highly singular.
+N = 21,880; 2,188 balanced groups of size 10
+N = 21,880; 151 unbalanced groups of sizes 10 to 1,340
+BS nih_total_cost young_nih: beta=  0.542 se=  0.542 PIs=2188 Insts=151
+file
+    ../output/figures/all_jrnls/ppml_pdid_het_bs/ppml_pdid_nih_total_cost_you
+    > ng_nih_agenih_r1_r2.pdf saved as PDF format
+Warning: Variance matrix is nonsymmetric or highly singular.
+N = 27,240; 2,724 balanced groups of size 10
+N = 27,240; 136 unbalanced groups of sizes 10 to 1,680
+BS nih_total_cost old_nih: beta=  1.082 se=  0.514 PIs=2724 Insts=136
+file
+    ../output/figures/all_jrnls/ppml_pdid_het_bs/ppml_pdid_nih_total_cost_old
+    > _nih_agenih_r1_r2.pdf saved as PDF format
+
+. 
+. log close
+      name:  <unnamed>
+       log:  /n/holylabs/pakes_lab/Lab/sci_eq/analysis/rf_heterogeneity/code/ru
+> n_age_nih_bs.log
+  log type:  text
+ closed on:  30 Jul 2026, 14:48:22
+-------------------------------------------------------------------------------

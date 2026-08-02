@@ -3,3 +3,5 @@
 ./exposure/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/exposure_msr/output/
 ./betas/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/analysis/first_stage/output/
 ./pis/ | /n/netscratch/pakes_lab/Lab/sci_eq/FOIA/exposure measure usable/pis/
+./pi_samp/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/analysis/pi_descriptives/output/prepped_samples/
+./nih/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/nih/match_pi_athr/output/

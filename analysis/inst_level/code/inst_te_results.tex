@@ -1,0 +1,277 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1.1in]{geometry}
+\usepackage{amsmath, amssymb, booktabs}
+\usepackage[colorlinks=true, linkcolor=blue]{hyperref}
+
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Post}{\mathrm{Post}}
+
+\title{The Role of Institutions in the Output Response:\\ What We Do and What We Find}
+\author{}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\noindent
+Companion to \texttt{inst\_te\_specification.tex}, which derives the estimand
+and the identification argument. This document reports the empirical pipeline
+and results. All numbers come from \texttt{inst\_fe\_diag.do}.
+
+\section{The exercise in one paragraph}
+
+We ask whether the institution a PI sits at shaped how her output responded
+to the 2014 procurement shock, and if so, which institutional
+characteristics account for it. Because no PI in the sample changes
+institution, an institution \emph{level} effect is collinear with the PI
+fixed effect and is not identified. What is identified is the institution
+$\times$ \Post{} \emph{shift}: two PIs with the same exposure, one at
+institution $j$ and one at $k$, differ in their post-2014 log-output change
+by exactly $te_j - te_k$. Stage 1 estimates the full set of $te_j$ from one
+pooled PPML; Stage 2 treats the $\widehat{te}_j$ as noisy observations of
+true institution effects and asks, by Fay--Herriot meta-regression, which
+institutional characteristics predict them.
+
+\paragraph{Stage 1.}
+\[
+\E[Y_{it}] = \exp\Big( \alpha_i + \delta_t + b\,Z_{it} + g\,Z^{S}_{it}
++ \textstyle\sum_{j \neq j_0} te_j\,\mathbf{1}[j(i)=j]\cdot \Post_t \Big),
+\]
+by \texttt{ppmlhdfe}, PI and year absorbed, standard errors clustered by PI.
+The exposure response $b$ is held common across institutions, so $te_j$ is a
+shift \emph{conditional on the same exposure}. The reference institution
+$j_0$ is the largest (Johns Hopkins, 464 PIs); estimates are then re-centered
+on the output-weighted mean, so zero is the response of the average unit of
+research output.
+
+\paragraph{Stage 2.}
+The $\widehat{te}_j$ are individually noisy, so they are never used raw as
+data points. They enter a random-effects meta-regression that models their
+sampling error explicitly, weighting institution $j$ by
+$1/(\tau^2 + \widehat{se}_j^2)$, with $\tau^2$ the variance of the true
+institution effects estimated by REML and Knapp--Hartung standard errors.
+Empirical Bayes posterior means are computed for display only; no reported
+slope or variance decomposition uses them.
+
+\section{Sample}
+
+\begin{center}
+\begin{tabular}{@{}lrl@{}}
+\toprule
+Step & $N$ & Binding constraint \\
+\midrule
+PI-by-year panel, 2010--2019 & 123,370 & 12,337 PIs, 198 institutions \\
+PIs changing institution     & 0        & sample construction \\
+Institutions with an estimable $te_j$ & 196 & reference + 1 collinear \\
+\quad and $\ge 10$ PIs on the estimation sample & 128 & precision floor \\
+\quad and endowment + HERD characteristics      & 103 & IPEDS/HERD coverage \\
+\quad and all 24 characteristics                & 98  & complete cases \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+The attrition from 198 to 103 is coverage, not selection on outcomes, but it
+does skew the second stage toward larger institutions. The pooled exposure
+response in the Stage 1 fit is $\hat b = -0.249$ (se $0.130$), consistent
+with the main reduced form.
+
+\section{Finding 1: institutions matter, but modestly}
+
+A joint Wald test that every institution $\times$ \Post{} shift is zero gives
+$\chi^2(187) = 14{,}841$, decisively rejected. Homogeneity across the 128
+estimable institutions is also rejected, $Q = 161.5$ on 127 degrees of
+freedom ($p = 0.021$).
+
+The magnitude, however, is modest. On the horse-race sample the REML estimate
+is $\tau^2 = 0.0024$, so the standard deviation of \emph{true} institution
+effects is $\tau \approx 0.049$ log points, and $I^2 = 27.8\%$. Moving from
+an average institution to one a standard deviation better is worth about five
+log points of post-2014 output --- real, but an order of magnitude smaller
+than the pooled exposure response.
+
+There is a size gradient visible in the normalization itself. The unweighted
+mean $te_j$ is $-0.111$ while the output-weighted mean is $-0.074$: the
+average \emph{unit of science} fared better than the average
+\emph{institution}, because the institutions where most output happens are
+the large ones, and large institutions did better.
+
+\section{Finding 2: most of the raw spread is estimation error}
+
+The raw $\widehat{te}_j$ have standard deviation $0.116$ across the 128
+institutions, but the median sampling standard error is $0.092$. Decomposing,
+$0.116^2 \approx 0.044^2 + 0.107^2$: roughly \textbf{85\% of the observed
+dispersion is noise}, and the true dispersion is the $\tau$ of Finding 1.
+This is why the empirical Bayes shrinkage factor
+$\lambda_j = \tau^2/(\tau^2 + \widehat{se}_j^2)$ averages only $0.21$,
+never exceeding $0.47$ even for the best-measured institution.
+
+Two practical consequences. First, no individual institution's $te_j$ should
+be quoted or ranked: an estimate at $-0.40$ is far more likely to be an
+ordinary institution with an unlucky draw than a genuinely extreme one.
+Second, neither caterpillar plot shows ``how much institutions differ.'' The
+raw figure overstates it by a factor near three; the EB figure understates
+it, because posterior means are under-dispersed by construction
+($\mathrm{sd}(\widehat{te}^{EB}) = \sqrt{\bar\lambda}\,\tau = 0.020$). Only
+$\tau = 0.049$ answers that question.
+
+\section{Finding 3: the characteristic that matters is the scale of biomedical research}
+
+Every one of the 31 characteristics in the univariate screen has a
+\emph{positive} dose-adjusted coefficient: larger and better-funded
+institutions had less negative post-2014 responses. The ranking, per standard
+deviation of the characteristic, with Benjamini--Hochberg $q$:
+
+\begin{center}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+Characteristic (log) & $\hat\theta$ & $q_{BH}$ \\
+\midrule
+Non-federal life-science/biomedical funding & $+0.058$ & $2\times10^{-6}$ \\
+Total biomedical funding                    & $+0.056$ & $3\times10^{-6}$ \\
+Federal life-science/biomedical funding     & $+0.051$ & $2\times10^{-5}$ \\
+Total R\&D funding                          & $+0.049$ & $5\times10^{-5}$ \\
+Basic research expenditure                  & $+0.044$ & $6\times10^{-5}$ \\
+Endowment per FTE                           & $+0.031$ & $4\times10^{-4}$ \\
+\midrule
+\multicolumn{3}{@{}l@{}}{\emph{not distinguishable from zero:}} \\
+Funding diversity ($1-$HHI over HERD sources) & $+0.008$ & $p = 0.35$ \\
+Development expenditure                       & $+0.004$ & $p = 0.65$ \\
+Health-services funding                       & $+0.013$ & $p = 0.24$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+The top rows survive Bonferroni, not merely BH. The nulls are informative:
+this is not a story about diversified revenue cushioning the shock, nor about
+applied-versus-basic orientation. It is about the \emph{level} of basic
+biomedical research resources.
+
+In the three-characteristic horse race, endowment and total R\&D funding both
+survive jointly while life-science funding drops out as the collinear
+duplicate:
+
+\begin{center}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+ & $\hat\theta$ & se & $p$ \\
+\midrule
+Endowment per FTE (z)      & $+0.0217$ & $0.0090$ & $0.018$ \\
+Total R\&D funding (z)     & $+0.0530$ & $0.0201$ & $0.010$ \\
+Life-science funding (z)   & $-0.0158$ & $0.0197$ & $0.426$ \\
+Institution mean exposure (z) & $-0.0270$ & $0.0118$ & $0.024$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+Because the funding measures are near-collinear, individual $\hat\theta$
+should be read ordinally. The collinearity-proof version is the principal
+components companion: PC1 carries 71\% of the variance of the 24
+characteristics, loads positively on every funding measure --- it is the scale
+factor --- and enters at $+0.0134$ ($p < 0.001$). The 24-characteristic joint
+horse race produces no individually significant coefficient, exactly as
+collinearity predicts, while still driving residual heterogeneity to zero.
+
+\section{Finding 4: exposure concentration hurts, beyond a PI's own exposure}
+
+The institution's mean PI exposure enters with a robustly negative
+coefficient: $-0.026$ alone ($p = 0.041$), $-0.027$ in the horse race
+($p = 0.024$), $-0.028$ once baseline productivity is added ($p = 0.017$).
+Since each PI's \emph{own} exposure is already absorbed by the pooled $b
+Z_{it}$, this says that conditional on how exposed you were, being at an
+institution where your colleagues were also heavily exposed made your
+response worse. The leave-one-out version in the one-step check --- which
+excludes the PI's own exposure from the institution mean by construction ---
+confirms it at $-0.019$ ($p = 0.011$).
+
+This is the one result that is not a mechanical size story, and it is the
+natural place to argue for a within-institution spillover: shared equipment,
+shared core facilities, or shared administrative capacity absorbing a common
+procurement shock.
+
+\section{Finding 5: observables explain essentially all of the heterogeneity}
+
+\begin{center}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+Specification & $\tau^2$ & $Q_{res}$ $p$ \\
+\midrule
+(a) no covariates          & $0.00242$ & $0.008$ \\
+(b) dose only              & $0.00196$ & $0.018$ \\
+(c) characteristics + dose & $\approx 0$ & $0.382$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+Scale plus exposure concentration absorb the entire estimated between-institution
+variance, and the residual homogeneity test stops rejecting. There is no
+detectable residual ``institution quality'' once these are conditioned on.
+Adding pre-2014 institution output (Finding 3's characteristics compete with
+it: $+0.022$, $p = 0.051$) leaves the dose coefficient untouched but
+attenuates endowment and funding, as expected for a third size proxy.
+
+\section{Validation}
+
+The two-step procedure is cross-checked against a one-step PPML in which
+$\Post_t \times W_k$ replaces the estimated $te_j$ entirely, with the same
+fixed-effect structure. The two approaches agree closely:
+
+\begin{center}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+ & Two-step $\hat\theta_k$ & One-step $\hat\delta_k$ \\
+\midrule
+Endowment per FTE    & $+0.0217$ & $+0.0193$ \\
+Total R\&D funding   & $+0.0530$ & $+0.0564$ \\
+Life-science funding & $-0.0158$ & $-0.0276$ \\
+Dose                 & $-0.0270$ & $-0.0194$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+Same signs, same magnitudes, significant in the same places. The findings are
+not an artifact of estimating institution effects first and regressing second.
+
+\section{Caveats}
+
+\begin{enumerate}
+\item \textbf{Collinearity.} All funding measures move together; the honest
+claim is ``scale of biomedical research,'' not any specific funding stream.
+\item \textbf{Sorting.} With no movers, $te_j$ cannot separate a causal
+institution effect from the resilience of the PIs an institution attracts.
+The effect is descriptive.
+\item \textbf{Coverage.} The second stage runs on 103 of 198 institutions,
+skewed large.
+\item \textbf{$\tau^2$ is probably understated.} The $\widehat{se}_j$ are
+measured relative to the omitted reference, so they carry that institution's
+estimation error, which is common to all $te_j$ and contributes nothing to
+cross-institution dispersion. REML subtracts it anyway. This biases $\tau^2$
+down, shrinkage up, and makes the ``100\% explained'' in Finding 5 look
+cleaner than it is. The Wald statistic of 14,841 against an expected $\approx
+320$ points the same way. The fix is to feed REML the diagonal of $MVM'$ with
+$M = I - \mathbf{1}\mathbf{1}'/J$; the independent check is a split-sample
+estimate of $\tau^2$.
+\item \textbf{Screening-grade inference.} Second-stage standard errors are
+Knapp--Hartung on PI-clustered $\widehat{se}_j$; anything headline should be
+bootstrapped through both stages.
+\item \textbf{PC5.} Significant at $p<0.001$ while carrying 2.5\% of the
+variance --- treat as overfitting until shown otherwise.
+\end{enumerate}
+
+\section{Bottom line}
+
+Institutional heterogeneity in the post-shock output response is
+statistically unambiguous but quantitatively modest: the true standard
+deviation across institutions is about five log points, against a pooled
+exposure response of $-25$. That heterogeneity is fully accounted for by two
+things --- the scale of an institution's biomedical research enterprise, which
+helped, and the concentration of exposure among its PIs, which hurt --- with
+no residual institution-specific component. Institutions mattered, but
+through resources and shared exposure rather than through anything
+idiosyncratic to the place.
+
+\end{document}

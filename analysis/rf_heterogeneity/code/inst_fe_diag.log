@@ -1,0 +1,823 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 120,000; see help set_maxvar.
+
+. do inst_fe_diag.do 
+
+. set more off
+
+. clear all
+
+. capture log close
+
+. program drop _all
+
+. set scheme modern
+
+. set linesize 200
+
+. 
+. local outdir ../output/inst_fe_diag
+
+. cap mkdir `outdir'
+
+. log using `outdir'/inst_fe_diag.log, replace text
+(file /n/holylabs/pakes_lab/Lab/sci_eq/analysis/rf_heterogeneity/code/../output/inst_fe_diag/inst_fe_diag.log not found)
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  /n/holylabs/pakes_lab/Lab/sci_eq/analysis/rf_heterogeneity/code/../output/inst_fe_diag/inst_fe_diag.log
+  log type:  text
+ opened on:  23 Jul 2026, 11:38:16
+
+. 
+. * ============================================================================
+. * Under num_place==1 (reduced_form/restrict_samp), author FE is a strict
+. * refinement of inst FE, so an additive twfe(author, inst) is not identified.
+. * Instead: fit the actual main spec with athr_id + year FE, save author FEs,
+. * aggregate by inst -> mean author FE per inst = "average PI level at inst".
+. * Then plot + regress on all HERD/IC vars.
+. * ============================================================================
+. 
+. use ../external/prepped_samples/es_all_jrnls_r1_r2.dta, clear
+
+. 
+. * Reconstruct Z_it and Z_share_it exactly as the main pooled_did spec builds them.
+. cap drop post Z_it Z_share_it
+
+. gen post       = year >= 2014
+
+. gen Z_it       = exposure      * post
+
+. gen Z_share_it = mkt_spend_shr * post
+
+. 
+. * Main spec fit: ppmlhdfe ppr_cnt Z_it Z_share_it, absorb(athr_id year)
+. * `savefe' writes __hdfe1__=athr_FE, __hdfe2__=yr_FE on log(E[Y]) scale.
+. ppmlhdfe ppr_cnt Z_it Z_share_it, absorb(athr_FE=athr_id yr_FE=year) vce(cluster athr_id)
+Iteration 1:   deviance = 1.1880e+05  eps = .         iters = 4    tol = 1.0e-04  min(eta) =  -1.40  P   
+Iteration 2:   deviance = 1.1580e+05  eps = 2.59e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.67      
+Iteration 3:   deviance = 1.1577e+05  eps = 1.93e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.72      
+Iteration 4:   deviance = 1.1577e+05  eps = 7.71e-08  iters = 2    tol = 1.0e-04  min(eta) =  -1.72      
+Iteration 5:   deviance = 1.1577e+05  eps = 1.76e-13  iters = 2    tol = 1.0e-05  min(eta) =  -1.72   S O
+------------------------------------------------------------------------------------------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
+Converged in 5 iterations and 12 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =    103,850
+Absorbing 2 HDFE groups                           Residual df     =     10,384
+Statistics robust to heteroskedasticity           Wald chi2(2)    =       5.56
+Deviance             =  115773.6697               Prob > chi2     =     0.0620
+Log pseudolikelihood = -163189.8782               Pseudo R2       =     0.1861
+
+Number of clusters (athr_id)=     10,385
+                           (Std. err. adjusted for 10,385 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+        Z_it |   -.319302   .1355293    -2.36   0.018    -.5849345   -.0536695
+  Z_share_it |   .0008084   .0580896     0.01   0.989     -.113045    .1146619
+       _cons |   .8426396   .0093176    90.44   0.000     .8243774    .8609018
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |     10385       10385           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. 
+. * One row per author, keep athr_FE + PI-invariants.
+. keep athr_id inst_id public type athr_FE
+
+. duplicates drop athr_id, force
+
+Duplicates in terms of athr_id
+
+(93,465 observations deleted)
+
+. di as text "===== PI-level author FEs ====="
+===== PI-level author FEs =====
+
+. sum athr_FE, d
+
+                       [FE] 1.athr_id
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%    -1.329097      -1.518895
+ 5%    -1.167996      -1.516306
+10%    -1.029256      -1.515549       Obs              10,385
+25%    -.7198066      -1.515467       Sum of wgt.      10,385
+
+50%    -.3478293                      Mean          -.3199982
+                        Largest       Std. dev.      .5375713
+75%     .0201792        1.74849
+90%     .4077791       1.830586       Variance        .288983
+95%     .6405327       2.152707       Skewness       .4110197
+99%     1.033929       2.235247       Kurtosis       2.984106
+
+. 
+. * -------------------------------------------------------- (1) inst-level object
+. * Mean athr_FE by inst = "average PI level" at each inst on log(ppr_cnt) scale.
+. * Also record N_PIs per inst (weight) and within-inst SD (spread).
+. bys inst_id: gegen inst_mean_FE = mean(athr_FE)
+
+. bys inst_id: gegen inst_sd_FE   = sd(athr_FE)
+
+. bys inst_id: gen  N_pi          = _N
+
+. 
+. keep inst_id public type inst_mean_FE inst_sd_FE N_pi
+
+. duplicates drop inst_id, force
+
+Duplicates in terms of inst_id
+
+(10,191 observations deleted)
+
+. 
+. * Demean the inst-level object so plots show deviations.
+. qui sum inst_mean_FE
+
+. gen inst_mean_FE_dev = inst_mean_FE - r(mean)
+
+. save ../temp/inst_meanfe.dta, replace
+(file ../temp/inst_meanfe.dta not found)
+file ../temp/inst_meanfe.dta saved
+
+. 
+. di as text "===== inst-level object (mean of author FEs per inst) ====="
+===== inst-level object (mean of author FEs per inst) =====
+
+. sum inst_mean_FE_dev, d
+
+                      inst_mean_FE_dev
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%    -.5391387      -.6449246
+ 5%    -.4251382      -.5391387
+10%    -.3007536      -.5388824       Obs                 194
+25%    -.1142793      -.4944797       Sum of wgt.         194
+
+50%    -.0015202                      Mean          -3.59e-10
+                        Largest       Std. dev.      .2592274
+75%      .106027       .7596744
+90%     .2288154       1.068787       Variance       .0671988
+95%     .3597428       1.205287       Skewness       1.545247
+99%     1.205287       1.415551       Kurtosis       10.39897
+
+. sum inst_mean_FE_dev if public == 1, d
+
+                      inst_mean_FE_dev
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%    -.5388824      -.5391387
+ 5%    -.3936915      -.5388824
+10%    -.2559474      -.4944797       Obs                 132
+25%    -.0973423      -.4866293       Sum of wgt.         132
+
+50%    -.0078698                      Mean           .0042618
+                        Largest       Std. dev.      .2648384
+75%      .089184       .5639361
+90%      .200274       1.068787       Variance       .0701394
+95%     .3597428       1.205287       Skewness       2.120321
+99%     1.205287       1.415551       Kurtosis       12.58811
+
+. sum inst_mean_FE_dev if public == 0, d
+
+                      inst_mean_FE_dev
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%    -.6449246      -.6449246
+ 5%    -.4251382      -.4641369
+10%     -.346997      -.4403529       Obs                  62
+25%    -.1328989      -.4251382       Sum of wgt.          62
+
+50%     .0309066                      Mean          -.0090735
+                        Largest       Std. dev.      .2487218
+75%     .1329865       .2967697
+90%      .246358       .4173482       Variance       .0618625
+95%     .2967697       .5191746       Skewness       .0290055
+99%     .7596744       .7596744       Kurtosis       3.812676
+
+. di as text "----- ttest inst-mean(author FE) by public -----"
+----- ttest inst-mean(author FE) by public -----
+
+. ttest inst_mean_FE_dev, by(public)
+
+Two-sample t test with equal variances
+------------------------------------------------------------------------------
+   Group |     Obs        Mean    Std. err.   Std. dev.   [95% conf. interval]
+---------+--------------------------------------------------------------------
+       0 |      62   -.0090735    .0315877    .2487218    -.072237      .05409
+       1 |     132    .0042618    .0230512    .2648384    -.041339    .0498626
+---------+--------------------------------------------------------------------
+Combined |     194   -3.59e-10    .0186114    .2592274   -.0367079    .0367079
+---------+--------------------------------------------------------------------
+    diff |           -.0133353    .0400038               -.0922386    .0655681
+------------------------------------------------------------------------------
+    diff = mean(0) - mean(1)                                      t =  -0.3333
+H0: diff = 0                                     Degrees of freedom =      192
+
+    Ha: diff < 0                 Ha: diff != 0                 Ha: diff > 0
+ Pr(T < t) = 0.3696         Pr(|T| > |t|) = 0.7392          Pr(T > t) = 0.6304
+
+. 
+. * Weighted (by N_pi) diff so big insts count more.
+. di as text "----- weighted (by N_pi) mean by public -----"
+----- weighted (by N_pi) mean by public -----
+
+. sum inst_mean_FE_dev [aw=N_pi] if public == 1, d
+
+                      inst_mean_FE_dev
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%    -.2559474      -.5391387
+ 5%    -.1293246      -.5388824
+10%     -.084153      -.4944797       Obs                 132
+25%     -.017607      -.4866293       Sum of wgt.       6,278
+
+50%     .0397393                      Mean           .0457295
+                        Largest       Std. dev.      .1149285
+75%     .0970542       .5639361
+90%     .1793559       1.068787       Variance       .0132086
+95%     .2425941       1.205287       Skewness       .4453879
+99%      .264493       1.415551       Kurtosis       12.09544
+
+. sum inst_mean_FE_dev [aw=N_pi] if public == 0, d
+
+                      inst_mean_FE_dev
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%    -.1545544      -.6449246
+ 5%    -.0735141      -.4641369
+10%    -.0648781      -.4403529       Obs                  62
+25%       .03603      -.4251382       Sum of wgt.       4,107
+
+50%     .1079519                      Mean           .0965611
+                        Largest       Std. dev.      .1229112
+75%      .163303       .2967697
+90%     .2288154       .4173482       Variance       .0151072
+95%      .272153       .5191746       Skewness      -.0209247
+99%     .4173482       .7596744       Kurtosis        4.80411
+
+. reg inst_mean_FE_dev public [aw=N_pi]
+(sum of wgt is 10,385)
+
+      Source |       SS           df       MS      Number of obs   =       194
+-------------+----------------------------------   F(1, 192)       =      8.59
+       Model |  .119840094         1  .119840094   Prob > F        =    0.0038
+    Residual |  2.67769386       192  .013946322   R-squared       =    0.0428
+-------------+----------------------------------   Adj R-squared   =    0.0379
+       Total |  2.79753395       193  .014494995   Root MSE        =    .11809
+
+------------------------------------------------------------------------------
+inst_mean_~v | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+      public |  -.0508316   .0173405    -2.93   0.004     -.085034   -.0166292
+       _cons |   .0965611   .0134825     7.16   0.000     .0699683    .1231539
+------------------------------------------------------------------------------
+
+. 
+. * -------------------------------------------------------- (2) distribution plots
+. tw (kdensity inst_mean_FE_dev if public == 1, lcolor(ebblue) lwidth(medthick)) ///
+>    (kdensity inst_mean_FE_dev if public == 0, lcolor(dkorange) lwidth(medthick)) ///
+>    , xtitle("Mean author FE at inst (log ppr_cnt, demeaned)") ytitle("Density") ///
+>      legend(order(1 "Public R1/R2" 2 "Private R1/R2") pos(2) ring(0) size(medsmall)) ///
+>      xlab(#10)
+
+. graph export `outdir'/inst_meanFE_kdens_pub_vs_priv.pdf, replace
+file ../output/inst_fe_diag/inst_meanFE_kdens_pub_vs_priv.pdf saved as PDF format
+
+. 
+. gsort inst_mean_FE_dev
+
+. gen rank = _n
+
+. tw (scatter inst_mean_FE_dev rank if public == 1 [aw=N_pi], mcolor(ebblue%50) msize(small)) ///
+>    (scatter inst_mean_FE_dev rank if public == 0 [aw=N_pi], mcolor(dkorange%50) msize(small)) ///
+>    , xtitle("Institution (ranked by mean author FE)") ///
+>      ytitle("Mean author FE (log ppr_cnt, demeaned)") ///
+>      legend(order(1 "Public R1/R2" 2 "Private R1/R2") pos(11) ring(0) size(medsmall)) ///
+>      note("Marker area = N PIs at inst.", size(vsmall))
+
+. graph export `outdir'/inst_meanFE_ranked_pub_vs_priv.pdf, replace
+file ../output/inst_fe_diag/inst_meanFE_ranked_pub_vs_priv.pdf saved as PDF format
+
+. 
+. tw (scatter inst_sd_FE inst_mean_FE_dev if public == 1, mcolor(ebblue) msize(small)) ///
+>    (scatter inst_sd_FE inst_mean_FE_dev if public == 0, mcolor(dkorange) msize(small)) ///
+>    , xtitle("Inst mean author FE (log, demeaned)") ///
+>      ytitle("Within-inst SD of author FE") ///
+>      legend(order(1 "Public R1/R2" 2 "Private R1/R2") pos(2) ring(0) size(medsmall))
+
+. graph export `outdir'/inst_FE_mean_vs_sd.pdf, replace
+file ../output/inst_fe_diag/inst_FE_mean_vs_sd.pdf saved as PDF format
+
+. 
+. * -------------------------------------------------- (3) merge inst characteristics
+. preserve
+
+.     import delimited ../external/college/ipeds_openalex.csv, clear varn(1) stringcols(_all)
+(encoding automatically selected: ISO-8859-1)
+(4 vars, 266 obs)
+
+.     keep ipeds_id inst_id
+
+.     drop if inst_id == "" | ipeds_id == ""
+(4 observations deleted)
+
+.     destring ipeds_id, replace
+ipeds_id: all characters numeric; replaced as long
+
+.     duplicates drop
+
+Duplicates in terms of all variables
+
+(0 observations are duplicates)
+
+.     bys ipeds_id (inst_id): keep if _n == 1
+(0 observations deleted)
+
+.     save ../temp/xw_fe.dta, replace
+file ../temp/xw_fe.dta saved
+
+. restore
+
+. preserve
+
+.     use ../external/inst_chars/combined_pre, clear
+
+.     merge 1:1 ipeds_id using ../temp/xw_fe.dta, keep(3) nogen
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                               259  
+    -----------------------------------------
+
+.     drop ipeds_id
+
+.     bys inst_id: keep if _n == 1
+(0 observations deleted)
+
+.     save ../temp/ic_fe.dta, replace
+file ../temp/ic_fe.dta saved
+
+. restore
+
+. merge 1:1 inst_id using ../temp/ic_fe.dta, keep(1 3) nogen
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                               194  
+    -----------------------------------------
+
+. 
+. di as text "===== N inst with inst-mean-FE + IC merge ====="
+===== N inst with inst-mean-FE + IC merge =====
+
+. count
+  194
+
+. count if !mi(tot_fund)
+  163
+
+. count if !mi(endowment)
+  192
+
+. 
+. local ic_all_raw ///
+>     contracts_fund fed_ls_bio_fund fed_ls_fund fed_ls_hs_fund grants_fund ///
+>     hhs_ls_bio_fund hhs_ls_fund hhs_ls_hs_fund nonfed_ls_bio_fund nonfed_ls_fund ///
+>     nonfed_ls_hs_fund subrecipient_fund tot_bus_fund tot_fed_fund tot_fund ///
+>     tot_inst_fund tot_nonprof_fund tot_state_fund ls_fund hs_fund bio_fund ///
+>     applied_expend applied_fed_expend basic_expend basic_fed_expend ///
+>     clin_trial_expend dev_expend ls_cap_expend med_sch_expend endowment
+
+. 
+. local ic_ln ""
+
+. foreach v of local ic_all_raw {
+  2.     cap confirm variable `v'
+  3.     if _rc {
+  4.         di as text "-- `v' not in inst_chars; skipping"
+  5.         continue
+  6.     }
+  7.     qui gen ln_`v' = ln(`v') if `v' > 0
+  8.     local ic_ln `ic_ln' ln_`v'
+  9. }
+
+. 
+. * -------------------------------------------------- (4) UNIVARIATE regressions
+. * Weighted by N_pi so results reflect the analysis-sample distribution.
+. di as text _n "===== UNIVARIATE: inst_mean_FE_dev ~ ln(IC var) [pw=N_pi] ====="
+
+===== UNIVARIATE: inst_mean_FE_dev ~ ln(IC var) [pw=N_pi] =====
+
+. di as text "  Var                          N     R2      beta        se       t"
+  Var                          N     R2      beta        se       t
+
+. tempname univ
+
+. postfile `univ' str32 var  n_uni  r2_uni  b_uni  se_uni  t_uni ///
+>         using `outdir'/univariate_results.dta, replace
+
+. foreach v of local ic_ln {
+  2.     cap reg inst_mean_FE_dev `v' [aw=N_pi]
+  3.     if _rc continue
+  4.     local n  = e(N)
+  5.     local r2 = e(r2)
+  6.     local b  = _b[`v']
+  7.     local se = _se[`v']
+  8.     local t  = `b'/`se'
+  9.     di as text %-28s "`v'" "  " %5.0f `n' "  " %6.3f `r2' "  " %8.4f `b' "  " %8.4f `se' "  " %6.2f `t'
+ 10.     post `univ' ("`v'") (`n') (`r2') (`b') (`se') (`t')
+ 11. }
+ln_contracts_fund               162   0.104    0.0375    0.0087    4.30
+ln_fed_ls_bio_fund              159   0.087    0.0340    0.0088    3.87
+ln_fed_ls_fund                  161   0.034    0.0186    0.0078    2.38
+ln_fed_ls_hs_fund               119   0.005    0.0043    0.0056    0.78
+ln_grants_fund                  163   0.136    0.0509    0.0101    5.03
+ln_hhs_ls_bio_fund              155   0.076    0.0263    0.0074    3.55
+ln_hhs_ls_fund                  160   0.032    0.0153    0.0067    2.28
+ln_hhs_ls_hs_fund               116   0.004    0.0045    0.0063    0.71
+ln_nonfed_ls_bio_fund           158   0.114    0.0389    0.0087    4.47
+ln_nonfed_ls_fund               161   0.034    0.0185    0.0078    2.37
+ln_nonfed_ls_hs_fund            130   0.007    0.0051    0.0053    0.97
+ln_subrecipient_fund            163   0.131    0.0516    0.0105    4.92
+ln_tot_bus_fund                 161   0.180    0.0464    0.0079    5.90
+ln_tot_fed_fund                 163   0.131    0.0510    0.0104    4.92
+ln_tot_fund                     163   0.145    0.0571    0.0109    5.22
+ln_tot_inst_fund                161   0.072    0.0370    0.0105    3.52
+ln_tot_nonprof_fund             161   0.167    0.0429    0.0076    5.65
+ln_tot_state_fund               162   0.006    0.0063    0.0065    0.97
+ln_ls_fund                      161   0.035    0.0194    0.0081    2.40
+ln_hs_fund                      118   0.007    0.0053    0.0060    0.88
+ln_bio_fund                     157   0.096    0.0374    0.0092    4.05
+ln_applied_expend               157   0.027    0.0167    0.0080    2.09
+ln_applied_fed_expend           155   0.028    0.0158    0.0074    2.12
+ln_basic_expend                 163   0.155    0.0484    0.0089    5.43
+ln_basic_fed_expend             163   0.144    0.0452    0.0087    5.21
+ln_clin_trial_expend             86   0.100    0.0187    0.0061    3.06
+ln_dev_expend                   152   0.000    0.0009    0.0059    0.15
+ln_ls_cap_expend                157   0.086    0.0338    0.0088    3.82
+ln_med_sch_expend                67   0.140    0.0375    0.0116    3.25
+ln_endowment                    192   0.193    0.0321    0.0048    6.74
+
+. postclose `univ'
+
+. 
+. preserve
+
+.     use `outdir'/univariate_results.dta, clear
+
+.     gsort -r2_uni
+
+.     gen rank = _n
+
+.     labmask rank, values(var)
+
+.     graph hbar (asis) r2_uni, over(rank, sort(r2_uni) descending label(labsize(vsmall))) ///
+>         ytitle("Univariate R^2 explaining inst mean author FE") ///
+>         blabel(bar, format(%4.2f) size(vsmall)) ///
+>         bar(1, color(ebblue))
+
+.     graph export `outdir'/univariate_r2_bars.pdf, replace
+file ../output/inst_fe_diag/univariate_r2_bars.pdf saved as PDF format
+
+. restore
+
+. 
+. * -------------------------------------------------- (5) JOINT regression
+. di as text _n "===== JOINT: inst_mean_FE_dev ~ ALL ln(IC vars) [pw=N_pi] ====="
+
+===== JOINT: inst_mean_FE_dev ~ ALL ln(IC vars) [pw=N_pi] =====
+
+. reg inst_mean_FE_dev `ic_ln' [aw=N_pi]
+(sum of wgt is 6,281)
+
+      Source |       SS           df       MS      Number of obs   =        57
+-------------+----------------------------------   F(30, 26)       =      4.11
+       Model |  .463014739        30  .015433825   Prob > F        =    0.0002
+    Residual |  .097726266        26  .003758703   R-squared       =    0.8257
+-------------+----------------------------------   Adj R-squared   =    0.6246
+       Total |  .560741005        56  .010013232   Root MSE        =    .06131
+
+---------------------------------------------------------------------------------------
+     inst_mean_FE_dev | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
+----------------------+----------------------------------------------------------------
+    ln_contracts_fund |  -.0037955   .0500188    -0.08   0.940    -.1066105    .0990196
+   ln_fed_ls_bio_fund |   .3688555   .3564696     1.03   0.310    -.3638783    1.101589
+       ln_fed_ls_fund |   1.206796   .8232117     1.47   0.155    -.4853395    2.898932
+    ln_fed_ls_hs_fund |   .1702692   .5602671     0.30   0.764    -.9813764    1.321915
+       ln_grants_fund |   .0549899    .272613     0.20   0.842    -.5053741     .615354
+   ln_hhs_ls_bio_fund |  -.0187571   .0874306    -0.21   0.832    -.1984732     .160959
+       ln_hhs_ls_fund |  -.2355169   .2911738    -0.81   0.426    -.8340332    .3629993
+    ln_hhs_ls_hs_fund |   -.124584   .3916034    -0.32   0.753    -.9295362    .6803683
+ln_nonfed_ls_bio_fund |   .2416479   .1174556     2.06   0.050     .0002144    .4830815
+    ln_nonfed_ls_fund |   .1377465    .288516     0.48   0.637    -.4553066    .7307995
+ ln_nonfed_ls_hs_fund |   .0732777   .1765075     0.42   0.681    -.2895386     .436094
+ ln_subrecipient_fund |  -.0046379   .0527125    -0.09   0.931    -.1129899    .1037141
+      ln_tot_bus_fund |   .0013303   .0427942     0.03   0.975    -.0866345     .089295
+      ln_tot_fed_fund |  -.5270244   .3204852    -1.64   0.112    -1.185791    .1317424
+          ln_tot_fund |   .5622968   .5732282     0.98   0.336    -.6159908    1.740584
+     ln_tot_inst_fund |  -.0030808    .079595    -0.04   0.969    -.1666906     .160529
+  ln_tot_nonprof_fund |   .0318161   .0355294     0.90   0.379    -.0412156    .1048477
+    ln_tot_state_fund |   .0111103   .0166125     0.67   0.510    -.0230371    .0452577
+           ln_ls_fund |  -1.327907   .8616154    -1.54   0.135    -3.098983     .443169
+           ln_hs_fund |  -.1429145   .5185918    -0.28   0.785    -1.208895    .9230662
+          ln_bio_fund |  -.5740714   .4146138    -1.38   0.178    -1.426322    .2781795
+    ln_applied_expend |  -.1535324   .0780454    -1.97   0.060     -.313957    .0068922
+ln_applied_fed_expend |   .1393592   .0730825     1.91   0.068    -.0108641    .2895825
+      ln_basic_expend |   .1277908   .2501579     0.51   0.614    -.3864162    .6419978
+  ln_basic_fed_expend |  -.0809071   .2345085    -0.35   0.733    -.5629463     .401132
+ ln_clin_trial_expend |   .0040472   .0132917     0.30   0.763    -.0232743    .0313687
+        ln_dev_expend |   .0031014   .0165158     0.19   0.853    -.0308474    .0370503
+     ln_ls_cap_expend |    .049665   .0440574     1.13   0.270    -.0408963    .1402263
+    ln_med_sch_expend |   .0745841   .0692349     1.08   0.291    -.0677302    .2168984
+         ln_endowment |    .019917   .0133395     1.49   0.147    -.0075027    .0473367
+                _cons |   .2465133   .7045819     0.35   0.729    -1.201776    1.694802
+---------------------------------------------------------------------------------------
+
+. di as text "Joint R^2 = " %6.3f e(r2) "  N = " e(N)
+Joint R^2 =  0.826  N = 57
+
+. 
+. di as text _n "===== JOINT (standardized) [pw=N_pi] ====="
+
+===== JOINT (standardized) [pw=N_pi] =====
+
+. reg inst_mean_FE_dev `ic_ln' [aw=N_pi], beta
+(sum of wgt is 6,281)
+
+      Source |       SS           df       MS      Number of obs   =        57
+-------------+----------------------------------   F(30, 26)       =      4.11
+       Model |  .463014739        30  .015433825   Prob > F        =    0.0002
+    Residual |  .097726266        26  .003758703   R-squared       =    0.8257
+-------------+----------------------------------   Adj R-squared   =    0.6246
+       Total |  .560741005        56  .010013232   Root MSE        =    .06131
+
+---------------------------------------------------------------------------------------
+     inst_mean_FE_dev | Coefficient  Std. err.      t    P>|t|                     Beta
+----------------------+----------------------------------------------------------------
+    ln_contracts_fund |  -.0037955   .0500188    -0.08   0.940                -.0314645
+   ln_fed_ls_bio_fund |   .3688555   .3564696     1.03   0.310                 3.033599
+       ln_fed_ls_fund |   1.206796   .8232117     1.47   0.155                 8.277518
+    ln_fed_ls_hs_fund |   .1702692   .5602671     0.30   0.764                 1.414973
+       ln_grants_fund |   .0549899    .272613     0.20   0.842                 .3713618
+   ln_hhs_ls_bio_fund |  -.0187571   .0874306    -0.21   0.832                -.1804215
+       ln_hhs_ls_fund |  -.2355169   .2911738    -0.81   0.426                -1.783642
+    ln_hhs_ls_hs_fund |   -.124584   .3916034    -0.32   0.753                -1.054038
+ln_nonfed_ls_bio_fund |   .2416479   .1174556     2.06   0.050                 2.056829
+    ln_nonfed_ls_fund |   .1377465    .288516     0.48   0.637                 1.009079
+ ln_nonfed_ls_hs_fund |   .0732777   .1765075     0.42   0.681                 .6549459
+ ln_subrecipient_fund |  -.0046379   .0527125    -0.09   0.931                -.0315984
+      ln_tot_bus_fund |   .0013303   .0427942     0.03   0.975                 .0117752
+      ln_tot_fed_fund |  -.5270244   .3204852    -1.64   0.112                -3.412871
+          ln_tot_fund |   .5622968   .5732282     0.98   0.336                 3.489807
+     ln_tot_inst_fund |  -.0030808    .079595    -0.04   0.969                 -.022263
+  ln_tot_nonprof_fund |   .0318161   .0355294     0.90   0.379                 .2771265
+    ln_tot_state_fund |   .0111103   .0166125     0.67   0.510                 .1576977
+           ln_ls_fund |  -1.327907   .8616154    -1.54   0.135                -8.747624
+           ln_hs_fund |  -.1429145   .5185918    -0.28   0.785                -1.161319
+          ln_bio_fund |  -.5740714   .4146138    -1.38   0.178                -4.503796
+    ln_applied_expend |  -.1535324   .0780454    -1.97   0.060                -1.785753
+ln_applied_fed_expend |   .1393592   .0730825     1.91   0.068                 1.727719
+      ln_basic_expend |   .1277908   .2501579     0.51   0.614                  .842224
+  ln_basic_fed_expend |  -.0809071   .2345085    -0.35   0.733                  -.55614
+ ln_clin_trial_expend |   .0040472   .0132917     0.30   0.763                 .0524694
+        ln_dev_expend |   .0031014   .0165158     0.19   0.853                 .0342825
+     ln_ls_cap_expend |    .049665   .0440574     1.13   0.270                 .3611278
+    ln_med_sch_expend |   .0745841   .0692349     1.08   0.291                 .6286245
+         ln_endowment |    .019917   .0133395     1.49   0.147                 .3076791
+                _cons |   .2465133   .7045819     0.35   0.729                        .
+---------------------------------------------------------------------------------------
+
+. 
+. * -------------------------------------------------- (6) correlation structure
+. di as text _n "===== VIF from joint regression ====="
+
+===== VIF from joint regression =====
+
+. qui reg inst_mean_FE_dev `ic_ln' [aw=N_pi]
+
+. vif
+
+    Variable |       VIF       1/VIF  
+-------------+----------------------
+  ln_ls_fund |   4806.14    0.000208
+ln_f~ls_fund |   4756.41    0.000210
+ln_f~hs_fund |   3233.99    0.000309
+  ln_hs_fund |   2649.27    0.000377
+ ln_tot_fund |   1888.21    0.000530
+ln_h~hs_fund |   1637.59    0.000611
+ ln_bio_fund |   1578.47    0.000634
+ln_fe~o_fund |   1282.25    0.000780
+ln_h~ls_fund |    725.44    0.001378
+ln_n~ls_fund |    666.43    0.001501
+ln_tot_fed~d |    642.57    0.001556
+ln_grants_~d |    505.65    0.001978
+ln_basic_e~d |    405.52    0.002466
+ln_basic_f~d |    387.65    0.002580
+ln_n~hs_fund |    371.29    0.002693
+ln_no~o_fund |    149.11    0.006707
+l~ied_expend |    122.93    0.008135
+ln_applied.. |    122.47    0.008165
+ln_hh~o_fund |    105.51    0.009478
+ln_med_sch~d |     50.80    0.019685
+ln_tot_ins~d |     49.35    0.020261
+ln_contrac~d |     25.65    0.038985
+ln_tot_bus~d |     21.41    0.046714
+ln_subreci~d |     19.24    0.051970
+ln_ls_cap_~d |     15.31    0.065315
+ln_tot_non~d |     14.29    0.069990
+ln_tot_sta~d |      8.29    0.120561
+ln_endowment |      6.34    0.157852
+ln_dev_exp~d |      4.97    0.201121
+ln_clin_tr~d |      4.43    0.225742
+-------------+----------------------
+    Mean VIF |    875.23
+
+. 
+. di as text _n "===== PCA of standardized IC vars ====="
+
+===== PCA of standardized IC vars =====
+
+. pca `ic_ln', components(6)
+
+Principal components/correlation                 Number of obs    =         57
+                                                 Number of comp.  =          6
+                                                 Trace            =         30
+    Rotation: (unrotated = principal)            Rho              =     0.9430
+
+    --------------------------------------------------------------------------
+       Component |   Eigenvalue   Difference         Proportion   Cumulative
+    -------------+------------------------------------------------------------
+           Comp1 |      23.6171      21.8288             0.7872       0.7872
+           Comp2 |       1.7883      .711016             0.0596       0.8468
+           Comp3 |      1.07728       .35414             0.0359       0.8828
+           Comp4 |      .723141       .12941             0.0241       0.9069
+           Comp5 |      .593732      .102444             0.0198       0.9267
+           Comp6 |      .491288      .136663             0.0164       0.9430
+           Comp7 |      .354625      .033418             0.0118       0.9549
+           Comp8 |      .321207     .0457938             0.0107       0.9656
+           Comp9 |      .275413     .0823782             0.0092       0.9747
+          Comp10 |      .193035     .0544043             0.0064       0.9812
+          Comp11 |       .13863    .00384432             0.0046       0.9858
+          Comp12 |      .134786     .0677332             0.0045       0.9903
+          Comp13 |      .067053    .00721151             0.0022       0.9925
+          Comp14 |     .0598414     .0156767             0.0020       0.9945
+          Comp15 |     .0441647     .0147681             0.0015       0.9960
+          Comp16 |     .0293966    .00532221             0.0010       0.9970
+          Comp17 |     .0240744    .00526147             0.0008       0.9978
+          Comp18 |     .0188129    .00322397             0.0006       0.9984
+          Comp19 |     .0155889    .00346711             0.0005       0.9989
+          Comp20 |     .0121218    .00264759             0.0004       0.9993
+          Comp21 |    .00947423    .00518246             0.0003       0.9996
+          Comp22 |    .00429177    .00162006             0.0001       0.9998
+          Comp23 |    .00267171    .00128432             0.0001       0.9999
+          Comp24 |    .00138739   .000214595             0.0000       0.9999
+          Comp25 |    .00117279    .00056201             0.0000       1.0000
+          Comp26 |   .000610782   .000261529             0.0000       1.0000
+          Comp27 |   .000349253  .0000886278             0.0000       1.0000
+          Comp28 |   .000260625   .000149933             0.0000       1.0000
+          Comp29 |   .000110692  .0000761786             0.0000       1.0000
+          Comp30 |  .0000345139            .             0.0000       1.0000
+    --------------------------------------------------------------------------
+
+Principal components (eigenvectors) 
+
+    ----------------------------------------------------------------------------------------
+        Variable |    Comp1     Comp2     Comp3     Comp4     Comp5     Comp6 | Unexplained 
+    -------------+------------------------------------------------------------+-------------
+    ln_contrac~d |   0.1755    0.2222   -0.0425   -0.1761    0.1369    0.0181 |       .1484 
+    ln_fe~o_fund |   0.1884   -0.1140    0.0793    0.3509   -0.0313    0.0009 |      .04189 
+    ln_f~ls_fund |   0.2012   -0.1094    0.0489   -0.0614   -0.0626    0.0115 |      .01455 
+    ln_f~hs_fund |   0.1922   -0.1655    0.0332   -0.2794   -0.0584    0.1103 |      .01296 
+    ln_grants_~d |   0.2017    0.0573    0.0242   -0.0699    0.0573   -0.1739 |      .01204 
+    ln_hh~o_fund |   0.1783   -0.2331    0.0709    0.3377   -0.0925    0.1688 |      .04468 
+    ln_h~ls_fund |   0.1983   -0.1519    0.0782   -0.0938   -0.0375    0.0603 |      .01483 
+    ln_h~hs_fund |   0.1924   -0.1591    0.0452   -0.2752   -0.0512    0.1177 |      .01498 
+    ln_no~o_fund |   0.1797    0.0807   -0.1277    0.4389   -0.0764    0.0380 |      .06433 
+    ln_n~ls_fund |   0.1958    0.0332   -0.1968    0.0704   -0.1150    0.0839 |       .0359 
+    ln_n~hs_fund |   0.1867   -0.1495   -0.2025   -0.0801   -0.1292    0.2697 |      .04227 
+    ln_subreci~d |   0.1884    0.1480    0.0608   -0.1137   -0.0487   -0.2905 |      .06607 
+    ln_tot_bus~d |   0.1818    0.0761   -0.1260   -0.0794    0.3145   -0.0142 |       .1286 
+    ln_tot_fed~d |   0.1999    0.0800    0.0663   -0.1099    0.0315   -0.1911 |      .01288 
+     ln_tot_fund |   0.2002    0.1276   -0.0313   -0.0617   -0.0248   -0.1815 |     .003487 
+    ln_tot_ins~d |   0.1702    0.2188   -0.1514    0.0716   -0.3704   -0.2411 |       .0919 
+    ln_tot_non~d |   0.1927    0.0252   -0.0368   -0.0766    0.1339   -0.0348 |       .1053 
+    ln_tot_sta~d |   0.1088    0.3829   -0.4375    0.1644    0.4064    0.1584 |       .1221 
+      ln_ls_fund |   0.2035   -0.0592   -0.0477   -0.0138   -0.0886    0.0312 |     .007965 
+      ln_hs_fund |   0.1943   -0.1586   -0.0590   -0.2157   -0.0834    0.1595 |     .009647 
+     ln_bio_fund |   0.1909   -0.0533    0.0122    0.3959   -0.0560   -0.0110 |      .01908 
+    l~ied_expend |   0.1450    0.3729    0.4060    0.0636   -0.1253    0.2132 |       .0428 
+    ln_applied.. |   0.1419    0.3365    0.5057    0.0195   -0.0786    0.1767 |      .02739 
+    ln_basic_e~d |   0.1930    0.0225   -0.1905   -0.0294   -0.0881   -0.3190 |      .02499 
+    ln_basic_f~d |   0.1954   -0.0334   -0.1051   -0.0600   -0.0333   -0.2899 |      .04003 
+    ln_clin_tr~d |   0.1630   -0.1819    0.0324    0.0954    0.4819    0.2071 |       .1469 
+    ln_dev_exp~d |   0.1622    0.2343    0.1520   -0.1299    0.2354    0.1248 |       .2026 
+    ln_ls_cap_~d |   0.1922   -0.0389   -0.0590    0.0614   -0.1885    0.1570 |      .08482 
+    ln_med_sch~d |   0.1920   -0.2109   -0.0092   -0.1068    0.0192    0.1638 |      .02777 
+    ln_endowment |   0.1285   -0.3120    0.3694    0.1728    0.3548   -0.4387 |      .09792 
+    ----------------------------------------------------------------------------------------
+
+. 
+. predict pc1 pc2 pc3, score
+(3 components skipped)
+
+Scoring coefficients 
+    sum of squares(column-loading) = 1
+
+    --------------------------------------------------------------------------
+        Variable |    Comp1     Comp2     Comp3     Comp4     Comp5     Comp6 
+    -------------+------------------------------------------------------------
+    ln_contrac~d |   0.1755    0.2222   -0.0425   -0.1761    0.1369    0.0181 
+    ln_fe~o_fund |   0.1884   -0.1140    0.0793    0.3509   -0.0313    0.0009 
+    ln_f~ls_fund |   0.2012   -0.1094    0.0489   -0.0614   -0.0626    0.0115 
+    ln_f~hs_fund |   0.1922   -0.1655    0.0332   -0.2794   -0.0584    0.1103 
+    ln_grants_~d |   0.2017    0.0573    0.0242   -0.0699    0.0573   -0.1739 
+    ln_hh~o_fund |   0.1783   -0.2331    0.0709    0.3377   -0.0925    0.1688 
+    ln_h~ls_fund |   0.1983   -0.1519    0.0782   -0.0938   -0.0375    0.0603 
+    ln_h~hs_fund |   0.1924   -0.1591    0.0452   -0.2752   -0.0512    0.1177 
+    ln_no~o_fund |   0.1797    0.0807   -0.1277    0.4389   -0.0764    0.0380 
+    ln_n~ls_fund |   0.1958    0.0332   -0.1968    0.0704   -0.1150    0.0839 
+    ln_n~hs_fund |   0.1867   -0.1495   -0.2025   -0.0801   -0.1292    0.2697 
+    ln_subreci~d |   0.1884    0.1480    0.0608   -0.1137   -0.0487   -0.2905 
+    ln_tot_bus~d |   0.1818    0.0761   -0.1260   -0.0794    0.3145   -0.0142 
+    ln_tot_fed~d |   0.1999    0.0800    0.0663   -0.1099    0.0315   -0.1911 
+     ln_tot_fund |   0.2002    0.1276   -0.0313   -0.0617   -0.0248   -0.1815 
+    ln_tot_ins~d |   0.1702    0.2188   -0.1514    0.0716   -0.3704   -0.2411 
+    ln_tot_non~d |   0.1927    0.0252   -0.0368   -0.0766    0.1339   -0.0348 
+    ln_tot_sta~d |   0.1088    0.3829   -0.4375    0.1644    0.4064    0.1584 
+      ln_ls_fund |   0.2035   -0.0592   -0.0477   -0.0138   -0.0886    0.0312 
+      ln_hs_fund |   0.1943   -0.1586   -0.0590   -0.2157   -0.0834    0.1595 
+     ln_bio_fund |   0.1909   -0.0533    0.0122    0.3959   -0.0560   -0.0110 
+    l~ied_expend |   0.1450    0.3729    0.4060    0.0636   -0.1253    0.2132 
+    ln_applied.. |   0.1419    0.3365    0.5057    0.0195   -0.0786    0.1767 
+    ln_basic_e~d |   0.1930    0.0225   -0.1905   -0.0294   -0.0881   -0.3190 
+    ln_basic_f~d |   0.1954   -0.0334   -0.1051   -0.0600   -0.0333   -0.2899 
+    ln_clin_tr~d |   0.1630   -0.1819    0.0324    0.0954    0.4819    0.2071 
+    ln_dev_exp~d |   0.1622    0.2343    0.1520   -0.1299    0.2354    0.1248 
+    ln_ls_cap_~d |   0.1922   -0.0389   -0.0590    0.0614   -0.1885    0.1570 
+    ln_med_sch~d |   0.1920   -0.2109   -0.0092   -0.1068    0.0192    0.1638 
+    ln_endowment |   0.1285   -0.3120    0.3694    0.1728    0.3548   -0.4387 
+    --------------------------------------------------------------------------
+
+. reg inst_mean_FE_dev pc1 pc2 pc3 [aw=N_pi]
+(sum of wgt is 6,281)
+
+      Source |       SS           df       MS      Number of obs   =        57
+-------------+----------------------------------   F(3, 53)        =      7.62
+       Model |  .169028897         3  .056342966   Prob > F        =    0.0003
+    Residual |  .391712108        53  .007390794   R-squared       =    0.3014
+-------------+----------------------------------   Adj R-squared   =    0.2619
+       Total |  .560741005        56  .010013232   Root MSE        =    .08597
+
+------------------------------------------------------------------------------
+inst_mean_~v | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         pc1 |   .0201576   .0042382     4.76   0.000     .0116568    .0286583
+         pc2 |  -.0075491   .0102952    -0.73   0.467    -.0281987    .0131006
+         pc3 |   -.004997   .0116268    -0.43   0.669    -.0283173    .0183234
+       _cons |   .0035119   .0176751     0.20   0.843      -.03194    .0389637
+------------------------------------------------------------------------------
+
+. di as text _n "===== R^2 from top-3 PCs = " %6.3f e(r2) " ====="
+
+===== R^2 from top-3 PCs =  0.301 =====
+
+. 
+. log close
+      name:  <unnamed>
+       log:  /n/holylabs/pakes_lab/Lab/sci_eq/analysis/rf_heterogeneity/code/../output/inst_fe_diag/inst_fe_diag.log
+  log type:  text
+ closed on:  23 Jul 2026, 11:38:24
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+. 
+end of do-file

@@ -94,17 +94,38 @@ program overlay_hist
         local sd_imean   : di %6.3f r(sd)
     restore
 
-    tw kdensity b if sample == 1, color(ebblue%70) lwidth(medthick) || ///
-       kdensity b if sample == 2, color(gs10%80) lwidth(medthick) lpattern(dash) ///
-       xtitle("DiD Coefficient (log `outcome')") ///
-       ytitle("Density") ///
-       xlab(-0.6(0.1)0.6) ///
-       xline(0, lcolor(gs6) lpattern(dash)) ///
-       xline(`mean_r_raw', lcolor(edkblue) lpattern(solid) lwidth(medthin)) ///
-       legend(on order(1 "Actual Treatment Effects (N=`N_r', mean=`mean_r', sd=`sd_r')" ///
-                       2 "Placebo Treatment Effects (N=`N_p', mean=`mean_p', sd=`sd_p')") ///
-              pos(7) ring(1) region(fcolor(none)) size(small))
-    graph export ../output/figures/did_coefs_overlay_kdens_eb`suf'.pdf, replace
+    // Evaluate both densities on a common grid so the gap between them can be
+    // shaded with rarea: blue where the real density exceeds the placebo,
+    // gray where the placebo exceeds the real.
+    preserve
+        qui sum b
+        local gmin  = r(min)
+        local gmax  = r(max)
+        local ngrid = 400
+        if _N < `ngrid' set obs `ngrid'
+        gen xgrid = `gmin' + (`gmax' - `gmin') * (_n - 1) / (`ngrid' - 1) in 1/`ngrid'
+        kdensity b if sample == 1, nograph at(xgrid) gen(dens_r)
+        kdensity b if sample == 2, nograph at(xgrid) gen(dens_p)
+
+        gen hi_r = dens_r if dens_r >= dens_p
+        gen lo_r = dens_p if dens_r >= dens_p
+        gen hi_p = dens_p if dens_p >  dens_r
+        gen lo_p = dens_r if dens_p >  dens_r
+
+        tw rarea hi_r lo_r xgrid, color(ebblue%25) lwidth(none) || ///
+           rarea hi_p lo_p xgrid, color(gs12%50) lwidth(none) || ///
+           line dens_r xgrid, color(ebblue%70) lwidth(medthick) || ///
+           line dens_p xgrid, color(gs10%80) lwidth(medthick) lpattern(dash) ///
+           xtitle("DiD Coefficient (log `outcome')") ///
+           ytitle("Density") ///
+           xlab(-0.6(0.1)0.6) ///
+           xline(0, lcolor(gs6) lpattern(dash)) ///
+           xline(`mean_r_raw', lcolor(edkblue) lpattern(solid) lwidth(medthin)) ///
+           legend(on order(3 "Actual Treatment Effects (N=`N_r', mean=`mean_r', sd=`sd_r')" ///
+                           4 "Placebo Treatment Effects (N=`N_p', mean=`mean_p', sd=`sd_p')") ///
+                  pos(7) ring(1) region(fcolor(none)) size(small))
+        graph export ../output/figures/did_coefs_overlay_kdens_eb`suf'.pdf, replace
+    restore
 
     // Companion figure: histogram of the placebo iteration means with the
     // observed mean overlaid -- this is the actual reference distribution for

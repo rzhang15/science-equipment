@@ -7,7 +7,7 @@ pause on
 set seed 8975
 
 program main
-    foreach s in top_jrnls { //} all_jrnls_no_clin top_jrnls top_jrnls_no_clin { 
+    foreach s in all_jrnls { //} all_jrnls_no_clin top_jrnls top_jrnls_no_clin { 
         local t year
         make_panel, time(`t') last(1) samp(`s') us(1)
         merge_ipeds, time(`t') last(1) samp(`s') us(1)
@@ -136,6 +136,11 @@ program make_panel
         keep if country_code == "US" & !mi(msa_comb)
     }
     *gen cns_impact_cite_affl_wt = impact_cite_affl_wt if cns == 1
+    preserve
+    keep athr_id athr_name
+    bys athr_id (athr_name): keep if _n == 1
+    save ../temp/athr_names_`samp'`suf', replace
+    restore
     preserve
     gcontract pmid `time' athr_id msa_comb inst_id
     drop _freq
@@ -274,6 +279,7 @@ program make_panel
 /*    foreach var in term1 term2 gen_mesh1 gen_mesh2 qualifier_name1 qualifier_name2 {
         bys athr_id (`time') : replace `var' = `var'[_n-1] if mi(`var') & !mi(`var'[_n-1])
     }*/
+    merge m:1 athr_id using ../temp/athr_names_`samp'`suf', keep(1 3) nogen
     save ../output/athr_panel_full_comb_`time'`suf'_`samp', replace
     restore
     preserve
@@ -331,6 +337,7 @@ program make_panel
 /*    foreach var in term1 term2 gen_mesh1 gen_mesh2 qualifier_name1 qualifier_name2 {
         bys athr_id (`time') : replace `var' = `var'[_n-1] if mi(`var') & !mi(`var'[_n-1])
     }*/
+    merge m:1 athr_id using ../temp/athr_names_`samp'`suf', keep(1 3) nogen
     save ../output/athr_panel_full_`time'`suf'_`samp', replace
     restore
 end

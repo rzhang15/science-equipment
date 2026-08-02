@@ -1,0 +1,243 @@
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  /n/holylabs/pakes_lab/Lab/sci_eq/analysis/reduced_form/code/build_public_samp.log
+  log type:  text
+ opened on:  26 Jul 2026, 23:30:07
+
+. restrict_samp, samp(all_jrnls) r1r2(1) public(1)
+(file ../temp/athr_any_all_jrnls_r1_r2_public.dta not found)
+file ../temp/athr_any_all_jrnls_r1_r2_public.dta saved
+
+Duplicates in terms of all variables
+
+(2,201,956 observations deleted)
+(file ../temp/athr_min_year_any_all_jrnls_r1_r2_public.dta not found)
+file ../temp/athr_min_year_any_all_jrnls_r1_r2_public.dta saved
+(85,455 observations deleted)
+(478,708 observations deleted)
+(221,595 observations deleted)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                           130,076  
+    -----------------------------------------
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                       129,103
+        from master                   129,103  
+        from using                          0  
+
+    Matched                               973  
+    -----------------------------------------
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                           130,076  
+    -----------------------------------------
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                           130,076  
+    -----------------------------------------
+(0 real changes made)
+(129,103 missing values generated)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                           130,076  
+    -----------------------------------------
+(895 real changes made)
+(0 real changes made)
+
+                       (sum) exposure
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%    -.0867337      -.2588701
+ 5%    -.0323845      -.0867337
+10%    -.0073711       -.074481       Obs                 145
+25%     .0025054      -.0548414       Sum of wgt.         145
+
+50%     .0124005                      Mean           .0244958
+                        Largest       Std. dev.       .053603
+75%     .0355725       .1687062
+90%     .0882663        .185364       Variance       .0028733
+95%     .1148049       .1928698       Skewness       .3492498
+99%     .1928698       .2591545       Kurtosis       10.90401
+
+                           imputed
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%    -.0704284      -.2334289
+ 5%    -.0175718      -.1978788
+10%    -.0065976      -.1832206       Obs              29,173
+25%     .0055922      -.1752384       Sum of wgt.      29,173
+
+50%      .021607                      Mean           .0313405
+                        Largest       Std. dev.      .0414072
+75%     .0527971       .3817245
+90%     .0897063       .3817245       Variance       .0017146
+95%     .1111918       .3817245       Skewness       .6404487
+99%      .147719       .3817245       Kurtosis       5.546976
+
+                     (sum) mkt_spend_shr
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%     .0244392       .0100839
+ 5%     .0497882       .0244392
+10%     .0894406       .0273335       Obs                 145
+25%     .1546795        .028094       Sum of wgt.         145
+
+50%      .248092                      Mean           .2776371
+                        Largest       Std. dev.      .1635072
+75%      .361081       .6261557
+90%     .4807475        .653486       Variance       .0267346
+95%      .617501       .6841812       Skewness       .9866793
+99%     .6841812              1       Kurtosis       4.788283
+
+                    imputed_mkt_spend_shr
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%     .0911501              0
+ 5%      .141389              0
+10%     .1667989              0       Obs              29,173
+25%     .2213141              0       Sum of wgt.      29,173
+
+50%     .2868989                      Mean           .3004125
+                        Largest       Std. dev.      .1141611
+75%     .3606667              1
+90%     .4556439              1       Variance       .0130328
+95%     .5230143              1       Skewness       .6887323
+99%     .6113974              1       Kurtosis       3.807596
+file ../output/figures/all_jrnls/exposure_dist_r1_r2_public.pdf saved as PDF format
+file ../output/figures/all_jrnls/mkt_spend_shr_dist_r1_r2_public.pdf saved as PDF format
+(973 real changes made)
+(973 real changes made)
+(63,193 observations deleted)
+(5,257 observations deleted)
+file ../temp/athr_xw.dta saved
+
+Panel variable: athr (unbalanced)
+ Time variable: year, 2010 to 2019, but with gaps
+         Delta: 1 unit
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                            85,910  
+    -----------------------------------------
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                        11,619
+        from master                    11,619  
+        from using                          0  
+
+    Matched                            74,291  
+    -----------------------------------------
+(24,284 real changes made)
+(24,284 real changes made)
+(24,284 real changes made)
+(11,619 real changes made)
+(11,619 real changes made)
+(11,619 real changes made)
+(11,619 real changes made)
+(11,619 real changes made)
+(11,619 real changes made)
+(51,546 missing values generated)
+(9,340 observations deleted)
+(0 observations deleted)
+(0 observations deleted)
+(30 observations deleted)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                        18,849
+        from master                    18,849  
+        from using                          0  
+
+    Matched                            57,691  
+    -----------------------------------------
+(18,849 real changes made)
+(9,432 real changes made, 9,432 to missing)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                        36,550
+        from master                    36,550  
+        from using                          0  
+
+    Matched                            39,990  
+    -----------------------------------------
+(36,550 real changes made)
+(20,140 missing values generated)
+(0 real changes made)
+(46,313 real changes made)
+(51,250 real changes made)
+(668 real changes made)
+restrict_samp all_jrnls_r1_r2_public winsorized cite_affl_wt at pre-period p99=32.14561033248901
+(403 real changes made)
+restrict_samp all_jrnls_r1_r2_public winsorized affl_wt at pre-period p99=9
+(817 real changes made)
+restrict_samp all_jrnls_r1_r2_public winsorized cite_affl_wt_any at pre-period p99=11.40122336149216
+(1,045 real changes made)
+restrict_samp all_jrnls_r1_r2_public winsorized affl_wt_any at pre-period p99=3.505591712892056
+(1,004 real changes made)
+restrict_samp all_jrnls_r1_r2_public winsorized cite_affl_wt_notlast at pre-period p99=3.209803342819214
+(1,416 real changes made)
+restrict_samp all_jrnls_r1_r2_public winsorized affl_wt_notlast at pre-period p99=.9159091114997864
+  variable num_coauthors_same_msa was float now byte
+  variable top_15 was float now byte
+  variable has_top_15 was float now byte
+  variable name_id was float now byte
+  variable max_year was float now int
+  variable athr_indicator was float now byte
+  variable num_yrs_pre was float now byte
+  variable tot_yrs was float now byte
+  variable plc_cntr was float now byte
+  variable num_place was float now byte
+  variable athr was float now int
+  variable public was float now byte
+  variable min_year was float now int
+  variable min_year_any was float now int
+  variable foia_athr was float now byte
+  variable pre_ppr_cnt was float now byte
+  variable pre_ppr_cnt_sum was float now byte
+  variable age_2014 was float now byte
+  variable num_grants was float now int
+  variable ppr_cnt_notlast was float now byte
+  variable ppr_cnt was double now byte
+  variable cns was double now byte
+  variable affl_wt was double now byte
+  variable pat_affl_wt was double now int
+  variable body_affl_wt was double now int
+  variable front_affl_wt was double now int
+  variable patent_count was double now int
+  variable front_only was double now int
+  variable body_only was double now int
+  variable tot_authors was double now long
+  variable msa_size was double now long
+  variable unbal_msa_size was double now int
+  variable ppr_cnt_any was double now byte
+  variable n_first_ppr was double now byte
+  variable n_middle_ppr was double now byte
+  variable n_last_ppr was double now byte
+  variable region was str28 now str14
+  variable country was str33 now str13
+  variable city was str45 now str15
+  variable inst was str191 now str58
+  athr_name is strL now coalesced
+  (26,888,714 bytes saved)
+(file ../output/prepped_samples/es_all_jrnls_r1_r2_public.dta not found)
+file ../output/prepped_samples/es_all_jrnls_r1_r2_public.dta saved
+
+. log close
+      name:  <unnamed>
+       log:  /n/holylabs/pakes_lab/Lab/sci_eq/analysis/reduced_form/code/build_public_samp.log
+  log type:  text
+ closed on:  26 Jul 2026, 23:33:50
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

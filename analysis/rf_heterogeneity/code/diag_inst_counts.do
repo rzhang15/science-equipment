@@ -22,7 +22,7 @@ log using diag_inst_counts.log, replace text
 * ============================================================================
 
 local samp all_jrnls
-local suf  _r1_public
+local suf  _r1
 
 * ---- (1) crosswalk universe ----
 import delimited ../external/college/ipeds_openalex.csv, ///

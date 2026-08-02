@@ -1,0 +1,499 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 120,000; see help set_maxvar.
+
+. do analysis.do figures 
+
+. set more off
+
+. clear all
+
+. capture log close
+
+. program drop _all
+
+. version 16.1
+
+. set scheme modern
+
+. set linesize 200
+
+. set maxvar 20000
+
+
+. 
+. * ============================================================================
+. * Institution-level heterogeneity in the 2014 procurement shock.
+. *
+. * PI i sits in institution j(i); institution LEVELS are collinear with the
+. * author FE (no movers), so only post-2014 objects are identified.
+. *
+. *   SPEC 1  E[Y_it] = exp(a_i + d_t + b*Z_it + g*Zs_it + pi_j * Post_t)
+. *   SPEC 2  E[Y_it] = exp(a_i + d_t + b*Z_it + g*Zs_it + pi_j * Post_t
+. *                         + beta_j * Z_it)
+. *
+. * Z_it = exposure x Post, Zs_it = mkt_spend_shr x Post (pooled control).
+. * pi_j   = institution-specific post shift at zero exposure.
+. * beta_j = institution-specific exposure slope; spec 2's response line is
+. *          Delta_j(E) = pi_j + beta_j * E, so pi_j stays in spec 2 to stop
+. *          beta_j from absorbing level shifts.
+. *
+. * Only relative effects are identified (sum_j PD_j = Post is absorbed by the
+. * year FE; sum_j PX_j = Z_it), so one institution is omitted. inst_ord is
+. * built so level 1 IS the median institution by pre-2014 research output, and
+. * the PD_/PX_ dummies simply skip level 1 -- so every pi_j / beta_j reads as
+. * a deviation from the median-output institution, b[Z_it] is that
+. * institution's own slope, and slope_j = b + beta_j is institution j's
+. * exposure response in levels.
+. *
+. * The dummies are built by hand rather than as i.inst_ord#i.post: factor
+. * expansion puts the base at the single (inst 1, post 0) CELL, keeps a term
+. * for every post level, and the author FE then makes the post==1 branch
+. * collinear -- ppmlhdfe estimates the PRE dummies and omits every post shift.
+. * ============================================================================
+. 
+. global YVAR    ppr_cnt
+
+. global SAMPLE  es_all_jrnls_r1_r2
+
+. global MIN_PI  10
+
+. * 1 = reuse ../temp/panel.dta + inst_xw.dta from a previous run instead of
+. * rebuilding them. Only valid while prep_panel is unchanged.
+. global REUSE_PANEL 1
+
+. * `do analysis.do figures' redraws the figures from saved estimates only.
+. global FIGURES_ONLY 0
+
+. if "`1'" == "figures" global FIGURES_ONLY 1
+
+. 
+. program main
+  1.     cap mkdir ../output
+  2.     cap mkdir ../output/tables
+  3.     cap mkdir ../output/figures
+  4.     cap mkdir ../temp
+  5. 
+.     * `do analysis.do figures' replots from ../temp/inst_effects_all.dta
+.     * without re-estimating, and writes its own log so the estimation log
+.     * survives.
+.     if "$FIGURES_ONLY" == "1" {
+  6.         log using ../output/replot.log, replace text
+  7.         di as text "FIGURES_ONLY: replotting from ../temp/inst_effects_all.dta"
+  8.         use ../temp/inst_effects_all.dta, clear
+  9.         figures
+ 10.         log close
+ 11.         exit
+ 12.     }
+ 13. 
+.     log using ../output/inst_level.log, replace text
+ 14.     if "$REUSE_PANEL" == "1" load_panel_meta
+ 15.     else                     prep_panel
+ 16.     estimate_spec, spec(1)
+ 17.     estimate_spec, spec(2)
+ 18.     report
+ 19.     output_tables
+ 20. 
+.     log close
+ 21. end
+
+. 
+. * ---------------------------------------------------------------- panel prep
+. program load_panel_meta
+  1.     confirm file ../temp/panel.dta
+  2.     use ../temp/inst_xw.dta, clear
+  3.     sort inst_ord
+  4.     qui count
+  5.     global N_INST = r(N)
+  6.     di as text "reusing ../temp/panel.dta: $N_INST institutions" ///
+>         ", reference (inst_ord 1) = " inst_base[1] ", n_pi = " n_pi[1]
+  7. end
+
+. 
+. program prep_panel
+  1.     use ../external/prepped_samples/${SAMPLE}.dta, clear
+  2. 
+.     preserve
+  3.         contract athr_id inst_id
+  4.         egen byte _t = tag(athr_id)
+  5.         bys athr_id: gen k = _N
+  6.         qui count if _t & k > 1
+  7.         di as text "movers (PIs with >1 inst_id): " r(N)
+  8.     restore
+  9. 
+.     preserve
+ 10.         gen byte pre = year < 2014
+ 11.         contract athr_id inst_id pre
+ 12.         gsort athr_id -pre -_freq inst_id
+ 13.         by athr_id: keep if _n == 1
+ 14.         rename inst_id inst_base
+ 15.         keep athr_id inst_base
+ 16.         save ../temp/inst_base.dta, replace
+ 17.     restore
+ 18.     merge m:1 athr_id using ../temp/inst_base.dta, nogen
+ 19. 
+.     gen byte   post       = year >= 2014
+ 20.     gen double Z_it       = exposure      * post
+ 21.     gen double Z_share_it = mkt_spend_shr * post
+ 22. 
+.     egen byte _tagA = tag(inst_base athr_id)
+ 23.     bys inst_base: egen n_pi = total(_tagA)
+ 24.     bys inst_base: egen double _sx = total(cond(_tagA, exposure, 0))
+ 25.     gen double mean_exp = _sx / n_pi
+ 26.     drop _tagA _sx
+ 27.     bys inst_base: egen double pre_out = total(cond(year < 2014, $YVAR, 0))
+ 28. 
+.     qui count
+ 29.     di as text "input panel: N = " r(N)
+ 30. 
+.     * inst_ord: median-output institution first, then the rest by ascending
+.     * pre-2014 output. Level 1 is the omitted reference.
+.     preserve
+ 31.         keep inst_base n_pi pre_out mean_exp
+ 32.         duplicates drop inst_base, force
+ 33.         gen byte elig = n_pi >= $MIN_PI
+ 34.         qui count if elig
+ 35.         local n_elig = r(N)
+ 36.         sort pre_out inst_base
+ 37.         gen long r_elig = sum(elig) if elig
+ 38.         local med = ceil(`n_elig'/2)
+ 39.         gen byte is_med = (r_elig == `med') & elig == 1
+ 40.         replace is_med = 0 if mi(is_med)
+ 41.         gsort -is_med pre_out inst_base
+ 42.         gen long inst_ord = _n
+ 43.         qui count
+ 44.         global N_INST = r(N)
+ 45.         di as text "institutions: $N_INST total, `n_elig' with n_pi >= $MIN_PI"
+ 46.         di as text "reference institution (inst_ord 1): " inst_base[1] ///
+>             ", rank `med' of `n_elig' by pre-2014 output = " %9.0f pre_out[1] ///
+>             ", n_pi = " n_pi[1]
+ 47.         drop elig r_elig is_med
+ 48.         order inst_ord inst_base
+ 49.         sort inst_ord
+ 50.         save ../temp/inst_xw.dta, replace
+ 51.     restore
+ 52. 
+.     merge m:1 inst_base using ../temp/inst_xw.dta, keepusing(inst_ord) nogen
+ 53.     save ../temp/panel.dta, replace
+ 54. end
+
+. 
+. * ------------------------------------------------------------------ estimate
+. program estimate_spec
+  1.     syntax, spec(int)
+  2.     use ../temp/panel.dta, clear
+  3. 
+.     forval j = 2/$N_INST {
+  4.         qui gen byte PD_`j' = (inst_ord == `j') * post
+  5.         if `spec' == 2 qui gen double PX_`j' = (inst_ord == `j') * Z_it
+  6.     }
+  7.     local rhs Z_it Z_share_it PD_*
+  8.     if `spec' == 2 local rhs `rhs' PX_*
+  9. 
+.     di as text _n "===== SPEC `spec': ppmlhdfe $YVAR `rhs', absorb(athr_id year) ====="
+ 10.     ppmlhdfe $YVAR `rhs', absorb(athr_id year) vce(cluster athr_id)
+ 11.     estimates save ../temp/est_spec`spec'.ster, replace
+ 12. 
+.     local b_x   = _b[Z_it]
+ 13.     local se_x  = _se[Z_it]
+ 14.     local b_s   = _b[Z_share_it]
+ 15.     local se_s  = _se[Z_share_it]
+ 16.     local N     = e(N)
+ 17.     local r2    = e(r2_p)
+ 18. 
+.     qui testparm PD_*
+ 19.     local chi_d = r(chi2)
+ 20.     local df_d  = r(df)
+ 21.     local p_d   = r(p)
+ 22.     di as text "joint test pi_j = 0: chi2(`df_d') = " %9.2f `chi_d' "  p = " %6.4f `p_d'
+ 23. 
+.     local chi_x = .
+ 24.     local df_x  = .
+ 25.     local p_x   = .
+ 26.     if `spec' == 2 {
+ 27.         qui testparm PX_*
+ 28.         local chi_x = r(chi2)
+ 29.         local df_x  = r(df)
+ 30.         local p_x   = r(p)
+ 31.         di as text "joint test beta_j = 0: chi2(`df_x') = " %9.2f `chi_x' "  p = " %6.4f `p_x'
+ 32.     }
+ 33. 
+.     gen byte smp = e(sample)
+ 34.     preserve
+ 35.         keep if smp
+ 36.         egen byte _t = tag(inst_ord athr_id)
+ 37.         bys inst_ord: egen n_pi_es = total(_t)
+ 38.         bys inst_ord: gen N_es = _N
+ 39.         keep inst_ord n_pi_es N_es
+ 40.         duplicates drop inst_ord, force
+ 41.         qui count
+ 42.         di as text "institutions in e(sample): " r(N) " of $N_INST"
+ 43.         save ../temp/aux_es`spec'.dta, replace
+ 44.     restore
+ 45. 
+.     * Institutions dropped by ppmlhdfe come back either absent from e(b) or
+.     * as an exact 0 with se 0; the se > 0 screen in report() separates those
+.     * from real estimates. inst_ord 1 is the reference, hence a structural 0.
+.     tempname pf
+ 46.     postfile `pf' int inst_ord double pi_j double se_pi double beta_j double se_beta ///
+>         double slope double se_slope byte base using ../temp/inst_spec`spec'.dta, replace
+ 47.     local n_miss = 0
+ 48.     forval j = 1/$N_INST {
+ 49.         local pi = .
+ 50.         local sp = .
+ 51.         local bt = .
+ 52.         local sb = .
+ 53.         local sl = .
+ 54.         local ss = .
+ 55.         local bs = (`j' == 1)
+ 56.         if `bs' {
+ 57.             local pi = 0
+ 58.             local sp = 0
+ 59.             local bt = 0
+ 60.             local sb = 0
+ 61.             local sl = `b_x'
+ 62.             local ss = `se_x'
+ 63.         }
+ 64.         else {
+ 65.             cap local pi = _b[PD_`j']
+ 66.             if !_rc local sp = _se[PD_`j']
+ 67.             else    local ++n_miss
+ 68.             if `spec' == 2 {
+ 69.                 cap local bt = _b[PX_`j']
+ 70.                 if !_rc {
+ 71.                     local sb = _se[PX_`j']
+ 72.                     qui lincom Z_it + PX_`j'
+ 73.                     local sl = r(estimate)
+ 74.                     local ss = r(se)
+ 75.                 }
+ 76.             }
+ 77.         }
+ 78.         post `pf' (`j') (`pi') (`sp') (`bt') (`sb') (`sl') (`ss') (`bs')
+ 79.     }
+ 80.     postclose `pf'
+ 81.     di as text "institution terms absent from e(b): `n_miss' of $N_INST"
+ 82. 
+.     cap mat drop pooled`spec'
+ 83.     mat pooled`spec' = J(12,1,.)
+ 84.     mat pooled`spec'[1,1]  = `b_x'
+ 85.     mat pooled`spec'[2,1]  = `se_x'
+ 86.     mat pooled`spec'[3,1]  = `b_s'
+ 87.     mat pooled`spec'[4,1]  = `se_s'
+ 88.     mat pooled`spec'[5,1]  = `chi_d'
+ 89.     mat pooled`spec'[6,1]  = `df_d'
+ 90.     mat pooled`spec'[7,1]  = `p_d'
+ 91.     mat pooled`spec'[8,1]  = `chi_x'
+ 92.     mat pooled`spec'[9,1]  = `df_x'
+ 93.     mat pooled`spec'[10,1] = `p_x'
+ 94.     mat pooled`spec'[11,1] = `N'
+ 95.     mat pooled`spec'[12,1] = `r2'
+ 96.     mat rownames pooled`spec' = b_exp se_exp b_share se_share ///
+>         chi2_pi df_pi p_pi chi2_beta df_beta p_beta N pseudo_r2
+ 97.     mat colnames pooled`spec' = spec`spec'
+ 98. end
+
+. 
+. * -------------------------------------------------------------------- report
+. program report
+  1.     use ../temp/inst_spec1.dta, clear
+  2.     rename (pi_j se_pi) (pi1 se_pi1)
+  3.     drop beta_j se_beta slope se_slope
+  4.     merge 1:1 inst_ord using ../temp/inst_spec2.dta, nogen
+  5.     merge 1:1 inst_ord using ../temp/inst_xw.dta, keep(1 3) nogen
+  6.     merge 1:1 inst_ord using ../temp/aux_es2.dta, keep(1 3) nogen
+  7. 
+.     preserve
+  8.         import delimited ../external/college/ipeds_openalex.csv, clear varn(1) stringcols(_all)
+  9.         keep inst_id name
+ 10.         drop if inst_id == ""
+ 11.         duplicates drop inst_id, force
+ 12.         rename inst_id inst_base
+ 13.         save ../temp/inst_names.dta, replace
+ 14.     restore
+ 15.     merge m:1 inst_base using ../temp/inst_names.dta, keep(1 3) nogen
+ 16. 
+.     * base is the reference (structural 0), so it is excluded from the
+.     * dispersion stats and the plots but kept in the exported table.
+.     gen byte report = !mi(n_pi_es) & n_pi_es >= $MIN_PI & !base ///
+>         & se_pi1 > 0 & !mi(se_pi1)
+ 17.     qui count if report
+ 18.     di as text _n "===== institutions reported: " r(N) " of $N_INST ====="
+ 19. 
+.     label var pi1    "Post x Inst (spec 1)"
+ 20.     label var pi_j   "Post x Inst (spec 2)"
+ 21.     label var beta_j "Post x Exposure x Inst (spec 2)"
+ 22.     label var slope  "Institution exposure slope (level)"
+ 23. 
+.     di as text _n "===== dispersion of institution effects ====="
+ 24.     sum pi1 pi_j beta_j slope if report, d
+ 25. 
+.     cap noi corr pi1 pi_j if report
+ 26.     cap noi corr pi_j beta_j if report
+ 27. 
+.     gen double pi1_lo    = pi1    - 1.96 * se_pi1
+ 28.     gen double pi1_hi    = pi1    + 1.96 * se_pi1
+ 29.     gen double pi2_lo    = pi_j   - 1.96 * se_pi
+ 30.     gen double pi2_hi    = pi_j   + 1.96 * se_pi
+ 31.     gen double beta_j_lo = beta_j - 1.96 * se_beta
+ 32.     gen double beta_j_hi = beta_j + 1.96 * se_beta
+ 33. 
+.     save ../temp/inst_effects_all.dta, replace
+ 34.     figures
+ 35. 
+.     order inst_ord inst_base name n_pi n_pi_es N_es mean_exp pre_out ///
+>         pi1 se_pi1 pi_j se_pi beta_j se_beta slope se_slope base report
+ 36.     sort inst_ord
+ 37.     save ../output/inst_effects.dta, replace
+ 38.     export delimited using ../output/tables/inst_effects.csv if report | base, replace
+ 39. end
+
+. 
+. program figures
+  1.     * Common x span for the caterpillars = the largest number of institution
+.     * effects any one of them plots, so the three are read on the same axis.
+.     global XMAX = 0
+  2.     foreach p in pi1 pi_j beta_j {
+  3.         local s = cond("`p'" == "pi1", "se_pi1", cond("`p'" == "pi_j", "se_pi", "se_beta"))
+  4.         qui count if report & !mi(`p') & `s' > 0 & !mi(`s')
+  5.         if r(N) > $XMAX global XMAX = r(N)
+  6.     }
+  7.     di as text "caterpillar x span = 1/$XMAX institution effects"
+  8. 
+.     * Ticks must stop at XMAX: xlab(#10) picks a round tick past it and the
+.     * axis then stretches to cover the label, which is where the trailing
+.     * white space came from.
+.     global XLAB 1
+  9.     forval t = 20(20)$XMAX {
+ 10.         if ($XMAX - `t') > 8 global XLAB $XLAB `t'
+ 11.     }
+ 12.     global XLAB $XLAB $XMAX
+ 13. 
+.     * --- caterpillars: coefficient on y, institutions ranked by it on x
+.     caterpillar, y(pi1) lo(pi1_lo) hi(pi1_hi) se(se_pi1) ///
+>         ytitle("Post x Institution") name(caterpillar_pi_spec1)
+ 14.     caterpillar, y(pi_j) lo(pi2_lo) hi(pi2_hi) se(se_pi) ///
+>         ytitle("Post x Institution") name(caterpillar_pi_spec2)
+ 15.     caterpillar, y(beta_j) lo(beta_j_lo) hi(beta_j_hi) se(se_beta) ///
+>         ytitle("Post x Exposure x Institution") name(caterpillar_beta_spec2)
+ 16. 
+.     * --- both specs on one panel, each ranked by its own magnitude
+.     preserve
+ 17.         keep if report
+ 18.         sort pi1
+ 19.         gen long rank1 = _n if !mi(pi1)
+ 20.         sort pi_j
+ 21.         gen long rank2 = _n if !mi(pi_j)
+ 22.         tw (scatter pi1  rank1, mcolor(ebblue)   msize(vsmall)) ///
+>            (scatter pi_j rank2, mcolor(dkorange) msize(vsmall) msymbol(T)) ///
+>            , yline(0, lcolor(red) lpattern(dash)) ///
+>              xscale(range(1 $XMAX) noextend) xlab($XLAB) ///
+>              plotregion(margin(l = 1 r = 1)) ///
+>              xtitle("Institution (ranked within specification)") ///
+>              ytitle("Post x Institution") ///
+>              legend(order(1 "Spec 1: Post x Inst" 2 "Spec 2: + Post x Exposure x Inst") ///
+>                     pos(11) ring(0) size(medsmall))
+ 23.         graph export ../output/figures/pi_both_specs_sorted.pdf, replace
+ 24.     restore
+ 25. 
+.     preserve
+ 26.         * beta_j dropped for collinearity comes back as an exact 0; it would
+.         * anchor the fit at the origin, so screen it out here too.
+.         keep if report & se_beta > 0 & !mi(se_beta)
+ 27.         qui regress beta_j pi_j
+ 28.         local fsl : di %7.3f _b[pi_j]
+ 29.         local fse : di %7.3f _se[pi_j]
+ 30.         local fn  = e(N)
+ 31.         qui corr beta_j pi_j
+ 32.         local frho : di %6.3f r(rho)
+ 33.         di as text "pi_j vs beta_j: slope = `fsl' (se `fse'), corr = `frho', N = `fn'"
+ 34.         tw (scatter beta_j pi_j, mcolor(ebblue) msize(small)) ///
+>            (lfit beta_j pi_j, lcolor(gs9)) ///
+>            , xtitle("Post x Institution") ///
+>              ytitle("Post x Exposure x Institution") legend(off) ///
+>              note("Slope = `=trim("`fsl'")' (se `=trim("`fse'")');" ///
+>                   " correlation = `=trim("`frho'")'; N = `fn'")
+ 35.         graph export ../output/figures/pi_vs_beta.pdf, replace
+ 36.     restore
+ 37. end
+
+. 
+. program caterpillar
+  1.     syntax, y(name) lo(name) hi(name) se(name) ytitle(string) name(string)
+  2.     preserve
+  3.         keep if report & !mi(`y') & `se' > 0 & !mi(`se')
+  4.         qui count
+  5.         if r(N) < 2 {
+  6.             di as text "caterpillar `name': " r(N) " institutions; skipping."
+  7.             exit 0
+  8.         }
+  9.         sort `y'
+ 10.         gen long rank = _n
+ 11.         tw (rcap `lo' `hi' rank, lcolor(gs11) lwidth(vthin)) ///
+>            (scatter `y' rank, mcolor(ebblue) msize(vsmall)) ///
+>            , yline(0, lcolor(red) lpattern(dash)) ///
+>              xscale(range(1 $XMAX) noextend) xlab($XLAB) ///
+>              plotregion(margin(l = 1 r = 1)) ///
+>              xtitle("Institution (ranked by coefficient)") ytitle("`ytitle'") ///
+>              legend(off)
+ 12.         graph export ../output/figures/`name'.pdf, replace
+ 13.     restore
+ 14. end
+
+. 
+. program output_tables
+  1.     foreach s in 1 2 {
+  2.         cap confirm matrix pooled`s'
+  3.         if !_rc {
+  4.             qui matrix_to_txt, saving("../output/tables/pooled_spec`s'.txt") ///
+>                 matrix(pooled`s') title(<tab:pooled_spec`s'>) format(%20.4f) replace
+  5.         }
+  6.     }
+  7. end
+
+. 
+. main
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  /n/holylabs/pakes_lab/Lab/sci_eq/analysis/inst_level/code/../output/replot.log
+  log type:  text
+ opened on:  30 Jul 2026, 04:58:33
+FIGURES_ONLY: replotting from ../temp/inst_effects_all.dta
+caterpillar x span = 1/128 institution effects
+(70 observations deleted)
+file ../output/figures/caterpillar_pi_spec1.pdf saved as PDF format
+(70 observations deleted)
+file ../output/figures/caterpillar_pi_spec2.pdf saved as PDF format
+(70 observations deleted)
+file ../output/figures/caterpillar_beta_spec2.pdf saved as PDF format
+(70 observations deleted)
+file ../output/figures/pi_both_specs_sorted.pdf saved as PDF format
+(70 observations deleted)
+pi_j vs beta_j: slope = -12.398 (se   1.517), corr = -0.589, N = 128
+file ../output/figures/pi_vs_beta.pdf saved as PDF format
+      name:  <unnamed>
+       log:  /n/holylabs/pakes_lab/Lab/sci_eq/analysis/inst_level/code/../output/replot.log
+  log type:  text
+ closed on:  30 Jul 2026, 04:58:52
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+. 
+end of do-file

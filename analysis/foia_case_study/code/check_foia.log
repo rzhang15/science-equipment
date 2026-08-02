@@ -1,0 +1,49 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 120,000; see help set_maxvar.
+
+. do /tmp/check_foia.do 
+
+. set more off
+
+. use ../external/samp/merged_foias_with_pis in 1/50, clear
+
+. describe, short
+
+Contains data from ../external/samp/merged_foias_with_pis.dta
+ Observations:            50                  
+    Variables:            30                  8 Jul 2026 21:56
+Sorted by: 
+
+. ds
+product_desc  sku           fund_id       is_nonlab_~t  middle_name
+clean_desc    price         purchase_id   nonlab_buc~t  athr_id
+potential_~u  qty           date          uni           F
+potential_~t  spend         funder        category      Field
+suppliername  unit          prediction~e  first_name    agency
+supplier_id   purchaser     similarity~e  last_name     count
+
+. count if !mi(athr_id)
+  21
+
+. 
+end of do-file

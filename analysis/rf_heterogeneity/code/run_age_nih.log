@@ -1,0 +1,1063 @@
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  /n/holylabs/pakes_lab/Lab/sci_eq/analysis/rf_heterogeneity/code/run_age_nih.log
+  log type:  text
+ opened on:  30 Jul 2026, 13:59:47
+
+. 
+. local samp  all_jrnls
+
+. local suf   _r1_r2
+
+. local fes   athr_id year
+
+. local vce_cl athr_id
+
+. local yvars n_grants nih_total_cost
+
+. local pairs `" "young old" "young_nih old_nih" "'
+
+. 
+. use ../temp/es_`samp'`suf', clear
+
+. 
+. gen rel = year - 2014
+
+. qui sum rel, d
+
+. local abs_lag  = abs(r(max))
+
+. local abs_lead = abs(r(min))
+
+. 
+. forval i = 1/`abs_lead' {
+  2.     gen int_lead`i'  = exposure      if rel == -`i'
+  3.     gen mshr_lead`i' = mkt_spend_shr if rel == -`i'
+  4. }
+(111,033 missing values generated)
+(111,033 missing values generated)
+(111,033 missing values generated)
+(111,033 missing values generated)
+(111,033 missing values generated)
+(111,033 missing values generated)
+(111,033 missing values generated)
+(111,033 missing values generated)
+
+. forval i = 0/`abs_lag' {
+  2.     gen int_lag`i'  = exposure      if rel == `i'
+  3.     gen mshr_lag`i' = mkt_spend_shr if rel == `i'
+  4. }
+(111,033 missing values generated)
+(111,033 missing values generated)
+(111,033 missing values generated)
+(111,033 missing values generated)
+(111,033 missing values generated)
+(111,033 missing values generated)
+(111,033 missing values generated)
+(111,033 missing values generated)
+(111,033 missing values generated)
+(111,033 missing values generated)
+(111,033 missing values generated)
+(111,033 missing values generated)
+
+. ds int_lead* int_lag* mshr_lead* mshr_lag*
+int_lead1   int_lead2   int_lead3   int_lead4   int_lag0    int_lag1    int_lag2    int_lag3    int_lag4    int_lag5    mshr_lead1  mshr_lead2  mshr_lead3  mshr_lead4  mshr_lag0   mshr_lag1   mshr_lag2   mshr_lag3   mshr_lag4   mshr_lag5
+
+. foreach var in `r(varlist)' {
+  2.     replace `var' = 0 if mi(`var')
+  3. }
+(111,033 real changes made)
+(111,033 real changes made)
+(111,033 real changes made)
+(111,033 real changes made)
+(111,033 real changes made)
+(111,033 real changes made)
+(111,033 real changes made)
+(111,033 real changes made)
+(111,033 real changes made)
+(111,033 real changes made)
+(111,033 real changes made)
+(111,033 real changes made)
+(111,033 real changes made)
+(111,033 real changes made)
+(111,033 real changes made)
+(111,033 real changes made)
+(111,033 real changes made)
+(111,033 real changes made)
+(111,033 real changes made)
+(111,033 real changes made)
+
+. local int_leads
+
+. local mshr_leads
+
+. local int_lags
+
+. local mshr_lags
+
+. forval i = 2/`abs_lead' {
+  2.     local int_leads  int_lead`i'  `int_leads'
+  3.     local mshr_leads mshr_lead`i' `mshr_leads'
+  4. }
+
+. forval i = 0/`abs_lag' {
+  2.     local int_lags  `int_lags'  int_lag`i'
+  3.     local mshr_lags `mshr_lags' mshr_lag`i'
+  4. }
+
+. 
+. gen post       = year >= 2014
+
+. gen Z_it       = exposure      * post
+
+. gen Z_share_it = mkt_spend_shr * post
+
+. 
+. foreach pair of local pairs {
+  2.     foreach grp of local pair {
+  3.         qui sum `grp'
+  4.         if r(N) == 0 | r(min) == r(max) {
+  5.             di as error "run_age_nih: `grp' degenerate -- aborting."
+  6.             exit 459
+  7.         }
+  8.         foreach v of local int_leads {
+  9.             gen `v'_`grp' = `v' * `grp'
+ 10.             local leads_`grp' `leads_`grp'' `v'_`grp'
+ 11.         }
+ 12.         foreach v of local int_lags {
+ 13.             gen `v'_`grp' = `v' * `grp'
+ 14.             local lags_`grp' `lags_`grp'' `v'_`grp'
+ 15.         }
+ 16.         foreach v of local mshr_leads {
+ 17.             gen `v'_`grp' = `v' * `grp'
+ 18.             local mleads_`grp' `mleads_`grp'' `v'_`grp'
+ 19.         }
+ 20.         foreach v of local mshr_lags {
+ 21.             gen `v'_`grp' = `v' * `grp'
+ 22.             local mlags_`grp' `mlags_`grp'' `v'_`grp'
+ 23.         }
+ 24.         gen int_lead1_`grp' = int_lead1 * `grp'
+ 25.         gen Z_`grp'  = Z_it       * `grp'
+ 26.         gen S_`grp'  = Z_share_it * `grp'
+ 27.         gen PT_`grp' = post       * `grp'
+ 28.     }
+ 29. }
+(72,940 missing values generated)
+(72,940 missing values generated)
+(72,940 missing values generated)
+(72,940 missing values generated)
+(72,940 missing values generated)
+(72,940 missing values generated)
+(72,940 missing values generated)
+(72,940 missing values generated)
+(72,940 missing values generated)
+(72,940 missing values generated)
+(72,940 missing values generated)
+(72,940 missing values generated)
+(72,940 missing values generated)
+(72,940 missing values generated)
+(72,940 missing values generated)
+(72,940 missing values generated)
+(72,940 missing values generated)
+(72,940 missing values generated)
+(72,940 missing values generated)
+(72,940 missing values generated)
+(72,940 missing values generated)
+(72,940 missing values generated)
+(72,940 missing values generated)
+(72,940 missing values generated)
+(72,940 missing values generated)
+(72,940 missing values generated)
+(72,940 missing values generated)
+(72,940 missing values generated)
+(72,940 missing values generated)
+(72,940 missing values generated)
+(72,940 missing values generated)
+(72,940 missing values generated)
+(72,940 missing values generated)
+(72,940 missing values generated)
+(72,940 missing values generated)
+(72,940 missing values generated)
+(72,940 missing values generated)
+(72,940 missing values generated)
+(72,940 missing values generated)
+(72,940 missing values generated)
+(72,940 missing values generated)
+(72,940 missing values generated)
+(72,940 missing values generated)
+(72,940 missing values generated)
+
+. 
+. cap mkdir "../output/figures/`samp'"
+
+. cap mkdir "../output/figures/`samp'/es_ppml"
+
+. 
+. global LBL_young     "Young"
+
+. global LBL_old       "Old"
+
+. global LBL_young_nih "Young (NIH-Matched PIs)"
+
+. global LBL_old_nih   "Old (NIH-Matched PIs)"
+
+. 
+. tempname ph
+
+. postfile `ph' str30 yvar str24 grp str12 split_type ///
+>     double(post_b post_se N r2_p n_pis) ///
+>     using "../temp/age_nih_results", replace
+
+. 
+. foreach yvar of local yvars {
+  2.     local ylab "`yvar'"
+  3.     if "`yvar'" == "n_grants"       local ylab "Active NIH Research Grants"
+  4.     if "`yvar'" == "nih_total_cost" local ylab "NIH Award Dollars"
+  5. 
+.     foreach pair of local pairs {
+  6.         local g1 : word 1 of `pair'
+  7.         local g2 : word 2 of `pair'
+  8.         local st = cond("`g1'" == "young", "med_pi", "med_pi_nih")
+  9. 
+.         di as text _n "==== pooled DiD PPML: `yvar' `g1' vs `g2' ===="
+ 10.         cap noi ppmlhdfe `yvar' Z_`g1' Z_`g2' S_`g1' S_`g2' PT_`g1', ///
+>             absorb(`fes') vce(cluster `vce_cl')
+ 11.         if _rc {
+ 12.             di as error "run_age_nih: pooled DiD `yvar' `g1'/`g2' failed; skipping."
+ 13.             continue
+ 14.         }
+ 15.         local Nppml  = e(N)
+ 16.         local r2ppml = e(r2_p)
+ 17.         foreach grp in `g1' `g2' {
+ 18.             gunique athr_id if e(sample) & `grp' == 1
+ 19.             local n_pis = r(unique)
+ 20.             gunique inst_id if e(sample) & `grp' == 1
+ 21.             local n_insts = r(unique)
+ 22.             local b  = _b[Z_`grp']
+ 23.             local se = _se[Z_`grp']
+ 24.             di as text "PDID `yvar' `grp': b=" %8.4f `b' " se=" %8.4f `se' ///
+>                 "  N=" %9.0f `Nppml' " PIs=`n_pis' Insts=`n_insts'"
+ 25.             post `ph' ("`yvar'") ("`grp'") ("`st'") ///
+>                 (`b') (`se') (`Nppml') (`r2ppml') (`n_pis')
+ 26.         }
+ 27.         cap noi lincom Z_`g1' - Z_`g2'
+ 28.         if !_rc di as text "DIFF `yvar' `g1'-`g2': b=" %8.4f r(estimate) ///
+>             " se=" %8.4f r(se) " p=" %6.4f r(p)
+ 29. 
+.         di as text _n "==== event study PPML: `yvar' `g1' vs `g2' ===="
+ 30.         cap noi ppmlhdfe `yvar' `leads_`g1'' `lags_`g1'' `leads_`g2'' `lags_`g2'' ///
+>             `mleads_`g1'' `mlags_`g1'' `mleads_`g2'' `mlags_`g2'' PT_`g1', ///
+>             absorb(`fes') vce(cluster `vce_cl')
+ 31.         if _rc {
+ 32.             di as error "run_age_nih: ES `yvar' `g1'/`g2' failed; skipping plots."
+ 33.             continue
+ 34.         }
+ 35.         foreach grp in `g1' `g2' {
+ 36.             local grp_label = "${LBL_`grp'}"
+ 37.             gunique athr_id if e(sample) & `grp' == 1
+ 38.             local num_athrs = r(unique)
+ 39.             gunique inst_id if e(sample) & `grp' == 1
+ 40.             local num_insts = r(unique)
+ 41.             sum `yvar' if rel <= -1 & e(sample) & `grp' == 1, d
+ 42.             local pre_mean : dis %6.3f r(mean)
+ 43.             preserve
+ 44.             cap mat drop es
+ 45.             foreach var in `leads_`grp'' `lags_`grp'' int_lead1_`grp' {
+ 46.                 if "`var'" == "int_lead1_`grp'" mat row = 0,0
+ 47.                 else mat row = _b[`var'], _se[`var']
+ 48.                 mat es = nullmat(es) \ row
+ 49.             }
+ 50.             svmat es
+ 51.             keep es1 es2
+ 52.             drop if mi(es1)
+ 53.             rename (es1 es2) (b se)
+ 54.             gen ub = b + 1.96*se
+ 55.             qui sum ub
+ 56.             local ymax = round(r(max), 0.1)
+ 57.             gen lb = b - 1.96*se
+ 58.             qui sum lb
+ 59.             local ymin = round(r(min), 0.1)
+ 60.             if `ymin' > 0 local ymin = 0
+ 61.             gen rel = -`abs_lead' if _n == 1
+ 62.             replace rel = rel[_n-1]+1 if _n > 1
+ 63.             replace rel = rel + 1 if rel >= -1
+ 64.             replace rel = -1 if rel == `abs_lag' + 1
+ 65.             gen year = rel + 2014
+ 66.             hashsort rel
+ 67.             tw rcap ub lb year if year != 2013, lcolor(ebblue%70) msize(vsmall) || ///
+>                scatter b year, mcolor(ebblue) || ///
+>             scatteri `ymax' 2013.75 `ymax' 2014.25, bcolor(gs12%30) recast(area) base(`ymin') ///
+>                xlab(2010(1)2019, labsize(small)) xtitle("Year") ///
+>                ytitle("Exposure x Post") ylab(`ymin'(0.1)`ymax') ///
+>                subtitle("`grp_label' -- `ylab'", pos(11) size(small)) ///
+>                legend(on order(- "Num. PIs: `num_athrs'" "Num. Insts: `num_insts'" "Pre-Period Avg : `pre_mean'") ///
+>                       pos(7) ring(1) rows(3) bmargin(zero) size(small)) ///
+>                yline(0, lcolor(gs10) lpattern(solid)) plotregion(margin(sides))
+ 68.             graph export ../output/figures/`samp'/es_ppml/es_`yvar'`suf'_`grp'_agenih.pdf, replace
+ 69.             restore
+ 70.         }
+ 71.     }
+ 72. }
+
+==== pooled DiD PPML: n_grants young vs old ====
+(dropped 1100 observations that are either singletons or separated by a fixed effect)
+Iteration 1:   deviance = 4.0559e+04  eps = .         iters = 4    tol = 1.0e-04  min(eta) =  -1.92  P   
+Iteration 2:   deviance = 3.8773e+04  eps = 4.61e-02  iters = 3    tol = 1.0e-04  min(eta) =  -2.56      
+Iteration 3:   deviance = 3.8710e+04  eps = 1.62e-03  iters = 2    tol = 1.0e-04  min(eta) =  -2.83      
+Iteration 4:   deviance = 3.8709e+04  eps = 2.06e-05  iters = 2    tol = 1.0e-04  min(eta) =  -2.88      
+Iteration 5:   deviance = 3.8709e+04  eps = 9.27e-09  iters = 2    tol = 1.0e-05  min(eta) =  -2.88      
+Iteration 6:   deviance = 3.8709e+04  eps = 2.22e-15  iters = 2    tol = 1.0e-06  min(eta) =  -2.88   S O
+------------------------------------------------------------------------------------------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
+Converged in 6 iterations and 15 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =     49,120
+Absorbing 2 HDFE groups                           Residual df     =      4,911
+Statistics robust to heteroskedasticity           Wald chi2(5)    =     107.33
+Deviance             =  38709.38541               Prob > chi2     =     0.0000
+Log pseudolikelihood = -51915.06326               Pseudo R2       =     0.2346
+
+Number of clusters (athr_id)=      4,912
+                            (Std. err. adjusted for 4,912 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+    n_grants | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+     Z_young |   .7007438   .3932605     1.78   0.075    -.0700326     1.47152
+       Z_old |   .5839415   .4041039     1.45   0.148    -.2080877    1.375971
+     S_young |   .1615219   .1652585     0.98   0.328    -.1623789    .4854227
+       S_old |  -.1389567   .1442218    -0.96   0.335    -.4216262    .1437129
+    PT_young |   .1518628    .073303     2.07   0.038     .0081915    .2955342
+       _cons |   .2639078   .0238134    11.08   0.000     .2172345    .3105812
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      4912        4912           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+N = 21,880; 2,188 balanced groups of size 10
+N = 21,880; 151 unbalanced groups of sizes 10 to 1,340
+PDID n_grants young: b=  0.7007 se=  0.3933  N=    49120 PIs=2188 Insts=151
+N = 27,240; 2,724 balanced groups of size 10
+N = 27,240; 136 unbalanced groups of sizes 10 to 1,680
+PDID n_grants old: b=  0.5839 se=  0.4041  N=    49120 PIs=2724 Insts=136
+
+ ( 1)  Z_young - Z_old = 0
+
+------------------------------------------------------------------------------
+    n_grants | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .1168023   .5638739     0.21   0.836    -.9883703    1.221975
+------------------------------------------------------------------------------
+DIFF n_grants young-old: b=  0.1168 se=  0.5639 p=0.8359
+
+==== event study PPML: n_grants young vs old ====
+(dropped 1100 observations that are either singletons or separated by a fixed effect)
+Iteration 1:   deviance = 4.0480e+04  eps = .         iters = 4    tol = 1.0e-04  min(eta) =  -2.15  P   
+Iteration 2:   deviance = 3.8688e+04  eps = 4.63e-02  iters = 3    tol = 1.0e-04  min(eta) =  -2.85      
+Iteration 3:   deviance = 3.8626e+04  eps = 1.63e-03  iters = 2    tol = 1.0e-04  min(eta) =  -3.14      
+Iteration 4:   deviance = 3.8625e+04  eps = 2.07e-05  iters = 2    tol = 1.0e-04  min(eta) =  -3.18      
+Iteration 5:   deviance = 3.8625e+04  eps = 9.34e-09  iters = 2    tol = 1.0e-05  min(eta) =  -3.18      
+Iteration 6:   deviance = 3.8625e+04  eps = 2.22e-15  iters = 2    tol = 1.0e-06  min(eta) =  -3.18   S  
+Iteration 7:   deviance = 3.8625e+04  eps = 2.22e-16  iters = 1    tol = 1.0e-09  min(eta) =  -3.18   S O
+------------------------------------------------------------------------------------------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
+Converged in 7 iterations and 16 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =     49,120
+Absorbing 2 HDFE groups                           Residual df     =      4,911
+Statistics robust to heteroskedasticity           Wald chi2(37)   =     184.61
+Deviance             =  38624.70448               Prob > chi2     =     0.0000
+Log pseudolikelihood = -51872.72279               Pseudo R2       =     0.2352
+
+Number of clusters (athr_id)=      4,912
+                                (Std. err. adjusted for 4,912 clusters in athr_id)
+----------------------------------------------------------------------------------
+                 |               Robust
+        n_grants | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-----------------+----------------------------------------------------------------
+ int_lead4_young |   .1746297   .5119777     0.34   0.733    -.8288282    1.178088
+ int_lead3_young |  -.1433508   .4577508    -0.31   0.754    -1.040526    .7538242
+ int_lead2_young |  -.0636735    .397508    -0.16   0.873    -.8427748    .7154277
+  int_lag0_young |     .61863   .4858693     1.27   0.203    -.3336563    1.570916
+  int_lag1_young |   .8565617   .5246868     1.63   0.103    -.1718055    1.884929
+  int_lag2_young |   1.104186   .5700692     1.94   0.053    -.0131293    2.221501
+  int_lag3_young |   .7908091   .5842836     1.35   0.176    -.3543657    1.935984
+  int_lag4_young |   .6688488   .6250585     1.07   0.285    -.5562433    1.893941
+  int_lag5_young |     .08435   .6445145     0.13   0.896    -1.178875    1.347575
+   int_lead4_old |   -.199853   .4488763    -0.45   0.656    -1.079634    .6799283
+   int_lead3_old |  -.3461176   .4573795    -0.76   0.449    -1.242565    .5503297
+   int_lead2_old |  -.6034875   .3639219    -1.66   0.097    -1.316761    .1097863
+    int_lag0_old |   .0023859   .4563851     0.01   0.996    -.8921124    .8968842
+    int_lag1_old |  -.0473955   .5020403    -0.09   0.925    -1.031376    .9365853
+    int_lag2_old |  -.0226836   .5777487    -0.04   0.969     -1.15505    1.109683
+    int_lag3_old |   .1216569   .6065007     0.20   0.841    -1.067063    1.310376
+    int_lag4_old |   1.157542   .6790226     1.70   0.088    -.1733177    2.488402
+    int_lag5_old |   .8693444   .7267375     1.20   0.232    -.5550348    2.293724
+mshr_lead4_young |  -.0866783   .1548136    -0.56   0.576    -.3901072    .2167507
+mshr_lead3_young |   .1636989    .145645     1.12   0.261      -.12176    .4491578
+mshr_lead2_young |   .2632526   .1203124     2.19   0.029     .0274447    .4990605
+ mshr_lag0_young |  -.0288156    .191115    -0.15   0.880    -.4033941    .3457629
+ mshr_lag1_young |   .2642323   .2060308     1.28   0.200    -.1395808    .6680453
+ mshr_lag2_young |   .0186479   .2100493     0.09   0.929    -.3930411     .430337
+ mshr_lag3_young |   .2075798   .2207742     0.94   0.347    -.2251297    .6402893
+ mshr_lag4_young |    .568692   .2289028     2.48   0.013     .1200508    1.017333
+ mshr_lag5_young |    .471995   .2303571     2.05   0.040     .0205034    .9234866
+  mshr_lead4_old |   .4091938   .1511122     2.71   0.007     .1130194    .7053683
+  mshr_lead3_old |   .3692217   .1448561     2.55   0.011     .0853089    .6531344
+  mshr_lead2_old |   .4049301   .1206761     3.36   0.001     .1684093    .6414509
+   mshr_lag0_old |   .3063891   .1589017     1.93   0.054    -.0050526    .6178307
+   mshr_lag1_old |   .5474947   .1717197     3.19   0.001     .2109304    .8840591
+   mshr_lag2_old |  -.0042113   .1956495    -0.02   0.983    -.3876773    .3792547
+   mshr_lag3_old |   .0070315   .2038236     0.03   0.972    -.3924554    .4065185
+   mshr_lag4_old |   .0674795   .2259845     0.30   0.765     -.375442    .5104009
+   mshr_lag5_old |  -.0750272   .2366862    -0.32   0.751    -.5389237    .3888692
+        PT_young |   .1521387   .0734539     2.07   0.038     .0081717    .2961057
+           _cons |   .2064985   .0321626     6.42   0.000     .1434611     .269536
+----------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      4912        4912           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+N = 21,880; 2,188 balanced groups of size 10
+N = 21,880; 151 unbalanced groups of sizes 10 to 1,340
+
+          distinct research awards active this year
+                     (supplements incl.)
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            0              0
+ 5%            0              0
+10%            0              0       Obs               8,752
+25%            0              0       Sum of wgt.       8,752
+
+50%            1                      Mean           .9221892
+                        Largest       Std. dev.      .9981133
+75%            1              7
+90%            2              7       Variance       .9962302
+95%            3              8       Skewness       1.520065
+99%            4              9       Kurtosis       7.060508
+(123,360 observations deleted)
+(9 missing values generated)
+(9 real changes made)
+(7 real changes made)
+(1 real change made)
+file ../output/figures/all_jrnls/es_ppml/es_n_grants_r1_r2_young_agenih.pdf saved as PDF format
+N = 27,240; 2,724 balanced groups of size 10
+N = 27,240; 136 unbalanced groups of sizes 10 to 1,680
+
+          distinct research awards active this year
+                     (supplements incl.)
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            0              0
+ 5%            0              0
+10%            0              0       Obs              10,896
+25%            0              0       Sum of wgt.      10,896
+
+50%            1                      Mean           1.314152
+                        Largest       Std. dev.      1.262938
+75%            2             10
+90%            3             10       Variance       1.595012
+95%            4             11       Skewness       1.440429
+99%            5             11       Kurtosis       7.029451
+(123,360 observations deleted)
+(9 missing values generated)
+(9 real changes made)
+(7 real changes made)
+(1 real change made)
+file ../output/figures/all_jrnls/es_ppml/es_n_grants_r1_r2_old_agenih.pdf saved as PDF format
+
+==== pooled DiD PPML: n_grants young_nih vs old_nih ====
+(dropped 1100 observations that are either singletons or separated by a fixed effect)
+Iteration 1:   deviance = 4.0559e+04  eps = .         iters = 4    tol = 1.0e-04  min(eta) =  -1.92  P   
+Iteration 2:   deviance = 3.8773e+04  eps = 4.61e-02  iters = 3    tol = 1.0e-04  min(eta) =  -2.56      
+Iteration 3:   deviance = 3.8710e+04  eps = 1.62e-03  iters = 2    tol = 1.0e-04  min(eta) =  -2.83      
+Iteration 4:   deviance = 3.8709e+04  eps = 2.06e-05  iters = 2    tol = 1.0e-04  min(eta) =  -2.88      
+Iteration 5:   deviance = 3.8709e+04  eps = 9.27e-09  iters = 2    tol = 1.0e-05  min(eta) =  -2.88      
+Iteration 6:   deviance = 3.8709e+04  eps = 2.22e-15  iters = 2    tol = 1.0e-06  min(eta) =  -2.88   S O
+------------------------------------------------------------------------------------------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
+Converged in 6 iterations and 15 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =     49,120
+Absorbing 2 HDFE groups                           Residual df     =      4,911
+Statistics robust to heteroskedasticity           Wald chi2(5)    =     107.33
+Deviance             =  38709.38541               Prob > chi2     =     0.0000
+Log pseudolikelihood = -51915.06326               Pseudo R2       =     0.2346
+
+Number of clusters (athr_id)=      4,912
+                            (Std. err. adjusted for 4,912 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+    n_grants | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+ Z_young_nih |   .7007438   .3932605     1.78   0.075    -.0700326     1.47152
+   Z_old_nih |   .5839415   .4041039     1.45   0.148    -.2080877    1.375971
+ S_young_nih |   .1615219   .1652585     0.98   0.328    -.1623789    .4854227
+   S_old_nih |  -.1389567   .1442218    -0.96   0.335    -.4216262    .1437129
+PT_young_nih |   .1518628    .073303     2.07   0.038     .0081915    .2955342
+       _cons |   .2639078   .0238134    11.08   0.000     .2172345    .3105812
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      4912        4912           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+N = 21,880; 2,188 balanced groups of size 10
+N = 21,880; 151 unbalanced groups of sizes 10 to 1,340
+PDID n_grants young_nih: b=  0.7007 se=  0.3933  N=    49120 PIs=2188 Insts=151
+N = 27,240; 2,724 balanced groups of size 10
+N = 27,240; 136 unbalanced groups of sizes 10 to 1,680
+PDID n_grants old_nih: b=  0.5839 se=  0.4041  N=    49120 PIs=2724 Insts=136
+
+ ( 1)  Z_young_nih - Z_old_nih = 0
+
+------------------------------------------------------------------------------
+    n_grants | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .1168023   .5638739     0.21   0.836    -.9883703    1.221975
+------------------------------------------------------------------------------
+DIFF n_grants young_nih-old_nih: b=  0.1168 se=  0.5639 p=0.8359
+
+==== event study PPML: n_grants young_nih vs old_nih ====
+(dropped 1100 observations that are either singletons or separated by a fixed effect)
+Iteration 1:   deviance = 4.0480e+04  eps = .         iters = 4    tol = 1.0e-04  min(eta) =  -2.15  P   
+Iteration 2:   deviance = 3.8688e+04  eps = 4.63e-02  iters = 3    tol = 1.0e-04  min(eta) =  -2.85      
+Iteration 3:   deviance = 3.8626e+04  eps = 1.63e-03  iters = 2    tol = 1.0e-04  min(eta) =  -3.14      
+Iteration 4:   deviance = 3.8625e+04  eps = 2.07e-05  iters = 2    tol = 1.0e-04  min(eta) =  -3.18      
+Iteration 5:   deviance = 3.8625e+04  eps = 9.34e-09  iters = 2    tol = 1.0e-05  min(eta) =  -3.18      
+Iteration 6:   deviance = 3.8625e+04  eps = 2.22e-15  iters = 2    tol = 1.0e-06  min(eta) =  -3.18   S  
+Iteration 7:   deviance = 3.8625e+04  eps = 2.22e-16  iters = 1    tol = 1.0e-09  min(eta) =  -3.18   S O
+------------------------------------------------------------------------------------------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
+Converged in 7 iterations and 16 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =     49,120
+Absorbing 2 HDFE groups                           Residual df     =      4,911
+Statistics robust to heteroskedasticity           Wald chi2(37)   =     184.61
+Deviance             =  38624.70448               Prob > chi2     =     0.0000
+Log pseudolikelihood = -51872.72279               Pseudo R2       =     0.2352
+
+Number of clusters (athr_id)=      4,912
+                                    (Std. err. adjusted for 4,912 clusters in athr_id)
+--------------------------------------------------------------------------------------
+                     |               Robust
+            n_grants | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+---------------------+----------------------------------------------------------------
+ int_lead4_young_nih |   .1746297   .5119777     0.34   0.733    -.8288282    1.178088
+ int_lead3_young_nih |  -.1433508   .4577508    -0.31   0.754    -1.040526    .7538242
+ int_lead2_young_nih |  -.0636735    .397508    -0.16   0.873    -.8427748    .7154277
+  int_lag0_young_nih |     .61863   .4858693     1.27   0.203    -.3336563    1.570916
+  int_lag1_young_nih |   .8565617   .5246868     1.63   0.103    -.1718055    1.884929
+  int_lag2_young_nih |   1.104186   .5700692     1.94   0.053    -.0131293    2.221501
+  int_lag3_young_nih |   .7908091   .5842836     1.35   0.176    -.3543657    1.935984
+  int_lag4_young_nih |   .6688488   .6250585     1.07   0.285    -.5562433    1.893941
+  int_lag5_young_nih |     .08435   .6445145     0.13   0.896    -1.178875    1.347575
+   int_lead4_old_nih |   -.199853   .4488763    -0.45   0.656    -1.079634    .6799283
+   int_lead3_old_nih |  -.3461176   .4573795    -0.76   0.449    -1.242565    .5503297
+   int_lead2_old_nih |  -.6034875   .3639219    -1.66   0.097    -1.316761    .1097863
+    int_lag0_old_nih |   .0023859   .4563851     0.01   0.996    -.8921124    .8968842
+    int_lag1_old_nih |  -.0473955   .5020403    -0.09   0.925    -1.031376    .9365853
+    int_lag2_old_nih |  -.0226836   .5777487    -0.04   0.969     -1.15505    1.109683
+    int_lag3_old_nih |   .1216569   .6065007     0.20   0.841    -1.067063    1.310376
+    int_lag4_old_nih |   1.157542   .6790226     1.70   0.088    -.1733177    2.488402
+    int_lag5_old_nih |   .8693444   .7267375     1.20   0.232    -.5550348    2.293724
+mshr_lead4_young_nih |  -.0866783   .1548136    -0.56   0.576    -.3901072    .2167507
+mshr_lead3_young_nih |   .1636989    .145645     1.12   0.261      -.12176    .4491578
+mshr_lead2_young_nih |   .2632526   .1203124     2.19   0.029     .0274447    .4990605
+ mshr_lag0_young_nih |  -.0288156    .191115    -0.15   0.880    -.4033941    .3457629
+ mshr_lag1_young_nih |   .2642323   .2060308     1.28   0.200    -.1395808    .6680453
+ mshr_lag2_young_nih |   .0186479   .2100493     0.09   0.929    -.3930411     .430337
+ mshr_lag3_young_nih |   .2075798   .2207742     0.94   0.347    -.2251297    .6402893
+ mshr_lag4_young_nih |    .568692   .2289028     2.48   0.013     .1200508    1.017333
+ mshr_lag5_young_nih |    .471995   .2303571     2.05   0.040     .0205034    .9234866
+  mshr_lead4_old_nih |   .4091938   .1511122     2.71   0.007     .1130194    .7053683
+  mshr_lead3_old_nih |   .3692217   .1448561     2.55   0.011     .0853089    .6531344
+  mshr_lead2_old_nih |   .4049301   .1206761     3.36   0.001     .1684093    .6414509
+   mshr_lag0_old_nih |   .3063891   .1589017     1.93   0.054    -.0050526    .6178307
+   mshr_lag1_old_nih |   .5474947   .1717197     3.19   0.001     .2109304    .8840591
+   mshr_lag2_old_nih |  -.0042113   .1956495    -0.02   0.983    -.3876773    .3792547
+   mshr_lag3_old_nih |   .0070315   .2038236     0.03   0.972    -.3924554    .4065185
+   mshr_lag4_old_nih |   .0674795   .2259845     0.30   0.765     -.375442    .5104009
+   mshr_lag5_old_nih |  -.0750272   .2366862    -0.32   0.751    -.5389237    .3888692
+        PT_young_nih |   .1521387   .0734539     2.07   0.038     .0081717    .2961057
+               _cons |   .2064985   .0321626     6.42   0.000     .1434611     .269536
+--------------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      4912        4912           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+N = 21,880; 2,188 balanced groups of size 10
+N = 21,880; 151 unbalanced groups of sizes 10 to 1,340
+
+          distinct research awards active this year
+                     (supplements incl.)
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            0              0
+ 5%            0              0
+10%            0              0       Obs               8,752
+25%            0              0       Sum of wgt.       8,752
+
+50%            1                      Mean           .9221892
+                        Largest       Std. dev.      .9981133
+75%            1              7
+90%            2              7       Variance       .9962302
+95%            3              8       Skewness       1.520065
+99%            4              9       Kurtosis       7.060508
+(123,360 observations deleted)
+(9 missing values generated)
+(9 real changes made)
+(7 real changes made)
+(1 real change made)
+file ../output/figures/all_jrnls/es_ppml/es_n_grants_r1_r2_young_nih_agenih.pdf saved as PDF format
+N = 27,240; 2,724 balanced groups of size 10
+N = 27,240; 136 unbalanced groups of sizes 10 to 1,680
+
+          distinct research awards active this year
+                     (supplements incl.)
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            0              0
+ 5%            0              0
+10%            0              0       Obs              10,896
+25%            0              0       Sum of wgt.      10,896
+
+50%            1                      Mean           1.314152
+                        Largest       Std. dev.      1.262938
+75%            2             10
+90%            3             10       Variance       1.595012
+95%            4             11       Skewness       1.440429
+99%            5             11       Kurtosis       7.029451
+(123,360 observations deleted)
+(9 missing values generated)
+(9 real changes made)
+(7 real changes made)
+(1 real change made)
+file ../output/figures/all_jrnls/es_ppml/es_n_grants_r1_r2_old_nih_agenih.pdf saved as PDF format
+
+==== pooled DiD PPML: nih_total_cost young vs old ====
+(dropped 1100 observations that are either singletons or separated by a fixed effect)
+Iteration 1:   deviance = 1.9427e+10  eps = .         iters = 4    tol = 1.0e-04  min(eta) =  -2.63  P   
+Iteration 2:   deviance = 1.7556e+10  eps = 1.07e-01  iters = 3    tol = 1.0e-04  min(eta) =  -3.61      
+Iteration 3:   deviance = 1.7420e+10  eps = 7.78e-03  iters = 2    tol = 1.0e-04  min(eta) =  -4.62      
+Iteration 4:   deviance = 1.7414e+10  eps = 3.51e-04  iters = 2    tol = 1.0e-04  min(eta) =  -5.62      
+Iteration 5:   deviance = 1.7414e+10  eps = 1.65e-05  iters = 2    tol = 1.0e-04  min(eta) =  -6.62      
+Iteration 6:   deviance = 1.7414e+10  eps = 2.56e-06  iters = 2    tol = 1.0e-05  min(eta) =  -7.62      
+Iteration 7:   deviance = 1.7414e+10  eps = 7.69e-07  iters = 2    tol = 1.0e-06  min(eta) =  -8.62      
+Iteration 8:   deviance = 1.7414e+10  eps = 2.77e-07  iters = 2    tol = 1.0e-07  min(eta) =  -9.62   S  
+Iteration 9:   deviance = 1.7414e+10  eps = 1.02e-07  iters = 2    tol = 1.0e-07  min(eta) = -10.62   S  
+Iteration 10:  deviance = 1.7414e+10  eps = 3.73e-08  iters = 2    tol = 1.0e-07  min(eta) = -11.61   S  
+Iteration 11:  deviance = 1.7414e+10  eps = 1.36e-08  iters = 2    tol = 1.0e-09  min(eta) = -12.60   S  
+Iteration 12:  deviance = 1.7414e+10  eps = 4.85e-09  iters = 2    tol = 1.0e-09  min(eta) = -13.58   S O
+------------------------------------------------------------------------------------------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
+Converged in 12 iterations and 27 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =     49,120
+Absorbing 2 HDFE groups                           Residual df     =      4,911
+Statistics robust to heteroskedasticity           Wald chi2(5)    =      68.97
+Deviance             =  1.74138e+10               Prob > chi2     =     0.0000
+Log pseudolikelihood =  -8707092070               Pseudo R2       =     0.5497
+
+Number of clusters (athr_id)=      4,912
+                            (Std. err. adjusted for 4,912 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+nih_total_~t | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+     Z_young |   .5420722   .5421097     1.00   0.317    -.5204433    1.604588
+       Z_old |   1.081772   .5136389     2.11   0.035     .0750587    2.088486
+     S_young |   .3158598    .256098     1.23   0.217    -.1860831    .8178028
+       S_old |  -.8058328   .3703202    -2.18   0.030    -1.531647   -.0800185
+    PT_young |  -.0840501   .1513776    -0.56   0.579    -.3807447    .2126445
+       _cons |   13.51719    .066268   203.98   0.000      13.3873    13.64707
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      4912        4912           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+N = 21,880; 2,188 balanced groups of size 10
+N = 21,880; 151 unbalanced groups of sizes 10 to 1,340
+PDID nih_total_cost young: b=  0.5421 se=  0.5421  N=    49120 PIs=2188 Insts=151
+N = 27,240; 2,724 balanced groups of size 10
+N = 27,240; 136 unbalanced groups of sizes 10 to 1,680
+PDID nih_total_cost old: b=  1.0818 se=  0.5136  N=    49120 PIs=2724 Insts=136
+
+ ( 1)  Z_young - Z_old = 0
+
+------------------------------------------------------------------------------
+nih_total_~t | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |  -.5397003   .7467984    -0.72   0.470    -2.003398    .9239977
+------------------------------------------------------------------------------
+DIFF nih_total_cost young-old: b= -0.5397 se=  0.7468 p=0.4699
+
+==== event study PPML: nih_total_cost young vs old ====
+(dropped 1100 observations that are either singletons or separated by a fixed effect)
+Iteration 1:   deviance = 1.9363e+10  eps = .         iters = 4    tol = 1.0e-04  min(eta) =  -2.91  P   
+Iteration 2:   deviance = 1.7496e+10  eps = 1.07e-01  iters = 3    tol = 1.0e-04  min(eta) =  -4.06      
+Iteration 3:   deviance = 1.7363e+10  eps = 7.67e-03  iters = 2    tol = 1.0e-04  min(eta) =  -4.70      
+Iteration 4:   deviance = 1.7357e+10  eps = 3.29e-04  iters = 2    tol = 1.0e-04  min(eta) =  -5.70      
+Iteration 5:   deviance = 1.7357e+10  eps = 1.61e-05  iters = 2    tol = 1.0e-04  min(eta) =  -6.70      
+Iteration 6:   deviance = 1.7357e+10  eps = 2.57e-06  iters = 2    tol = 1.0e-05  min(eta) =  -7.70      
+Iteration 7:   deviance = 1.7357e+10  eps = 7.73e-07  iters = 2    tol = 1.0e-06  min(eta) =  -8.70      
+Iteration 8:   deviance = 1.7357e+10  eps = 2.78e-07  iters = 2    tol = 1.0e-07  min(eta) =  -9.70   S  
+Iteration 9:   deviance = 1.7357e+10  eps = 1.02e-07  iters = 2    tol = 1.0e-07  min(eta) = -10.70   S  
+Iteration 10:  deviance = 1.7357e+10  eps = 3.74e-08  iters = 2    tol = 1.0e-07  min(eta) = -11.69   S  
+Iteration 11:  deviance = 1.7357e+10  eps = 1.36e-08  iters = 2    tol = 1.0e-09  min(eta) = -12.68   S  
+Iteration 12:  deviance = 1.7357e+10  eps = 4.87e-09  iters = 2    tol = 1.0e-09  min(eta) = -13.65   S O
+------------------------------------------------------------------------------------------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
+Converged in 12 iterations and 27 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =     49,120
+Absorbing 2 HDFE groups                           Residual df     =      4,911
+Statistics robust to heteroskedasticity           Wald chi2(37)   =     141.88
+Deviance             =  1.73568e+10               Prob > chi2     =     0.0000
+Log pseudolikelihood =  -8678582325               Pseudo R2       =     0.5512
+
+Number of clusters (athr_id)=      4,912
+                                (Std. err. adjusted for 4,912 clusters in athr_id)
+----------------------------------------------------------------------------------
+                 |               Robust
+  nih_total_cost | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-----------------+----------------------------------------------------------------
+ int_lead4_young |  -.0452425   .6136145    -0.07   0.941    -1.247905     1.15742
+ int_lead3_young |  -.3261551   .4878236    -0.67   0.504    -1.282272    .6299616
+ int_lead2_young |  -.0702424   .4123196    -0.17   0.865    -.8783741    .7378892
+  int_lag0_young |   .3210737   .5670826     0.57   0.571    -.7903877    1.432535
+  int_lag1_young |   1.037442   .6407551     1.62   0.105    -.2184151    2.293299
+  int_lag2_young |   .9216498   .6794273     1.36   0.175    -.4100032    2.253303
+  int_lag3_young |   1.257716   .7114626     1.77   0.077    -.1367245    2.652157
+  int_lag4_young |   .1030805   .8346024     0.12   0.902     -1.53271    1.738871
+  int_lag5_young |  -.7739904   .8929137    -0.87   0.386    -2.524069    .9760884
+   int_lead4_old |  -.8630279   .5992114    -1.44   0.150    -2.037461    .3114049
+   int_lead3_old |  -.9879631   .6065717    -1.63   0.103    -2.176822    .2008957
+   int_lead2_old |  -1.187103   .5189975    -2.29   0.022    -2.204319   -.1698862
+    int_lag0_old |  -.7693556   .6418225    -1.20   0.231    -2.027305    .4885934
+    int_lag1_old |   .2449814   .6103033     0.40   0.688     -.951191    1.441154
+    int_lag2_old |  -.0756156   .8120904    -0.09   0.926    -1.667283    1.516052
+    int_lag3_old |  -.0137856   .9684795    -0.01   0.989    -1.911971    1.884399
+    int_lag4_old |   1.841137   .8314444     2.21   0.027     .2115355    3.470738
+    int_lag5_old |   .8458521   1.044718     0.81   0.418    -1.201758    2.893462
+mshr_lead4_young |     .26167   .3334177     0.78   0.433    -.3918166    .9151567
+mshr_lead3_young |   .4400204   .3233892     1.36   0.174    -.1938107    1.073852
+mshr_lead2_young |   .3662342   .1817877     2.01   0.044     .0099369    .7225315
+ mshr_lag0_young |   .2664762   .3133804     0.85   0.395    -.3477382    .8806906
+ mshr_lag1_young |   .5684959   .3156899     1.80   0.072    -.0502449    1.187237
+ mshr_lag2_young |     .31221   .3302004     0.95   0.344    -.3349708    .9593909
+ mshr_lag3_young |   .2932681   .3393857     0.86   0.388    -.3719156    .9584518
+ mshr_lag4_young |   .7679072   .3641743     2.11   0.035     .0541387    1.481676
+ mshr_lag5_young |   1.164516   .5078788     2.29   0.022     .1690918     2.15994
+  mshr_lead4_old |    .720058   .2933812     2.45   0.014     .1450414    1.295075
+  mshr_lead3_old |   .6057854   .2883041     2.10   0.036     .0407197    1.170851
+  mshr_lead2_old |   .4957024     .16747     2.96   0.003     .1674672    .8239375
+   mshr_lag0_old |  -.1505897   .2880761    -0.52   0.601    -.7152084    .4140291
+   mshr_lag1_old |   .0724647   .3180785     0.23   0.820    -.5509577    .6958871
+   mshr_lag2_old |  -.4910354   .3769072    -1.30   0.193     -1.22976    .2476892
+   mshr_lag3_old |  -.3723604   .5097051    -0.73   0.465    -1.371364    .6266433
+   mshr_lag4_old |  -.6923905   .4865074    -1.42   0.155    -1.645928    .2611465
+   mshr_lag5_old |  -.4697634   .4381029    -1.07   0.284    -1.328429    .3889025
+        PT_young |  -.0805748   .1505603    -0.54   0.593    -.3756676    .2145181
+           _cons |   13.42152    .068414   196.18   0.000     13.28744    13.55561
+----------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      4912        4912           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+N = 21,880; 2,188 balanced groups of size 10
+N = 21,880; 151 unbalanced groups of sizes 10 to 1,340
+
+         total cost, research rows incl. supplements
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            0              0
+ 5%            0              0
+10%            0              0       Obs               8,752
+25%            0              0       Sum of wgt.       8,752
+
+50%       273094                      Mean           337353.7
+                        Largest       Std. dev.      482006.4
+75%     459148.5        6809885
+90%       801900        7451270       Variance       2.32e+11
+95%      1119194        7585657       Skewness       4.744792
+99%      2122530        8855607       Kurtosis       51.33546
+(123,360 observations deleted)
+(9 missing values generated)
+(9 real changes made)
+(7 real changes made)
+(1 real change made)
+file ../output/figures/all_jrnls/es_ppml/es_nih_total_cost_r1_r2_young_agenih.pdf saved as PDF format
+N = 27,240; 2,724 balanced groups of size 10
+N = 27,240; 136 unbalanced groups of sizes 10 to 1,680
+
+         total cost, research rows incl. supplements
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            0              0
+ 5%            0              0
+10%            0              0       Obs              10,896
+25%            0              0       Sum of wgt.      10,896
+
+50%       362746                      Mean           513894.8
+                        Largest       Std. dev.      874711.4
+75%       736901       1.85e+07
+90%      1145694       1.90e+07       Variance       7.65e+11
+95%      1494234       3.60e+07       Skewness       27.69022
+99%      2524846       5.18e+07       Kurtosis       1381.895
+(123,360 observations deleted)
+(9 missing values generated)
+(9 real changes made)
+(7 real changes made)
+(1 real change made)
+file ../output/figures/all_jrnls/es_ppml/es_nih_total_cost_r1_r2_old_agenih.pdf saved as PDF format
+
+==== pooled DiD PPML: nih_total_cost young_nih vs old_nih ====
+(dropped 1100 observations that are either singletons or separated by a fixed effect)
+Iteration 1:   deviance = 1.9427e+10  eps = .         iters = 4    tol = 1.0e-04  min(eta) =  -2.63  P   
+Iteration 2:   deviance = 1.7556e+10  eps = 1.07e-01  iters = 3    tol = 1.0e-04  min(eta) =  -3.61      
+Iteration 3:   deviance = 1.7420e+10  eps = 7.78e-03  iters = 2    tol = 1.0e-04  min(eta) =  -4.62      
+Iteration 4:   deviance = 1.7414e+10  eps = 3.51e-04  iters = 2    tol = 1.0e-04  min(eta) =  -5.62      
+Iteration 5:   deviance = 1.7414e+10  eps = 1.65e-05  iters = 2    tol = 1.0e-04  min(eta) =  -6.62      
+Iteration 6:   deviance = 1.7414e+10  eps = 2.56e-06  iters = 2    tol = 1.0e-05  min(eta) =  -7.62      
+Iteration 7:   deviance = 1.7414e+10  eps = 7.69e-07  iters = 2    tol = 1.0e-06  min(eta) =  -8.62      
+Iteration 8:   deviance = 1.7414e+10  eps = 2.77e-07  iters = 2    tol = 1.0e-07  min(eta) =  -9.62   S  
+Iteration 9:   deviance = 1.7414e+10  eps = 1.02e-07  iters = 2    tol = 1.0e-07  min(eta) = -10.62   S  
+Iteration 10:  deviance = 1.7414e+10  eps = 3.73e-08  iters = 2    tol = 1.0e-07  min(eta) = -11.61   S  
+Iteration 11:  deviance = 1.7414e+10  eps = 1.36e-08  iters = 2    tol = 1.0e-09  min(eta) = -12.60   S  
+Iteration 12:  deviance = 1.7414e+10  eps = 4.85e-09  iters = 2    tol = 1.0e-09  min(eta) = -13.58   S O
+------------------------------------------------------------------------------------------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
+Converged in 12 iterations and 27 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =     49,120
+Absorbing 2 HDFE groups                           Residual df     =      4,911
+Statistics robust to heteroskedasticity           Wald chi2(5)    =      68.97
+Deviance             =  1.74138e+10               Prob > chi2     =     0.0000
+Log pseudolikelihood =  -8707092070               Pseudo R2       =     0.5497
+
+Number of clusters (athr_id)=      4,912
+                            (Std. err. adjusted for 4,912 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+nih_total_~t | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+ Z_young_nih |   .5420722   .5421097     1.00   0.317    -.5204433    1.604588
+   Z_old_nih |   1.081772   .5136389     2.11   0.035     .0750587    2.088486
+ S_young_nih |   .3158598    .256098     1.23   0.217    -.1860831    .8178028
+   S_old_nih |  -.8058328   .3703202    -2.18   0.030    -1.531647   -.0800185
+PT_young_nih |  -.0840501   .1513776    -0.56   0.579    -.3807447    .2126445
+       _cons |   13.51719    .066268   203.98   0.000      13.3873    13.64707
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      4912        4912           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+N = 21,880; 2,188 balanced groups of size 10
+N = 21,880; 151 unbalanced groups of sizes 10 to 1,340
+PDID nih_total_cost young_nih: b=  0.5421 se=  0.5421  N=    49120 PIs=2188 Insts=151
+N = 27,240; 2,724 balanced groups of size 10
+N = 27,240; 136 unbalanced groups of sizes 10 to 1,680
+PDID nih_total_cost old_nih: b=  1.0818 se=  0.5136  N=    49120 PIs=2724 Insts=136
+
+ ( 1)  Z_young_nih - Z_old_nih = 0
+
+------------------------------------------------------------------------------
+nih_total_~t | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |  -.5397003   .7467984    -0.72   0.470    -2.003398    .9239977
+------------------------------------------------------------------------------
+DIFF nih_total_cost young_nih-old_nih: b= -0.5397 se=  0.7468 p=0.4699
+
+==== event study PPML: nih_total_cost young_nih vs old_nih ====
+(dropped 1100 observations that are either singletons or separated by a fixed effect)
+Iteration 1:   deviance = 1.9363e+10  eps = .         iters = 4    tol = 1.0e-04  min(eta) =  -2.91  P   
+Iteration 2:   deviance = 1.7496e+10  eps = 1.07e-01  iters = 3    tol = 1.0e-04  min(eta) =  -4.06      
+Iteration 3:   deviance = 1.7363e+10  eps = 7.67e-03  iters = 2    tol = 1.0e-04  min(eta) =  -4.70      
+Iteration 4:   deviance = 1.7357e+10  eps = 3.29e-04  iters = 2    tol = 1.0e-04  min(eta) =  -5.70      
+Iteration 5:   deviance = 1.7357e+10  eps = 1.61e-05  iters = 2    tol = 1.0e-04  min(eta) =  -6.70      
+Iteration 6:   deviance = 1.7357e+10  eps = 2.57e-06  iters = 2    tol = 1.0e-05  min(eta) =  -7.70      
+Iteration 7:   deviance = 1.7357e+10  eps = 7.73e-07  iters = 2    tol = 1.0e-06  min(eta) =  -8.70      
+Iteration 8:   deviance = 1.7357e+10  eps = 2.78e-07  iters = 2    tol = 1.0e-07  min(eta) =  -9.70   S  
+Iteration 9:   deviance = 1.7357e+10  eps = 1.02e-07  iters = 2    tol = 1.0e-07  min(eta) = -10.70   S  
+Iteration 10:  deviance = 1.7357e+10  eps = 3.74e-08  iters = 2    tol = 1.0e-07  min(eta) = -11.69   S  
+Iteration 11:  deviance = 1.7357e+10  eps = 1.36e-08  iters = 2    tol = 1.0e-09  min(eta) = -12.68   S  
+Iteration 12:  deviance = 1.7357e+10  eps = 4.87e-09  iters = 2    tol = 1.0e-09  min(eta) = -13.65   S O
+------------------------------------------------------------------------------------------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
+Converged in 12 iterations and 27 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =     49,120
+Absorbing 2 HDFE groups                           Residual df     =      4,911
+Statistics robust to heteroskedasticity           Wald chi2(37)   =     141.88
+Deviance             =  1.73568e+10               Prob > chi2     =     0.0000
+Log pseudolikelihood =  -8678582325               Pseudo R2       =     0.5512
+
+Number of clusters (athr_id)=      4,912
+                                    (Std. err. adjusted for 4,912 clusters in athr_id)
+--------------------------------------------------------------------------------------
+                     |               Robust
+      nih_total_cost | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+---------------------+----------------------------------------------------------------
+ int_lead4_young_nih |  -.0452425   .6136145    -0.07   0.941    -1.247905     1.15742
+ int_lead3_young_nih |  -.3261551   .4878236    -0.67   0.504    -1.282272    .6299616
+ int_lead2_young_nih |  -.0702424   .4123196    -0.17   0.865    -.8783741    .7378892
+  int_lag0_young_nih |   .3210737   .5670826     0.57   0.571    -.7903877    1.432535
+  int_lag1_young_nih |   1.037442   .6407551     1.62   0.105    -.2184151    2.293299
+  int_lag2_young_nih |   .9216498   .6794273     1.36   0.175    -.4100032    2.253303
+  int_lag3_young_nih |   1.257716   .7114626     1.77   0.077    -.1367245    2.652157
+  int_lag4_young_nih |   .1030805   .8346024     0.12   0.902     -1.53271    1.738871
+  int_lag5_young_nih |  -.7739904   .8929137    -0.87   0.386    -2.524069    .9760884
+   int_lead4_old_nih |  -.8630279   .5992114    -1.44   0.150    -2.037461    .3114049
+   int_lead3_old_nih |  -.9879631   .6065717    -1.63   0.103    -2.176822    .2008957
+   int_lead2_old_nih |  -1.187103   .5189975    -2.29   0.022    -2.204319   -.1698862
+    int_lag0_old_nih |  -.7693556   .6418225    -1.20   0.231    -2.027305    .4885934
+    int_lag1_old_nih |   .2449814   .6103033     0.40   0.688     -.951191    1.441154
+    int_lag2_old_nih |  -.0756156   .8120904    -0.09   0.926    -1.667283    1.516052
+    int_lag3_old_nih |  -.0137856   .9684795    -0.01   0.989    -1.911971    1.884399
+    int_lag4_old_nih |   1.841137   .8314444     2.21   0.027     .2115355    3.470738
+    int_lag5_old_nih |   .8458521   1.044718     0.81   0.418    -1.201758    2.893462
+mshr_lead4_young_nih |     .26167   .3334177     0.78   0.433    -.3918166    .9151567
+mshr_lead3_young_nih |   .4400204   .3233892     1.36   0.174    -.1938107    1.073852
+mshr_lead2_young_nih |   .3662342   .1817877     2.01   0.044     .0099369    .7225315
+ mshr_lag0_young_nih |   .2664762   .3133804     0.85   0.395    -.3477382    .8806906
+ mshr_lag1_young_nih |   .5684959   .3156899     1.80   0.072    -.0502449    1.187237
+ mshr_lag2_young_nih |     .31221   .3302004     0.95   0.344    -.3349708    .9593909
+ mshr_lag3_young_nih |   .2932681   .3393857     0.86   0.388    -.3719156    .9584518
+ mshr_lag4_young_nih |   .7679072   .3641743     2.11   0.035     .0541387    1.481676
+ mshr_lag5_young_nih |   1.164516   .5078788     2.29   0.022     .1690918     2.15994
+  mshr_lead4_old_nih |    .720058   .2933812     2.45   0.014     .1450414    1.295075
+  mshr_lead3_old_nih |   .6057854   .2883041     2.10   0.036     .0407197    1.170851
+  mshr_lead2_old_nih |   .4957024     .16747     2.96   0.003     .1674672    .8239375
+   mshr_lag0_old_nih |  -.1505897   .2880761    -0.52   0.601    -.7152084    .4140291
+   mshr_lag1_old_nih |   .0724647   .3180785     0.23   0.820    -.5509577    .6958871
+   mshr_lag2_old_nih |  -.4910354   .3769072    -1.30   0.193     -1.22976    .2476892
+   mshr_lag3_old_nih |  -.3723604   .5097051    -0.73   0.465    -1.371364    .6266433
+   mshr_lag4_old_nih |  -.6923905   .4865074    -1.42   0.155    -1.645928    .2611465
+   mshr_lag5_old_nih |  -.4697634   .4381029    -1.07   0.284    -1.328429    .3889025
+        PT_young_nih |  -.0805748   .1505603    -0.54   0.593    -.3756676    .2145181
+               _cons |   13.42152    .068414   196.18   0.000     13.28744    13.55561
+--------------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      4912        4912           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+N = 21,880; 2,188 balanced groups of size 10
+N = 21,880; 151 unbalanced groups of sizes 10 to 1,340
+
+         total cost, research rows incl. supplements
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            0              0
+ 5%            0              0
+10%            0              0       Obs               8,752
+25%            0              0       Sum of wgt.       8,752
+
+50%       273094                      Mean           337353.7
+                        Largest       Std. dev.      482006.4
+75%     459148.5        6809885
+90%       801900        7451270       Variance       2.32e+11
+95%      1119194        7585657       Skewness       4.744792
+99%      2122530        8855607       Kurtosis       51.33546
+(123,360 observations deleted)
+(9 missing values generated)
+(9 real changes made)
+(7 real changes made)
+(1 real change made)
+file ../output/figures/all_jrnls/es_ppml/es_nih_total_cost_r1_r2_young_nih_agenih.pdf saved as PDF format
+N = 27,240; 2,724 balanced groups of size 10
+N = 27,240; 136 unbalanced groups of sizes 10 to 1,680
+
+         total cost, research rows incl. supplements
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            0              0
+ 5%            0              0
+10%            0              0       Obs              10,896
+25%            0              0       Sum of wgt.      10,896
+
+50%       362746                      Mean           513894.8
+                        Largest       Std. dev.      874711.4
+75%       736901       1.85e+07
+90%      1145694       1.90e+07       Variance       7.65e+11
+95%      1494234       3.60e+07       Skewness       27.69022
+99%      2524846       5.18e+07       Kurtosis       1381.895
+(123,360 observations deleted)
+(9 missing values generated)
+(9 real changes made)
+(7 real changes made)
+(1 real change made)
+file ../output/figures/all_jrnls/es_ppml/es_nih_total_cost_r1_r2_old_nih_agenih.pdf saved as PDF format
+
+. postclose `ph'
+
+. 
+. use ../temp/age_nih_results, clear
+
+. list, sepby(yvar) noobs
+
+  +---------------------------------------------------------------------------------------------+
+  |           yvar         grp   split_type      post_b     post_se       N        r2_p   n_pis |
+  |---------------------------------------------------------------------------------------------|
+  |       n_grants       young       med_pi   .70074377   .39326047   49120   .23461028    2188 |
+  |       n_grants         old       med_pi   .58394151   .40410395   49120   .23461028    2724 |
+  |       n_grants   young_nih   med_pi_nih   .70074377   .39326047   49120   .23461028    2188 |
+  |       n_grants     old_nih   med_pi_nih   .58394151   .40410395   49120   .23461028    2724 |
+  |---------------------------------------------------------------------------------------------|
+  | nih_total_cost       young       med_pi   .54207215    .5421097   49120    .5497266    2188 |
+  | nih_total_cost         old       med_pi   1.0817724   .51363888   49120    .5497266    2724 |
+  | nih_total_cost   young_nih   med_pi_nih   .54207215    .5421097   49120    .5497266    2188 |
+  | nih_total_cost     old_nih   med_pi_nih   1.0817724   .51363888   49120    .5497266    2724 |
+  +---------------------------------------------------------------------------------------------+
+
+. export delimited using "../output/tables/`samp'/age_nih_results`suf'.txt", replace delim(tab)
+(file ../output/tables/all_jrnls/age_nih_results_r1_r2.txt not found)
+file ../output/tables/all_jrnls/age_nih_results_r1_r2.txt saved
+
+. 
+. log close
+      name:  <unnamed>
+       log:  /n/holylabs/pakes_lab/Lab/sci_eq/analysis/rf_heterogeneity/code/run_age_nih.log
+  log type:  text
+ closed on:  30 Jul 2026, 14:00:36
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

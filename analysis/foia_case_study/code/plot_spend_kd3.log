@@ -1,0 +1,159 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 120,000; see help set_maxvar.
+
+. do /tmp/plot_spend_kd3.do 
+
+. set more off
+
+. clear all
+
+. set scheme modern
+
+. preliminaries
+
+. version 17
+
+. local scratch /tmp/claude-67049/-n-holylabs-pakes-lab-Lab-sci-eq/593c86b4-6d7b-46e4-a29b-a5b5aeb79839/scratchpad
+
+. 
+. use ../external/samp/merged_foias_with_pis, clear
+
+. drop if mi(athr_id)
+(82,800 observations deleted)
+
+. gen year = year(date(date, "YMD"))
+
+. drop if year > 2013
+(322,872 observations deleted)
+
+. merge m:1 category using ../external/categories/categories_tfidf, keep(1 3)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                        28,242
+        from master                    28,242  (_merge==1)
+        from using                          0  (_merge==2)
+
+    Matched                            99,809  (_merge==3)
+    -----------------------------------------
+
+. rename _merge nonlab
+
+. replace nonlab = 0 if nonlab == 3
+(99,809 real changes made)
+
+. replace keep = 2 if keep == .
+(28,242 real changes made)
+
+. gen hq = keep == 1 | (bad_control == 1 & support >= 25 & precision >= 0.8 & recall >= 0.8)
+
+. gen nonlab_spend = spend if nonlab == 1
+(102,608 missing values generated)
+
+. gen lab_spend    = spend if nonlab == 0
+(31,351 missing values generated)
+
+. gen hq_labspend  = lab_spend if hq == 1
+(58,172 missing values generated)
+
+. collapse (sum) tot_spend = spend nonlab_spend lab_spend hq_labspend, by(athr_id year)
+
+. gen perc_lab_spend = lab_spend / tot_spend * 100
+(127 missing values generated)
+
+. collapse (mean) tot_spend nonlab_spend lab_spend hq_labspend perc_lab_spend (count) n_yrs = year, by(athr_id)
+
+. merge 1:1 athr_id using ../temp/foia_pi_age, keep(3) nogen
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                                68  
+    -----------------------------------------
+
+. qui sum age_2014, d
+
+. gen young = age_2014 < r(p50)
+
+. 
+. foreach v in tot_spend lab_spend nonlab_spend perc_lab_spend {
+  2.     if "`v'" == "tot_spend"      local xtitle "Avg annual total spend ($)"
+  3.     if "`v'" == "lab_spend"      local xtitle "Avg annual lab spend ($)"
+  4.     if "`v'" == "nonlab_spend"   local xtitle "Avg annual non-lab spend ($)"
+  5.     if "`v'" == "perc_lab_spend" local xtitle "Lab share of spend (%)"
+  6.     local w 5000
+  7.     local wlab "$5,000"
+  8.     if "`v'" == "perc_lab_spend" {
+  9.         local w 5
+ 10.         local wlab "5pp"
+ 11.     }
+ 12.     qui sum `v', d
+ 13.     local xcap = r(p95)
+ 14.     if "`v'" == "perc_lab_spend" local xcap = 100
+ 15.     qui sum `v' if young == 1, d
+ 16.     local mean_y = strtrim("`: di %9.0fc r(mean)'")
+ 17.     local p50_y  = strtrim("`: di %9.0fc r(p50)'")
+ 18.     local n_y    = r(N)
+ 19.     qui sum `v' if young == 0, d
+ 20.     local mean_o = strtrim("`: di %9.0fc r(mean)'")
+ 21.     local p50_o  = strtrim("`: di %9.0fc r(p50)'")
+ 22.     local n_o    = r(N)
+ 23.     cap drop _kx_y _kd_y _kx_o _kd_o _kp_y _kp_o
+ 24.     kdensity `v' if young == 1 & `v' <= `xcap', gen(_kx_y _kd_y) n(200) nograph
+ 25.     kdensity `v' if young == 0 & `v' <= `xcap', gen(_kx_o _kd_o) n(200) nograph
+ 26.     gen _kp_y = _kd_y * `w' * 100
+ 27.     gen _kp_o = _kd_o * `w' * 100
+ 28.     tw (line _kp_y _kx_y if inrange(_kx_y, 0, `xcap'), lcolor(ebblue)) ///
+>        (line _kp_o _kx_o if inrange(_kx_o, 0, `xcap'), lcolor(dkorange)), ///
+>        xtitle("`xtitle'") ytitle("Percent of PIs (per `wlab' bin)") ///
+>        legend(order(1 "Young: mean=`mean_y', p50=`p50_y', N=`n_y'" ///
+>                     2 "Old: mean=`mean_o', p50=`p50_o', N=`n_o'") ///
+>            pos(1) ring(0) cols(1) size(small) region(fcolor(none))) ///
+>        plotregion(margin(sides))
+ 29.     graph export ../output/figures/kd_`v'_by_age.pdf, replace
+ 30.     graph export `scratch'/kd3_`v'_by_age.png, replace width(1200)
+ 31.     cap drop _kx_y _kd_y _kx_o _kd_o _kp_y _kp_o
+ 32. }
+(n() set to 68)
+(n() set to 68)
+file ../output/figures/kd_tot_spend_by_age.pdf saved as PDF format
+(file /tmp/claude-67049/-n-holylabs-pakes-lab-Lab-sci-eq/593c86b4-6d7b-46e4-a29b-a5b5aeb79839/scratchpad/kd3_tot_spend_by_age.png not found)
+file /tmp/claude-67049/-n-holylabs-pakes-lab-Lab-sci-eq/593c86b4-6d7b-46e4-a29b-a5b5aeb79839/scratchpad/kd3_tot_spend_by_age.png written in PNG format
+(n() set to 68)
+(n() set to 68)
+file ../output/figures/kd_lab_spend_by_age.pdf saved as PDF format
+(file /tmp/claude-67049/-n-holylabs-pakes-lab-Lab-sci-eq/593c86b4-6d7b-46e4-a29b-a5b5aeb79839/scratchpad/kd3_lab_spend_by_age.png not found)
+file /tmp/claude-67049/-n-holylabs-pakes-lab-Lab-sci-eq/593c86b4-6d7b-46e4-a29b-a5b5aeb79839/scratchpad/kd3_lab_spend_by_age.png written in PNG format
+(n() set to 68)
+(n() set to 68)
+file ../output/figures/kd_nonlab_spend_by_age.pdf saved as PDF format
+(file /tmp/claude-67049/-n-holylabs-pakes-lab-Lab-sci-eq/593c86b4-6d7b-46e4-a29b-a5b5aeb79839/scratchpad/kd3_nonlab_spend_by_age.png not found)
+file /tmp/claude-67049/-n-holylabs-pakes-lab-Lab-sci-eq/593c86b4-6d7b-46e4-a29b-a5b5aeb79839/scratchpad/kd3_nonlab_spend_by_age.png written in PNG format
+(n() set to 68)
+(n() set to 68)
+file ../output/figures/kd_perc_lab_spend_by_age.pdf saved as PDF format
+(file /tmp/claude-67049/-n-holylabs-pakes-lab-Lab-sci-eq/593c86b4-6d7b-46e4-a29b-a5b5aeb79839/scratchpad/kd3_perc_lab_spend_by_age.png not found)
+file /tmp/claude-67049/-n-holylabs-pakes-lab-Lab-sci-eq/593c86b4-6d7b-46e4-a29b-a5b5aeb79839/scratchpad/kd3_perc_lab_spend_by_age.png written in PNG format
+
+. 
+end of do-file

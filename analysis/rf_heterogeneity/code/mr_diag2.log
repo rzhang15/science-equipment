@@ -1,0 +1,425 @@
+-------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  /n/holylabs/pakes_lab/Lab/sci_eq/analysis/rf_heterogeneity/code/mr
+> _diag2.log
+  log type:  text
+ opened on:  26 Jul 2026, 23:09:04
+
+. 
+. use ../temp/es_all_jrnls_r1_r2, clear
+
+. gen post       = year >= 2014
+
+. gen Z_it       = exposure      * post
+
+. gen Z_share_it = mkt_spend_shr * post
+
+. 
+. * ---------- E1. Is exposure correlated with baseline level WITHIN group? ---
+> -------
+. di as text _n(2) "=== E1. Exposure vs pre-period level, within baseline group
+>  ==="
+
+
+=== E1. Exposure vs pre-period level, within baseline group ===
+
+. preserve
+
+.     bys athr_id: keep if _n == 1
+(111,033 observations deleted)
+
+.     di as text "-- corr(exposure, pre_ppr_cnt_sum) overall and within group -
+> -"
+-- corr(exposure, pre_ppr_cnt_sum) overall and within group --
+
+.     corr exposure pre_ppr_cnt_sum
+(obs=12,337)
+
+             | exposure pre_pp~m
+-------------+------------------
+    exposure |   1.0000
+pre_ppr_cn~m |   0.0205   1.0000
+
+
+.     foreach g in 0 1 {
+  2.         di as text _n "  high_pre_ppr == `g':"
+  3.         corr exposure pre_ppr_cnt_sum if high_pre_ppr == `g'
+  4.     }
+
+  high_pre_ppr == 0:
+(obs=5,562)
+
+             | exposure pre_pp~m
+-------------+------------------
+    exposure |   1.0000
+pre_ppr_cn~m |  -0.0332   1.0000
+
+
+  high_pre_ppr == 1:
+(obs=6,775)
+
+             | exposure pre_pp~m
+-------------+------------------
+    exposure |   1.0000
+pre_ppr_cn~m |   0.0206   1.0000
+
+
+.     di as text _n "-- mean exposure by group --"
+
+-- mean exposure by group --
+
+.     table high_pre_ppr, stat(mean exposure) stat(sd exposure) stat(n exposure
+> ) nformat(%8.4f)
+
+--------------------------------------------------------------------------
+             |    Mean   Standard deviation   Number of non-missing values
+-------------+------------------------------------------------------------
+high_pre_ppr |                                                            
+  0          |  0.0314               0.0402                        5.6e+03
+  1          |  0.0328               0.0439                        6.8e+03
+  Total      |  0.0321               0.0423                        1.2e+04
+--------------------------------------------------------------------------
+
+. restore
+
+. 
+. * ---------- E2. Split-half reliability of the HP/LP classification ---------
+> -
+. di as text _n(2) "=== E2. Split-half reliability: HP defined on even vs odd p
+> re-years ==="
+
+
+=== E2. Split-half reliability: HP defined on even vs odd pre-years ===
+
+. preserve
+
+.     gen pe = ppr_cnt if inlist(year, 2010, 2012)
+(98,696 missing values generated)
+
+.     gen po = ppr_cnt if inlist(year, 2011, 2013)
+(98,696 missing values generated)
+
+.     bys athr_id: egen se_ = total(pe)
+
+.     bys athr_id: egen so_ = total(po)
+
+.     bys athr_id: keep if _n == 1
+(111,033 observations deleted)
+
+.     qui sum se_, d
+
+.     gen byte hp_e = se_ >= r(p50)
+
+.     qui sum so_, d
+
+.     gen byte hp_o = so_ >= r(p50)
+
+.     di as text "-- agreement between even-year and odd-year classification --
+> "
+-- agreement between even-year and odd-year classification --
+
+.     tab hp_e hp_o, row
+
++----------------+
+| Key            |
+|----------------|
+|   frequency    |
+| row percentage |
++----------------+
+
+           |         hp_o
+      hp_e |         0          1 |     Total
+-----------+----------------------+----------
+         0 |     2,092      1,579 |     3,671 
+           |     56.99      43.01 |    100.00 
+-----------+----------------------+----------
+         1 |     3,927      4,739 |     8,666 
+           |     45.32      54.68 |    100.00 
+-----------+----------------------+----------
+     Total |     6,019      6,318 |    12,337 
+           |     48.79      51.21 |    100.00 
+
+.     qui corr hp_e hp_o
+
+.     di as text "  corr(hp_even, hp_odd) = " %6.4f r(rho)
+  corr(hp_even, hp_odd) = 0.1068
+
+. restore
+
+. 
+. * ---------- E3. Clean split: define on 2010-2011, estimate on 2012-2019 ----
+> ------
+. di as text _n(2) "=== E3. Split defined on 2010-2011 only; estimation window 
+> 2012-2019 ==="
+
+
+=== E3. Split defined on 2010-2011 only; estimation window 2012-2019 ===
+
+. preserve
+
+.     gen p1011 = ppr_cnt if inlist(year, 2010, 2011)
+(98,696 missing values generated)
+
+.     bys athr_id: egen pre_early = total(p1011)
+
+.     bys athr_id: gen _one = _n == 1
+
+.     qui sum pre_early if _one == 1, d
+
+.     local cut = r(p50)
+
+.     gen byte hp2 = pre_early >= `cut'
+
+.     gen byte lp2 = pre_early <  `cut'
+
+.     di as text "  cut = `cut';  N PIs hi/lo:"
+  cut = 3;  N PIs hi/lo:
+
+.     qui count if _one == 1 & hp2 == 1
+
+.     di as text "    hp2 = " r(N)
+    hp2 = 8699
+
+.     qui count if _one == 1 & lp2 == 1
+
+.     di as text "    lp2 = " r(N)
+    lp2 = 3638
+
+. 
+.     keep if year >= 2012
+(24,674 observations deleted)
+
+.     gen Z_hp2 = Z_it * hp2
+
+.     gen Z_lp2 = Z_it * lp2
+
+.     gen S_hp2 = Z_share_it * hp2
+
+.     gen S_lp2 = Z_share_it * lp2
+
+.     gen PT_hp2 = post * hp2
+
+. 
+.     di as text _n "--- E3a. grp x post ---"
+
+--- E3a. grp x post ---
+
+.     ppmlhdfe ppr_cnt Z_hp2 Z_lp2 S_hp2 S_lp2 PT_hp2, absorb(athr_id year) vce
+> (cluster athr_id)
+Iteration 1:   deviance = 1.0605e+05  eps = .         iters = 4    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.84  P   
+Iteration 2:   deviance = 1.0258e+05  eps = 3.39e-02  iters = 3    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -2.51      
+Iteration 3:   deviance = 1.0253e+05  eps = 5.15e-04  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -2.87      
+Iteration 4:   deviance = 1.0252e+05  eps = 4.27e-06  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -2.96      
+Iteration 5:   deviance = 1.0252e+05  eps = 5.93e-09  iters = 2    tol = 1.0e-0
+> 5                                                                            
+>    min(eta) =  -2.96      
+Iteration 6:   deviance = 1.0252e+05  eps = 1.84e-14  iters = 2    tol = 1.0e-0
+> 7                                                                            
+>    min(eta) =  -2.96   S O
+-------------------------------------------------------------------------------
+> -----------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon 
+> below tolerance)
+Converged in 6 iterations and 15 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =     98,696
+Absorbing 2 HDFE groups                           Residual df     =     12,336
+Statistics robust to heteroskedasticity           Wald chi2(5)    =     268.06
+Deviance             =  102524.7576               Prob > chi2     =     0.0000
+Log pseudolikelihood =  -141539.993               Pseudo R2       =     0.2230
+
+Number of clusters (athr_id)=     12,337
+                           (Std. err. adjusted for 12,337 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+       Z_hp2 |   -.285101   .1589788    -1.79   0.073    -.5966938    .0264918
+       Z_lp2 |  -.6346588   .2997846    -2.12   0.034    -1.222226   -.0470917
+       S_hp2 |  -.0327773   .0662954    -0.49   0.621    -.1627139    .0971594
+       S_lp2 |  -.0427874   .1158677    -0.37   0.712     -.269884    .1843092
+      PT_hp2 |   .2195183   .0431702     5.08   0.000     .1349064    .3041302
+       _cons |   .6502448   .0246737    26.35   0.000     .6018851    .6986044
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |     12337       12337           0    *|
+        year |         8           1           7     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+.     local e3_hp = _b[Z_hp2]
+
+.     local e3_lp = _b[Z_lp2]
+
+.     local e3_hpse = _se[Z_hp2]
+
+.     local e3_lpse = _se[Z_lp2]
+
+.     lincom Z_hp2 - Z_lp2
+
+ ( 1)  Z_hp2 - Z_lp2 = 0
+
+------------------------------------------------------------------------------
+     ppr_cnt | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .3495578   .3393304     1.03   0.303    -.3155175    1.014633
+------------------------------------------------------------------------------
+
+.     local e3_d = r(estimate)
+
+.     local e3_dse = r(se)
+
+.     local e3_dp = r(p)
+
+. 
+.     di as text _n(2) "=== E3 SUMMARY (clean split, 2010-11 defined, 2012-19 e
+> st) ==="
+
+
+=== E3 SUMMARY (clean split, 2010-11 defined, 2012-19 est) ===
+
+.     di as text "  beta_HP = " %8.4f `e3_hp' " (" %6.4f `e3_hpse' ")"
+  beta_HP =  -0.2851 (0.1590)
+
+.     di as text "  beta_LP = " %8.4f `e3_lp' " (" %6.4f `e3_lpse' ")"
+  beta_LP =  -0.6347 (0.2998)
+
+.     di as text "  HP-LP   = " %8.4f `e3_d' " (" %6.4f `e3_dse' ")  p=" %5.3f 
+> `e3_dp'
+  HP-LP   =   0.3496 (0.3393)  p=0.303
+
+. restore
+
+. 
+. * ---------- E4. Same 2012-2019 window, ORIGINAL split, for apples-to-apples 
+> ----------
+. di as text _n(2) "=== E4. Original 2010-13 split, same 2012-2019 window ==="
+
+
+=== E4. Original 2010-13 split, same 2012-2019 window ===
+
+. preserve
+
+.     keep if year >= 2012
+(24,674 observations deleted)
+
+.     gen Z_hp = Z_it * high_pre_ppr
+
+.     gen Z_lp = Z_it * low_pre_ppr
+
+.     gen S_hp = Z_share_it * high_pre_ppr
+
+.     gen S_lp = Z_share_it * low_pre_ppr
+
+.     gen PT_hp = post * high_pre_ppr
+
+.     ppmlhdfe ppr_cnt Z_hp Z_lp S_hp S_lp PT_hp, absorb(athr_id year) vce(clus
+> ter athr_id)
+Iteration 1:   deviance = 1.0640e+05  eps = .         iters = 3    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.87  P   
+Iteration 2:   deviance = 1.0283e+05  eps = 3.47e-02  iters = 3    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -2.54      
+Iteration 3:   deviance = 1.0277e+05  eps = 5.36e-04  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -2.90      
+Iteration 4:   deviance = 1.0277e+05  eps = 4.26e-06  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -2.98      
+Iteration 5:   deviance = 1.0277e+05  eps = 5.91e-09  iters = 2    tol = 1.0e-0
+> 5                                                                            
+>    min(eta) =  -2.98      
+Iteration 6:   deviance = 1.0277e+05  eps = 1.84e-14  iters = 2    tol = 1.0e-0
+> 7                                                                            
+>    min(eta) =  -2.98   S O
+-------------------------------------------------------------------------------
+> -----------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon 
+> below tolerance)
+Converged in 6 iterations and 14 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =     98,696
+Absorbing 2 HDFE groups                           Residual df     =     12,336
+Statistics robust to heteroskedasticity           Wald chi2(5)    =      85.33
+Deviance             =  102774.2804               Prob > chi2     =     0.0000
+Log pseudolikelihood = -141664.7544               Pseudo R2       =     0.2223
+
+Number of clusters (athr_id)=     12,337
+                           (Std. err. adjusted for 12,337 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+        Z_hp |  -.2850064   .1641135    -1.74   0.082     -.606663    .0366502
+        Z_lp |  -.5641269   .2688146    -2.10   0.036    -1.090994   -.0372599
+        S_hp |   .0688836   .0688327     1.00   0.317     -.066026    .2037932
+        S_lp |   -.068798   .1029162    -0.67   0.504      -.27051     .132914
+       PT_hp |  -.1692907    .040219    -4.21   0.000    -.2481184    -.090463
+       _cons |   .8339096    .021876    38.12   0.000     .7910334    .8767859
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |     12337       12337           0    *|
+        year |         8           1           7     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+.     local e4_hp = _b[Z_hp]
+
+.     local e4_lp = _b[Z_lp]
+
+.     local e4_hpse = _se[Z_hp]
+
+.     local e4_lpse = _se[Z_lp]
+
+.     lincom Z_hp - Z_lp
+
+ ( 1)  Z_hp - Z_lp = 0
+
+------------------------------------------------------------------------------
+     ppr_cnt | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .2791205   .3149517     0.89   0.375    -.3381734    .8964144
+------------------------------------------------------------------------------
+
+.     di as text _n(2) "=== E4 SUMMARY (original split, 2012-19 window) ==="
+
+
+=== E4 SUMMARY (original split, 2012-19 window) ===
+
+.     di as text "  beta_HP = " %8.4f `e4_hp' " (" %6.4f `e4_hpse' ")"
+  beta_HP =  -0.2850 (0.1641)
+
+.     di as text "  beta_LP = " %8.4f `e4_lp' " (" %6.4f `e4_lpse' ")"
+  beta_LP =  -0.5641 (0.2688)
+
+.     di as text "  HP-LP   = " %8.4f r(estimate) " (" %6.4f r(se) ")  p=" %5.3
+> f r(p)
+  HP-LP   =   0.2791 (0.3150)  p=0.375
+
+. restore
+
+. 
+. log close
+      name:  <unnamed>
+       log:  /n/holylabs/pakes_lab/Lab/sci_eq/analysis/rf_heterogeneity/code/mr
+> _diag2.log
+  log type:  text
+ closed on:  26 Jul 2026, 23:15:36
+-------------------------------------------------------------------------------

@@ -21,14 +21,6 @@ Notes:
       3. More than 2 billion observations are allowed; see help obs_advice.
       4. Maximum number of variables is set to 120,000; see help set_maxvar.
 
-. do /tmp/exp_by_cluster.do 
-
-. use /n/home02/cxu75/sci_eq/analysis/reduced_form/temp/es_all_jrnls_r1_r2_publ
-> ic, clear
-file
-    /n/home02/cxu75/sci_eq/analysis/reduced_form/temp/es_all_jrnls_r1_r2_publ
-    > ic.dta not found
-r(601);
-
-end of do-file
+. do eb_chk.do 
+file eb_chk.do not found
 r(601);

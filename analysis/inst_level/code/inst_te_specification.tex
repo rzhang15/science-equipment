@@ -1,0 +1,249 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1.1in]{geometry}
+\usepackage{amsmath, amssymb, booktabs}
+\usepackage[colorlinks=true, linkcolor=blue]{hyperref}
+
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Post}{\mathrm{Post}}
+
+\title{Institution-Level Treatment Effects:\\ Specification, Identification, and the Levels-vs-Slopes Distinction}
+\author{}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{Setup and notation}
+
+PI-by-year panel, 2010--2019. PI $i$ belongs to exactly one institution
+$j(i)$ for the entire panel (no movers, by sample construction). The 2014
+procurement shock hits PIs with intensity $E_i$ (imputed exposure, fixed over
+time); $S_i$ is the PI's market-spend share (the partialling-out control from
+the main reduced form). Define
+\[
+\Post_t = \mathbf{1}[t \ge 2014], \qquad
+Z_{it} = E_i \cdot \Post_t, \qquad
+Z^{S}_{it} = S_i \cdot \Post_t .
+\]
+Outcome $Y_{it}$ is the last-author publication count; all models are PPML
+(Poisson pseudo-likelihood), so coefficients read as log points.
+
+\section{Three distinct institution-level objects}
+
+It is worth being pedantic about three objects that are easy to conflate.
+Write the conditional mean in an encompassing form:
+\begin{equation}
+\E[Y_{it}] \;=\; \exp\Big(
+\underbrace{\alpha_i}_{\text{PI level}}
++ \underbrace{\delta_t}_{\text{year}}
++ \underbrace{\phi_{j(i)}}_{\substack{\text{institution}\\ \text{LEVEL}}}
++ \underbrace{\pi_{j(i)}\,\Post_t}_{\substack{\text{institution}\\ \text{response INTERCEPT}}}
++ \underbrace{\beta_{j(i)}\, Z_{it}}_{\substack{\text{institution}\\ \text{response SLOPE}}}
++ \gamma_{j(i)}\, Z^{S}_{it}
+\Big).
+\label{eq:encompassing}
+\end{equation}
+
+To fix language, consider institution $j$'s \emph{response line}: the
+post-minus-pre change in log expected output for one of its PIs with exposure
+$E$,
+\begin{equation}
+\Delta_j(E) \;=\; \pi_j + \beta_j \, E .
+\label{eq:responseline}
+\end{equation}
+
+\begin{center}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Object & Name used here & What it measures & Identified w/o movers? \\
+\midrule
+$\phi_j$ & institution \textbf{level} & permanent output difference & \textbf{No} \\
+$\pi_j$ & response \textbf{intercept} ($te_j$) & post-2014 shift common to all of $j$'s PIs & \textbf{Yes} \\
+$\beta_j$ & response \textbf{slope} (gradient) & how the shift scales with exposure within $j$ & Yes (needs $\ge 2$ PIs w/ distinct $E$) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\paragraph{``Levels'' vs.\ ``slopes,'' precisely.}
+Throughout this note, \emph{level} refers only to $\phi_j$: a time-invariant
+institution effect on output. \emph{Intercept} ($\pi_j$, our $te_j$) is a
+level shift \emph{of the response} --- constant across the institution's PIs
+but occurring only after 2014. \emph{Slope} ($\beta_j$) is the gradient of
+the response in exposure, within the institution. The earlier draft of this
+analysis estimated institution-specific $\beta_j$; the current version
+estimates institution-specific $\pi_j$ with a pooled slope. They answer
+different questions (Section~\ref{sec:gradient}).
+
+\section{Why institution levels $\phi_j$ are not identified}
+
+In an AKM design, person and firm effects are separated by movers: when a
+worker switches firms, the change in her outcome identifies the firm
+contrast. Here nobody moves, so the PI fixed effects are a strict refinement
+of institution fixed effects: the institution dummy equals the sum of its
+PIs' dummies. Adding a constant $c$ to $\phi_j$ and subtracting $c$ from
+$\alpha_i$ for every $i$ with $j(i)=j$ leaves the likelihood unchanged. The
+data cannot distinguish a productive institution from an institution staffed
+by productive people. Consequently $\phi_j$ is dropped from all estimated
+models (absorbed into $\alpha_i$), and \emph{nothing in this analysis speaks
+to permanent institutional quality differences}.
+
+\section{The estimated specification: institution response intercepts}
+\label{sec:main}
+
+The implemented model (\texttt{inst\_fe\_diag.do}, Stage 1) restricts the
+slope to be common across institutions ($\beta_j \equiv b$, $\gamma_j \equiv
+g$) and saturates the intercepts:
+\begin{equation}
+\E[Y_{it}] \;=\; \exp\Big( \alpha_i + \delta_t + b\, Z_{it} + g\, Z^{S}_{it}
++ \sum_{j \ne j_0} te_j \, \mathbf{1}[j(i)=j] \cdot \Post_t \Big),
+\label{eq:main}
+\end{equation}
+estimated by \texttt{ppmlhdfe} with standard errors clustered by PI.
+
+\paragraph{Interpretation.}
+Take two PIs with the \emph{same} exposure $E$, one at institution $j$, one
+at institution $k$. Under \eqref{eq:main} their expected post-minus-pre
+log-output changes differ by exactly $te_j - te_k$: the common exposure
+response $b E$ and the common year path $\delta_t$ cancel. So $te_j$ answers:
+\emph{conditional on identical exposure, how does being at institution $j$
+change the output response to the shock period?} This is the feasible analog
+of the AKM institution effect --- but for the \emph{change} rather than the
+level.
+
+\paragraph{Why $te_j$ is identified without movers.}
+The trick is that $te_j$ multiplies $\Post_t$, which varies \emph{within} PI
+over time. A PI fixed effect $\alpha_i$ is constant over the panel; it
+absorbs ``PI $i$ is productive,'' but cannot absorb ``PI $i$'s output fell
+after 2014.'' Each PI's pre-2014 years therefore act as her own control, and
+$te_j$ is (up to the common terms being netted out) an average of
+\emph{within-PI pre/post changes} across the PIs of institution $j$. No
+comparison requires observing the same person at two institutions. The
+person-vs-place confound that destroys $\phi_j$ never arises, because the
+person's level is differenced out by her own history. Even a single-PI
+institution has an identified (if noisy) $te_j$.
+
+\paragraph{Normalization.}
+Summing the interactions over all institutions gives
+$\sum_j \mathbf{1}[j(i)=j]\Post_t = \Post_t$, which lies in the span of the
+year effects. Hence one institution $j_0$ must be omitted and only
+\emph{relative} intercepts are identified --- the same normalization as AKM
+firm effects; it is a bookkeeping issue, not an identification failure. We
+omit the largest institution (Johns Hopkins, 464 PIs) so the reference is
+maximally precise, then re-center all $\hat{te}_j$ at their precision-weighted
+mean ($1/\hat{se}_j^2$ weights). Reported effects are therefore
+\emph{deviations from the average institution}. Re-centering also nets out
+the reference institution's estimation error, which is common to every
+$\hat{te}_j$. All second-stage slopes and variance decompositions are
+invariant to these normalization choices; only the constant moves.
+
+\paragraph{What $te_j$ does and does not contain.}
+$te_j$ absorbs \emph{any} institution-wide change in output coinciding with
+the post period --- shock transmission, but also e.g.\ a 2015 building
+opening or leadership change. Two facts tie the estimated heterogeneity back
+to the shock: (i) institutions with higher mean exposure have systematically
+more negative $\hat{te}_j$ (the ``dose'' gradient in the second stage), and
+(ii) the buffer covariates (endowment etc.)\ explain the between-institution
+variance in the predicted direction. Additionally, without movers, a causal
+institution effect cannot be separated from \emph{sorting}: institutions may
+differ in the (unobserved) resilience of the PIs they attract. $te_j$ is
+``the effect of being at institution $j$'' in the descriptive sense.
+
+\section{The earlier specification: institution response slopes}
+\label{sec:gradient}
+
+An earlier version of the analysis instead saturated the \emph{slopes}:
+\begin{equation}
+\E[Y_{it}] \;=\; \exp\Big( \alpha_i + \lambda_{j(i),t}
++ \beta_j \, Z_{it} + \gamma_j \, Z^{S}_{it} \Big),
+\label{eq:gradient}
+\end{equation}
+where $\lambda_{jt}$ are institution$\times$year fixed effects. Two points
+about this design:
+
+\begin{enumerate}
+\item \textbf{What $\beta_j$ measures.} $\beta_j$ is the slope of the
+response line \eqref{eq:responseline} within institution $j$: among PIs
+\emph{at the same institution}, how much worse is the post-2014 outcome per
+unit of exposure. Cross-institution heterogeneity in $\beta_j$ asks: is the
+exposure \emph{gradient} steeper at some institutions than others?
+
+\item \textbf{Why $\lambda_{jt}$ (or at least $\pi_j \Post_t$) must be
+included.} If \eqref{eq:gradient} used only common year effects $\delta_t$,
+an institution-wide post shock ($\pi_j$-type variation) would have no
+dedicated regressor and would be projected onto the only institution-specific
+regressors available --- the exposure interactions --- contaminating
+$\hat\beta_j$. With $\lambda_{jt}$ absorbed, every institution-level shift in
+every year is soaked up nonparametrically, and $\beta_j$ is a pure
+within-institution, cross-PI comparison. The cost is that $\lambda_{jt}$
+also absorbs $\pi_j$ itself: \emph{the slope specification is mechanically
+silent about intercept heterogeneity, and vice versa.}
+\end{enumerate}
+
+\paragraph{Identification requirements differ.}
+$\beta_j$ is identified only if institution $j$ has at least two PIs with
+\emph{different} exposure values (with exactly two, $\beta_j$ and $\gamma_j$
+are collinear and only one is estimable). Single-PI institutions have no
+within-institution exposure contrast at all; in the joint estimation their
+unidentified columns degrade the full variance matrix --- the practical
+failure that motivated the redesign. The intercept specification
+\eqref{eq:main} has no such requirement.
+
+\paragraph{The two objects are complements.}
+Neither specification can see the other's effect:
+\begin{center}
+\begin{tabular}{@{}lcc@{}}
+\toprule
+True institutional behavior & Appears in $te_j$? & Appears in $\beta_j$? \\
+\midrule
+Uniform cushion (helps all PIs equally) & Yes & No \\
+Targeted cushion (protects exposed PIs) & Partially$^{\dagger}$ & Yes (flatter $\beta_j$) \\
+Unrelated inst-wide 2014 change & Yes (confound) & No \\
+\bottomrule
+\end{tabular}
+
+{\footnotesize $^{\dagger}$a targeted cushion raises the institution's
+\emph{average} response and so moves $te_j$ toward zero, by an amount
+depending on the institution's exposure distribution.}
+\end{center}
+A buffering story in which well-endowed institutions cushion the shock
+predicts \emph{both} a less-negative intercept ($te_j$) and a flatter slope
+($\beta_j$) at buffered institutions. The current pipeline tests the
+intercept margin; the slope margin is a natural companion exercise using
+\eqref{eq:gradient}.
+
+\section{Estimation and inference details}
+
+\begin{itemize}
+\item \textbf{Stage 1.} Equation \eqref{eq:main} by \texttt{ppmlhdfe};
+institution$\times$post dummies are constructed manually (Stata's factor
+machinery silently re-bases interactions, which in one run moved the
+reference institution without notice). Clustering is at the PI level:
+institution-level clustering is \emph{mechanically degenerate} for
+institution-specific coefficients, because each $te_j$'s score has support in
+exactly one cluster, driving its cluster-robust variance to zero. PI
+clustering understates any residual cross-PI dependence within institutions;
+first-stage SEs are therefore screening-grade, with definitive inference
+deferred to an institution-block bootstrap of the full pipeline.
+\item \textbf{Heterogeneity test.} Cochran's $Q=\sum_j
+\hat{se}_j^{-2}(\hat{te}_j - \overline{te})^2 \sim \chi^2_{J-1}$ under
+homogeneity (current run: $Q=161.5$, $df=127$, $p=0.021$).
+\item \textbf{Stage 2.} Fay--Herriot random-effects meta-regressions of
+$\hat{te}_j$ on institution characteristics (REML, Knapp--Hartung SEs),
+weighting each institution by $1/(\hat\tau^2 + \hat{se}_j^2)$; a univariate
+screen with BH/Bonferroni corrections, then a joint ``horse race'' of
+endowment, nonprofit funding, and funding-source diversification, controlling
+for institution mean exposure (dose).
+\item \textbf{Empirical Bayes.} $\hat{te}^{EB}_j = \bar{te} +
+\hat\lambda_j(\hat{te}_j - \bar{te})$ with $\hat\lambda_j = \hat\tau^2 /
+(\hat\tau^2 + \hat{se}_j^2)$. Because most of the raw cross-institution
+spread is sampling noise ($I^2 \approx 20$--$25\%$), shrinkage is strong;
+the EB spread is a lower bound on true heterogeneity given that first-stage
+SEs are, if anything, understated.
+\item \textbf{Cross-check.} A one-step pooled PPML replacing the estimated
+$\hat{te}_j$ with direct $\Post_t \times W_j$ interactions reproduces the
+horse-race coefficients in sign and magnitude for endowment and
+diversification, validating that the two-step projection is not an artifact
+of estimation-then-regression.
+\end{itemize}
+
+\end{document}

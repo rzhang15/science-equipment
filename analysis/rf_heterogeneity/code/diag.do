@@ -23,9 +23,9 @@ local lbl_tfnd  "Total R&D Funding"
 local lbl_lsf   "Life-Sci Funding"
 local lbl_endow "Endowment"
 
-* Loop over both samples: R1+R2+public and R1-only-public. All output PDFs and
-* tempfile paths get the sample suffix appended.
-foreach samp_suf in _r1_r2_public _r1_public {
+* Loop over both samples: R1+R2 (public+private) and R1-only (public+private).
+* All output PDFs and tempfile paths get the sample suffix appended.
+foreach samp_suf in _r1_r2 _r1 {
 di as text _n(3) "============================================================" ///
     _n "=== SAMPLE: `samp_suf'"                                                 ///
     _n "============================================================" _n
@@ -33,6 +33,21 @@ di as text _n(3) "============================================================" 
 use ../temp/es_all_jrnls`samp_suf', clear
 qui gunique athr_id
 di as text "Unique PIs in panel = " r(unique)
+
+* Baseline grants-per-paper: pre-period NIH grants active per year (pre_nihg,
+* built in add_het_splits) over pre-period papers per year. Dropped from the
+* LPMs when either input is unavailable.
+local gppv
+cap drop pre_gpp
+cap confirm variable pre_nihg
+local rc_g = _rc
+cap confirm variable pre_ppr_cnt_avg
+local rc_p = _rc
+if `rc_g' == 0 & `rc_p' == 0 {
+    gen double pre_gpp = pre_nihg / pre_ppr_cnt_avg if pre_ppr_cnt_avg > 0 & !mi(pre_ppr_cnt_avg)
+    local gppv pre_gpp
+}
+else di as error "diag `samp_suf': pre_nihg or pre_ppr_cnt_avg missing -- pre_gpp SKIPPED in tabstat/LPMs."
 
 * ============================================================
 * Part A: PI-level diagnostics (preserve for the joint 2x2 in Part B)
@@ -53,7 +68,7 @@ local n_r2 = r(N)
 
 graph bar (mean) young, ///
     over(r1, relabel(1 `"R2 (N=`n_r2')"' 2 `"R1 (N=`n_r1')"')) ///
-    ytitle("Share Young") bar(1, color(ebblue)) ///
+    ytitle("Share Early-Career") bar(1, color(ebblue)) ///
     blabel(bar, format(%4.3f) size(medium)) ///
     plotregion(margin(sides))
 graph export ../output/figures/all_jrnls/diag_share_young_by_r1`samp_suf'.pdf, replace
@@ -66,27 +81,50 @@ tw histogram age_2014 if r1 == 1, freq lcolor(ebblue) fcolor(ebblue%30) width(2)
 graph export ../output/figures/all_jrnls/diag_age_hist_by_r1`samp_suf'.pdf, replace
 
 * --- A2: baseline productivity kdensity (young vs old) ---
+* Total pre-period papers and papers per pre-period year.
 qui count if young == 1
 local n_y = r(N)
 qui count if young == 0
 local n_o = r(N)
-qui sum pre_ppr_cnt_sum if young == 1
-local mu_y : dis %5.1f r(mean)
-qui sum pre_ppr_cnt_sum if young == 0
-local mu_o : dis %5.1f r(mean)
-gen double ln_pre_ppr = ln(1 + pre_ppr_cnt_sum)
-tw kdensity ln_pre_ppr if young == 1, lcolor(ebblue) lwidth(medthick) || ///
-   kdensity ln_pre_ppr if young == 0, lcolor(dkorange) lwidth(medthick) ///
-   , xtitle("ln(1 + Pre-Period Paper Count, 2009-2013)") ///
-     ytitle("Density") ///
-     legend(order(1 "Young (N=`n_y', mean=`mu_y')" 2 "Old (N=`n_o', mean=`mu_o')") ///
-            pos(2) ring(0) rows(2) size(small)) ///
-     plotregion(margin(sides))
-graph export ../output/figures/all_jrnls/diag_kd_pre_ppr_ln`samp_suf'.pdf, replace
+local prod_src    pre_ppr_cnt_sum pre_ppr_cnt_avg
+local prod_alias  ppr_tot         ppr_yr
+local lbl_ppr_tot "Total Papers"
+local lbl_ppr_yr  "Papers per Year"
+local fmt_ppr_tot %6.1f
+local fmt_ppr_yr  %5.2f
+forvalues i = 1/2 {
+    local src : word `i' of `prod_src'
+    local a   : word `i' of `prod_alias'
+    local xlbl "`lbl_`a''"
+    local f   "`fmt_`a''"
+    cap confirm variable `src'
+    if _rc {
+        di as error "diag `samp_suf': `src' not found -- `a' kdensity SKIPPED."
+        continue
+    }
+    qui sum `src' if young == 1, d
+    local mu_y = strtrim(string(r(mean), "`f'"))
+    local md_y = strtrim(string(r(p50),  "`f'"))
+    qui sum `src' if young == 0, d
+    local mu_o = strtrim(string(r(mean), "`f'"))
+    local md_o = strtrim(string(r(p50),  "`f'"))
+    di as text "A2 `a': young mean=`mu_y' p50=`md_y' N=`n_y' | old mean=`mu_o' p50=`md_o' N=`n_o'"
+    cap drop ln_pre_`a'
+    gen double ln_pre_`a' = ln(1 + `src')
+    tw kdensity ln_pre_`a' if young == 1, lcolor(ebblue) lwidth(medthick) || ///
+       kdensity ln_pre_`a' if young == 0, lcolor(dkorange) lwidth(medthick) ///
+       , xtitle("ln(1 + Pre-Period `xlbl')") ///
+         ytitle("Density") ///
+         legend(order(1 "Early-Career: mean=`mu_y', p50=`md_y', N=`n_y'" ///
+                      2 "Late-Career: mean=`mu_o', p50=`md_o', N=`n_o'") ///
+                pos(2) ring(0) rows(2) size(small)) ///
+         plotregion(margin(sides))
+    graph export ../output/figures/all_jrnls/diag_kd_pre_`a'_ln`samp_suf'.pdf, replace
+}
 
 * --- A3: LPM of young on characteristics ---
 di as text _n(2) "=== Characteristic means by young / old ==="
-tabstat pre_ppr_cnt_sum pre_gpp pre_team_avg pre_coauth_avg ///
+tabstat pre_ppr_cnt_sum `gppv' pre_team_avg pre_coauth_avg ///
         age_2014 msa_size_at r1 ic_tfnd ic_fedf ic_endow, ///
         by(young) stats(mean sd n) col(stats)
 
@@ -94,7 +132,7 @@ tabstat pre_ppr_cnt_sum pre_gpp pre_team_avg pre_coauth_avg ///
 * team size / grants-per-paper? Regress each char on the young dummy. Positive
 * young coef = young PIs have MORE of that char; negative = LESS.
 di as text _n(2) "=== Char ~ young (per-char reversed regression, cluster inst_id) ==="
-foreach c in pre_ppr_cnt_sum pre_coauth_avg pre_team_avg pre_gpp msa_size_at {
+foreach c in pre_ppr_cnt_sum pre_coauth_avg pre_team_avg `gppv' msa_size_at {
     di as text _n "--- reg `c' young, vce(cluster inst_id) ---"
     reg `c' young, vce(cluster inst_id)
 }
@@ -106,11 +144,12 @@ foreach a of local ic_aliases {
 }
 
 * Standardize PI-level and ic vars so coefficients are directly comparable.
-foreach v of varlist pre_ppr_cnt_sum pre_gpp pre_team_avg pre_coauth_avg ///
+foreach v of varlist pre_ppr_cnt_sum `gppv' pre_team_avg pre_coauth_avg ///
                      msa_size_at {
     qui sum `v'
     gen double z_`v' = (`v' - r(mean)) / r(sd)
 }
+local z_gppv = cond("`gppv'" == "", "", "z_`gppv'")
 foreach a of local ic_aliases {
     cap confirm variable ic_`a'
     if _rc continue
@@ -126,10 +165,10 @@ foreach a of local ic_aliases {
     if _rc continue
     qui count if !mi(z_ic_`a')
     di as text _n "-- young ~ PI chars + z_ic_`a' (N with z_ic_`a' non-mi = " r(N) ") --"
-    reg young z_pre_ppr_cnt_sum z_pre_gpp z_pre_team_avg z_pre_coauth_avg ///
+    reg young z_pre_ppr_cnt_sum `z_gppv' z_pre_team_avg z_pre_coauth_avg ///
               z_msa_size_at r1 z_ic_`a', vce(cluster inst_id)
     di as text _n "-- same, R1 only --"
-    reg young z_pre_ppr_cnt_sum z_pre_gpp z_pre_team_avg z_pre_coauth_avg ///
+    reg young z_pre_ppr_cnt_sum `z_gppv' z_pre_team_avg z_pre_coauth_avg ///
               z_msa_size_at z_ic_`a' if r1 == 1, vce(cluster inst_id)
 }
 
@@ -140,7 +179,7 @@ foreach a of local ic_aliases {
     cap confirm variable z_ic_`a'
     if !_rc local all_z `all_z' z_ic_`a'
 }
-reg young z_pre_ppr_cnt_sum z_pre_gpp z_pre_team_avg z_pre_coauth_avg ///
+reg young z_pre_ppr_cnt_sum `z_gppv' z_pre_team_avg z_pre_coauth_avg ///
           z_msa_size_at r1 `all_z', vce(cluster inst_id)
 
 * --- A4a: Age distribution by hi/lo baseline productivity ---
@@ -168,7 +207,7 @@ foreach spec of local pi_split_specs {
     tw kdensity age_2014 if `dvar' == 1, lcolor(ebblue) lwidth(medthick) || ///
        kdensity age_2014 if `dvar' == 0, lcolor(dkorange) lwidth(medthick) ///
        , xtitle("Age in 2014") ytitle("Density") ///
-         subtitle("`dlbl' split (share young: Hi=`sh_yh', Lo=`sh_yl')", size(small)) ///
+         subtitle("`dlbl' split (share early-career: Hi=`sh_yh', Lo=`sh_yl')", size(small)) ///
          legend(order(1 "High `dlbl' (N=`n_hi', mean=`mu_hi')" ///
                       2 "Low `dlbl' (N=`n_lo', mean=`mu_lo')") ///
                 pos(6) ring(1) rows(1) size(small)) ///
@@ -241,8 +280,8 @@ foreach wt of local wt_list {
         local sh_hph : dis %4.2f r(mean)
         qui sum high_pre_ppr if `hi'_`a' == 0
         local sh_hpl : dis %4.2f r(mean)
-        tw kdensity ln_pre_ppr if `hi'_`a' == 1, lcolor(ebblue) lwidth(medthick) || ///
-           kdensity ln_pre_ppr if `hi'_`a' == 0, lcolor(dkorange) lwidth(medthick) ///
+        tw kdensity ln_pre_ppr_tot if `hi'_`a' == 1, lcolor(ebblue) lwidth(medthick) || ///
+           kdensity ln_pre_ppr_tot if `hi'_`a' == 0, lcolor(dkorange) lwidth(medthick) ///
            , xtitle("ln(1 + Pre-Period Paper Count, 2009-2013)") ytitle("Density") ///
              subtitle("Cutoff: `wt_lbl' of ic_`a' (share HP: Hi=`sh_hph', Lo=`sh_hpl')", size(small)) ///
              legend(order(1 "Hi `a' (N=`n_hi', mean=`mu_hi')" ///
@@ -475,7 +514,7 @@ foreach wt of local wt_list {
        , xline(0, lcolor(gs10) lpattern(solid)) ///
          ylabel(`ylabs', angle(0) labsize(small) noticks nogrid) ///
          ytitle("") xtitle("β on Exposure x Post (ppr_cnt)", size(small)) ///
-         legend(order(2 "Young x Hi" 4 "Old x Hi") pos(11) ring(0) rows(2) size(small)) ///
+         legend(order(2 "Early-Career x Hi" 4 "Late-Career x Hi") pos(11) ring(0) rows(2) size(small)) ///
          ysize(`=max(6, `nrow'*0.5)') xsize(7) ///
          plotregion(margin(sides))
     graph export ../output/figures/all_jrnls/diag_joint_`wt'_yhi_vs_ohi`samp_suf'.pdf, replace
@@ -496,7 +535,7 @@ foreach wt of local wt_list {
        , xline(0, lcolor(gs10) lpattern(solid)) ///
          ylabel(`ylabs', angle(0) labsize(small) noticks nogrid) ///
          ytitle("") xtitle("β on Exposure x Post (ppr_cnt)", size(small)) ///
-         legend(order(2 "Young x Hi" 4 "Young x Lo" 6 "Old x Hi" 8 "Old x Lo") ///
+         legend(order(2 "Early-Career x Hi" 4 "Early-Career x Lo" 6 "Late-Career x Hi" 8 "Late-Career x Lo") ///
                 pos(11) ring(0) rows(4) size(small)) ///
          ysize(`=max(6, `nrow'*0.7)') xsize(8) ///
          plotregion(margin(sides))
@@ -541,14 +580,14 @@ foreach wt of local wt_list {
            rcap ub lb y if inlist(y, 2, 1), horizontal lcolor(dkorange%70) msize(vsmall) || ///
            scatter y b if inlist(y, 2, 1), mcolor(dkorange) msymbol(D) msize(medium)      ///
            , xline(0, lcolor(gs10) lpattern(solid)) ///
-             ylabel(4 `"Young × Hi (N=`nyhi')"' ///
-                    3 `"Young × Lo (N=`nylo')"' ///
-                    2 `"Old × Hi (N=`nohi')"'   ///
-                    1 `"Old × Lo (N=`nolo')"',  ///
+             ylabel(4 `"Early-Career × Hi (N=`nyhi')"' ///
+                    3 `"Early-Career × Lo (N=`nylo')"' ///
+                    2 `"Late-Career × Hi (N=`nohi')"'   ///
+                    1 `"Late-Career × Lo (N=`nolo')"',  ///
                     angle(0) labsize(small) noticks nogrid) ///
              ytitle("") xtitle("Exposure x Post", size(small)) ///
              subtitle("Split on `hi'_`a'", size(small)) ///
-             legend(order(2 "Young" 4 "Old") pos(11) ring(0) rows(2) size(small)) ///
+             legend(order(2 "Early-Career" 4 "Late-Career") pos(11) ring(0) rows(2) size(small)) ///
              xsize(7) ysize(4) ///
              plotregion(margin(sides))
         graph export ../output/figures/all_jrnls/coef_age_x_`a'_`wt'`samp_suf'.pdf, replace
