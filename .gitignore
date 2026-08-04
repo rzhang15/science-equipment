@@ -6,3 +6,9 @@
 *.dta
 *.pdf
 *.csv
+
+# allow PDFs in analysis output folders
+!analysis/*/output/
+analysis/*/output/**
+!analysis/*/output/**/
+!analysis/*/output/**/*.pdf
