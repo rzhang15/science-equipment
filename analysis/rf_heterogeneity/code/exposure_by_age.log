@@ -1,0 +1,110 @@
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  /n/holylabs/pakes_lab/Lab/sci_eq/analysis/rf_heterogeneity/code/exposure_by_age.log
+  log type:  text
+ opened on:   4 Aug 2026, 10:35:39
+
+. 
+. local samp all_jrnls
+
+. local suf  _r1_r2
+
+. 
+. use ../temp/es_`samp'`suf', clear
+
+. 
+. cap drop athr_indicator
+
+. bys athr_id : gen athr_indicator = _n == 1
+
+. 
+. qui sum age_2014 if athr_indicator == 1, d
+
+. di as text _n "es_`samp'`suf': age_2014 median (young/old cutoff) = " %6.2f r(p50)
+
+es_all_jrnls_r1_r2: age_2014 median (young/old cutoff) =  50.00
+
+. 
+. di as text _n "==== PI-level exposure, full analysis sample ===="
+
+==== PI-level exposure, full analysis sample ====
+
+. foreach g in young old {
+  2.     qui sum exposure if athr_indicator == 1 & `g' == 1, d
+  3.     di as text "  `g': N=" %6.0f r(N) "  mean=" %9.5f r(mean) ///
+>         "  sd=" %9.5f r(sd) "  p25=" %9.5f r(p25) ///
+>         "  p50=" %9.5f r(p50) "  p75=" %9.5f r(p75)
+  4. }
+  young: N=  5864  mean=  0.03452  sd=  0.04509  p25=  0.00553  p50=  0.02537  p75=  0.06287
+  old: N=  6473  mean=  0.03000  sd=  0.03942  p25=  0.00783  p50=  0.02327  p75=  0.05104
+
+. 
+. di as text _n "==== PI-level exposure, NIH-matched PIs ===="
+
+==== PI-level exposure, NIH-matched PIs ====
+
+. cap confirm variable young_nih
+
+. if !_rc {
+.     foreach g in young_nih old_nih {
+  2.         qui sum exposure if athr_indicator == 1 & `g' == 1, d
+  3.         di as text "  `g': N=" %6.0f r(N) "  mean=" %9.5f r(mean) ///
+>             "  sd=" %9.5f r(sd) "  p25=" %9.5f r(p25) ///
+>             "  p50=" %9.5f r(p50) "  p75=" %9.5f r(p75)
+  4.     }
+  young_nih: N=  2266  mean=  0.03419  sd=  0.04694  p25=  0.00704  p50=  0.02607  p75=  0.06210
+  old_nih: N=  2777  mean=  0.03019  sd=  0.04010  p25=  0.00974  p50=  0.02449  p75=  0.05019
+. }
+
+. else di as error "  young_nih/old_nih not in panel"
+
+. 
+. di as text _n "==== PI-level exposure, observed FOIA exposure only ===="
+
+==== PI-level exposure, observed FOIA exposure only ====
+
+. foreach g in young old {
+  2.     qui count if athr_indicator == 1 & `g' == 1 & foia_athr == 1
+  3.     if r(N) == 0 {
+  4.         di as text "  `g' (FOIA): no PIs"
+  5.         continue
+  6.     }
+  7.     qui sum exposure if athr_indicator == 1 & `g' == 1 & foia_athr == 1, d
+  8.     di as text "  `g' (FOIA): N=" %6.0f r(N) "  mean=" %9.5f r(mean) ///
+>         "  sd=" %9.5f r(sd) "  p25=" %9.5f r(p25) ///
+>         "  p50=" %9.5f r(p50) "  p75=" %9.5f r(p75)
+  9. }
+  young (FOIA): N=    30  mean=  0.02956  sd=  0.04495  p25=  0.00363  p50=  0.01701  p75=  0.04159
+  old (FOIA): N=    52  mean=  0.01887  sd=  0.06131  p25=  0.00229  p50=  0.01274  p75=  0.02496
+
+. 
+. di as text _n "==== Difference test (PI level, clustered on institution) ===="
+
+==== Difference test (PI level, clustered on institution) ====
+
+. egen long inst_num = group(inst_id)
+
+. cap noi reg exposure young if athr_indicator == 1, vce(cluster inst_num)
+
+Linear regression                               Number of obs     =     12,337
+                                                F(1, 197)         =      39.70
+                                                Prob > F          =     0.0000
+                                                R-squared         =     0.0029
+                                                Root MSE          =     .04221
+
+                             (Std. err. adjusted for 198 clusters in inst_num)
+------------------------------------------------------------------------------
+             |               Robust
+    exposure | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+       young |   .0045234   .0007179     6.30   0.000     .0031076    .0059392
+       _cons |   .0299953    .000542    55.35   0.000     .0289265    .0310641
+------------------------------------------------------------------------------
+
+. 
+. log close
+      name:  <unnamed>
+       log:  /n/holylabs/pakes_lab/Lab/sci_eq/analysis/rf_heterogeneity/code/exposure_by_age.log
+  log type:  text
+ closed on:   4 Aug 2026, 10:35:44
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

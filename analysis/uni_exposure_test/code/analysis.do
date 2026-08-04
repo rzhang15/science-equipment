@@ -696,7 +696,7 @@ program _bin_did
     qui gunique uni_id if e(sample)
     local Nstr = trim(string(r(unique), "%15.0fc"))
     if `uc_panel' == 1 {
-        binscatter _y_r _Z_r [aw=w_pre], n(`nbins') msymbol(O) mcolor(ebblue) ///
+        binscatter _y_r _Z_r [aw=w_pre], n(`nbins') msymbol(O) mcolors(gs6) lcolors(ebblue) ///
             xtitle("`xtit'") ytitle("`ytit'") ///
             ylab(#10) ///
             legend(on order(- "{&beta} = `b_str' (SE: `se_str')") ///
@@ -704,7 +704,7 @@ program _bin_did
             plotregion(margin(sides))
     }
     else {
-        binscatter _y_r _Z_r, n(`nbins') msymbol(O) mcolor(ebblue) ///
+        binscatter _y_r _Z_r, n(`nbins') msymbol(O) mcolors(gs6) lcolors(ebblue) ///
             xtitle("`xtit'") ytitle("`ytit'") ///
             ylab(#10) ///
             legend(on order(- "{&beta} = `b_str' (SE: `se_str')") ///

@@ -257,11 +257,11 @@ program process_coefs
     graph export ../output/figures/coef_spend_rank_`outcome'.pdf, replace
     corr b delta_hhi [aw=spend_2013]
     local corr : di %4.3f r(rho)
-    binscatter2 b delta_hhi [aw = spend_2013], legend(on order(- "corr: `corr'") ring(0) pos(1)) xtitle("Delta HHI") ytitle("Estimated Coefficient (log `outcome')")
+    binscatter2 b delta_hhi [aw = spend_2013], mcolors(gs6) lcolors(ebblue) legend(on order(- "corr: `corr'") ring(0) pos(1)) xtitle("Delta HHI") ytitle("Estimated Coefficient (log `outcome')")
     graph export ../output/figures/delta_hhi_corr_`outcome'.pdf, replace
     corr b simulated_hhi [aw=spend_2013]
     local corr : di %4.3f r(rho)
-    binscatter2 b simulated_hhi [aw = spend_2013], legend(on order(- "corr: `corr'") ring(0) pos(1)) xtitle("Simulated HHI") ytitle("Estimated Coefficient (log `outcome')")
+    binscatter2 b simulated_hhi [aw = spend_2013], mcolors(gs6) lcolors(ebblue) legend(on order(- "corr: `corr'") ring(0) pos(1)) xtitle("Simulated HHI") ytitle("Estimated Coefficient (log `outcome')")
     graph export ../output/figures/sim_hhi_corr_`outcome'.pdf, replace
 
     // ============================================================
@@ -357,7 +357,7 @@ program process_coefs
 
     corr b_eb simulated_hhi [aw=spend_2013]
     local corr_eb : di %4.3f r(rho)
-    binscatter2 b_eb simulated_hhi [aw = spend_2013], legend(on order(- "corr: `corr_eb'") ring(0) pos(1)) xtitle("Simulated HHI") ytitle("EB DiD Coefficient (log `outcome')")
+    binscatter2 b_eb simulated_hhi [aw = spend_2013], mcolors(gs6) lcolors(ebblue) legend(on order(- "corr: `corr_eb'") ring(0) pos(1)) xtitle("Simulated HHI") ytitle("EB DiD Coefficient (log `outcome')")
     graph export ../output/figures/sim_hhi_corr_eb_`outcome'.pdf, replace
 end
 

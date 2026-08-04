@@ -79,7 +79,7 @@ foreach yvar of local yvars {
                 xtitle("Exposure x Post") ///
                 ytitle("{&Delta} Log Expected `bs_lbl'") ///
                 xlab(-0.06(0.015)0.06, format(%5.3f)) ///
-                msymbol(O) mcolor(ebblue) ///
+                msymbol(O) mcolors(gs6) lcolors(ebblue) ///
                 note("Num. PIs: `n_pis'   Num. Insts: `n_insts'" "{&beta} = `b_str' (SE: `se_str')", ///
                      size(small) pos(7) ring(1) justification(left)) ///
                 plotregion(margin(sides))

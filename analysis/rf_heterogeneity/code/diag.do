@@ -111,15 +111,25 @@ forvalues i = 1/2 {
     di as text "A2 `a': young mean=`mu_y' p50=`md_y' N=`n_y' | old mean=`mu_o' p50=`md_o' N=`n_o'"
     cap drop ln_pre_`a'
     gen double ln_pre_`a' = ln(1 + `src')
-    tw kdensity ln_pre_`a' if young == 1, lcolor(ebblue) lwidth(medthick) || ///
-       kdensity ln_pre_`a' if young == 0, lcolor(dkorange) lwidth(medthick) ///
+    * both densities on one common x grid so rarea can shade the gap
+    qui sum ln_pre_`a'
+    cap drop _kx _kd_y _kd_o _kd_c
+    gen _kx = r(min) + (r(max) - r(min)) * (_n - 1) / 199 if _n <= 200
+    kdensity ln_pre_`a' if young == 1, at(_kx) gen(_kd_y) nograph
+    kdensity ln_pre_`a' if young == 0, at(_kx) gen(_kd_o) nograph
+    gen _kd_c = min(_kd_y, _kd_o)
+    tw (rarea _kd_c _kd_y _kx, color(ebblue*0.3) lwidth(none)) ///
+       (rarea _kd_c _kd_o _kx, color(dkorange*0.3) lwidth(none)) ///
+       (line _kd_y _kx, lcolor(ebblue) lwidth(medthick)) ///
+       (line _kd_o _kx, lcolor(dkorange) lwidth(medthick)) ///
        , xtitle("ln(1 + Pre-Period `xlbl')") ///
          ytitle("Density") ///
-         legend(order(1 "Early-Career: mean=`mu_y', p50=`md_y', N=`n_y'" ///
-                      2 "Late-Career: mean=`mu_o', p50=`md_o', N=`n_o'") ///
+         legend(order(3 "Early-Career (N=`n_y'): mean=`mu_y'" ///
+                      4 "Late-Career (N=`n_o'): mean=`mu_o'") ///
                 pos(2) ring(0) rows(2) size(small)) ///
          plotregion(margin(sides))
     graph export ../output/figures/all_jrnls/diag_kd_pre_`a'_ln`samp_suf'.pdf, replace
+    cap drop _kx _kd_y _kd_o _kd_c
 }
 
 * --- A3: LPM of young on characteristics ---

@@ -439,6 +439,9 @@ program event_study
         if "`yvar'" == "avg_num_coathrs"      local poisson_name "Coauthors"
         if "`yvar'" == "n_grants"             local poisson_name "Active NIH Research Grants"
         if "`yvar'" == "nih_total_cost"       local poisson_name "NIH Award Dollars"
+        local ppml_ytit "Output-Cost Elasticity"
+        if inlist("`yvar'", "n_grants", "n_new_grants", "nih_total_cost") ///
+            local ppml_ytit "{&Delta} Log Expected `poisson_name'"
 
         // PPML is the reported estimator everywhere; OLS runs only for the
         // ppr_cnt OLS-vs-Poisson comparison and for outcomes PPML can't take
@@ -551,7 +554,7 @@ program event_study
               scatter b year, mcolor(ebblue) || ///
               scatteri `ymax' 2013.75 `ymax' 2014.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
               xlab(2010(1)2019) xtitle("Year") ///
-              ytitle("{&Delta} Log Expected `poisson_name'") ylab(`ymin'(0.1)`ymax') ///
+              ytitle("`ppml_ytit'") ylab(`ymin'(0.1)`ymax') ///
               yline(0, lcolor(gs10) lpattern(solid)) ///
               legend(on order(- "Num. PIs: `num_athrs'" "Num. Institutions: `num_insts'" "Pre-Period Avg : `pre_mean'") pos(7) ring(1) rows(2) bmargin(zero) size(small)) plotregion(margin(sides))
             graph export ../output/figures/`samp'/es_`yvar'`suf'_ppml_mshrctrl`wsuf'.pdf, replace
@@ -611,7 +614,7 @@ program event_study
               scatter b year, mcolor(dkorange) || ///
               scatteri `ymax' 2013.75 `ymax' 2014.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
               xlab(2010(1)2019) xtitle("Year") ///
-              ytitle("{&Delta} Log Expected `poisson_name'") ylab(#6) ///
+              ytitle("`ppml_ytit'") ylab(#6) ///
               yline(0, lcolor(gs10) lpattern(solid)) ///
               title("FOIA PIs only (observed exposure)", size(small)) ///
               legend(on order(- "Num. PIs: `num_athrs'" "Num. Institutions: `num_insts'" "Pre-Period Avg : `pre_mean'") pos(7) ring(1) rows(2) bmargin(zero) size(small)) plotregion(margin(sides))
@@ -671,7 +674,7 @@ program event_study
               scatter b year, mcolor(lavender) || ///
               scatteri `ymax' 2013.75 `ymax' 2014.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
               xlab(2010(1)2019) xtitle("Year") ///
-              ytitle("{&Delta} Log Expected `poisson_name'") ylab(#6) ///
+              ytitle("`ppml_ytit'") ylab(#6) ///
               yline(0, lcolor(gs10) lpattern(solid)) ///
               title("NIH-matched PIs only", size(small)) ///
               legend(on order(- "Num. PIs: `num_athrs'" "Num. Institutions: `num_insts'" "Pre-Period Avg : `pre_mean'") pos(7) ring(1) rows(2) bmargin(zero) size(small)) plotregion(margin(sides))
@@ -848,7 +851,7 @@ program pooled_did
                 binscatter _y_r _Z_r `wt_bin', n(30) ///
                     xtitle("Exposure x Post") ytitle("`var_name'") ///
                     xlab(-0.06(0.015)0.06, format(%5.3f)) ///
-                    msymbol(O) mcolor(ebblue) ///
+                    msymbol(O) mcolors(gs6) lcolors(ebblue) ///
                     note("{&beta} = `pds_b_str' (SE: `pds_se_str')") ///
                     plotregion(margin(sides))
                 graph export ../output/figures/`samp'/pdid_`yvar'`suf'_mshrctrl`wsuf'.pdf, replace
@@ -1043,7 +1046,7 @@ program ppml_specs
                         xtitle("Exposure x Post") ///
                         ytitle("{&Delta} Log Expected `poisson_name'") ///
                         xlab(-0.06(0.015)0.06, format(%5.3f)) ///
-                        msymbol(O) mcolor(ebblue) ///
+                        msymbol(O) mcolors(gs6) lcolors(ebblue) ///
                         note("{&beta} = `pb_str' (SE: `pse_str')", size(small) pos(7) ring(1) justification(left)) ///
                         plotregion(margin(sides))
                     graph export ../output/figures/`samp'/ppml_pdid_`yvar'`suf'`wsuf'.pdf, replace
@@ -1071,7 +1074,7 @@ program ppml_specs
                         xtitle("Exposure x Post") ///
                         ytitle("{&Delta} Log Expected `poisson_name'") ///
                         xlab(-0.06(0.015)0.06, format(%5.3f)) ///
-                        msymbol(O) mcolor(ebblue) ///
+                        msymbol(O) mcolors(gs6) lcolors(ebblue) ///
                         note("{&beta} = `pbs_str' (SE: `pses_str')", size(small) pos(7) ring(1) justification(left)) ///
                         plotregion(margin(sides))
                     graph export ../output/figures/`samp'/ppml_pdid_`yvar'`suf'_mshrctrl`wsuf'.pdf, replace
@@ -1165,7 +1168,7 @@ program ppml_specs
                         xtitle("Exposure x Post") ///
                         ytitle("{&Delta} Log Expected `poisson_name'") ///
                         xlab(-0.06(0.015)0.06, format(%5.3f)) ///
-                        msymbol(O) mcolor(lavender) ///
+                        msymbol(O) mcolors(gs6) lcolors(ebblue) ///
                         title("NIH-matched PIs only", size(small)) ///
                         note("{&beta} = `pbn_str' (SE: `psen_str')", size(small) pos(7) ring(1) justification(left)) ///
                         plotregion(margin(sides))
@@ -1258,6 +1261,7 @@ program placebo_treatment
     foreach placebo_yr in 2011 2012 {
         foreach yvar in ppr_cnt {
             local poisson_name "Publications"
+            local ppml_ytit "Output-Cost Elasticity"
 
             use ../output/prepped_samples/es_`samp'`suf', clear
             cap drop pl_rel pl_int_lead* pl_int_lag* pl_mshr_lead* pl_mshr_lag*
@@ -1332,7 +1336,7 @@ program placebo_treatment
             tw rcap ub lb year if year != `ref_yr', lcolor(dkorange%70) msize(vsmall) || ///
               scatter b year, mcolor(dkorange) ///
               , xlab(2010(1)2019) xtitle("Year (placebo treatment at `placebo_yr')") ///
-                ytitle("{&Delta} Log Expected `poisson_name'") ///
+                ytitle("`ppml_ytit'") ///
                 ylab(`ymin'(0.1)`ymax') yline(0, lcolor(gs10) lpattern(solid)) ///
                 xline(2014, lpattern(dash) lcolor(gs10)) ///
                 title("Placebo ES: treatment shifted to `placebo_yr' (real: 2014)", size(small)) ///
@@ -1447,6 +1451,7 @@ program trim_top
     foreach yvar in ppr_cnt {
         local var_name "Publication Count"
         local poisson_name "Publications"
+        local ppml_ytit "Output-Cost Elasticity"
 
         * [F3] both figures read trim`t' matrices only — baseline (trim=0) is
         * now the same with-share spec as every trimmed point.
@@ -1501,7 +1506,7 @@ program trim_top
            scatter b trim, mcolor(dkorange) msize(medium) ///
            , xlab(0 "Full sample" 1 "Drop top 1%" 5 "5%" 10 "10%" 25 "25%", labsize(small)) ///
              xtitle("Top-pre-pub PIs dropped") ///
-             ytitle("{&Delta} Log Expected `poisson_name'") ///
+             ytitle("`ppml_ytit'") ///
              yline(0, lcolor(gs10) lpattern(solid)) ///
              title("Trim-top sensitivity (ppml): `var_name'", size(small)) ///
              legend(off) plotregion(margin(sides))
@@ -1686,6 +1691,7 @@ program robustness
         if "`yvar'" == "cite_affl_wt_any"     local poisson_name "Citation-Weighted Output (any position)"
         if "`yvar'" == "ppr_cnt_notlast"      local poisson_name "Publications (non-last author)"
         if "`yvar'" == "cite_affl_wt_notlast" local poisson_name "Citation-Weighted Output (non-last author)"
+        local ppml_ytit "Output-Cost Elasticity"
         if regexm("`yvar'", "^ppr_cnt")      local gap 0.5
         if regexm("`yvar'", "^cite_affl_wt") local gap 1
         if regexm("`yvar'", "^ppr_cnt")      & "`samp'" == "top_jrnls" local gap 2
@@ -1788,7 +1794,7 @@ program robustness
             local ytit "`var_name'"
             local ylabopt ""
             if "`est'" == "ppmlhdfe" {
-                local ytit "{&Delta} Log Expected `poisson_name'"
+                local ytit "`ppml_ytit'"
                 local ylabopt "ylab(#6)"
             }
             else {

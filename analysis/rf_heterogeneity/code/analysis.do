@@ -390,6 +390,17 @@ program add_het_splits
         gen byte o_lp = (young == 0 & high_pre_ppr == 0) if !mi(young) & !mi(high_pre_ppr)
     }
 
+    * Joint age x baseline-NIH-funding 2x2. Cells missing off the NIH-matched
+    * sample, so fits using them drop unmatched PIs rather than pooling them
+    * into the base category.
+    cap confirm variable high_nihd
+    if !_rc {
+        gen byte y_hn = (young == 1 & high_nihd == 1) if !mi(young) & !mi(high_nihd)
+        gen byte y_ln = (young == 1 & high_nihd == 0) if !mi(young) & !mi(high_nihd)
+        gen byte o_hn = (young == 0 & high_nihd == 1) if !mi(young) & !mi(high_nihd)
+        gen byte o_ln = (young == 0 & high_nihd == 0) if !mi(young) & !mi(high_nihd)
+    }
+
     * Joint PI-split x inst-char 2x2. For each axis (baseline productivity,
     * coauthors), build 4 subgroup dummies per inst char keyed on the PI split
     * and the PI-wtd inst-char hi/lo indicator.
@@ -572,6 +583,10 @@ program event_study_het
             using "../temp/phet_results_`samp'`suf'_`yvar'", replace
         local gap 0.5
         if regexm("`yvar'", "^cite_affl_wt") local gap 1
+        local ppml_ytit "Output-Cost Elasticity"
+        if "`yvar'" == "n_grants"       local ppml_ytit "{&Delta} Log Expected Active NIH Research Grants"
+        if "`yvar'" == "n_new_grants"   local ppml_ytit "{&Delta} Log Expected New NIH Research Grants"
+        if "`yvar'" == "nih_total_cost" local ppml_ytit "{&Delta} Log Expected NIH Award Dollars"
 
         * ---- OLS median het (gated by $HET_RUN_OLS, headline outcomes only)
         * leads_g1/lags_g1 are the differential vs the dummy=0 (`g2') group
@@ -757,7 +772,7 @@ program event_study_het
                       scatter b year, mcolor(ebblue) || ///
                     scatteri `ymax' 2013.75 `ymax' 2014.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
                       xlab(2010(1)2019, labsize(small)) xtitle("Year") ///
-                      ytitle("Exposure x Post") ylab(`ymin'(0.1)`ymax') ///
+                      ytitle("`ppml_ytit'") ylab(`ymin'(0.1)`ymax') ///
                       subtitle("`grp_label'", pos(11) size(small)) ///
                       legend(on order(- "Num. PIs: `num_athrs'" "Num. Insts: `num_insts'" "Pre-Period Avg : `pre_mean'") pos(7) ring(1) rows(3) bmargin(zero) size(small)) ///
                       yline(0, lcolor(gs10) lpattern(solid)) plotregion(margin(sides))
@@ -899,7 +914,7 @@ program event_study_het
                       scatter b year, mcolor(ebblue) || ///
                     scatteri `ymax' 2013.75 `ymax' 2014.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
                       xlab(2010(1)2019, labsize(small)) xtitle("Year") ///
-                      ytitle("Exposure x Post") ylab(`ymin'(0.1)`ymax') ///
+                      ytitle("`ppml_ytit'") ylab(`ymin'(0.1)`ymax') ///
                       subtitle("`grp_label'", pos(11) size(small)) ///
                       legend(on order(- "Num. PIs: `num_athrs'" "Num. Insts: `num_insts'" "Pre-Period Avg : `pre_mean'") pos(7) ring(1) rows(3) bmargin(zero) size(small)) ///
                       yline(0, lcolor(gs10) lpattern(solid)) plotregion(margin(sides))
@@ -1052,6 +1067,59 @@ program event_study_het
                 }
             }
 
+            * ---- Age x baseline-NIH-funding 2x2 (NIH-matched sample). One PPML,
+            * four subgroup coefficients. Posts split_type = "joint_agenih".
+            cap confirm variable y_hn
+            if !_rc {
+                foreach grp in y_hn y_ln o_hn o_ln {
+                    cap drop Z_`grp' S_`grp' PT_`grp'
+                    gen Z_`grp' = Z_it       * `grp'
+                    gen S_`grp' = Z_share_it * `grp'
+                    gen PT_`grp' = post * `grp'
+                }
+                * [H11] o_ln x post is the omitted base
+                cap noi ppmlhdfe `yvar' Z_y_hn Z_y_ln Z_o_hn Z_o_ln ///
+                                        S_y_hn S_y_ln S_o_hn S_o_ln ///
+                                        PT_y_hn PT_y_ln PT_o_hn, ///
+                                        absorb(`fes') vce(cluster `vce_cl')
+                if _rc {
+                    di as error "event_study_het `samp'`suf' `yvar' joint-agenih ppml failed; skipping."
+                }
+                else {
+                    local Nppml = e(N)
+                    local r2ppml = e(r2_p)
+                    foreach grp in y_hn y_ln o_hn o_ln {
+                        gunique athr_id if e(sample) & `grp' == 1
+                        local num_athrs = r(unique)
+                        gunique inst_id if e(sample) & `grp' == 1
+                        local num_insts = r(unique)
+                        local b_post  = _b[Z_`grp']
+                        local se_post = _se[Z_`grp']
+                        di as text "joint-agenih PPML `samp'`suf' `yvar' `grp': b=" %8.4f `b_post' ///
+                            " (se=" %8.4f `se_post' ")   N=" %9.0f `Nppml' " PIs=`num_athrs' Insts=`num_insts'"
+                        post `ph_handle' ("`yvar'") ("`grp'") ("mshrctrl") ("joint_agenih") ///
+                            (`b_post') (`se_post') (.) (.) (`Nppml') (`r2ppml')
+                    }
+                    * Hi-vs-lo NIH funding within age and young-vs-old within
+                    * funding tier; SEs via lincom use the full VCE.
+                    foreach d in "y_diff_nihd Z_y_hn Z_y_ln" "o_diff_nihd Z_o_hn Z_o_ln" ///
+                                 "hi_diff_age Z_y_hn Z_o_hn" "lo_diff_age Z_y_ln Z_o_ln" {
+                        local dname : word 1 of `d'
+                        local d1    : word 2 of `d'
+                        local d2    : word 3 of `d'
+                        cap noi lincom `d1' - `d2'
+                        if _rc continue
+                        local b_diff  = r(estimate)
+                        local se_diff = r(se)
+                        local p_diff  = r(p)
+                        di as text "joint-agenih DIFF `samp'`suf' `yvar' `dname': b=" %8.4f `b_diff' ///
+                            " (se=" %8.4f `se_diff' ") p=" %6.4f `p_diff'
+                        post `ph_handle' ("`yvar'") ("`dname'") ("mshrctrl") ("joint_agenih_diff") ///
+                            (`b_diff') (`se_diff') (`p_diff') (.) (`Nppml') (`r2ppml')
+                    }
+                }
+            }
+
         }
         postclose `ph_handle'
 
@@ -1182,7 +1250,7 @@ program ppml_pdid_het_binscatter
                     xtitle("Exposure x Post") ///
                     ytitle("{&Delta} Log Expected `bs_lbl'") ///
                     xlab(-0.06(0.015)0.06, format(%5.3f)) ///
-                    msymbol(O) mcolor(ebblue) ///
+                    msymbol(O) mcolors(gs6) lcolors(ebblue) ///
                     note("Num. PIs: `n_pis'   Num. Insts: `n_insts'" "{&beta} = `b_str' (SE: `se_str')", size(small) pos(7) ring(1) justification(left)) ///
                     plotregion(margin(sides))
                 graph export ///
@@ -1269,31 +1337,48 @@ program desc_pre_output_by_age
         qui sum pre_`a' if young == 0, d
         local mu_o = strtrim(string(r(mean), "`f'"))
         local md_o = strtrim(string(r(p50),  "`f'"))
-        local leg_y "Early-Career: mean=`mu_y', p50=`md_y', N=`n_y'"
-        local leg_o "Late-Career: mean=`mu_o', p50=`md_o', N=`n_o'"
+        local leg_y "Early-Career (N=`n_y'): mean=`mu_y'"
+        local leg_o "Late-Career (N=`n_o'): mean=`mu_o'"
         di as text "  `a': young mean=`mu_y' p50=`md_y' | old mean=`mu_o' p50=`md_o'"
         cap noi ksmirnov pre_`a', by(young)
         qui reg pre_`a' young, vce(cluster inst_num)
         di as text "  `a': young-old diff = " %8.3f _b[young] " (se " %8.3f _se[young] ")"
 
         gen double ln_pre_`a' = ln(1 + pre_`a')
-        tw kdensity ln_pre_`a' if young == 1, lcolor(ebblue) lwidth(medthick) || ///
-           kdensity ln_pre_`a' if young == 0, lcolor(dkorange) lwidth(medthick) ///
+        * both densities on one common x grid so rarea can shade the gap
+        qui sum ln_pre_`a'
+        cap drop _kx _kd_y _kd_o _kd_c
+        gen _kx = r(min) + (r(max) - r(min)) * (_n - 1) / 199 if _n <= 200
+        kdensity ln_pre_`a' if young == 1, at(_kx) gen(_kd_y) nograph
+        kdensity ln_pre_`a' if young == 0, at(_kx) gen(_kd_o) nograph
+        gen _kd_c = min(_kd_y, _kd_o)
+        tw (rarea _kd_c _kd_y _kx, color(ebblue*0.3) lwidth(none)) ///
+           (rarea _kd_c _kd_o _kx, color(dkorange*0.3) lwidth(none)) ///
+           (line _kd_y _kx, lcolor(ebblue) lwidth(medthick)) ///
+           (line _kd_o _kx, lcolor(dkorange) lwidth(medthick)) ///
            , xtitle("ln(1 + Pre-Period `lbl_`a'', `y0'-`y1')") ytitle("Density") ///
-             legend(order(1 "`leg_y'" 2 "`leg_o'") ///
+             legend(order(3 "`leg_y'" 4 "`leg_o'") ///
                     pos(2) ring(0) rows(2) size(small)) ///
              plotregion(margin(sides))
         graph export ../output/figures/`samp'/desc_kd_pre_`a'_ln`suf'.pdf, replace
 
         qui sum pre_`a', d
         local xcap = r(p95)
-        tw kdensity pre_`a' if young == 1 & pre_`a' <= `xcap', lcolor(ebblue) lwidth(medthick) || ///
-           kdensity pre_`a' if young == 0 & pre_`a' <= `xcap', lcolor(dkorange) lwidth(medthick) ///
+        cap drop _kx _kd_y _kd_o _kd_c
+        gen _kx = `xcap' * (_n - 1) / 199 if _n <= 200
+        kdensity pre_`a' if young == 1 & pre_`a' <= `xcap', at(_kx) gen(_kd_y) nograph
+        kdensity pre_`a' if young == 0 & pre_`a' <= `xcap', at(_kx) gen(_kd_o) nograph
+        gen _kd_c = min(_kd_y, _kd_o)
+        tw (rarea _kd_c _kd_y _kx, color(ebblue*0.3) lwidth(none)) ///
+           (rarea _kd_c _kd_o _kx, color(dkorange*0.3) lwidth(none)) ///
+           (line _kd_y _kx, lcolor(ebblue) lwidth(medthick)) ///
+           (line _kd_o _kx, lcolor(dkorange) lwidth(medthick)) ///
            , xtitle("Pre-Period `lbl_`a'', `y0'-`y1' (x capped at pooled p95)") ytitle("Density") ///
-             legend(order(1 "`leg_y'" 2 "`leg_o'") ///
+             legend(order(3 "`leg_y'" 4 "`leg_o'") ///
                     pos(2) ring(0) rows(2) size(small)) ///
              plotregion(margin(sides))
         graph export ../output/figures/`samp'/desc_kd_pre_`a'_raw`suf'.pdf, replace
+        cap drop _kx _kd_y _kd_o _kd_c
     }
 
     save ../temp/desc_pre_output_`samp'`suf', replace
@@ -1359,14 +1444,14 @@ program ppml_het_coefplot
     foreach axis of global PI_CHAR_ALIASES {
         local axis_sts `axis_sts' joint_ae_`axis'
     }
-    local st_list med_pi joint_ae `axis_sts' joint_agepr
+    local st_list med_pi joint_ae `axis_sts' joint_agepr joint_agenih
     if "$HET_INCLUDE_INSTWTD" == "1" local st_list med `st_list'
     if "$HET_RUN_QUARTILES" == "1" {
         local st_list `st_list' quart_pi
         if "$HET_INCLUDE_INSTWTD" == "1" local st_list `st_list' quart
     }
     foreach st of local st_list {
-        if "`st'" == "joint_ae" | "`st'" == "joint_agepr" | strpos("`st'", "joint_ae_") == 1 {
+        if "`st'" == "joint_ae" | "`st'" == "joint_agepr" | "`st'" == "joint_agenih" | strpos("`st'", "joint_ae_") == 1 {
             * Custom paired rendering used instead of the standard panel loop.
             * Leaving all groups empty causes the standard loop to skip.
             local groups_pi
@@ -1652,6 +1737,57 @@ program ppml_het_coefplot
                     "../output/figures/`samp'/`spec_folder'/ppml_het_coefplot_`yv'_joint_agepr`suf'.pdf", ///
                     replace
                 di as text "wrote joint_agepr coefplot for `yv' `spec_tag'"
+                restore
+            }
+        }
+
+        * ----- Age x baseline-NIH-funding 2x2 (NIH-matched sample).
+        *       Standard coefplot: one row per cell, age pairs blocked.
+        if "`st'" == "joint_agenih" {
+            foreach yv of local ppml_het_yvars {
+                preserve
+                use "`resfile'", clear
+                keep if yvar == "`yv'" & split_type == "joint_agenih" & spec == "`spec_tag'"
+                if _N == 0 {
+                    restore
+                    continue
+                }
+                gen double y_pos = .
+                replace y_pos = 4.7 if grp == "y_hn"
+                replace y_pos = 3.7 if grp == "y_ln"
+                replace y_pos = 2   if grp == "o_hn"
+                replace y_pos = 1   if grp == "o_ln"
+                drop if mi(y_pos) | mi(post_b)
+                if _N == 0 {
+                    restore
+                    continue
+                }
+                gen ub = post_b + 1.96*post_se
+                gen lb = post_b - 1.96*post_se
+
+                qui sum lb
+                local xmin = floor(r(min)/0.5)*0.5
+                qui sum ub
+                local xmax = ceil(r(max)/0.5)*0.5
+
+                tw rcap ub lb y_pos, horizontal lcolor(ebblue%70) msize(vsmall) || ///
+                   scatter y_pos post_b, mcolor(ebblue) msize(small) ///
+                   , xline(0, lcolor(gs10) lpattern(solid)) ///
+                     ylabel(4.7 `""Early-Career Scientists" "More NIH Funding at Baseline""' ///
+                            3.7 `""Early-Career Scientists" "Less NIH Funding at Baseline""' ///
+                            2   `""Late-Career Scientists" "More NIH Funding at Baseline""' ///
+                            1   `""Late-Career Scientists" "Less NIH Funding at Baseline""', ///
+                            angle(0) labsize(small) noticks nogrid) ///
+                     ytitle("") xtitle("Exposure x Post", size(small)) ///
+                     xlabel(`xmin'(0.5)`xmax', labsize(small)) ///
+                     legend(off) ///
+                     ysize(5) xsize(7) ///
+                     yscale(range(0.9 .)) ///
+                     plotregion(margin(l=zero r=zero b=zero t=vsmall))
+                graph export ///
+                    "../output/figures/`samp'/`spec_folder'/ppml_het_coefplot_`yv'_joint_agenih`suf'.pdf", ///
+                    replace
+                di as text "wrote joint_agenih coefplot for `yv' `spec_tag'"
                 restore
             }
         }

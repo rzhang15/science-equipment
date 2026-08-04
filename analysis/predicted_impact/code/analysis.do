@@ -431,6 +431,8 @@ program plot_one
      preserve and pass it in. Falls back to "" if omitted.
     */
     syntax, yvar(string) samp(string) pre_mean(string) [suf(string) n_athrs(string)]
+    local ytit "`yvar'"
+    if strpos("`suf'", "_ppml") local ytit "Output-Cost Elasticity"
     sum ub, d
     local ymax = r(max)
     sum lb, d
@@ -450,7 +452,7 @@ program plot_one
       scatter b year, mcolor(ebblue) || ///
       scatteri `ymax' 2013.75 `ymax' 2014.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
       xlab(2010(1)2019) xtitle("Year") ///
-      ytitle("`yvar'") ylab(`ymin'(`gap')`ymax') ///
+      ytitle("`ytit'") ylab(`ymin'(`gap')`ymax') ///
       yline(0, lcolor(gs10) lpattern(solid)) ///
       legend(on `legend_extra' pos(7) ring(1) rows(2) bmargin(zero) size(small)) plotregion(margin(sides))
     graph export ../output/figures/`samp'/es_`yvar'`suf'.pdf, replace

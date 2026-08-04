@@ -8,15 +8,18 @@ version 17
 
 program main
     boe
-    spend_by_age
-    spend_by_age_piyr
     gather_nih
-    gather_pubs
-    foreach s in foia all {
-        nih_by_age,      samp(`s')
-        nih_by_age_piyr, samp(`s')
-        pubs_by_age,     samp(`s')
-        prod_per_dollar, samp(`s')
+    foreach ds in r1_r2 r1_r2_public {
+        local sufopt = cond("`ds'" == "r1_r2", "", "suf(_public)")
+        spend_by_age, `sufopt'
+        spend_by_age_piyr, `sufopt'
+        gather_pubs, `sufopt'
+        foreach s in foia all {
+            nih_by_age,      samp(`s') `sufopt'
+            nih_by_age_piyr, samp(`s') `sufopt'
+            pubs_by_age,     samp(`s') `sufopt'
+            prod_per_dollar, samp(`s') `sufopt'
+        }
     }
 end
 
@@ -52,7 +55,8 @@ program pfmt, rclass
 end
 
 * ---------------------------------------------------------------------------
-* kdensity overlay, young vs old, rescaled to percent of obs per fixed bin.
+* kdensity overlay, young vs old, rescaled to percent of obs per fixed bin
+* (raw densities over dollar amounts are unreadable 1e-5-scale numbers).
 * x capped at p95 of the pooled distribution (long right tail otherwise
 * flattens everything); kernel spills past the data boundary, so only the
 * [0, cap] range is drawn.
@@ -68,11 +72,9 @@ program kd_young_old
     }
     qui sum `v' if young == 1, d
     local mean_y = strtrim("`: di `fmt' r(mean)'")
-    local p50_y  = strtrim("`: di `fmt' r(p50)'")
     local n_y    = r(N)
     qui sum `v' if young == 0, d
     local mean_o = strtrim("`: di `fmt' r(mean)'")
-    local p50_o  = strtrim("`: di `fmt' r(p50)'")
     local n_o    = r(N)
 
     if "`cluster'" != "" local clopt cluster(`cluster')
@@ -88,21 +90,30 @@ program kd_young_old
     else                 local ptxt "Early-career - late-career = `diff'; t-test p = `pt_s'; K-S p = `pks_s'"
     di as text "`v': `ptxt'"
 
-    cap drop _kx_y _kd_y _kx_o _kd_o _kp_y _kp_o
-    kdensity `v' if young == 1 & `v' <= `xcap', gen(_kx_y _kd_y) n(200) nograph
-    kdensity `v' if young == 0 & `v' <= `xcap', gen(_kx_o _kd_o) n(200) nograph
+    * both densities evaluated on one common x grid so rarea can shade the gap
+    cap drop _kx _kd_y _kd_o _kp_y _kp_o _kp_c
+    gen _kx = `xcap' * (_n - 1) / 199 if _n <= 200
+    kdensity `v' if young == 1 & `v' <= `xcap', at(_kx) gen(_kd_y) nograph
+    kdensity `v' if young == 0 & `v' <= `xcap', at(_kx) gen(_kd_o) nograph
     gen _kp_y = _kd_y * `w' * 100
     gen _kp_o = _kd_o * `w' * 100
-    tw (line _kp_y _kx_y if inrange(_kx_y, 0, `xcap'), lcolor(ebblue)) ///
-       (line _kp_o _kx_o if inrange(_kx_o, 0, `xcap'), lcolor(dkorange)), ///
+    * opaque lightened tints (*0.3), not %-opacity: translucent fills leave
+    * hairline seam artifacts in exported PDFs. Excess bands run from the
+    * common envelope up to each curve (zero-height where no excess), so no
+    * if-splits are needed.
+    gen _kp_c = min(_kp_y, _kp_o)
+    tw (rarea _kp_c _kp_y _kx, color(ebblue*0.3) lwidth(none)) ///
+       (rarea _kp_c _kp_o _kx, color(dkorange*0.3) lwidth(none)) ///
+       (line _kp_y _kx, lcolor(ebblue)) ///
+       (line _kp_o _kx, lcolor(dkorange)), ///
        xtitle("`xtitle'") ytitle("Percent of `unit' (per `wlab' bin)") ///
-       legend(order(1 "Early-Career: mean=`mean_y', p50=`p50_y', N=`n_y'" ///
-                    2 "Late-Career: mean=`mean_o', p50=`p50_o', N=`n_o'") ///
+       legend(order(3 "Early-Career (N=`n_y'): mean=`mean_y'" ///
+                    4 "Late-Career (N=`n_o'): mean=`mean_o'") ///
            pos(1) ring(0) cols(1) size(small) region(fcolor(none))) ///
-       note("`ptxt'", size(vsmall)) ///
+       note("`ptxt'", size(small)) ///
        plotregion(margin(sides))
     graph export `out', replace
-    cap drop _kx_y _kd_y _kx_o _kd_o _kp_y _kp_o
+    cap drop _kx _kd_y _kd_o _kp_y _kp_o _kp_c
 end
 
 * ---------------------------------------------------------------------------
@@ -154,32 +165,32 @@ end
 * pre-merger, so neither belongs in the funding distribution.
 * ---------------------------------------------------------------------------
 program nih_by_age
-    syntax, samp(string)
+    syntax, samp(string) [suf(string)]
     cap mkdir ../output/tables
     cap mkdir ../output/figures
 
-    use ../external/pi_samp/pi_desc_all_jrnls_r1_r2, clear
+    use ../external/pi_samp/pi_desc_all_jrnls_r1_r2`suf', clear
     keep if athr_indicator == 1
     if "`samp'" == "foia" keep if foia_athr == 1
     gen byte nih_matched = !mi(nih_pi_name)
     keep athr_id age_2014 nih_matched
-    save ../temp/nih_age_pis_`samp', replace
+    save ../temp/nih_age_pis_`samp'`suf', replace
 
     use ../temp/nih_pre_amt, clear
-    merge 1:1 athr_id using ../temp/nih_age_pis_`samp', keep(2 3)
+    merge 1:1 athr_id using ../temp/nih_age_pis_`samp'`suf', keep(2 3)
     qui count
     local n_pis = r(N)
     qui count if nih_matched == 1
     local n_match = r(N)
     qui count if _merge == 3
     local n_grants_pi = r(N)
-    di as text "nih_by_age `samp': `n_pis' PIs, `n_match' matched to RePORTER, " ///
+    di as text "nih_by_age `samp'`suf': `n_pis' PIs, `n_match' matched to RePORTER, " ///
         "`n_grants_pi' with grant records in 2010-2013"
 
     qui sum age_2014, d
     local med_age = r(p50)
     gen young = age_2014 < `med_age'
-    di as text "nih_by_age `samp': median age_2014 = `med_age' (young = below median)"
+    di as text "nih_by_age `samp'`suf': median age_2014 = `med_age' (young = below median)"
 
     * composition before the restriction: unmatched vs matched-but-unfunded
     foreach g in 1 0 {
@@ -193,7 +204,7 @@ program nih_by_age
 
     keep if nih_matched == 1 & _merge == 3
     drop _merge
-    save ../output/nih_by_age_pis_`samp', replace
+    save ../output/nih_by_age_pis_`samp'`suf', replace
 
     cap mat drop nih_age
     qui count if young == 1
@@ -224,24 +235,24 @@ program nih_by_age
     }
     mat colnames nih_age = young_mean young_p50 young_N old_mean old_p50 old_N
     mat rownames nih_age = `rownames'
-    qui matrix_to_txt, saving("../output/tables/nih_by_age_`samp'.txt") ///
-        matrix(nih_age) title(<tab:nih_by_age_`samp'>) format(%14.2f) replace
+    qui matrix_to_txt, saving("../output/tables/nih_by_age_`samp'`suf'.txt") ///
+        matrix(nih_age) title(<tab:nih_by_age_`samp'`suf'>) format(%14.2f) replace
 
     kd_young_old nih_amt_yr, xtitle(Avg annual NIH funding, 2010-2013 ($)) ///
         w(100000) wlab("$100,000") unit(PIs) ///
-        out(../output/figures/kd_nih_amt_by_age_`samp'.pdf)
+        out(../output/figures/kd_nih_amt_by_age_`samp'`suf'.pdf)
     kd_young_old nih_active_yr, xtitle(Avg # active NIH grants per year, 2010-2013) ///
         w(0.5) wlab("0.5 grants") unit(PIs) fmt(%9.2f) ///
-        out(../output/figures/kd_nih_active_by_age_`samp'.pdf)
+        out(../output/figures/kd_nih_active_by_age_`samp'`suf'.pdf)
 
     bs_stats, y(nih_amt_yr) x(age_2014) ///
         xtitle(Age in 2014 (yrs since first pub + 30)) ///
         ytitle(Avg annual NIH funding, 2010-2013 ($)) ///
-        out(../output/figures/bs_nih_amt_by_age_`samp'.pdf)
+        out(../output/figures/bs_nih_amt_by_age_`samp'`suf'.pdf)
     bs_stats, y(nih_active_yr) x(age_2014) ///
         xtitle(Age in 2014 (yrs since first pub + 30)) ///
         ytitle(Avg # active NIH grants per year, 2010-2013) ///
-        out(../output/figures/bs_nih_active_by_age_`samp'.pdf)
+        out(../output/figures/bs_nih_active_by_age_`samp'`suf'.pdf)
 end
 
 * ---------------------------------------------------------------------------
@@ -250,9 +261,9 @@ end
 * Young/old uses the same PI-level median age as nih_by_age.
 * ---------------------------------------------------------------------------
 program nih_by_age_piyr
-    syntax, samp(string)
+    syntax, samp(string) [suf(string)]
 
-    use ../temp/nih_age_pis_`samp', clear
+    use ../temp/nih_age_pis_`samp'`suf', clear
     qui sum age_2014, d
     local med_age = r(p50)
     keep if nih_matched == 1
@@ -271,10 +282,10 @@ program nih_by_age_piyr
     qui count if _tag & young == 0
     local npi_o = r(N)
     drop _tag
-    di as text "nih_by_age_piyr `samp': median age = `med_age'; PIs young/old = `npi_y'/`npi_o'"
+    di as text "nih_by_age_piyr `samp'`suf': median age = `med_age'; PIs young/old = `npi_y'/`npi_o'"
 
     keep athr_id year age_2014 young nih_amt nih_active nih_new_grants
-    save ../output/nih_by_age_piyrs_`samp', replace
+    save ../output/nih_by_age_piyrs_`samp'`suf', replace
 
     cap mat drop nih_age_piyr
     qui count if young == 1
@@ -301,15 +312,15 @@ program nih_by_age_piyr
     }
     mat colnames nih_age_piyr = young_mean young_p50 young_N old_mean old_p50 old_N
     mat rownames nih_age_piyr = `rownames'
-    qui matrix_to_txt, saving("../output/tables/nih_by_age_piyr_`samp'.txt") ///
-        matrix(nih_age_piyr) title(<tab:nih_by_age_piyr_`samp'>) format(%14.2f) replace
+    qui matrix_to_txt, saving("../output/tables/nih_by_age_piyr_`samp'`suf'.txt") ///
+        matrix(nih_age_piyr) title(<tab:nih_by_age_piyr_`samp'`suf'>) format(%14.2f) replace
 
     kd_young_old nih_amt, xtitle(Annual NIH funding ($, PI-year)) ///
         w(100000) wlab("$100,000") unit(PI-years) cluster(athr_id) ///
-        out(../output/figures/kd_nih_amt_by_age_piyr_`samp'.pdf)
+        out(../output/figures/kd_nih_amt_by_age_piyr_`samp'`suf'.pdf)
     kd_young_old nih_active, xtitle(# active NIH grants (PI-year)) ///
         w(1) wlab("1 grant") unit(PI-years) fmt(%9.2f) cluster(athr_id) ///
-        out(../output/figures/kd_nih_active_by_age_piyr_`samp'.pdf)
+        out(../output/figures/kd_nih_active_by_age_piyr_`samp'`suf'.pdf)
 end
 
 * ---------------------------------------------------------------------------
@@ -321,9 +332,10 @@ end
 * last-author counts; the any-position analogues are built here.
 * ---------------------------------------------------------------------------
 program gather_pubs
+    syntax [, suf(string)]
     use athr_id year age_2014 athr_indicator foia_athr nih_pi_name ppr_cnt_any ///
         pre_ppr_cnt_sum pre_ppr_cnt_avg ///
-        using ../external/pi_samp/pi_desc_all_jrnls_r1_r2, clear
+        using ../external/pi_samp/pi_desc_all_jrnls_r1_r2`suf', clear
     gen pre_any = ppr_cnt_any if year < 2014
     bys athr_id: egen pre_ppr_any_sum = total(pre_any)
     bys athr_id: egen pre_ppr_any_avg = mean(pre_any)
@@ -333,15 +345,15 @@ program gather_pubs
     rename (pre_ppr_cnt_sum pre_ppr_cnt_avg) (pre_ppr_sum pre_ppr_avg)
     keep athr_id age_2014 foia_athr nih_matched ///
          pre_ppr_sum pre_ppr_avg pre_ppr_any_sum pre_ppr_any_avg
-    save ../temp/pubs_pre_pis, replace
+    save ../temp/pubs_pre_pis`suf', replace
 end
 
 program pubs_by_age
-    syntax, samp(string)
+    syntax, samp(string) [suf(string)]
     cap mkdir ../output/tables
     cap mkdir ../output/figures
 
-    use ../temp/pubs_pre_pis, clear
+    use ../temp/pubs_pre_pis`suf', clear
     if "`samp'" == "foia" keep if foia_athr == 1
     drop foia_athr nih_matched
 
@@ -349,9 +361,9 @@ program pubs_by_age
     local med_age = r(p50)
     gen young = age_2014 < `med_age'
     qui count
-    di as text "pubs_by_age `samp': `r(N)' PIs, median age_2014 = `med_age' (young = below median)"
+    di as text "pubs_by_age `samp'`suf': `r(N)' PIs, median age_2014 = `med_age' (young = below median)"
 
-    save ../output/pubs_by_age_pis_`samp', replace
+    save ../output/pubs_by_age_pis_`samp'`suf', replace
 
     cap mat drop pubs_age
     qui count if young == 1
@@ -372,21 +384,21 @@ program pubs_by_age
     }
     mat colnames pubs_age = young_mean young_p50 young_N old_mean old_p50 old_N
     mat rownames pubs_age = `rownames'
-    qui matrix_to_txt, saving("../output/tables/pubs_by_age_`samp'.txt") ///
-        matrix(pubs_age) title(<tab:pubs_by_age_`samp'>) format(%14.2f) replace
+    qui matrix_to_txt, saving("../output/tables/pubs_by_age_`samp'`suf'.txt") ///
+        matrix(pubs_age) title(<tab:pubs_by_age_`samp'`suf'>) format(%14.2f) replace
 
-    kd_young_old pre_ppr_sum, xtitle(Total pubs 2010-2013 (last author)) ///
+    kd_young_old pre_ppr_sum, xtitle(Total pubs 2010-2013) ///
         w(2) wlab("2 pubs") unit(PIs) fmt(%9.1f) ///
-        out(../output/figures/kd_pre_ppr_sum_by_age_`samp'.pdf)
-    kd_young_old pre_ppr_avg, xtitle(Avg pubs per year, 2010-2013 (last author)) ///
+        out(../output/figures/kd_pre_ppr_sum_by_age_`samp'`suf'.pdf)
+    kd_young_old pre_ppr_avg, xtitle(Avg pubs per year, 2010-2013) ///
         w(0.5) wlab("0.5 pubs") unit(PIs) fmt(%9.2f) ///
-        out(../output/figures/kd_pre_ppr_avg_by_age_`samp'.pdf)
+        out(../output/figures/kd_pre_ppr_avg_by_age_`samp'`suf'.pdf)
     kd_young_old pre_ppr_any_sum, xtitle(Total pubs 2010-2013 (any position)) ///
         w(5) wlab("5 pubs") unit(PIs) fmt(%9.1f) ///
-        out(../output/figures/kd_pre_ppr_any_sum_by_age_`samp'.pdf)
+        out(../output/figures/kd_pre_ppr_any_sum_by_age_`samp'`suf'.pdf)
     kd_young_old pre_ppr_any_avg, xtitle(Avg pubs per year, 2010-2013 (any position)) ///
         w(1) wlab("1 pub") unit(PIs) fmt(%9.2f) ///
-        out(../output/figures/kd_pre_ppr_any_avg_by_age_`samp'.pdf)
+        out(../output/figures/kd_pre_ppr_any_avg_by_age_`samp'`suf'.pdf)
 
     foreach v in pre_ppr_sum pre_ppr_avg pre_ppr_any_sum pre_ppr_any_avg {
         if "`v'" == "pre_ppr_sum"      local ytitle "Total pubs 2010-2013 (last author)"
@@ -396,7 +408,7 @@ program pubs_by_age
         bs_stats, y(`v') x(age_2014) ///
             xtitle(Age in 2014 (yrs since first pub + 30)) ///
             ytitle(`ytitle') ///
-            out(../output/figures/bs_`v'_by_age_`samp'.pdf)
+            out(../output/figures/bs_`v'_by_age_`samp'`suf'.pdf)
     }
 end
 
@@ -423,11 +435,11 @@ end
 * matching nih_by_age.
 * ---------------------------------------------------------------------------
 program prod_per_dollar
-    syntax, samp(string)
+    syntax, samp(string) [suf(string)]
     cap mkdir ../output/tables
     cap mkdir ../output/figures
 
-    use ../temp/pubs_pre_pis, clear
+    use ../temp/pubs_pre_pis`suf', clear
     if "`samp'" == "foia" keep if foia_athr == 1
     qui count
     local n_start = r(N)
@@ -464,10 +476,10 @@ program prod_per_dollar
     }
     qui count
     local n_kept = r(N)
-    di as text "prod_per_dollar `samp': `n_start' PIs -> `n_match' NIH-matched -> " ///
+    di as text "prod_per_dollar `samp'`suf': `n_start' PIs -> `n_match' NIH-matched -> " ///
         "`n_grant' with 2010-2013 grants -> `n_pos' with positive funding -> " ///
         "`n_floor' above the $10k/yr floor -> `n_kept' kept"
-    di as text "prod_per_dollar `samp': median age_2014 = `med_age' (young = below median)"
+    di as text "prod_per_dollar `samp'`suf': median age_2014 = `med_age' (young = below median)"
 
     gen double ppr_per_100k_nih     = pre_ppr_avg     / (nih_amt_yr / 100000)
     gen double ppr_any_per_100k_nih = pre_ppr_any_avg / (nih_amt_yr / 100000)
@@ -481,7 +493,7 @@ program prod_per_dollar
         local vars `vars' ppr_per_10k_spend spend_per_ppr ppr_per_100k_comb comb_per_ppr
     }
 
-    save ../output/prod_per_dollar_pis_`samp', replace
+    save ../output/prod_per_dollar_pis_`samp'`suf', replace
 
     * Aggregate ratio (total pubs / total dollars within the age group) from
     * the untrimmed data. Unlike the mean of the PI-level ratio it is not
@@ -542,26 +554,26 @@ program prod_per_dollar
     }
     mat colnames prod = young_mean young_p50 young_N old_mean old_p50 old_N
     mat rownames prod = `rownames'
-    qui matrix_to_txt, saving("../output/tables/prod_per_dollar_`samp'.txt") ///
-        matrix(prod) title(<tab:prod_per_dollar_`samp'>) format(%14.4f) replace
+    qui matrix_to_txt, saving("../output/tables/prod_per_dollar_`samp'`suf'.txt") ///
+        matrix(prod) title(<tab:prod_per_dollar_`samp'`suf'>) format(%14.4f) replace
 
     kd_young_old ppr_per_100k_nih, ///
-        xtitle(Pubs per year per $100k NIH funding, 2010-2013 (last author)) ///
+        xtitle(Pubs per year per $100k NIH funding, 2010-2013) ///
         w(0.5) wlab("0.5 pubs") unit(PIs) fmt(%9.2f) ///
-        out(../output/figures/kd_ppr_per_100k_nih_`samp'.pdf)
+        out(../output/figures/kd_ppr_per_100k_nih_`samp'`suf'.pdf)
     kd_young_old ppr_any_per_100k_nih, ///
         xtitle(Pubs per year per $100k NIH funding, 2010-2013 (any position)) ///
         w(1) wlab("1 pub") unit(PIs) fmt(%9.2f) ///
-        out(../output/figures/kd_ppr_any_per_100k_nih_`samp'.pdf)
+        out(../output/figures/kd_ppr_any_per_100k_nih_`samp'`suf'.pdf)
     if "`samp'" == "foia" {
         kd_young_old ppr_per_10k_spend, ///
-            xtitle(Pubs per year per $10k FOIA spend, 2010-2013 (last author)) ///
+            xtitle(Pubs per year per $10k FOIA spend, 2010-2013) ///
             w(0.5) wlab("0.5 pubs") unit(PIs) fmt(%9.2f) ///
-            out(../output/figures/kd_ppr_per_10k_spend_`samp'.pdf)
+            out(../output/figures/kd_ppr_per_10k_spend_`samp'`suf'.pdf)
         kd_young_old ppr_per_100k_comb, ///
-            xtitle(Pubs per year per $100k NIH + FOIA, 2010-2013 (last author)) ///
+            xtitle(Pubs per year per $100k NIH + FOIA, 2010-2013) ///
             w(0.5) wlab("0.5 pubs") unit(PIs) fmt(%9.2f) ///
-            out(../output/figures/kd_ppr_per_100k_comb_`samp'.pdf)
+            out(../output/figures/kd_ppr_per_100k_comb_`samp'`suf'.pdf)
     }
 
     foreach v of local vars {
@@ -575,7 +587,7 @@ program prod_per_dollar
         bs_stats, y(`v') x(age_2014) ///
             xtitle(Age in 2014 (yrs since first pub + 30)) ///
             ytitle(`ytitle') ///
-            out(../output/figures/bs_`v'_by_age_`samp'.pdf)
+            out(../output/figures/bs_`v'_by_age_`samp'`suf'.pdf)
     }
 end
 
@@ -590,7 +602,7 @@ program bs_stats
     qui corr `y' `x'
     local r_s = strtrim("`: di %5.3f r(rho)'")
     local n_s = r(N)
-    binscatter `y' `x', n(20) msymbol(O) mcolor(ebblue) lcolors(dkorange) ///
+    binscatter `y' `x', n(20) msymbol(O) mcolors(gs6) lcolors(ebblue) ///
         xtitle("`xtitle'") ytitle("`ytitle'") ///
         legend(on order(- "slope = `b_s' (SE: `se_s')" "corr = `r_s', N = `n_s'") ///
             pos(1) ring(0) region(fcolor(none)) size(small)) ///
@@ -605,13 +617,14 @@ end
 * (year <= 2013), same cleaning as boe.
 * ---------------------------------------------------------------------------
 program spend_by_age
+    syntax [, suf(string)]
     cap mkdir ../output/tables
     cap mkdir ../output/figures
 
-    use ../external/pi_samp/pi_desc_all_jrnls_r1_r2, clear
+    use ../external/pi_samp/pi_desc_all_jrnls_r1_r2`suf', clear
     keep if athr_indicator == 1 & foia_athr == 1
     keep athr_id age_2014
-    save ../temp/foia_pi_age, replace
+    save ../temp/foia_pi_age`suf', replace
 
     use ../external/samp/merged_foias_with_pis, clear
     drop if mi(athr_id)
@@ -632,25 +645,25 @@ program spend_by_age
              (count) n_yrs = year, by(athr_id)
     save ../temp/spend_pi_avg, replace
 
-    merge 1:1 athr_id using ../temp/foia_pi_age, keep(1 3)
+    merge 1:1 athr_id using ../temp/foia_pi_age`suf', keep(1 3)
     qui count
     local n_all = r(N)
     qui count if _merge == 3
     local n_aged = r(N)
-    di as text "spend_by_age: `n_aged' of `n_all' FOIA PIs with spend data matched to analysis-sample age"
+    di as text "spend_by_age`suf': `n_aged' of `n_all' FOIA PIs with spend data matched to analysis-sample age"
     keep if _merge == 3
     drop _merge
 
     qui sum age_2014, d
     local med_age = r(p50)
     gen young = age_2014 < `med_age'
-    di as text "spend_by_age: median age_2014 = `med_age' (young = below median)"
+    di as text "spend_by_age`suf': median age_2014 = `med_age' (young = below median)"
 
     * PI-level dataset behind the table/plots (incl. young/old flag)
     preserve
         keep athr_id age_2014 young tot_spend lab_spend nonlab_spend ///
              hq_labspend perc_lab_spend n_yrs
-        save ../output/spend_by_age_pis, replace
+        save ../output/spend_by_age_pis`suf', replace
     restore
 
     cap mat drop spend_age
@@ -672,13 +685,13 @@ program spend_by_age
     }
     mat colnames spend_age = young_mean young_p50 young_N old_mean old_p50 old_N
     mat rownames spend_age = `rownames'
-    qui matrix_to_txt, saving("../output/tables/spend_by_age.txt") ///
-        matrix(spend_age) title(<tab:spend_by_age>) format(%14.2f) replace
+    qui matrix_to_txt, saving("../output/tables/spend_by_age`suf'.txt") ///
+        matrix(spend_age) title(<tab:spend_by_age`suf'>) format(%14.2f) replace
 
     * kdensity overlays young vs old; x capped at p95 of the pooled
     * distribution — the long right tail otherwise flattens everything.
-    * Density is rescaled to percent of PIs per fixed bin (a smooth density
-    * has no natural "percent" unit without one).
+    * Density is rescaled to percent of PIs per fixed bin (raw densities
+    * over dollar amounts are unreadable 1e-5-scale numbers).
     foreach v in tot_spend lab_spend nonlab_spend perc_lab_spend {
         if "`v'" == "tot_spend"      local xtitle "Avg annual total spend ($)"
         if "`v'" == "lab_spend"      local xtitle "Avg annual lab spend ($)"
@@ -696,11 +709,9 @@ program spend_by_age
 
         qui sum `v' if young == 1, d
         local mean_y = strtrim("`: di %9.0fc r(mean)'")
-        local p50_y  = strtrim("`: di %9.0fc r(p50)'")
         local n_y    = r(N)
         qui sum `v' if young == 0, d
         local mean_o = strtrim("`: di %9.0fc r(mean)'")
-        local p50_o  = strtrim("`: di %9.0fc r(p50)'")
         local n_o    = r(N)
 
         kd_tests `v'
@@ -714,22 +725,27 @@ program spend_by_age
         local ptxt "Early-career - late-career = `diff'; t-test p = `pt_s'; K-S p = `pks_s'"
         di as text "`v': `ptxt'"
 
-        cap drop _kx_y _kd_y _kx_o _kd_o _kp_y _kp_o
-        kdensity `v' if young == 1 & `v' <= `xcap', gen(_kx_y _kd_y) n(200) nograph
-        kdensity `v' if young == 0 & `v' <= `xcap', gen(_kx_o _kd_o) n(200) nograph
+        * both densities on one common x grid so rarea can shade the gap;
+        * grid starts at 0 so the kernel spill into negative spend isn't drawn
+        cap drop _kx _kd_y _kd_o _kp_y _kp_o _kp_c
+        gen _kx = `xcap' * (_n - 1) / 199 if _n <= 200
+        kdensity `v' if young == 1 & `v' <= `xcap', at(_kx) gen(_kd_y) nograph
+        kdensity `v' if young == 0 & `v' <= `xcap', at(_kx) gen(_kd_o) nograph
         gen _kp_y = _kd_y * `w' * 100
         gen _kp_o = _kd_o * `w' * 100
-        * kernel spills past the data boundary; don't draw negative spend
-        tw (line _kp_y _kx_y if inrange(_kx_y, 0, `xcap'), lcolor(ebblue)) ///
-           (line _kp_o _kx_o if inrange(_kx_o, 0, `xcap'), lcolor(dkorange)), ///
+        gen _kp_c = min(_kp_y, _kp_o)
+        tw (rarea _kp_c _kp_y _kx, color(ebblue*0.3) lwidth(none)) ///
+           (rarea _kp_c _kp_o _kx, color(dkorange*0.3) lwidth(none)) ///
+           (line _kp_y _kx, lcolor(ebblue)) ///
+           (line _kp_o _kx, lcolor(dkorange)), ///
            xtitle("`xtitle'") ytitle("Percent of PIs (per `wlab' bin)") ///
-           legend(order(1 "Early-Career: mean=`mean_y', p50=`p50_y', N=`n_y'" ///
-                        2 "Late-Career: mean=`mean_o', p50=`p50_o', N=`n_o'") ///
+           legend(order(3 "Early-Career (N=`n_y'): mean=`mean_y'" ///
+                        4 "Late-Career (N=`n_o'): mean=`mean_o'") ///
                pos(1) ring(0) cols(1) size(small) region(fcolor(none))) ///
-           note("`ptxt'", size(vsmall)) ///
+           note("`ptxt'", size(small)) ///
            plotregion(margin(sides))
-        graph export ../output/figures/kd_`v'_by_age.pdf, replace
-        cap drop _kx_y _kd_y _kx_o _kd_o _kp_y _kp_o
+        graph export ../output/figures/kd_`v'_by_age`suf'.pdf, replace
+        cap drop _kx _kd_y _kd_o _kp_y _kp_o _kp_c
     }
 
     * logs drop PIs with no lab spend; N in the legend shows how many
@@ -743,7 +759,7 @@ program spend_by_age
         bs_stats, y(`v') x(age_2014) ///
             xtitle(Age in 2014 (yrs since first pub + 30)) ///
             ytitle(`ytitle') ///
-            out(../output/figures/bs_`v'_by_age.pdf)
+            out(../output/figures/bs_`v'_by_age`suf'.pdf)
     }
 end
 
@@ -753,8 +769,9 @@ end
 * PI-level median age as spend_by_age.
 * ---------------------------------------------------------------------------
 program spend_by_age_piyr
+    syntax [, suf(string)]
     use ../temp/spend_athr_yr, clear
-    merge m:1 athr_id using ../temp/foia_pi_age, keep(3) nogen
+    merge m:1 athr_id using ../temp/foia_pi_age`suf', keep(3) nogen
 
     egen _tag = tag(athr_id)
     qui sum age_2014 if _tag, d
@@ -765,12 +782,12 @@ program spend_by_age_piyr
     qui count if _tag & young == 0
     local npi_o = r(N)
     drop _tag
-    di as text "spend_by_age_piyr: median age = `med_age'; PIs young/old = `npi_y'/`npi_o'"
+    di as text "spend_by_age_piyr`suf': median age = `med_age'; PIs young/old = `npi_y'/`npi_o'"
 
     preserve
         keep athr_id year age_2014 young tot_spend lab_spend nonlab_spend ///
              hq_labspend perc_lab_spend
-        save ../output/spend_by_age_piyrs, replace
+        save ../output/spend_by_age_piyrs`suf', replace
     restore
 
     cap mat drop spend_age_piyr
@@ -793,8 +810,8 @@ program spend_by_age_piyr
     }
     mat colnames spend_age_piyr = young_mean young_p50 young_N old_mean old_p50 old_N
     mat rownames spend_age_piyr = `rownames'
-    qui matrix_to_txt, saving("../output/tables/spend_by_age_piyr.txt") ///
-        matrix(spend_age_piyr) title(<tab:spend_by_age_piyr>) format(%14.2f) replace
+    qui matrix_to_txt, saving("../output/tables/spend_by_age_piyr`suf'.txt") ///
+        matrix(spend_age_piyr) title(<tab:spend_by_age_piyr`suf'>) format(%14.2f) replace
 
     foreach v in tot_spend lab_spend nonlab_spend perc_lab_spend {
         if "`v'" == "tot_spend"      local xtitle "Annual total spend ($, PI-year)"
@@ -813,11 +830,9 @@ program spend_by_age_piyr
 
         qui sum `v' if young == 1, d
         local mean_y = strtrim("`: di %9.0fc r(mean)'")
-        local p50_y  = strtrim("`: di %9.0fc r(p50)'")
         local n_y    = r(N)
         qui sum `v' if young == 0, d
         local mean_o = strtrim("`: di %9.0fc r(mean)'")
-        local p50_o  = strtrim("`: di %9.0fc r(p50)'")
         local n_o    = r(N)
 
         * PI-years are clustered within PI, so the mean difference is tested
@@ -833,21 +848,26 @@ program spend_by_age_piyr
         local ptxt "Early-career - late-career = `diff'; t-test p = `pt_s' (PI-clustered); K-S p = `pks_s'"
         di as text "`v': `ptxt'"
 
-        cap drop _kx_y _kd_y _kx_o _kd_o _kp_y _kp_o
-        kdensity `v' if young == 1 & `v' <= `xcap', gen(_kx_y _kd_y) n(200) nograph
-        kdensity `v' if young == 0 & `v' <= `xcap', gen(_kx_o _kd_o) n(200) nograph
+        * both densities on one common x grid so rarea can shade the gap
+        cap drop _kx _kd_y _kd_o _kp_y _kp_o _kp_c
+        gen _kx = `xcap' * (_n - 1) / 199 if _n <= 200
+        kdensity `v' if young == 1 & `v' <= `xcap', at(_kx) gen(_kd_y) nograph
+        kdensity `v' if young == 0 & `v' <= `xcap', at(_kx) gen(_kd_o) nograph
         gen _kp_y = _kd_y * `w' * 100
         gen _kp_o = _kd_o * `w' * 100
-        tw (line _kp_y _kx_y if inrange(_kx_y, 0, `xcap'), lcolor(ebblue)) ///
-           (line _kp_o _kx_o if inrange(_kx_o, 0, `xcap'), lcolor(dkorange)), ///
+        gen _kp_c = min(_kp_y, _kp_o)
+        tw (rarea _kp_c _kp_y _kx, color(ebblue*0.3) lwidth(none)) ///
+           (rarea _kp_c _kp_o _kx, color(dkorange*0.3) lwidth(none)) ///
+           (line _kp_y _kx, lcolor(ebblue)) ///
+           (line _kp_o _kx, lcolor(dkorange)), ///
            xtitle("`xtitle'") ytitle("Percent of PI-years (per `wlab' bin)") ///
-           legend(order(1 "Early-Career: mean=`mean_y', p50=`p50_y', N=`n_y' (PIs=`npi_y')" ///
-                        2 "Late-Career: mean=`mean_o', p50=`p50_o', N=`n_o' (PIs=`npi_o')") ///
+           legend(order(3 "Early-Career (N=`n_y', PIs=`npi_y'): mean=`mean_y'" ///
+                        4 "Late-Career (N=`n_o', PIs=`npi_o'): mean=`mean_o'") ///
                pos(1) ring(0) cols(1) size(small) region(fcolor(none))) ///
-           note("`ptxt'", size(vsmall)) ///
+           note("`ptxt'", size(small)) ///
            plotregion(margin(sides))
-        graph export ../output/figures/kd_`v'_by_age_piyr.pdf, replace
-        cap drop _kx_y _kd_y _kx_o _kd_o _kp_y _kp_o
+        graph export ../output/figures/kd_`v'_by_age_piyr`suf'.pdf, replace
+        cap drop _kx _kd_y _kd_o _kp_y _kp_o _kp_c
     }
 end
 
@@ -881,7 +901,7 @@ program boe
     collapse (mean) tot_spend nonlab_spend lab_spend hq_labspend lq_labspend perc_lab_spend perc_nonlab_spend, by(athr_id)
     graph bar lab_spend nonlab_spend, over(athr_id ,sort((mean) tot_spend) descending) stack bar(1, color(lavender%70)) bar(2, color(dkorange%70)) legend(on order(- "Lab Spend" - "Non-Lab Spend") pos(1) ring(0) size(small) region(fcolor(none))) ytitle("Average Annual Spend ($)") plotregion(margin(sides))
     graph export ../output/figures/avg_spend_by_athr.pdf, replace
-    sum lab_spend if lab_spend >0, d
+    sum lab_spend if lab_spend >50, d
     local mean_lab_spend : di %6.2f r(mean)
     local sd_lab_spend : di %6.2f r(sd)
     local min_lab_spend : di %6.2f r(min)
