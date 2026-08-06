@@ -13,7 +13,8 @@ end
 program build_reporter
     local keepvars pi_names project_start project_end total_cost ///
                    budget_start budget_end full_project_num fy ///
-                   org_ipf_code org_name project_terms project_title ///
+                   org_ipf_code org_name org_city org_state org_country ///
+                   project_terms project_title ///
                    activity subproject_id core_project_num ///
                    total_cost_sub_project
 

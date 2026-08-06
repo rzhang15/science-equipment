@@ -89,23 +89,27 @@ program gather_external_data
     rename sum_imputed_shares imputed_mkt_spend_shr
     save ../temp/exposure, replace
 
-    * NIH measures are taken as built in derived/nih/match_pi_athr -- nothing is
-    * re-derived here. The author-year measures are panel-independent, so the
-    * all-institution last-author panel carries every PI we can use.
-    cap use athr_id year n_grants n_new_grants nih_total_cost has_nih ///
-            n_grants_ever nih_cost_ever nih_pi_name ///
-            using ../external/nih_grants/athr_panel_full_year_last_all_jrnls_r1_r2_with_nih, clear
+    * Author-year NIH measures straight from the grant-level build. The
+    * *_with_nih panels merge these onto the last-author publication panel with
+    * keep(1 3), so a funded PI-year with no last-author paper is dropped there
+    * and would be zero-filled downstream (see derived/nih/match_pi_athr).
+    cap use athr_id year n_grants n_new_grants nih_total_cost ///
+            using ../external/nih_grants/nih_athr_year, clear
     if _rc {
-        di as error "gather_external_data: *_with_nih panel not found -- NIH outcomes SKIPPED (rerun derived/nih/match_pi_athr)."
+        di as error "gather_external_data: nih_athr_year not found -- NIH outcomes SKIPPED (rerun derived/nih/match_pi_athr)."
     }
     else {
-        * merge_one_panel zero-fills the numeric measures for every PI, so an
-        * unmatched PI is indistinguishable from an unfunded one there.
-        * nih_pi_name is left blank without a RePORTER match: that is the flag.
-        gen byte nih_matched = !mi(nih_pi_name)
-        drop nih_pi_name
+        gen byte has_nih = n_grants > 0
         duplicates drop athr_id year, force
         save ../temp/nih_athr_yr, replace
+
+        * nih_pi_name is left blank without a RePORTER match: that is the flag.
+        use athr_id nih_pi_name using ../external/nih_grants/nih_names_by_athr, clear
+        gen byte nih_matched = !mi(nih_pi_name)
+        drop nih_pi_name
+        merge 1:1 athr_id using ../external/nih_grants/nih_totals_by_athr, ///
+            keepusing(n_grants_ever nih_cost_ever) keep(1 3) nogen
+        save ../temp/nih_athr_level, replace
     }
 
     import delimited ../external/cluster/author_static_clusters_30.csv, clear varnames(1)
@@ -265,14 +269,10 @@ program restrict_samp
     if _rc di as error "restrict_samp `samp'`suf': ../temp/nih_athr_yr missing -- NIH outcomes unavailable this run."
     else {
         merge 1:1 athr_id year using ../temp/nih_athr_yr, keep(1 3) nogen
-        * PI-level fields arrive missing on tsfill'd rows; spread them within PI.
-        foreach v in nih_matched n_grants_ever nih_cost_ever {
-            bys athr_id: egen _pi_`v' = max(`v')
-            replace `v' = _pi_`v'
-            drop _pi_`v'
-        }
-        * A tsfill'd year is a year with no award record, which is what the
-        * derived build itself codes as zero for the years it does carry.
+        merge m:1 athr_id using ../temp/nih_athr_level, keep(1 3) nogen
+        replace nih_matched = 0 if mi(nih_matched)
+        * The source file has no publication filter, so a non-merging year for
+        * a matched PI really is a year with no award record.
         foreach v in n_grants n_new_grants nih_total_cost has_nih {
             replace `v' = 0 if mi(`v') & nih_matched == 1
         }

@@ -22,7 +22,7 @@ program make_panel
     // ends in _no_clin; sub_athrs paths stay the same
     local src "openalex"
     if regexm("`samp'", "_no_clin$") local src "openalex_no_clin"
-    import delimited ../external/clusters/author_static_clusters_25.csv, clear
+    import delimited ../external/clusters/author_static_clusters_30.csv, clear
     save ../temp/clusters, replace
 
     // Build coauthor structures from the full-authors sample so team-size
