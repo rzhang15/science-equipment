@@ -1,0 +1,1837 @@
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  /n/holylabs/pakes_lab/Lab/sci_eq/analysis/rf_heterogeneity/code/run_age_ngrants.log
+  log type:  text
+ opened on:   6 Aug 2026, 02:05:45
+
+. 
+. local samp   all_jrnls
+
+. local sufs   _r1_r2 _r1_r2_public
+
+. local fes    athr_id year
+
+. local vce_cl athr_id
+
+. local yvars  ppr_cnt cite_affl_wt
+
+. 
+. cap mkdir "../output/figures/`samp'"
+
+. cap mkdir "../output/figures/`samp'/es_ppml"
+
+. cap mkdir "../output/tables/`samp'"
+
+. 
+. global LBL_y_mg "Early-Career Scientists x Multiple NIH Grants at Baseline"
+
+. global LBL_y_sg "Early-Career Scientists x Single NIH Grant at Baseline"
+
+. global LBL_o_mg "Late-Career Scientists x Multiple NIH Grants at Baseline"
+
+. global LBL_o_sg "Late-Career Scientists x Single NIH Grant at Baseline"
+
+. 
+. * Grant diversification at baseline: max number of NIH projects held
+. * concurrently in any FY2010-2013 (distinct full_project_num per athr-FY).
+. * multi = ever >= 2 overlapping awards pre-merger; single = never more than 1.
+. * Restricted to PIs with at least one FY2010-2013 award: an unmatched PI's
+. * zero is a failed name match and a matched PI funded only post-2013 was not
+. * an NIH PI pre-merger, so neither is a single-grant lab. A grant-PI pair can
+. * appear twice when the same name matches twice in pi_names, hence the dedup.
+. use athr_id grant_id full_project_num fy using ../external/nih/nih_grants_by_athr_id, clear
+
+. duplicates drop athr_id grant_id, force
+
+Duplicates in terms of athr_id grant_id
+
+(152 observations deleted)
+
+. keep if inrange(fy, 2010, 2013)
+(303,363 observations deleted)
+
+. bys athr_id fy full_project_num: gen byte proj = _n == 1
+
+. gcollapse (sum) n_active = proj, by(athr_id fy) fast
+
+. gcollapse (max) max_active = n_active, by(athr_id) fast
+
+. save ../temp/nih_pre_ngrants, replace
+(file ../temp/nih_pre_ngrants.dta not found)
+file ../temp/nih_pre_ngrants.dta saved
+
+. 
+. foreach suf of local sufs {
+  2. 
+. di as text _n(2) "################ run_age_ngrants: `samp'`suf' ################"
+  3. 
+. cap confirm file ../temp/es_`samp'`suf'.dta
+  4. if _rc {
+  5.     di as error "run_age_ngrants: ../temp/es_`samp'`suf'.dta not found -- run add_het_splits for this sample first; skipping."
+  6.     continue
+  7. }
+  8. use ../temp/es_`samp'`suf', clear
+  9. 
+. cap confirm variable young
+ 10. if _rc {
+ 11.     di as error "run_age_ngrants`suf': young not in panel -- rerun add_het_splits; skipping."
+ 12.     continue
+ 13. }
+ 14. 
+. cap drop _merge
+ 15. merge m:1 athr_id using ../temp/nih_pre_ngrants, keep(1 3)
+ 16. gen byte multi_g = max_active >= 2 if _merge == 3
+ 17. drop _merge
+ 18. 
+. * 2x2 cells; missing off the pre-funded NIH sample, so every fit below drops
+. * ineligible PIs rather than pooling them into the base category.
+. gen byte y_mg = (young == 1 & multi_g == 1) if !mi(young) & !mi(multi_g)
+ 19. gen byte y_sg = (young == 1 & multi_g == 0) if !mi(young) & !mi(multi_g)
+ 20. gen byte o_mg = (young == 0 & multi_g == 1) if !mi(young) & !mi(multi_g)
+ 21. gen byte o_sg = (young == 0 & multi_g == 0) if !mi(young) & !mi(multi_g)
+ 22. 
+. local skip 0
+ 23. foreach grp in y_mg y_sg o_mg o_sg {
+ 24.     qui sum `grp'
+ 25.     if r(N) == 0 | r(max) == 0 {
+ 26.         di as error "run_age_ngrants`suf': cell `grp' empty -- skipping this sample."
+ 27.         local skip 1
+ 28.     }
+ 29.     cap drop _tag
+ 30.     egen byte _tag = tag(athr_id) if `grp' == 1
+ 31.     qui count if _tag == 1
+ 32.     di as text "run_age_ngrants`suf': cell `grp' PIs = " r(N)
+ 33. }
+ 34. cap drop _tag
+ 35. if `skip' continue
+ 36. 
+. gen rel = year - 2014
+ 37. qui sum rel, d
+ 38. local abs_lag  = abs(r(max))
+ 39. local abs_lead = abs(r(min))
+ 40. 
+. forval i = 1/`abs_lead' {
+ 41.     gen int_lead`i'  = exposure      if rel == -`i'
+ 42.     gen mshr_lead`i' = mkt_spend_shr if rel == -`i'
+ 43. }
+ 44. forval i = 0/`abs_lag' {
+ 45.     gen int_lag`i'  = exposure      if rel == `i'
+ 46.     gen mshr_lag`i' = mkt_spend_shr if rel == `i'
+ 47. }
+ 48. ds int_lead* int_lag* mshr_lead* mshr_lag*
+ 49. foreach var in `r(varlist)' {
+ 50.     replace `var' = 0 if mi(`var')
+ 51. }
+ 52. local int_leads
+ 53. local mshr_leads
+ 54. local int_lags
+ 55. local mshr_lags
+ 56. forval i = 2/`abs_lead' {
+ 57.     local int_leads  int_lead`i'  `int_leads'
+ 58.     local mshr_leads mshr_lead`i' `mshr_leads'
+ 59. }
+ 60. forval i = 0/`abs_lag' {
+ 61.     local int_lags  `int_lags'  int_lag`i'
+ 62.     local mshr_lags `mshr_lags' mshr_lag`i'
+ 63. }
+ 64. 
+. gen post       = year >= 2014
+ 65. gen Z_it       = exposure      * post
+ 66. gen Z_share_it = mkt_spend_shr * post
+ 67. 
+. foreach grp in y_mg y_sg o_mg o_sg {
+ 68.     * cleared per suffix: these accumulate, and stale terms from the
+.     * previous sample would enter the next sample's ES spec.
+.     local leads_`grp'
+ 69.     local lags_`grp'
+ 70.     local mleads_`grp'
+ 71.     local mlags_`grp'
+ 72.     foreach v of local int_leads {
+ 73.         gen `v'_`grp' = `v' * `grp'
+ 74.         local leads_`grp' `leads_`grp'' `v'_`grp'
+ 75.     }
+ 76.     foreach v of local int_lags {
+ 77.         gen `v'_`grp' = `v' * `grp'
+ 78.         local lags_`grp' `lags_`grp'' `v'_`grp'
+ 79.     }
+ 80.     foreach v of local mshr_leads {
+ 81.         gen `v'_`grp' = `v' * `grp'
+ 82.         local mleads_`grp' `mleads_`grp'' `v'_`grp'
+ 83.     }
+ 84.     foreach v of local mshr_lags {
+ 85.         gen `v'_`grp' = `v' * `grp'
+ 86.         local mlags_`grp' `mlags_`grp'' `v'_`grp'
+ 87.     }
+ 88.     gen int_lead1_`grp' = int_lead1 * `grp'
+ 89.     gen Z_`grp'  = Z_it       * `grp'
+ 90.     gen S_`grp'  = Z_share_it * `grp'
+ 91.     gen PT_`grp' = post       * `grp'
+ 92. }
+ 93. 
+. tempname ph
+ 94. postfile `ph' str30 yvar str24 grp str24 split_type ///
+>     double(post_b post_se p N r2_p n_pis) ///
+>     using "../temp/age_ngrants_results`suf'", replace
+ 95. 
+. foreach yvar of local yvars {
+ 96.     local ylab "`yvar'"
+ 97.     if "`yvar'" == "ppr_cnt"      local ylab "Publications"
+ 98.     if "`yvar'" == "cite_affl_wt" local ylab "Citation-Weighted Output"
+ 99.     local gap = cond(regexm("`yvar'", "^cite_affl_wt"), 0.2, 0.1)
+100. 
+.     di as text _n "==== pooled DiD PPML 2x2 age x ngrants: `yvar' (`suf') ===="
+101.     * o_sg x post is the omitted base
+.     cap noi ppmlhdfe `yvar' Z_y_mg Z_y_sg Z_o_mg Z_o_sg ///
+>                             S_y_mg S_y_sg S_o_mg S_o_sg ///
+>                             PT_y_mg PT_y_sg PT_o_mg, ///
+>         absorb(`fes') vce(cluster `vce_cl')
+102.     if _rc {
+103.         di as error "run_age_ngrants`suf': pooled DiD `yvar' failed; skipping."
+104.         continue
+105.     }
+106.     local Nppml  = e(N)
+107.     local r2ppml = e(r2_p)
+108.     foreach grp in y_mg y_sg o_mg o_sg {
+109.         gunique athr_id if e(sample) & `grp' == 1
+110.         local n_pis = r(unique)
+111.         gunique inst_id if e(sample) & `grp' == 1
+112.         local n_insts = r(unique)
+113.         local b  = _b[Z_`grp']
+114.         local se = _se[Z_`grp']
+115.         di as text "PDID `yvar' `grp': b=" %8.4f `b' " se=" %8.4f `se' ///
+>             "  N=" %9.0f `Nppml' " PIs=`n_pis' Insts=`n_insts'"
+116.         post `ph' ("`yvar'") ("`grp'") ("joint_agengrants") ///
+>             (`b') (`se') (.) (`Nppml') (`r2ppml') (`n_pis')
+117.     }
+118.     * Multi-vs-single grant within age and young-vs-old within grant tier.
+.     foreach d in "y_diff_ng Z_y_mg Z_y_sg" "o_diff_ng Z_o_mg Z_o_sg" ///
+>                  "mg_diff_age Z_y_mg Z_o_mg" "sg_diff_age Z_y_sg Z_o_sg" {
+119.         local dname : word 1 of `d'
+120.         local d1    : word 2 of `d'
+121.         local d2    : word 3 of `d'
+122.         cap noi lincom `d1' - `d2'
+123.         if _rc continue
+124.         local b_diff  = r(estimate)
+125.         local se_diff = r(se)
+126.         local p_diff  = r(p)
+127.         di as text "DIFF `yvar' `dname': b=" %8.4f `b_diff' ///
+>             " se=" %8.4f `se_diff' " p=" %6.4f `p_diff'
+128.         post `ph' ("`yvar'") ("`dname'") ("joint_agengrants_diff") ///
+>             (`b_diff') (`se_diff') (`p_diff') (`Nppml') (`r2ppml') (.)
+129.     }
+130. 
+.     di as text _n "==== event study PPML 2x2 age x ngrants: `yvar' (`suf') ===="
+131.     cap noi ppmlhdfe `yvar' ///
+>         `leads_y_mg' `lags_y_mg' `leads_y_sg' `lags_y_sg' ///
+>         `leads_o_mg' `lags_o_mg' `leads_o_sg' `lags_o_sg' ///
+>         `mleads_y_mg' `mlags_y_mg' `mleads_y_sg' `mlags_y_sg' ///
+>         `mleads_o_mg' `mlags_o_mg' `mleads_o_sg' `mlags_o_sg' ///
+>         PT_y_mg PT_y_sg PT_o_mg, ///
+>         absorb(`fes') vce(cluster `vce_cl')
+132.     if _rc {
+133.         di as error "run_age_ngrants`suf': ES `yvar' failed; skipping plots."
+134.         continue
+135.     }
+136.     foreach grp in y_mg y_sg o_mg o_sg {
+137.         local grp_label = "${LBL_`grp'}"
+138.         gunique athr_id if e(sample) & `grp' == 1
+139.         local num_athrs = r(unique)
+140.         gunique inst_id if e(sample) & `grp' == 1
+141.         local num_insts = r(unique)
+142.         sum `yvar' if rel <= -1 & e(sample) & `grp' == 1, d
+143.         local pre_mean : dis %6.3f r(mean)
+144.         preserve
+145.         cap mat drop es
+146.         foreach var in `leads_`grp'' `lags_`grp'' int_lead1_`grp' {
+147.             if "`var'" == "int_lead1_`grp'" mat row = 0,0
+148.             else mat row = _b[`var'], _se[`var']
+149.             mat es = nullmat(es) \ row
+150.         }
+151.         svmat es
+152.         keep es1 es2
+153.         drop if mi(es1)
+154.         rename (es1 es2) (b se)
+155.         gen ub = b + 1.96*se
+156.         qui sum ub
+157.         local ymax = round(r(max), `gap')
+158.         gen lb = b - 1.96*se
+159.         qui sum lb
+160.         local ymin = round(r(min), `gap')
+161.         if `ymin' > 0 local ymin = 0
+162.         gen rel = -`abs_lead' if _n == 1
+163.         replace rel = rel[_n-1]+1 if _n > 1
+164.         replace rel = rel + 1 if rel >= -1
+165.         replace rel = -1 if rel == `abs_lag' + 1
+166.         gen year = rel + 2014
+167.         hashsort rel
+168.         tw rcap ub lb year if year != 2013, lcolor(ebblue%70) msize(vsmall) || ///
+>            scatter b year, mcolor(ebblue) || ///
+>         scatteri `ymax' 2013.75 `ymax' 2014.25, bcolor(gs12%30) recast(area) base(`ymin') ///
+>            xlab(2010(1)2019, labsize(small)) xtitle("Year") ///
+>            ytitle("{&Delta} Log Expected `ylab'") ylab(`ymin'(`gap')`ymax') ///
+>            subtitle("`grp_label'", pos(11) size(small)) ///
+>            legend(on order(- "Num. PIs: `num_athrs'" "Num. Insts: `num_insts'" "Pre-Period Avg : `pre_mean'") ///
+>                   pos(7) ring(1) rows(3) bmargin(zero) size(small)) ///
+>            yline(0, lcolor(gs10) lpattern(solid)) plotregion(margin(sides))
+169.         graph export ../output/figures/`samp'/es_ppml/es_`yvar'`suf'_`grp'_agengrants.pdf, replace
+170.         restore
+171.     }
+172. }
+173. postclose `ph'
+174. 
+. use ../temp/age_ngrants_results`suf', clear
+175. di as text _n "==== age_ngrants_results`suf' ===="
+176. list, sepby(yvar) noobs
+177. export delimited using "../output/tables/`samp'/age_ngrants_results`suf'.txt", replace delim(tab)
+178. 
+. }
+
+
+################ run_age_ngrants: all_jrnls_r1_r2 ################
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                        59,590
+        from master                    59,590  (_merge==1)
+        from using                          0  (_merge==2)
+
+    Matched                            63,780  (_merge==3)
+    -----------------------------------------
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+run_age_ngrants_r1_r2: cell y_mg PIs = 1492
+run_age_ngrants_r1_r2: cell y_sg PIs = 1319
+run_age_ngrants_r1_r2: cell o_mg PIs = 2381
+run_age_ngrants_r1_r2: cell o_sg PIs = 1186
+(111,033 missing values generated)
+(111,033 missing values generated)
+(111,033 missing values generated)
+(111,033 missing values generated)
+(111,033 missing values generated)
+(111,033 missing values generated)
+(111,033 missing values generated)
+(111,033 missing values generated)
+(111,033 missing values generated)
+(111,033 missing values generated)
+(111,033 missing values generated)
+(111,033 missing values generated)
+(111,033 missing values generated)
+(111,033 missing values generated)
+(111,033 missing values generated)
+(111,033 missing values generated)
+(111,033 missing values generated)
+(111,033 missing values generated)
+(111,033 missing values generated)
+(111,033 missing values generated)
+int_lead1   int_lead3   int_lag0    int_lag2    int_lag4    mshr_lead1  mshr_lead3  mshr_lag0   mshr_lag2   mshr_lag4
+int_lead2   int_lead4   int_lag1    int_lag3    int_lag5    mshr_lead2  mshr_lead4  mshr_lag1   mshr_lag3   mshr_lag5
+(111,033 real changes made)
+(111,033 real changes made)
+(111,033 real changes made)
+(111,033 real changes made)
+(111,033 real changes made)
+(111,033 real changes made)
+(111,033 real changes made)
+(111,033 real changes made)
+(111,033 real changes made)
+(111,033 real changes made)
+(111,033 real changes made)
+(111,033 real changes made)
+(111,033 real changes made)
+(111,033 real changes made)
+(111,033 real changes made)
+(111,033 real changes made)
+(111,033 real changes made)
+(111,033 real changes made)
+(111,033 real changes made)
+(111,033 real changes made)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(59,590 missing values generated)
+(file ../temp/age_ngrants_results_r1_r2.dta not found)
+
+==== pooled DiD PPML 2x2 age x ngrants: ppr_cnt (_r1_r2) ====
+Iteration 1:   deviance = 6.9094e+04  eps = .         iters = 3    tol = 1.0e-04  min(eta) =  -1.51  P   
+Iteration 2:   deviance = 6.7406e+04  eps = 2.50e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.88      
+Iteration 3:   deviance = 6.7395e+04  eps = 1.64e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.95      
+Iteration 4:   deviance = 6.7395e+04  eps = 3.96e-08  iters = 2    tol = 1.0e-04  min(eta) =  -1.96      
+Iteration 5:   deviance = 6.7395e+04  eps = 3.42e-14  iters = 1    tol = 1.0e-05  min(eta) =  -1.96   S  
+Iteration 6:   deviance = 6.7395e+04  eps = 2.04e-16  iters = 2    tol = 1.0e-09  min(eta) =  -1.96   S O
+------------------------------------------------------------------------------------------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
+Converged in 6 iterations and 12 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =     63,780
+Absorbing 2 HDFE groups                           Residual df     =      6,377
+Statistics robust to heteroskedasticity           Wald chi2(11)   =     148.76
+Deviance             =  67394.84629               Prob > chi2     =     0.0000
+Log pseudolikelihood = -98568.63038               Pseudo R2       =     0.1916
+
+Number of clusters (athr_id)=      6,378
+                            (Std. err. adjusted for 6,378 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+      Z_y_mg |  -.4612906   .2797427    -1.65   0.099    -1.009576    .0869951
+      Z_y_sg |  -.0992323   .3685928    -0.27   0.788    -.8216609    .6231963
+      Z_o_mg |  -.0122457   .2628211    -0.05   0.963    -.5273657    .5028743
+      Z_o_sg |   .5761687   .4236938     1.36   0.174    -.2542558    1.406593
+      S_y_mg |   -.128622   .1289492    -1.00   0.319    -.3813578    .1241139
+      S_y_sg |   .0297002   .1528732     0.19   0.846    -.2699258    .3293262
+      S_o_mg |    -.12565   .1045562    -1.20   0.229    -.3305765    .0792764
+      S_o_sg |   .2182052   .1622048     1.35   0.179    -.0997104    .5361209
+     PT_y_mg |   .3902636   .0703815     5.54   0.000     .2523184    .5282089
+     PT_y_sg |   .2455902   .0744243     3.30   0.001     .0997212    .3914591
+     PT_o_mg |   .2088571   .0639345     3.27   0.001     .0835478    .3341664
+       _cons |   .7222922   .0282634    25.56   0.000     .6668969    .7776875
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      6378        6378           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+N = 14,920; 1,492 balanced groups of size 10
+N = 14,920; 127 unbalanced groups of sizes 10 to 600
+PDID ppr_cnt y_mg: b= -0.4613 se=  0.2797  N=    63780 PIs=1492 Insts=127
+N = 13,190; 1,319 balanced groups of size 10
+N = 13,190; 156 unbalanced groups of sizes 10 to 510
+PDID ppr_cnt y_sg: b= -0.0992 se=  0.3686  N=    63780 PIs=1319 Insts=156
+N = 23,810; 2,381 balanced groups of size 10
+N = 23,810; 118 unbalanced groups of sizes 10 to 1,020
+PDID ppr_cnt o_mg: b= -0.0122 se=  0.2628  N=    63780 PIs=2381 Insts=118
+N = 11,860; 1,186 balanced groups of size 10
+N = 11,860; 135 unbalanced groups of sizes 10 to 500
+PDID ppr_cnt o_sg: b=  0.5762 se=  0.4237  N=    63780 PIs=1186 Insts=135
+
+ ( 1)  Z_y_mg - Z_y_sg = 0
+
+------------------------------------------------------------------------------
+     ppr_cnt | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |  -.3620582   .4627274    -0.78   0.434    -1.268987    .5448708
+------------------------------------------------------------------------------
+DIFF ppr_cnt y_diff_ng: b= -0.3621 se=  0.4627 p=0.4340
+
+ ( 1)  Z_o_mg - Z_o_sg = 0
+
+------------------------------------------------------------------------------
+     ppr_cnt | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |  -.5884144   .4985894    -1.18   0.238    -1.565632    .3888028
+------------------------------------------------------------------------------
+DIFF ppr_cnt o_diff_ng: b= -0.5884 se=  0.4986 p=0.2379
+
+ ( 1)  Z_y_mg - Z_o_mg = 0
+
+------------------------------------------------------------------------------
+     ppr_cnt | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |  -.4490448   .3838371    -1.17   0.242    -1.201352    .3032621
+------------------------------------------------------------------------------
+DIFF ppr_cnt mg_diff_age: b= -0.4490 se=  0.3838 p=0.2420
+
+ ( 1)  Z_y_sg - Z_o_sg = 0
+
+------------------------------------------------------------------------------
+     ppr_cnt | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   -.675401   .5615844    -1.20   0.229    -1.776086    .4252842
+------------------------------------------------------------------------------
+DIFF ppr_cnt sg_diff_age: b= -0.6754 se=  0.5616 p=0.2291
+
+==== event study PPML 2x2 age x ngrants: ppr_cnt (_r1_r2) ====
+Iteration 1:   deviance = 6.8939e+04  eps = .         iters = 3    tol = 1.0e-04  min(eta) =  -1.59  P   
+Iteration 2:   deviance = 6.7249e+04  eps = 2.51e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.93      
+Iteration 3:   deviance = 6.7238e+04  eps = 1.65e-04  iters = 2    tol = 1.0e-04  min(eta) =  -2.01      
+Iteration 4:   deviance = 6.7238e+04  eps = 3.95e-08  iters = 2    tol = 1.0e-04  min(eta) =  -2.01      
+Iteration 5:   deviance = 6.7238e+04  eps = 3.41e-14  iters = 2    tol = 1.0e-05  min(eta) =  -2.01   S  
+Iteration 6:   deviance = 6.7238e+04  eps = 0.00e+00  iters = 2    tol = 1.0e-09  min(eta) =  -2.01   S O
+------------------------------------------------------------------------------------------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
+Converged in 6 iterations and 13 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =     63,780
+Absorbing 2 HDFE groups                           Residual df     =      6,377
+Statistics robust to heteroskedasticity           Wald chi2(75)   =     268.60
+Deviance             =  67237.99922               Prob > chi2     =     0.0000
+Log pseudolikelihood = -98490.20684               Pseudo R2       =     0.1923
+
+Number of clusters (athr_id)=      6,378
+                               (Std. err. adjusted for 6,378 clusters in athr_id)
+---------------------------------------------------------------------------------
+                |               Robust
+        ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+----------------+----------------------------------------------------------------
+ int_lead4_y_mg |   .2241941    .476188     0.47   0.638    -.7091172    1.157505
+ int_lead3_y_mg |  -.4588356   .5068266    -0.91   0.365    -1.452198    .5345263
+ int_lead2_y_mg |   .3353605   .4314872     0.78   0.437    -.5103389     1.18106
+  int_lag0_y_mg |  -.0267802   .5456079    -0.05   0.961    -1.096152    1.042592
+  int_lag1_y_mg |  -.9581144    .442618    -2.16   0.030     -1.82563    -.090599
+  int_lag2_y_mg |  -.4868906   .4873377    -1.00   0.318    -1.442055    .4682737
+  int_lag3_y_mg |  -.7229316   .4912713    -1.47   0.141    -1.685806    .2399425
+  int_lag4_y_mg |  -.1509759   .5255324    -0.29   0.774       -1.181    .8790486
+  int_lag5_y_mg |  -.2868135    .563382    -0.51   0.611    -1.391022     .817395
+ int_lead4_y_sg |  -.4624446   .6207072    -0.75   0.456    -1.679008    .7541192
+ int_lead3_y_sg |  -.9250876   .5441527    -1.70   0.089    -1.991607    .1414321
+ int_lead2_y_sg |  -.6356081   .5281017    -1.20   0.229    -1.670668    .3994522
+  int_lag0_y_sg |  -.2042064   .5736107    -0.36   0.722    -1.328463    .9200499
+  int_lag1_y_sg |   .0428025   .6153568     0.07   0.945    -1.163275     1.24888
+  int_lag2_y_sg |  -.7601088   .6844319    -1.11   0.267    -2.101571     .581353
+  int_lag3_y_sg |  -.6650671   .6842348    -0.97   0.331    -2.006143    .6760085
+  int_lag4_y_sg |  -1.254656   .7462898    -1.68   0.093    -2.717358    .2080448
+  int_lag5_y_sg |   -1.07526   .7135709    -1.51   0.132    -2.473833    .3233135
+ int_lead4_o_mg |  -.1615326   .4739673    -0.34   0.733    -1.090491    .7674263
+ int_lead3_o_mg |  -.4754466   .4495394    -1.06   0.290    -1.356528    .4056344
+ int_lead2_o_mg |   .0771349   .4505877     0.17   0.864    -.8060007    .9602705
+  int_lag0_o_mg |  -.1276681   .4811928    -0.27   0.791    -1.070789    .8154524
+  int_lag1_o_mg |  -.4294651   .4893859    -0.88   0.380    -1.388644    .5297137
+  int_lag2_o_mg |  -.1444983   .5083799    -0.28   0.776    -1.140904     .851908
+  int_lag3_o_mg |   .0369602   .5155497     0.07   0.943    -.9734986    1.047419
+  int_lag4_o_mg |   .2271418   .5626487     0.40   0.686    -.8756294    1.329913
+  int_lag5_o_mg |  -.4471514   .5588415    -0.80   0.424    -1.542461    .6481578
+ int_lead4_o_sg |    -.31071   .6892739    -0.45   0.652    -1.661662    1.040242
+ int_lead3_o_sg |   .0052827   .6652558     0.01   0.994    -1.298595     1.30916
+ int_lead2_o_sg |  -.2828278   .6453745    -0.44   0.661    -1.547738    .9820829
+  int_lag0_o_sg |   .4751214    .704426     0.67   0.500    -.9055281    1.855771
+  int_lag1_o_sg |   .0591636   .7569616     0.08   0.938    -1.424454    1.542781
+  int_lag2_o_sg |   1.120002   .7689342     1.46   0.145    -.3870813    2.627085
+  int_lag3_o_sg |   .4505574   .8661403     0.52   0.603    -1.247046    2.148161
+  int_lag4_o_sg |  -.4705226    .844796    -0.56   0.578    -2.126292    1.185247
+  int_lag5_o_sg |   1.051871   .8757049     1.20   0.230    -.6644788    2.768221
+mshr_lead4_y_mg |   -.162353    .128889    -1.26   0.208    -.4149707    .0902647
+mshr_lead3_y_mg |   .0470752   .1238608     0.38   0.704    -.1956874    .2898379
+mshr_lead2_y_mg |  -.0471512   .1150764    -0.41   0.682    -.2726968    .1783945
+ mshr_lag0_y_mg |  -.1338197   .1717353    -0.78   0.436    -.4704146    .2027752
+ mshr_lag1_y_mg |   .0004389   .1594683     0.00   0.998    -.3121131     .312991
+ mshr_lag2_y_mg |  -.1775825   .1799742    -0.99   0.324    -.5303254    .1751604
+ mshr_lag3_y_mg |  -.2583544   .1801349    -1.43   0.152    -.6114124    .0947035
+ mshr_lag4_y_mg |  -.2821275   .1889753    -1.49   0.135    -.6525123    .0882573
+ mshr_lag5_y_mg |  -.1799007   .1892877    -0.95   0.342    -.5508978    .1910964
+mshr_lead4_y_sg |  -.0623368   .1441878    -0.43   0.666    -.3449396     .220266
+mshr_lead3_y_sg |   .1801191    .130629     1.38   0.168    -.0759091    .4361473
+mshr_lead2_y_sg |   .2642652   .1274025     2.07   0.038     .0145608    .5139695
+ mshr_lag0_y_sg |   .2745027   .1779257     1.54   0.123    -.0742252    .6232306
+ mshr_lag1_y_sg |   .1251765   .1953652     0.64   0.522    -.2577323    .5080852
+ mshr_lag2_y_sg |   .0668879   .2064583     0.32   0.746    -.3377629    .4715387
+ mshr_lag3_y_sg |   .0872902   .2052814     0.43   0.671    -.3150538    .4896343
+ mshr_lag4_y_sg |   .1228116   .2057225     0.60   0.551    -.2803971    .5260202
+ mshr_lag5_y_sg |   .0794999   .2179725     0.36   0.715    -.3477184    .5067183
+mshr_lead4_o_mg |   .3722986   .1307945     2.85   0.004     .1159462    .6286511
+mshr_lead3_o_mg |   .1736396   .1235147     1.41   0.160    -.0684447     .415724
+mshr_lead2_o_mg |   .1218666   .1183819     1.03   0.303    -.1101578    .3538909
+ mshr_lag0_o_mg |   .3299607   .1475592     2.24   0.025     .0407499    .6191715
+ mshr_lag1_o_mg |   .2936882   .1534793     1.91   0.056    -.0071258    .5945021
+ mshr_lag2_o_mg |  -.0255109   .1562297    -0.16   0.870    -.3317154    .2806937
+ mshr_lag3_o_mg |  -.1379506   .1627504    -0.85   0.397    -.4569356    .1810344
+ mshr_lag4_o_mg |  -.1609534   .1689524    -0.95   0.341    -.4920939    .1701872
+ mshr_lag5_o_mg |  -.2257675   .1719294    -1.31   0.189    -.5627429    .1112079
+mshr_lead4_o_sg |   .5424012   .1461179     3.71   0.000     .2560154     .828787
+mshr_lead3_o_sg |   .5165515   .1410356     3.66   0.000     .2401268    .7929762
+mshr_lead2_o_sg |   .3294175   .1331151     2.47   0.013     .0685167    .5903183
+ mshr_lag0_o_sg |   .7855911   .1955919     4.02   0.000      .402238    1.168944
+ mshr_lag1_o_sg |   .8337345    .199121     4.19   0.000     .4434646    1.224004
+ mshr_lag2_o_sg |    .452569   .2107534     2.15   0.032     .0394999    .8656381
+ mshr_lag3_o_sg |   .5477421   .2158232     2.54   0.011     .1247363    .9707479
+ mshr_lag4_o_sg |   .4731858   .2238015     2.11   0.034      .034543    .9118286
+ mshr_lag5_o_sg |   .1822202    .245537     0.74   0.458    -.2990235    .6634639
+        PT_y_mg |   .3904499   .0703998     5.55   0.000     .2524689    .5284309
+        PT_y_sg |   .2454433   .0744781     3.30   0.001     .0994688    .3914177
+        PT_o_mg |   .2104497   .0639636     3.29   0.001     .0850832    .3358161
+          _cons |   .6876258   .0340839    20.17   0.000     .6208226     .754429
+---------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      6378        6378           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+N = 14,920; 1,492 balanced groups of size 10
+N = 14,920; 127 unbalanced groups of sizes 10 to 600
+
+                        (sum) ppr_cnt
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            0              0
+ 5%            0              0
+10%            0              0       Obs               5,968
+25%            1              0       Sum of wgt.       5,968
+
+50%            2                      Mean           2.345174
+                        Largest       Std. dev.      1.940671
+75%            3             16
+90%            5             16       Variance       3.766204
+95%            6             19       Skewness       1.879278
+99%            9             19       Kurtosis       9.431674
+(123,360 observations deleted)
+(9 missing values generated)
+(9 real changes made)
+(7 real changes made)
+(1 real change made)
+file ../output/figures/all_jrnls/es_ppml/es_ppr_cnt_r1_r2_y_mg_agengrants.pdf saved as PDF format
+N = 13,190; 1,319 balanced groups of size 10
+N = 13,190; 156 unbalanced groups of sizes 10 to 510
+
+                        (sum) ppr_cnt
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            0              0
+ 5%            0              0
+10%            0              0       Obs               5,276
+25%            1              0       Sum of wgt.       5,276
+
+50%            2                      Mean           2.005118
+                        Largest       Std. dev.      1.671895
+75%            3             13
+90%            4             14       Variance       2.795234
+95%            5             14       Skewness       1.794867
+99%            8             16       Kurtosis       8.627962
+(123,360 observations deleted)
+(9 missing values generated)
+(9 real changes made)
+(7 real changes made)
+(1 real change made)
+file ../output/figures/all_jrnls/es_ppml/es_ppr_cnt_r1_r2_y_sg_agengrants.pdf saved as PDF format
+N = 23,810; 2,381 balanced groups of size 10
+N = 23,810; 118 unbalanced groups of sizes 10 to 1,020
+
+                        (sum) ppr_cnt
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            0              0
+ 5%            0              0
+10%            1              0       Obs               9,524
+25%            1              0       Sum of wgt.       9,524
+
+50%            2                      Mean           2.534334
+                        Largest       Std. dev.      2.130712
+75%            3             23
+90%            5             27       Variance       4.539932
+95%            6             28       Skewness       2.336545
+99%           10             32       Kurtosis       16.26727
+(123,360 observations deleted)
+(9 missing values generated)
+(9 real changes made)
+(7 real changes made)
+(1 real change made)
+file ../output/figures/all_jrnls/es_ppml/es_ppr_cnt_r1_r2_o_mg_agengrants.pdf saved as PDF format
+N = 11,860; 1,186 balanced groups of size 10
+N = 11,860; 135 unbalanced groups of sizes 10 to 500
+
+                        (sum) ppr_cnt
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            0              0
+ 5%            0              0
+10%            0              0       Obs               4,744
+25%            1              0       Sum of wgt.       4,744
+
+50%            2                      Mean            2.06113
+                        Largest       Std. dev.      1.732615
+75%            3             14
+90%            4             16       Variance       3.001955
+95%            5             16       Skewness        1.95322
+99%            8             17       Kurtosis       10.17222
+(123,360 observations deleted)
+(9 missing values generated)
+(9 real changes made)
+(7 real changes made)
+(1 real change made)
+file ../output/figures/all_jrnls/es_ppml/es_ppr_cnt_r1_r2_o_sg_agengrants.pdf saved as PDF format
+
+==== pooled DiD PPML 2x2 age x ngrants: cite_affl_wt (_r1_r2) ====
+Iteration 1:   deviance = 2.3079e+05  eps = .         iters = 3    tol = 1.0e-04  min(eta) =  -2.33  P   
+Iteration 2:   deviance = 2.1403e+05  eps = 7.83e-02  iters = 2    tol = 1.0e-04  min(eta) =  -3.24      
+Iteration 3:   deviance = 2.1356e+05  eps = 2.20e-03  iters = 2    tol = 1.0e-04  min(eta) =  -3.98      
+Iteration 4:   deviance = 2.1356e+05  eps = 3.18e-05  iters = 2    tol = 1.0e-04  min(eta) =  -4.43      
+Iteration 5:   deviance = 2.1356e+05  eps = 3.07e-07  iters = 2    tol = 1.0e-05  min(eta) =  -4.57      
+Iteration 6:   deviance = 2.1356e+05  eps = 5.65e-10  iters = 2    tol = 1.0e-06  min(eta) =  -4.58   S O
+------------------------------------------------------------------------------------------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
+Converged in 6 iterations and 13 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =     63,780
+Absorbing 2 HDFE groups                           Residual df     =      6,377
+Statistics robust to heteroskedasticity           Wald chi2(11)   =      59.70
+Deviance             =  213555.3567               Prob > chi2     =     0.0000
+Log pseudolikelihood =  -180504.147               Pseudo R2       =     0.4004
+
+Number of clusters (athr_id)=      6,378
+                            (Std. err. adjusted for 6,378 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+cite_affl_wt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+      Z_y_mg |  -.1469937   .4041557    -0.36   0.716    -.9391243    .6451369
+      Z_y_sg |   .6838327   .6032877     1.13   0.257    -.4985894    1.866255
+      Z_o_mg |   .0808355   .3853015     0.21   0.834    -.6743415    .8360125
+      Z_o_sg |   .4087733   .6432447     0.64   0.525    -.8519631     1.66951
+      S_y_mg |  -.1271717   .1876862    -0.68   0.498    -.4950298    .2406864
+      S_y_sg |  -.1631936   .2647045    -0.62   0.538    -.6820049    .3556177
+      S_o_mg |  -.0049674   .1648697    -0.03   0.976     -.328106    .3181713
+      S_o_sg |   .1582669   .2653136     0.60   0.551    -.3617382    .6782721
+     PT_y_mg |   .3443155   .1101284     3.13   0.002     .1284678    .5601632
+     PT_y_sg |   .2576165   .1245168     2.07   0.039     .0135681    .5016649
+     PT_o_mg |   .1421419    .103713     1.37   0.171    -.0611317    .3454156
+       _cons |   1.783574   .0484233    36.83   0.000     1.688666    1.878482
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      6378        6378           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+N = 14,920; 1,492 balanced groups of size 10
+N = 14,920; 127 unbalanced groups of sizes 10 to 600
+PDID cite_affl_wt y_mg: b= -0.1470 se=  0.4042  N=    63780 PIs=1492 Insts=127
+N = 13,190; 1,319 balanced groups of size 10
+N = 13,190; 156 unbalanced groups of sizes 10 to 510
+PDID cite_affl_wt y_sg: b=  0.6838 se=  0.6033  N=    63780 PIs=1319 Insts=156
+N = 23,810; 2,381 balanced groups of size 10
+N = 23,810; 118 unbalanced groups of sizes 10 to 1,020
+PDID cite_affl_wt o_mg: b=  0.0808 se=  0.3853  N=    63780 PIs=2381 Insts=118
+N = 11,860; 1,186 balanced groups of size 10
+N = 11,860; 135 unbalanced groups of sizes 10 to 500
+PDID cite_affl_wt o_sg: b=  0.4088 se=  0.6432  N=    63780 PIs=1186 Insts=135
+
+ ( 1)  Z_y_mg - Z_y_sg = 0
+
+------------------------------------------------------------------------------
+cite_affl_wt | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |  -.8308265   .7261528    -1.14   0.253     -2.25406    .5924068
+------------------------------------------------------------------------------
+DIFF cite_affl_wt y_diff_ng: b= -0.8308 se=  0.7262 p=0.2526
+
+ ( 1)  Z_o_mg - Z_o_sg = 0
+
+------------------------------------------------------------------------------
+cite_affl_wt | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |  -.3279378   .7498139    -0.44   0.662    -1.797546    1.141671
+------------------------------------------------------------------------------
+DIFF cite_affl_wt o_diff_ng: b= -0.3279 se=  0.7498 p=0.6619
+
+ ( 1)  Z_y_mg - Z_o_mg = 0
+
+------------------------------------------------------------------------------
+cite_affl_wt | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |  -.2278292   .5583897    -0.41   0.683    -1.322253    .8665945
+------------------------------------------------------------------------------
+DIFF cite_affl_wt mg_diff_age: b= -0.2278 se=  0.5584 p=0.6833
+
+ ( 1)  Z_y_sg - Z_o_sg = 0
+
+------------------------------------------------------------------------------
+cite_affl_wt | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .2750595   .8818842     0.31   0.755    -1.453402    2.003521
+------------------------------------------------------------------------------
+DIFF cite_affl_wt sg_diff_age: b=  0.2751 se=  0.8819 p=0.7551
+
+==== event study PPML 2x2 age x ngrants: cite_affl_wt (_r1_r2) ====
+Iteration 1:   deviance = 2.3034e+05  eps = .         iters = 3    tol = 1.0e-04  min(eta) =  -2.36  P   
+Iteration 2:   deviance = 2.1358e+05  eps = 7.85e-02  iters = 2    tol = 1.0e-04  min(eta) =  -3.28      
+Iteration 3:   deviance = 2.1311e+05  eps = 2.21e-03  iters = 2    tol = 1.0e-04  min(eta) =  -4.03      
+Iteration 4:   deviance = 2.1310e+05  eps = 3.20e-05  iters = 2    tol = 1.0e-04  min(eta) =  -4.49      
+Iteration 5:   deviance = 2.1310e+05  eps = 3.09e-07  iters = 2    tol = 1.0e-05  min(eta) =  -4.62      
+Iteration 6:   deviance = 2.1310e+05  eps = 5.68e-10  iters = 2    tol = 1.0e-06  min(eta) =  -4.64   S  
+Iteration 7:   deviance = 2.1310e+05  eps = 1.34e-14  iters = 2    tol = 1.0e-08  min(eta) =  -4.64   S O
+------------------------------------------------------------------------------------------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
+Converged in 7 iterations and 15 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =     63,780
+Absorbing 2 HDFE groups                           Residual df     =      6,377
+Statistics robust to heteroskedasticity           Wald chi2(75)   =     147.70
+Deviance             =  213102.4543               Prob > chi2     =     0.0000
+Log pseudolikelihood = -180277.6958               Pseudo R2       =     0.4012
+
+Number of clusters (athr_id)=      6,378
+                               (Std. err. adjusted for 6,378 clusters in athr_id)
+---------------------------------------------------------------------------------
+                |               Robust
+   cite_affl_wt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+----------------+----------------------------------------------------------------
+ int_lead4_y_mg |  -.0978893   .7990152    -0.12   0.902     -1.66393    1.468152
+ int_lead3_y_mg |  -.2811368   .6990816    -0.40   0.688    -1.651311    1.089038
+ int_lead2_y_mg |  -.6085855   .6843784    -0.89   0.374    -1.949942    .7327715
+  int_lag0_y_mg |   .2138432   .7816453     0.27   0.784    -1.318153     1.74584
+  int_lag1_y_mg |   -1.26872   .7419653    -1.71   0.087    -2.722945    .1855055
+  int_lag2_y_mg |  -.7081943   .8168745    -0.87   0.386    -2.309239    .8928504
+  int_lag3_y_mg |  -.6150978   .7766273    -0.79   0.428    -2.137259    .9070638
+  int_lag4_y_mg |   .4831367   .8057282     0.60   0.549    -1.096062    2.062335
+  int_lag5_y_mg |  -.3521931    .819577    -0.43   0.667    -1.958534    1.254148
+ int_lead4_y_sg |  -.2559273   1.003985    -0.25   0.799    -2.223703    1.711848
+ int_lead3_y_sg |   .2653384   .8698092     0.31   0.760    -1.439456    1.970133
+ int_lead2_y_sg |   .4323864    .911772     0.47   0.635    -1.354654    2.219427
+  int_lag0_y_sg |   .8657312   .9762132     0.89   0.375    -1.047612    2.779074
+  int_lag1_y_sg |   .2628372   1.274788     0.21   0.837    -2.235701    2.761375
+  int_lag2_y_sg |     1.7796   1.101487     1.62   0.106    -.3792753    3.938476
+  int_lag3_y_sg |   .8294833    1.05798     0.78   0.433    -1.244119    2.903086
+  int_lag4_y_sg |   .8664947   1.102473     0.79   0.432    -1.294312    3.027301
+  int_lag5_y_sg |   .2403664    1.33358     0.18   0.857    -2.373402    2.854135
+ int_lead4_o_mg |   .4444016   .6995505     0.64   0.525    -.9266921    1.815495
+ int_lead3_o_mg |   .5592314   .7265986     0.77   0.442    -.8648758    1.983339
+ int_lead2_o_mg |   .0208056   .6858482     0.03   0.976    -1.323432    1.365043
+  int_lag0_o_mg |   .4642828   .7222311     0.64   0.520    -.9512641     1.87983
+  int_lag1_o_mg |  -.8870784   .7275926    -1.22   0.223    -2.313134     .538977
+  int_lag2_o_mg |  -.3411895   .8568399    -0.40   0.690    -2.020565    1.338186
+  int_lag3_o_mg |   .8820622   .7954509     1.11   0.267     -.676993    2.441117
+  int_lag4_o_mg |   1.194956   .7985561     1.50   0.135    -.3701857    2.760097
+  int_lag5_o_mg |   1.066315   .9674335     1.10   0.270    -.8298201     2.96245
+ int_lead4_o_sg |   -.098918   1.102263    -0.09   0.928    -2.259313    2.061477
+ int_lead3_o_sg |   .0523606   1.140434     0.05   0.963    -2.182849     2.28757
+ int_lead2_o_sg |  -.9873151   1.061005    -0.93   0.352    -3.066847    1.092216
+  int_lag0_o_sg |  -.5180367   1.158735    -0.45   0.655    -2.789116    1.753043
+  int_lag1_o_sg |   .5013958   1.092623     0.46   0.646    -1.640107    2.642898
+  int_lag2_o_sg |   .5724738    1.15349     0.50   0.620    -1.688326    2.833273
+  int_lag3_o_sg |   .9985722   1.314067     0.76   0.447    -1.576952    3.574096
+  int_lag4_o_sg |  -.4544538   1.227231    -0.37   0.711    -2.859782    1.950874
+  int_lag5_o_sg |  -.1939473   1.464263    -0.13   0.895     -3.06385    2.675956
+mshr_lead4_y_mg |   .2236244   .1949442     1.15   0.251    -.1584592    .6057079
+mshr_lead3_y_mg |   .1560884   .1813421     0.86   0.389    -.1993356    .5115124
+mshr_lead2_y_mg |   .0895447   .1864761     0.48   0.631    -.2759417    .4550311
+ mshr_lag0_y_mg |  -.1003581   .2481092    -0.40   0.686    -.5866432    .3859269
+ mshr_lag1_y_mg |   .1049654   .2441613     0.43   0.667     -.373582    .5835129
+ mshr_lag2_y_mg |   .1175146   .2635142     0.45   0.656    -.3989638     .633993
+ mshr_lag3_y_mg |   .0331559   .2647711     0.13   0.900    -.4857859    .5520977
+ mshr_lag4_y_mg |  -.4655855   .2681767    -1.74   0.083    -.9912021    .0600312
+ mshr_lag5_y_mg |   .1919502   .2677486     0.72   0.473    -.3328275    .7167278
+mshr_lead4_y_sg |  -.2320349   .2211144    -1.05   0.294    -.6654112    .2013414
+mshr_lead3_y_sg |  -.0537438   .2124353    -0.25   0.800    -.4701092    .3626217
+mshr_lead2_y_sg |   .0321868   .2091311     0.15   0.878    -.3777026    .4420762
+ mshr_lag0_y_sg |  -.2027546   .3065848    -0.66   0.508    -.8036498    .3981406
+ mshr_lag1_y_sg |  -.0912063   .3683887    -0.25   0.804    -.8132348    .6308222
+ mshr_lag2_y_sg |  -.3652393   .3319605    -1.10   0.271     -1.01587    .2853913
+ mshr_lag3_y_sg |  -.1339985   .3229619    -0.41   0.678    -.7669923    .4989952
+ mshr_lag4_y_sg |  -.3693603   .3232187    -1.14   0.253    -1.002857    .2641368
+ mshr_lag5_y_sg |   -.173045   .3699651    -0.47   0.640    -.8981632    .5520733
+mshr_lead4_o_mg |   .5454794   .1969893     2.77   0.006     .1593875    .9315713
+mshr_lead3_o_mg |   .2949538    .187271     1.58   0.115    -.0720907    .6619983
+mshr_lead2_o_mg |   .2005646   .1868341     1.07   0.283    -.1656235    .5667528
+ mshr_lag0_o_mg |   .2919026   .2471165     1.18   0.238    -.1924368     .776242
+ mshr_lag1_o_mg |   .5980461   .2355696     2.54   0.011     .1363381    1.059754
+ mshr_lag2_o_mg |   .3234324   .2527882     1.28   0.201    -.1720233    .8188881
+ mshr_lag3_o_mg |   .2403118   .2539787     0.95   0.344    -.2574774    .7381009
+ mshr_lag4_o_mg |  -.1945194   .2657785    -0.73   0.464    -.7154356    .3263968
+ mshr_lag5_o_mg |    .173488   .2995269     0.58   0.562     -.413574    .7605499
+mshr_lead4_o_sg |   .6124554   .2212747     2.77   0.006     .1787648    1.046146
+mshr_lead3_o_sg |   .5576136   .2184702     2.55   0.011     .1294198    .9858073
+mshr_lead2_o_sg |   .3071195   .2107917     1.46   0.145    -.1060247    .7202636
+ mshr_lag0_o_sg |   .7225839    .313106     2.31   0.021     .1089073     1.33626
+ mshr_lag1_o_sg |   .7391181   .3032644     2.44   0.015     .1447307    1.333506
+ mshr_lag2_o_sg |   .4869791   .3371223     1.44   0.149    -.1737684    1.147727
+ mshr_lag3_o_sg |   .4898546   .3559862     1.38   0.169    -.2078655    1.187575
+ mshr_lag4_o_sg |    .204921   .3550551     0.58   0.564    -.4909742    .9008163
+ mshr_lag5_o_sg |   .4786969   .3829057     1.25   0.211    -.2717845    1.229178
+        PT_y_mg |   .3471617   .1102491     3.15   0.002     .1310773     .563246
+        PT_y_sg |   .2586441   .1246041     2.08   0.038     .0144245    .5028636
+        PT_o_mg |   .1434134   .1038213     1.38   0.167    -.0600727    .3468994
+          _cons |   1.727646   .0574421    30.08   0.000     1.615061     1.84023
+---------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      6378        6378           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+N = 14,920; 1,492 balanced groups of size 10
+N = 14,920; 127 unbalanced groups of sizes 10 to 600
+
+                     (sum) cite_affl_wt
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            0              0
+ 5%            0              0
+10%            0              0       Obs               5,968
+25%     1.064562              0       Sum of wgt.       5,968
+
+50%     2.897976                      Mean           5.527394
+                        Largest       Std. dev.      7.443712
+75%     6.721355       38.61996
+90%     13.68624       38.61996       Variance       55.40884
+95%     21.45476       38.61996       Skewness       2.550325
+99%     38.61996       38.61996       Kurtosis       10.08725
+(123,360 observations deleted)
+(9 missing values generated)
+(9 real changes made)
+(7 real changes made)
+(1 real change made)
+file ../output/figures/all_jrnls/es_ppml/es_cite_affl_wt_r1_r2_y_mg_agengrants.pdf saved as PDF format
+N = 13,190; 1,319 balanced groups of size 10
+N = 13,190; 156 unbalanced groups of sizes 10 to 510
+
+                     (sum) cite_affl_wt
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            0              0
+ 5%            0              0
+10%            0              0       Obs               5,276
+25%     .6801371              0       Sum of wgt.       5,276
+
+50%     1.963033                      Mean           3.776648
+                        Largest       Std. dev.      5.531542
+75%     4.673986       38.61996
+90%     8.900925       38.61996       Variance       30.59796
+95%     13.40314       38.61996       Skewness       3.452034
+99%     32.31933       38.61996       Kurtosis       18.33589
+(123,360 observations deleted)
+(9 missing values generated)
+(9 real changes made)
+(7 real changes made)
+(1 real change made)
+file ../output/figures/all_jrnls/es_ppml/es_cite_affl_wt_r1_r2_y_sg_agengrants.pdf saved as PDF format
+N = 23,810; 2,381 balanced groups of size 10
+N = 23,810; 118 unbalanced groups of sizes 10 to 1,020
+
+                     (sum) cite_affl_wt
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            0              0
+ 5%            0              0
+10%     .1103991              0       Obs               9,524
+25%     1.120226              0       Sum of wgt.       9,524
+
+50%     2.986689                      Mean           5.603075
+                        Largest       Std. dev.      7.459388
+75%     6.779192       38.61996
+90%     14.04631       38.61996       Variance       55.64247
+95%     21.35735       38.61996       Skewness       2.570605
+99%     38.61996       38.61996       Kurtosis        10.2617
+(123,360 observations deleted)
+(9 missing values generated)
+(9 real changes made)
+(7 real changes made)
+(1 real change made)
+file ../output/figures/all_jrnls/es_ppml/es_cite_affl_wt_r1_r2_o_mg_agengrants.pdf saved as PDF format
+N = 11,860; 1,186 balanced groups of size 10
+N = 11,860; 135 unbalanced groups of sizes 10 to 500
+
+                     (sum) cite_affl_wt
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            0              0
+ 5%            0              0
+10%            0              0       Obs               4,744
+25%     .6347946              0       Sum of wgt.       4,744
+
+50%     1.850808                      Mean           3.567081
+                        Largest       Std. dev.      5.305394
+75%     4.286081       38.61996
+90%     8.279931       38.61996       Variance        28.1472
+95%     12.71561       38.61996       Skewness       3.540222
+99%     29.53987       38.61996       Kurtosis       19.12156
+(123,360 observations deleted)
+(9 missing values generated)
+(9 real changes made)
+(7 real changes made)
+(1 real change made)
+file ../output/figures/all_jrnls/es_ppml/es_cite_affl_wt_r1_r2_o_sg_agengrants.pdf saved as PDF format
+
+==== age_ngrants_results_r1_r2 ====
+
+  +---------------------------------------------------------------------------------------------------------------------+
+  |         yvar           grp              split_type       post_b     post_se           p       N        r2_p   n_pis |
+  |---------------------------------------------------------------------------------------------------------------------|
+  |      ppr_cnt          y_mg        joint_agengrants   -.46129056   .27974273           .   63780   .19162095    1492 |
+  |      ppr_cnt          y_sg        joint_agengrants   -.09923233   .36859278           .   63780   .19162095    1319 |
+  |      ppr_cnt          o_mg        joint_agengrants   -.01224572   .26282114           .   63780   .19162095    2381 |
+  |      ppr_cnt          o_sg        joint_agengrants    .57616868   .42369376           .   63780   .19162095    1186 |
+  |      ppr_cnt     y_diff_ng   joint_agengrants_diff   -.36205824   .46272739   .43395373   63780   .19162095       . |
+  |      ppr_cnt     o_diff_ng   joint_agengrants_diff   -.58841439   .49858936   .23793725   63780   .19162095       . |
+  |      ppr_cnt   mg_diff_age   joint_agengrants_diff   -.44904485   .38383714   .24204774   63780   .19162095       . |
+  |      ppr_cnt   sg_diff_age   joint_agengrants_diff     -.675401    .5615844   .22910385   63780   .19162095       . |
+  |---------------------------------------------------------------------------------------------------------------------|
+  | cite_affl_wt          y_mg        joint_agengrants   -.14699372   .40415571           .   63780   .40041579    1492 |
+  | cite_affl_wt          y_sg        joint_agengrants    .68383275   .60328769           .   63780   .40041579    1319 |
+  | cite_affl_wt          o_mg        joint_agengrants     .0808355   .38530146           .   63780   .40041579    2381 |
+  | cite_affl_wt          o_sg        joint_agengrants    .40877325   .64324465           .   63780   .40041579    1186 |
+  | cite_affl_wt     y_diff_ng   joint_agengrants_diff   -.83082647   .72615279   .25256215   63780   .40041579       . |
+  | cite_affl_wt     o_diff_ng   joint_agengrants_diff   -.32793775   .74981391   .66185112   63780   .40041579       . |
+  | cite_affl_wt   mg_diff_age   joint_agengrants_diff   -.22782921   .55838969    .6832655   63780   .40041579       . |
+  | cite_affl_wt   sg_diff_age   joint_agengrants_diff     .2750595   .88188419   .75511668   63780   .40041579       . |
+  +---------------------------------------------------------------------------------------------------------------------+
+(file ../output/tables/all_jrnls/age_ngrants_results_r1_r2.txt not found)
+file ../output/tables/all_jrnls/age_ngrants_results_r1_r2.txt saved
+
+
+################ run_age_ngrants: all_jrnls_r1_r2_public ################
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                        39,480
+        from master                    39,480  (_merge==1)
+        from using                          0  (_merge==2)
+
+    Matched                            37,060  (_merge==3)
+    -----------------------------------------
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+run_age_ngrants_r1_r2_public: cell y_mg PIs = 838
+run_age_ngrants_r1_r2_public: cell y_sg PIs = 856
+run_age_ngrants_r1_r2_public: cell o_mg PIs = 1251
+run_age_ngrants_r1_r2_public: cell o_sg PIs = 761
+(68,886 missing values generated)
+(68,886 missing values generated)
+(68,886 missing values generated)
+(68,886 missing values generated)
+(68,886 missing values generated)
+(68,886 missing values generated)
+(68,886 missing values generated)
+(68,886 missing values generated)
+(68,886 missing values generated)
+(68,886 missing values generated)
+(68,886 missing values generated)
+(68,886 missing values generated)
+(68,886 missing values generated)
+(68,886 missing values generated)
+(68,886 missing values generated)
+(68,886 missing values generated)
+(68,886 missing values generated)
+(68,886 missing values generated)
+(68,886 missing values generated)
+(68,886 missing values generated)
+int_lead1   int_lead3   int_lag0    int_lag2    int_lag4    mshr_lead1  mshr_lead3  mshr_lag0   mshr_lag2   mshr_lag4
+int_lead2   int_lead4   int_lag1    int_lag3    int_lag5    mshr_lead2  mshr_lead4  mshr_lag1   mshr_lag3   mshr_lag5
+(68,886 real changes made)
+(68,886 real changes made)
+(68,886 real changes made)
+(68,886 real changes made)
+(68,886 real changes made)
+(68,886 real changes made)
+(68,886 real changes made)
+(68,886 real changes made)
+(68,886 real changes made)
+(68,886 real changes made)
+(68,886 real changes made)
+(68,886 real changes made)
+(68,886 real changes made)
+(68,886 real changes made)
+(68,886 real changes made)
+(68,886 real changes made)
+(68,886 real changes made)
+(68,886 real changes made)
+(68,886 real changes made)
+(68,886 real changes made)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(39,480 missing values generated)
+(file ../temp/age_ngrants_results_r1_r2_public.dta not found)
+
+==== pooled DiD PPML 2x2 age x ngrants: ppr_cnt (_r1_r2_public) ====
+Iteration 1:   deviance = 4.0224e+04  eps = .         iters = 3    tol = 1.0e-04  min(eta) =  -1.51  P   
+Iteration 2:   deviance = 3.9235e+04  eps = 2.52e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.87      
+Iteration 3:   deviance = 3.9228e+04  eps = 1.68e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.94      
+Iteration 4:   deviance = 3.9228e+04  eps = 3.94e-08  iters = 2    tol = 1.0e-04  min(eta) =  -1.95      
+Iteration 5:   deviance = 3.9228e+04  eps = 2.38e-14  iters = 1    tol = 1.0e-05  min(eta) =  -1.95   S  
+Iteration 6:   deviance = 3.9228e+04  eps = 1.71e-16  iters = 2    tol = 1.0e-09  min(eta) =  -1.95   S O
+------------------------------------------------------------------------------------------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
+Converged in 6 iterations and 12 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =     37,060
+Absorbing 2 HDFE groups                           Residual df     =      3,705
+Statistics robust to heteroskedasticity           Wald chi2(11)   =      72.23
+Deviance             =  39228.36519               Prob > chi2     =     0.0000
+Log pseudolikelihood = -56808.73366               Pseudo R2       =     0.1881
+
+Number of clusters (athr_id)=      3,706
+                            (Std. err. adjusted for 3,706 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+      Z_y_mg |  -.4050252   .3688324    -1.10   0.272    -1.127924    .3178731
+      Z_y_sg |  -.2433332   .4564108    -0.53   0.594    -1.137882    .6512156
+      Z_o_mg |   .0660198   .3577742     0.18   0.854    -.6352048    .7672444
+      Z_o_sg |  -.0603983   .5269606    -0.11   0.909    -1.093222    .9724255
+      S_y_mg |   -.194476   .1742649    -1.12   0.264    -.5360289     .147077
+      S_y_sg |  -.2061546   .1970045    -1.05   0.295    -.5922763    .1799671
+      S_o_mg |  -.2131514   .1385754    -1.54   0.124    -.4847541    .0584513
+      S_o_sg |   .2159275   .1809122     1.19   0.233    -.1386539     .570509
+     PT_y_mg |   .3687283   .0872821     4.22   0.000     .1976586     .539798
+     PT_y_sg |   .2926169   .0915861     3.19   0.001     .1131114    .4721223
+     PT_o_mg |   .2187167   .0788117     2.78   0.006     .0642487    .3731848
+       _cons |   .7101334   .0327759    21.67   0.000     .6458938     .774373
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      3706        3706           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+N = 8,380; 838 balanced groups of size 10
+N = 8,380; 89 unbalanced groups of sizes 10 to 670
+PDID ppr_cnt y_mg: b= -0.4050 se=  0.3688  N=    37060 PIs=838 Insts=89
+N = 8,560; 856 balanced groups of size 10
+N = 8,560; 103 unbalanced groups of sizes 10 to 440
+PDID ppr_cnt y_sg: b= -0.2433 se=  0.4564  N=    37060 PIs=856 Insts=103
+N = 12,510; 1,251 balanced groups of size 10
+N = 12,510; 82 unbalanced groups of sizes 10 to 870
+PDID ppr_cnt o_mg: b=  0.0660 se=  0.3578  N=    37060 PIs=1251 Insts=82
+N = 7,610; 761 balanced groups of size 10
+N = 7,610; 93 unbalanced groups of sizes 10 to 430
+PDID ppr_cnt o_sg: b= -0.0604 se=  0.5270  N=    37060 PIs=761 Insts=93
+
+ ( 1)  Z_y_mg - Z_y_sg = 0
+
+------------------------------------------------------------------------------
+     ppr_cnt | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   -.161692   .5868119    -0.28   0.783    -1.311822    .9884381
+------------------------------------------------------------------------------
+DIFF ppr_cnt y_diff_ng: b= -0.1617 se=  0.5868 p=0.7829
+
+ ( 1)  Z_o_mg - Z_o_sg = 0
+
+------------------------------------------------------------------------------
+     ppr_cnt | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .1264181   .6369379     0.20   0.843    -1.121957    1.374793
+------------------------------------------------------------------------------
+DIFF ppr_cnt o_diff_ng: b=  0.1264 se=  0.6369 p=0.8427
+
+ ( 1)  Z_y_mg - Z_o_mg = 0
+
+------------------------------------------------------------------------------
+     ppr_cnt | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   -.471045    .513848    -0.92   0.359    -1.478169    .5360786
+------------------------------------------------------------------------------
+DIFF ppr_cnt mg_diff_age: b= -0.4710 se=  0.5138 p=0.3593
+
+ ( 1)  Z_y_sg - Z_o_sg = 0
+
+------------------------------------------------------------------------------
+     ppr_cnt | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |  -.1829349   .6971358    -0.26   0.793    -1.549296    1.183426
+------------------------------------------------------------------------------
+DIFF ppr_cnt sg_diff_age: b= -0.1829 se=  0.6971 p=0.7930
+
+==== event study PPML 2x2 age x ngrants: ppr_cnt (_r1_r2_public) ====
+Iteration 1:   deviance = 4.0100e+04  eps = .         iters = 3    tol = 1.0e-04  min(eta) =  -1.58  P   
+Iteration 2:   deviance = 3.9109e+04  eps = 2.53e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.92      
+Iteration 3:   deviance = 3.9102e+04  eps = 1.70e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.99      
+Iteration 4:   deviance = 3.9102e+04  eps = 3.96e-08  iters = 2    tol = 1.0e-04  min(eta) =  -1.99      
+Iteration 5:   deviance = 3.9102e+04  eps = 2.42e-14  iters = 2    tol = 1.0e-05  min(eta) =  -1.99   S  
+Iteration 6:   deviance = 3.9102e+04  eps = 0.00e+00  iters = 2    tol = 1.0e-09  min(eta) =  -1.99   S O
+------------------------------------------------------------------------------------------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
+Converged in 6 iterations and 13 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =     37,060
+Absorbing 2 HDFE groups                           Residual df     =      3,705
+Statistics robust to heteroskedasticity           Wald chi2(75)   =     175.56
+Deviance             =  39102.48472               Prob > chi2     =     0.0000
+Log pseudolikelihood = -56745.79342               Pseudo R2       =     0.1890
+
+Number of clusters (athr_id)=      3,706
+                               (Std. err. adjusted for 3,706 clusters in athr_id)
+---------------------------------------------------------------------------------
+                |               Robust
+        ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+----------------+----------------------------------------------------------------
+ int_lead4_y_mg |   .3901743   .6374065     0.61   0.540    -.8591196    1.639468
+ int_lead3_y_mg |  -.7318536   .6442472    -1.14   0.256    -1.994555    .5308476
+ int_lead2_y_mg |   .2351111    .563719     0.42   0.677    -.8697578     1.33998
+  int_lag0_y_mg |  -.5697331   .6791243    -0.84   0.402    -1.900792    .7613261
+  int_lag1_y_mg |  -1.059118   .6158945    -1.72   0.085    -2.266249    .1480125
+  int_lag2_y_mg |  -.1141655   .6698015    -0.17   0.865    -1.426952    1.198621
+  int_lag3_y_mg |  -1.285412    .656761    -1.96   0.050     -2.57264    .0018161
+  int_lag4_y_mg |   .9023695   .7168103     1.26   0.208     -.502553    2.307292
+  int_lag5_y_mg |  -.3718209   .7593716    -0.49   0.624    -1.860162     1.11652
+ int_lead4_y_sg |   -.299323   .7351679    -0.41   0.684    -1.740226     1.14158
+ int_lead3_y_sg |  -1.392277   .6724833    -2.07   0.038     -2.71032   -.0742341
+ int_lead2_y_sg |  -.6942146   .6154751    -1.13   0.259    -1.900524    .5120944
+  int_lag0_y_sg |  -.2244728    .712348    -0.32   0.753    -1.620649    1.171704
+  int_lag1_y_sg |   .4141723   .7463352     0.55   0.579    -1.048618    1.876962
+  int_lag2_y_sg |  -.9095783   .8075398    -1.13   0.260    -2.492327    .6731706
+  int_lag3_y_sg |  -1.162896   .8631352    -1.35   0.178     -2.85461    .5288174
+  int_lag4_y_sg |  -1.827295   .9366831    -1.95   0.051     -3.66316    .0085703
+  int_lag5_y_sg |   -2.01195   .8745093    -2.30   0.021    -3.725957   -.2979437
+ int_lead4_o_mg |  -.7300098   .6486174    -1.13   0.260    -2.001277    .5412571
+ int_lead3_o_mg |   -1.34062   .6212675    -2.16   0.031    -2.558282   -.1229582
+ int_lead2_o_mg |  -.1639887   .5906702    -0.28   0.781    -1.321681    .9937036
+  int_lag0_o_mg |  -.3331008   .6562385    -0.51   0.612    -1.619305    .9531031
+  int_lag1_o_mg |  -1.141405     .69183    -1.65   0.099    -2.497367    .2145564
+  int_lag2_o_mg |  -1.114505   .7200076    -1.55   0.122    -2.525694    .2966842
+  int_lag3_o_mg |   .4780832   .7451308     0.64   0.521    -.9823463    1.938513
+  int_lag4_o_mg |  -.5517958   .7795076    -0.71   0.479    -2.079603     .976011
+  int_lag5_o_mg |  -.1273049   .8171709    -0.16   0.876     -1.72893    1.474321
+ int_lead4_o_sg |  -.0865362   .7883616    -0.11   0.913    -1.631696    1.458624
+ int_lead3_o_sg |   .0229974   .7277684     0.03   0.975    -1.403402    1.449397
+ int_lead2_o_sg |   .1042337   .7360395     0.14   0.887    -1.338377    1.546845
+  int_lag0_o_sg |   .1731576   .8578161     0.20   0.840    -1.508131    1.854446
+  int_lag1_o_sg |   .3432044   .8803072     0.39   0.697    -1.382166    2.068575
+  int_lag2_o_sg |   .8381822   .9682302     0.87   0.387    -1.059514    2.735879
+  int_lag3_o_sg |  -.8198665   1.087055    -0.75   0.451    -2.950455    1.310722
+  int_lag4_o_sg |  -1.308043   1.105108    -1.18   0.237    -3.474014    .8579293
+  int_lag5_o_sg |   .2894847   1.087914     0.27   0.790    -1.842787    2.421756
+mshr_lead4_y_mg |  -.0761125   .1661195    -0.46   0.647    -.4017007    .2494757
+mshr_lead3_y_mg |   .1458907   .1577226     0.92   0.355      -.16324    .4550214
+mshr_lead2_y_mg |   .0871587   .1524681     0.57   0.568    -.2116732    .3859906
+ mshr_lag0_y_mg |  -.0611501   .2380839    -0.26   0.797    -.5277859    .4054857
+ mshr_lag1_y_mg |   .1419973   .2188532     0.65   0.516     -.286947    .5709417
+ mshr_lag2_y_mg |  -.3076966   .2391225    -1.29   0.198    -.7763681    .1609748
+ mshr_lag3_y_mg |  -.3043553   .2484623    -1.22   0.221    -.7913325    .1826218
+ mshr_lag4_y_mg |  -.2926258   .2690214    -1.09   0.277     -.819898    .2346464
+ mshr_lag5_y_mg |  -.1769654   .2460751    -0.72   0.472    -.6592636    .3053329
+mshr_lead4_y_sg |  -.0253244     .17665    -0.14   0.886    -.3715519    .3209032
+mshr_lead3_y_sg |   .2819511   .1682821     1.68   0.094    -.0478757     .611778
+mshr_lead2_y_sg |    .319009   .1608933     1.98   0.047      .003664     .634354
+ mshr_lag0_y_sg |   .1139477     .22623     0.50   0.614    -.3294548    .5573503
+ mshr_lag1_y_sg |   .0489421   .2517618     0.19   0.846    -.4445019    .5423862
+ mshr_lag2_y_sg |  -.1578367   .2795001    -0.56   0.572    -.7056469    .3899734
+ mshr_lag3_y_sg |   -.145784   .2709985    -0.54   0.591    -.6769313    .3853634
+ mshr_lag4_y_sg |  -.1417387   .2754161    -0.51   0.607    -.6815444     .398067
+ mshr_lag5_y_sg |  -.1377345   .2889415    -0.48   0.634    -.7040493    .4285804
+mshr_lead4_o_mg |   .4719841   .1686868     2.80   0.005     .1413641    .8026042
+mshr_lead3_o_mg |   .4039654   .1646218     2.45   0.014     .0813125    .7266183
+mshr_lead2_o_mg |   .3883074   .1551847     2.50   0.012     .0841509    .6924638
+ mshr_lag0_o_mg |   .2858202   .2036538     1.40   0.160     -.113334    .6849744
+ mshr_lag1_o_mg |   .6068981   .2043018     2.97   0.003      .206474    1.007322
+ mshr_lag2_o_mg |   -.007394   .2051845    -0.04   0.971    -.4095483    .3947602
+ mshr_lag3_o_mg |  -.2216122   .2207535    -1.00   0.315     -.654281    .2110567
+ mshr_lag4_o_mg |  -.0176188   .2301507    -0.08   0.939    -.4687057    .4334682
+ mshr_lag5_o_mg |  -.2426925   .2393721    -1.01   0.311    -.7118532    .2264681
+mshr_lead4_o_sg |   .5048604    .168361     3.00   0.003     .1748789    .8348418
+mshr_lead3_o_sg |   .5084841   .1662982     3.06   0.002     .1825455    .8344227
+mshr_lead2_o_sg |   .4256009   .1602637     2.66   0.008     .1114898    .7397119
+ mshr_lag0_o_sg |   .7217028   .2236049     3.23   0.001     .2834453     1.15996
+ mshr_lag1_o_sg |   .9669078   .2335369     4.14   0.000     .5091839    1.424632
+ mshr_lag2_o_sg |   .3949818   .2449191     1.61   0.107    -.0850509    .8750144
+ mshr_lag3_o_sg |   .4535593   .2550627     1.78   0.075    -.0463544     .953473
+ mshr_lag4_o_sg |    .521616   .2744235     1.90   0.057    -.0162441    1.059476
+ mshr_lag5_o_sg |   .2751253   .2976054     0.92   0.355    -.3081705    .8584211
+        PT_y_mg |   .3690672    .087295     4.23   0.000     .1979722    .5401622
+        PT_y_sg |   .2927049   .0916362     3.19   0.001     .1131013    .4723086
+        PT_o_mg |   .2204219    .078816     2.80   0.005     .0659453    .3748985
+          _cons |   .6525524   .0423336    15.41   0.000     .5695802    .7355247
+---------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      3706        3706           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+N = 8,380; 838 balanced groups of size 10
+N = 8,380; 89 unbalanced groups of sizes 10 to 670
+
+                        (sum) ppr_cnt
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            0              0
+ 5%            0              0
+10%            0              0       Obs               3,352
+25%            1              0       Sum of wgt.       3,352
+
+50%            2                      Mean           2.367243
+                        Largest       Std. dev.      1.979221
+75%            3             13
+90%            5             15       Variance       3.917315
+95%            6             15       Skewness       1.761877
+99%           10             16       Kurtosis       7.669987
+(76,530 observations deleted)
+(9 missing values generated)
+(9 real changes made)
+(7 real changes made)
+(1 real change made)
+file ../output/figures/all_jrnls/es_ppml/es_ppr_cnt_r1_r2_public_y_mg_agengrants.pdf saved as PDF format
+N = 8,560; 856 balanced groups of size 10
+N = 8,560; 103 unbalanced groups of sizes 10 to 440
+
+                        (sum) ppr_cnt
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            0              0
+ 5%            0              0
+10%            0              0       Obs               3,424
+25%            1              0       Sum of wgt.       3,424
+
+50%            2                      Mean           2.044393
+                        Largest       Std. dev.      1.692835
+75%            3             12
+90%            4             12       Variance       2.865689
+95%            5             14       Skewness        1.75181
+99%            8             16       Kurtosis       8.319937
+(76,530 observations deleted)
+(9 missing values generated)
+(9 real changes made)
+(7 real changes made)
+(1 real change made)
+file ../output/figures/all_jrnls/es_ppml/es_ppr_cnt_r1_r2_public_y_sg_agengrants.pdf saved as PDF format
+N = 12,510; 1,251 balanced groups of size 10
+N = 12,510; 82 unbalanced groups of sizes 10 to 870
+
+                        (sum) ppr_cnt
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            0              0
+ 5%            0              0
+10%            0              0       Obs               5,004
+25%            1              0       Sum of wgt.       5,004
+
+50%            2                      Mean           2.439648
+                        Largest       Std. dev.      1.991425
+75%            3             14
+90%            5             14       Variance       3.965775
+95%            6             15       Skewness       1.629613
+99%            9             18       Kurtosis        7.18517
+(76,530 observations deleted)
+(9 missing values generated)
+(9 real changes made)
+(7 real changes made)
+(1 real change made)
+file ../output/figures/all_jrnls/es_ppml/es_ppr_cnt_r1_r2_public_o_mg_agengrants.pdf saved as PDF format
+N = 7,610; 761 balanced groups of size 10
+N = 7,610; 93 unbalanced groups of sizes 10 to 430
+
+                        (sum) ppr_cnt
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            0              0
+ 5%            0              0
+10%            0              0       Obs               3,044
+25%            1              0       Sum of wgt.       3,044
+
+50%            2                      Mean           2.051248
+                        Largest       Std. dev.      1.750077
+75%            3             14
+90%            4             16       Variance       3.062769
+95%            5             16       Skewness       2.138741
+99%            8             17       Kurtosis       11.68276
+(76,530 observations deleted)
+(9 missing values generated)
+(9 real changes made)
+(7 real changes made)
+(1 real change made)
+file ../output/figures/all_jrnls/es_ppml/es_ppr_cnt_r1_r2_public_o_sg_agengrants.pdf saved as PDF format
+
+==== pooled DiD PPML 2x2 age x ngrants: cite_affl_wt (_r1_r2_public) ====
+Iteration 1:   deviance = 1.1484e+05  eps = .         iters = 3    tol = 1.0e-04  min(eta) =  -2.29  P   
+Iteration 2:   deviance = 1.0723e+05  eps = 7.10e-02  iters = 2    tol = 1.0e-04  min(eta) =  -3.15      
+Iteration 3:   deviance = 1.0703e+05  eps = 1.86e-03  iters = 2    tol = 1.0e-04  min(eta) =  -3.77      
+Iteration 4:   deviance = 1.0703e+05  eps = 2.11e-05  iters = 2    tol = 1.0e-04  min(eta) =  -4.06      
+Iteration 5:   deviance = 1.0703e+05  eps = 1.07e-07  iters = 2    tol = 1.0e-05  min(eta) =  -4.11      
+Iteration 6:   deviance = 1.0703e+05  eps = 2.71e-11  iters = 2    tol = 1.0e-06  min(eta) =  -4.11   S O
+------------------------------------------------------------------------------------------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
+Converged in 6 iterations and 13 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =     37,060
+Absorbing 2 HDFE groups                           Residual df     =      3,705
+Statistics robust to heteroskedasticity           Wald chi2(11)   =      34.07
+Deviance             =  107026.0512               Prob > chi2     =     0.0004
+Log pseudolikelihood = -94581.92959               Pseudo R2       =     0.3604
+
+Number of clusters (athr_id)=      3,706
+                            (Std. err. adjusted for 3,706 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+cite_affl_wt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+      Z_y_mg |   .0251553   .5054661     0.05   0.960      -.96554    1.015851
+      Z_y_sg |   .8295146   .6092103     1.36   0.173    -.3645156    2.023545
+      Z_o_mg |  -.2245504   .4908137    -0.46   0.647    -1.186527    .7374267
+      Z_o_sg |  -.3501927   .8843071    -0.40   0.692    -2.083403    1.383017
+      S_y_mg |  -.1526801   .2203311    -0.69   0.488    -.5845211    .2791608
+      S_y_sg |  -.5372849   .2955848    -1.82   0.069    -1.116621    .0420507
+      S_o_mg |  -.1293527   .2191049    -0.59   0.555    -.5587903     .300085
+      S_o_sg |   .3204768   .3050447     1.05   0.293    -.2773999    .9183534
+     PT_y_mg |   .3568151   .1294719     2.76   0.006     .1030549    .6105752
+     PT_y_sg |   .3889541   .1425076     2.73   0.006     .1096444    .6682639
+     PT_o_mg |   .2376898   .1271381     1.87   0.062    -.0114962    .4868759
+       _cons |   1.558954   .0551472    28.27   0.000     1.450867     1.66704
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      3706        3706           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+N = 8,380; 838 balanced groups of size 10
+N = 8,380; 89 unbalanced groups of sizes 10 to 670
+PDID cite_affl_wt y_mg: b=  0.0252 se=  0.5055  N=    37060 PIs=838 Insts=89
+N = 8,560; 856 balanced groups of size 10
+N = 8,560; 103 unbalanced groups of sizes 10 to 440
+PDID cite_affl_wt y_sg: b=  0.8295 se=  0.6092  N=    37060 PIs=856 Insts=103
+N = 12,510; 1,251 balanced groups of size 10
+N = 12,510; 82 unbalanced groups of sizes 10 to 870
+PDID cite_affl_wt o_mg: b= -0.2246 se=  0.4908  N=    37060 PIs=1251 Insts=82
+N = 7,610; 761 balanced groups of size 10
+N = 7,610; 93 unbalanced groups of sizes 10 to 430
+PDID cite_affl_wt o_sg: b= -0.3502 se=  0.8843  N=    37060 PIs=761 Insts=93
+
+ ( 1)  Z_y_mg - Z_y_sg = 0
+
+------------------------------------------------------------------------------
+cite_affl_wt | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |  -.8043594   .7916016    -1.02   0.310     -2.35587    .7471513
+------------------------------------------------------------------------------
+DIFF cite_affl_wt y_diff_ng: b= -0.8044 se=  0.7916 p=0.3096
+
+ ( 1)  Z_o_mg - Z_o_sg = 0
+
+------------------------------------------------------------------------------
+cite_affl_wt | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .1256423   1.011384     0.12   0.901    -1.856634    2.107918
+------------------------------------------------------------------------------
+DIFF cite_affl_wt o_diff_ng: b=  0.1256 se=  1.0114 p=0.9011
+
+ ( 1)  Z_y_mg - Z_o_mg = 0
+
+------------------------------------------------------------------------------
+cite_affl_wt | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .2497057   .7045523     0.35   0.723    -1.131192    1.630603
+------------------------------------------------------------------------------
+DIFF cite_affl_wt mg_diff_age: b=  0.2497 se=  0.7046 p=0.7230
+
+ ( 1)  Z_y_sg - Z_o_sg = 0
+
+------------------------------------------------------------------------------
+cite_affl_wt | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   1.179707   1.073842     1.10   0.272     -.924984    3.284399
+------------------------------------------------------------------------------
+DIFF cite_affl_wt sg_diff_age: b=  1.1797 se=  1.0738 p=0.2719
+
+==== event study PPML 2x2 age x ngrants: cite_affl_wt (_r1_r2_public) ====
+Iteration 1:   deviance = 1.1448e+05  eps = .         iters = 3    tol = 1.0e-04  min(eta) =  -2.32  P   
+Iteration 2:   deviance = 1.0688e+05  eps = 7.11e-02  iters = 2    tol = 1.0e-04  min(eta) =  -3.14      
+Iteration 3:   deviance = 1.0668e+05  eps = 1.86e-03  iters = 2    tol = 1.0e-04  min(eta) =  -3.76      
+Iteration 4:   deviance = 1.0668e+05  eps = 2.12e-05  iters = 2    tol = 1.0e-04  min(eta) =  -4.04      
+Iteration 5:   deviance = 1.0668e+05  eps = 1.08e-07  iters = 2    tol = 1.0e-05  min(eta) =  -4.09      
+Iteration 6:   deviance = 1.0668e+05  eps = 2.71e-11  iters = 2    tol = 1.0e-06  min(eta) =  -4.09   S  
+Iteration 7:   deviance = 1.0668e+05  eps = 0.00e+00  iters = 2    tol = 1.0e-08  min(eta) =  -4.09   S O
+------------------------------------------------------------------------------------------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
+Converged in 7 iterations and 15 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =     37,060
+Absorbing 2 HDFE groups                           Residual df     =      3,705
+Statistics robust to heteroskedasticity           Wald chi2(75)   =     124.14
+Deviance             =   106681.428               Prob > chi2     =     0.0003
+Log pseudolikelihood =   -94409.618               Pseudo R2       =     0.3615
+
+Number of clusters (athr_id)=      3,706
+                               (Std. err. adjusted for 3,706 clusters in athr_id)
+---------------------------------------------------------------------------------
+                |               Robust
+   cite_affl_wt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+----------------+----------------------------------------------------------------
+ int_lead4_y_mg |   .5027858   1.060771     0.47   0.636    -1.576287    2.581859
+ int_lead3_y_mg |  -1.392395   .9019606    -1.54   0.123    -3.160206    .3754149
+ int_lead2_y_mg |  -.7085095   .8497333    -0.83   0.404    -2.373956    .9569373
+  int_lag0_y_mg |   .0916303   1.005682     0.09   0.927     -1.87947    2.062731
+  int_lag1_y_mg |  -1.185715   1.028295    -1.15   0.249    -3.201135    .8297056
+  int_lag2_y_mg |  -1.075061   1.075778    -1.00   0.318    -3.183548    1.033425
+  int_lag3_y_mg |  -.8428741   .9290306    -0.91   0.364    -2.663741    .9779924
+  int_lag4_y_mg |   1.410861   1.012346     1.39   0.163    -.5733005    3.395022
+  int_lag5_y_mg |  -.5369102   .9373121    -0.57   0.567    -2.374008    1.300188
+ int_lead4_y_sg |  -.4915742   1.112746    -0.44   0.659    -2.672516    1.689368
+ int_lead3_y_sg |  -.3201626   1.067666    -0.30   0.764     -2.41275    1.772425
+ int_lead2_y_sg |  -.8075296   1.040822    -0.78   0.438    -2.847504    1.232445
+  int_lag0_y_sg |  -.1376304   1.163737    -0.12   0.906    -2.418513    2.143252
+  int_lag1_y_sg |    .886779   1.389367     0.64   0.523     -1.83633    3.609888
+  int_lag2_y_sg |   .4838072   1.188437     0.41   0.684    -1.845487    2.813102
+  int_lag3_y_sg |    1.16137   1.242548     0.93   0.350     -1.27398     3.59672
+  int_lag4_y_sg |   .6407034   1.362948     0.47   0.638    -2.030625    3.312032
+  int_lag5_y_sg |  -.5004867   1.434939    -0.35   0.727    -3.312915    2.311942
+ int_lead4_o_mg |   -.039207   1.022095    -0.04   0.969    -2.042476    1.964063
+ int_lead3_o_mg |  -.2182834   .9034447    -0.24   0.809    -1.989002    1.552436
+ int_lead2_o_mg |  -.2325982   .9585953    -0.24   0.808     -2.11141    1.646214
+  int_lag0_o_mg |   .2114642   .9898028     0.21   0.831    -1.728514    2.151442
+  int_lag1_o_mg |  -2.289704   .9530512    -2.40   0.016     -4.15765   -.4217581
+  int_lag2_o_mg |  -1.886338   1.006833    -1.87   0.061    -3.859694    .0870174
+  int_lag3_o_mg |   1.039723   1.059139     0.98   0.326    -1.036151    3.115597
+  int_lag4_o_mg |   .3732969   1.116478     0.33   0.738     -1.81496    2.561554
+  int_lag5_o_mg |    .772716   1.229312     0.63   0.530    -1.636691    3.182123
+ int_lead4_o_sg |   .1393746    1.22539     0.11   0.909    -2.262346    2.541095
+ int_lead3_o_sg |   -.719754   1.195956    -0.60   0.547    -3.063785    1.624277
+ int_lead2_o_sg |  -1.293176   1.116167    -1.16   0.247    -3.480822    .8944712
+  int_lag0_o_sg |  -.5683449   1.336595    -0.43   0.671    -3.188023    2.051333
+  int_lag1_o_sg |  -1.243471   1.624696    -0.77   0.444    -4.427816    1.940874
+  int_lag2_o_sg |   .2419519   1.298679     0.19   0.852    -2.303411    2.787315
+  int_lag3_o_sg |  -1.266349   1.522237    -0.83   0.405    -4.249879    1.717182
+  int_lag4_o_sg |  -.1645883   1.371031    -0.12   0.904    -2.851759    2.522583
+  int_lag5_o_sg |  -1.938516   2.141046    -0.91   0.365    -6.134889    2.257856
+mshr_lead4_y_mg |   .0832412   .2481907     0.34   0.737    -.4032035     .569686
+mshr_lead3_y_mg |   .2904505   .2222648     1.31   0.191    -.1451806    .7260815
+mshr_lead2_y_mg |   .0674211   .2246762     0.30   0.764    -.3729362    .5077785
+ mshr_lag0_y_mg |  -.1157569   .3153256    -0.37   0.714    -.7337837      .50227
+ mshr_lag1_y_mg |   .2171521    .297223     0.73   0.465    -.3653942    .7996984
+ mshr_lag2_y_mg |   .0348556   .3276652     0.11   0.915    -.6073564    .6770676
+ mshr_lag3_y_mg |  -.1160822    .332129    -0.35   0.727    -.7670431    .5348788
+ mshr_lag4_y_mg |  -.4418388   .3505232    -1.26   0.207    -1.128852     .245174
+ mshr_lag5_y_mg |   .1249375   .3177951     0.39   0.694    -.4979294    .7478044
+mshr_lead4_y_sg |  -.1878703   .2610623    -0.72   0.472    -.6995429    .3238024
+mshr_lead3_y_sg |  -.0428228   .2571568    -0.17   0.868    -.5468408    .4611951
+mshr_lead2_y_sg |  -.0921117   .2472807    -0.37   0.710     -.576773    .3925496
+ mshr_lag0_y_sg |  -.3774771   .3517157    -1.07   0.283    -1.066827     .311873
+ mshr_lag1_y_sg |    -.37394   .4076841    -0.92   0.359    -1.172986    .4251063
+ mshr_lag2_y_sg |  -.7416209   .3936074    -1.88   0.060    -1.513077    .0298355
+ mshr_lag3_y_sg |  -.8295365   .4087344    -2.03   0.042    -1.630641   -.0284319
+ mshr_lag4_y_sg |   -.769828   .3936095    -1.96   0.050    -1.541288    .0016324
+ mshr_lag5_y_sg |  -.6989067   .4070801    -1.72   0.086    -1.496769    .0989557
+mshr_lead4_o_mg |   .5985235   .2579886     2.32   0.020      .092875    1.104172
+mshr_lead3_o_mg |   .5537841   .2371708     2.33   0.020     .0889378     1.01863
+mshr_lead2_o_mg |   .1575496   .2362966     0.67   0.505    -.3055832    .6206824
+ mshr_lag0_o_mg |   .2757026   .3180722     0.87   0.386    -.3477075    .8991127
+ mshr_lag1_o_mg |   .6986501   .2966351     2.36   0.019      .117256    1.280044
+ mshr_lag2_o_mg |   .1304977   .3202544     0.41   0.684    -.4971893    .7581848
+ mshr_lag3_o_mg |   .0001465   .3383292     0.00   1.000    -.6629665    .6632596
+ mshr_lag4_o_mg |  -.1158776   .3450858    -0.34   0.737    -.7922334    .5604781
+ mshr_lag5_o_mg |   .0735741   .3847998     0.19   0.848    -.6806195    .8277678
+mshr_lead4_o_sg |   .5686244   .2574146     2.21   0.027     .0641011    1.073148
+mshr_lead3_o_sg |   .5677701   .2452517     2.32   0.021     .0870855    1.048455
+mshr_lead2_o_sg |   .2169855   .2550028     0.85   0.395    -.2828109    .7167819
+ mshr_lag0_o_sg |   .6480549   .3789335     1.71   0.087    -.0946412    1.390751
+ mshr_lag1_o_sg |   1.003065   .4232653     2.37   0.018     .1734799    1.832649
+ mshr_lag2_o_sg |    .502316   .3615305     1.39   0.165    -.2062708    1.210903
+ mshr_lag3_o_sg |    .540641   .3943879     1.37   0.170    -.2323451    1.313627
+ mshr_lag4_o_sg |   .4333814   .4013278     1.08   0.280    -.3532065    1.219969
+ mshr_lag5_o_sg |   .8399361   .5129692     1.64   0.102     -.165465    1.845337
+        PT_y_mg |   .3592866   .1293247     2.78   0.005     .1058148    .6127584
+        PT_y_sg |   .3918735   .1423952     2.75   0.006     .1127841    .6709629
+        PT_o_mg |   .2398662   .1269099     1.89   0.059    -.0088727    .4886051
+          _cons |   1.510328   .0681052    22.18   0.000     1.376844    1.643812
+---------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      3706        3706           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+N = 8,380; 838 balanced groups of size 10
+N = 8,380; 89 unbalanced groups of sizes 10 to 670
+
+                     (sum) cite_affl_wt
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            0              0
+ 5%            0              0
+10%            0              0       Obs               3,352
+25%     1.041079              0       Sum of wgt.       3,352
+
+50%      2.75012                      Mean            4.96238
+                        Largest       Std. dev.      6.416016
+75%     6.099056       32.14561
+90%      12.3371       32.14561       Variance       41.16527
+95%     18.88859       32.14561       Skewness       2.434835
+99%     32.14561       32.14561       Kurtosis       9.380981
+(76,530 observations deleted)
+(9 missing values generated)
+(9 real changes made)
+(7 real changes made)
+(1 real change made)
+file ../output/figures/all_jrnls/es_ppml/es_cite_affl_wt_r1_r2_public_y_mg_agengrants.pdf saved as PDF format
+N = 8,560; 856 balanced groups of size 10
+N = 8,560; 103 unbalanced groups of sizes 10 to 440
+
+                     (sum) cite_affl_wt
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            0              0
+ 5%            0              0
+10%            0              0       Obs               3,424
+25%     .7097083              0       Sum of wgt.       3,424
+
+50%     1.966483                      Mean            3.65703
+                        Largest       Std. dev.      5.124997
+75%     4.398713       32.14561
+90%     8.749126       32.14561       Variance       26.26559
+95%     12.80954       32.14561       Skewness       3.091278
+99%     30.82894       32.14561       Kurtosis        14.7561
+(76,530 observations deleted)
+(9 missing values generated)
+(9 real changes made)
+(7 real changes made)
+(1 real change made)
+file ../output/figures/all_jrnls/es_ppml/es_cite_affl_wt_r1_r2_public_y_sg_agengrants.pdf saved as PDF format
+N = 12,510; 1,251 balanced groups of size 10
+N = 12,510; 82 unbalanced groups of sizes 10 to 870
+
+                     (sum) cite_affl_wt
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            0              0
+ 5%            0              0
+10%            0              0       Obs               5,004
+25%     .9935916              0       Sum of wgt.       5,004
+
+50%     2.613353                      Mean           4.642738
+                        Largest       Std. dev.      5.960976
+75%     5.823551       32.14561
+90%     11.15355       32.14561       Variance       35.53324
+95%     16.83586       32.14561       Skewness       2.545477
+99%     32.14561       32.14561       Kurtosis       10.41327
+(76,530 observations deleted)
+(9 missing values generated)
+(9 real changes made)
+(7 real changes made)
+(1 real change made)
+file ../output/figures/all_jrnls/es_ppml/es_cite_affl_wt_r1_r2_public_o_mg_agengrants.pdf saved as PDF format
+N = 7,610; 761 balanced groups of size 10
+N = 7,610; 93 unbalanced groups of sizes 10 to 430
+
+                     (sum) cite_affl_wt
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            0              0
+ 5%            0              0
+10%            0              0       Obs               3,044
+25%     .6468695              0       Sum of wgt.       3,044
+
+50%     1.770328                      Mean           3.285091
+                        Largest       Std. dev.      4.502059
+75%     4.167565       32.14561
+90%      7.68481       32.14561       Variance       20.26854
+95%      11.7299       32.14561       Skewness        3.14603
+99%     24.25533       32.14561       Kurtosis       16.21941
+(76,530 observations deleted)
+(9 missing values generated)
+(9 real changes made)
+(7 real changes made)
+(1 real change made)
+file ../output/figures/all_jrnls/es_ppml/es_cite_affl_wt_r1_r2_public_o_sg_agengrants.pdf saved as PDF format
+
+==== age_ngrants_results_r1_r2_public ====
+
+  +---------------------------------------------------------------------------------------------------------------------+
+  |         yvar           grp              split_type       post_b     post_se           p       N        r2_p   n_pis |
+  |---------------------------------------------------------------------------------------------------------------------|
+  |      ppr_cnt          y_mg        joint_agengrants   -.40502521   .36883244           .   37060   .18808281     838 |
+  |      ppr_cnt          y_sg        joint_agengrants   -.24333318    .4564108           .   37060   .18808281     856 |
+  |      ppr_cnt          o_mg        joint_agengrants    .06601982   .35777423           .   37060   .18808281    1251 |
+  |      ppr_cnt          o_sg        joint_agengrants   -.06039827   .52696058           .   37060   .18808281     761 |
+  |      ppr_cnt     y_diff_ng   joint_agengrants_diff   -.16169204   .58681189   .78289893   37060   .18808281       . |
+  |      ppr_cnt     o_diff_ng   joint_agengrants_diff    .12641809   .63693787   .84267118   37060   .18808281       . |
+  |      ppr_cnt   mg_diff_age   joint_agengrants_diff   -.47104503     .513848   .35929929   37060   .18808281       . |
+  |      ppr_cnt   sg_diff_age   joint_agengrants_diff   -.18293491   .69713576    .7930059   37060   .18808281       . |
+  |---------------------------------------------------------------------------------------------------------------------|
+  | cite_affl_wt          y_mg        joint_agengrants    .02515527   .50546608           .   37060   .36037962     838 |
+  | cite_affl_wt          y_sg        joint_agengrants    .82951464   .60921028           .   37060   .36037962     856 |
+  | cite_affl_wt          o_mg        joint_agengrants    -.2245504   .49081366           .   37060   .36037962    1251 |
+  | cite_affl_wt          o_sg        joint_agengrants   -.35019267   .88430712           .   37060   .36037962     761 |
+  | cite_affl_wt     y_diff_ng   joint_agengrants_diff   -.80435937   .79160162   .30957397   37060   .36037962       . |
+  | cite_affl_wt     o_diff_ng   joint_agengrants_diff    .12564227   1.0113838   .90113468   37060   .36037962       . |
+  | cite_affl_wt   mg_diff_age   joint_agengrants_diff    .24970567   .70455235   .72302603   37060   .36037962       . |
+  | cite_affl_wt   sg_diff_age   joint_agengrants_diff    1.1797073   1.0738418    .2719488   37060   .36037962       . |
+  +---------------------------------------------------------------------------------------------------------------------+
+(file ../output/tables/all_jrnls/age_ngrants_results_r1_r2_public.txt not found)
+file ../output/tables/all_jrnls/age_ngrants_results_r1_r2_public.txt saved
+
+. 
+. log close
+      name:  <unnamed>
+       log:  /n/holylabs/pakes_lab/Lab/sci_eq/analysis/rf_heterogeneity/code/run_age_ngrants.log
+  log type:  text
+ closed on:   6 Aug 2026, 02:07:42
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

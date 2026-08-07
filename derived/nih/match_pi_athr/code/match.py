@@ -174,6 +174,8 @@ def _given_score(gp, ga) -> float:
     best = 0
     for i, tp in enumerate(gp):
         for j, ta in enumerate(ga):
+            if (i or j) and (len(tp) == 1 or len(ta) == 1):
+                continue    # a middle initial cannot vouch for a first name
             s = _tok_score(tp, ta)
             if i or j:
                 s -= 6      # published under a middle name

@@ -1,3 +1,4 @@
 ./prepped_samples/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/analysis/reduced_form/output/prepped_samples
 ./college/ | /n/netscratch/pakes_lab/Lab/sci_eq/college
 ./inst_chars/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/inst_chars/output
+./nih/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/nih/match_pi_athr/output

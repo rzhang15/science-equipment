@@ -129,7 +129,7 @@ program gather_external_data
     * cheap to build and future specs may want it).
     cap confirm file ../temp/athr_cluster30.dta
     if _rc {
-        import delimited ../external/cluster/author_static_clusters_30.csv, clear varnames(1)
+        import delimited ../external/cluster/author_static_clusters_30_ls.csv, clear varnames(1)
         cap tostring athr_id, replace
         rename cluster_label cluster_30
         save ../temp/athr_cluster30, replace

@@ -80,7 +80,7 @@ program gather_external_data
     drop _freq
     save ../temp/athr_yr_grnt_cnt, replace
 
-    import delimited ../external/cluster/author_static_clusters_30.csv, clear varnames(1)
+    import delimited ../external/cluster/author_static_clusters_30_ls.csv, clear varnames(1)
     cap tostring athr_id, replace
     rename cluster_label cluster_30
     save ../temp/athr_cluster30, replace

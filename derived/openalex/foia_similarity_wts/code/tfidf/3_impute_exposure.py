@@ -45,7 +45,7 @@ def main():
                          "shrinking low-confidence imputations toward zero.")
     ap.add_argument("--cluster-filter", default="",
                     help="Path to author_static_clusters_K.csv from "
-                         "openalex/cluster_fields. After imputation, drop universe "
+                         "openalex/us_cluster_fields. After imputation, drop universe "
                          "authors whose K-cluster contains fewer FOIA PIs than "
                          "--min-foia-per-cluster — those imputations rest on "
                          "out-of-domain TF-IDF vocabulary overlap, not real "

@@ -272,7 +272,7 @@ def main():
     ap.add_argument("--betas-path", default=DEFAULT_BETAS_FILE,
                     help="Stata file with columns [category, b] giving per-market shocks.")
     ap.add_argument("--cluster-filter", default="",
-                    help="author_static_clusters_K.csv from openalex/cluster_fields. "
+                    help="author_static_clusters_K.csv from openalex/us_cluster_fields. "
                          "After imputation, drop universe authors whose K-cluster "
                          "has fewer FOIA PIs than --min-foia-per-cluster "
                          "(same logic as 3_impute_exposure.py).")

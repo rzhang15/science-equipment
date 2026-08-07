@@ -87,7 +87,13 @@ if [ "$STAGE" = "2" ] || [ "$STAGE" = "all" ]; then
 
     # Sweep for the K-selection evidence. Every run appends a row to
     # ../output/k_diagnostics_ls.csv (inertia + sampled silhouette).
-    for K in 10 15 20 25 30 35 40 50; do
+    #
+    # K=100 is not a field-size candidate: it exists so foia_similarity_wts'
+    # --cluster-filter (_cf) tests domain validity on a partition fit on the
+    # same life-science pool as the K=30 field variable. Using stage 1's
+    # K=100 instead leaves the sample restriction and the field FE defined on
+    # two different embeddings of two different populations.
+    for K in 10 15 20 25 30 35 40 50 100; do
         echo "=== K=$K (life-science pool) ==="
         python -u 2_cluster.py --clusters $K --suffix _ls
     done
