@@ -1,0 +1,494 @@
+[?1h=
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Unicode is supported; see help unicode_advice.
+      2. More than 2 billion observations are allowed; see help obs_advice.
+      3. Maximum number of variables is set to 120,000; see help set_maxvar.
+
+. do "build.do" 
+
+. set more off
+
+. clear all
+
+. capture log close
+
+. program drop _all
+
+. set scheme modern
+
+. pause on
+
+. set seed 8975
+
+. 
+. program main
+  1.     foreach s in all_jrnls_no_clin { //} all_jrnls_no_clin top_jrnls top_j
+> rnls_no_clin { 
+  2.         local t year
+  3.         make_panel, time(`t') last(1) samp(`s') us(1)
+  4.         merge_ipeds, time(`t') last(1) samp(`s') us(1)
+  5.         make_panel, time(`t') samp(`s') us(1)
+  6.         merge_ipeds, time(`t') samp(`s') us(1)
+  7.     }
+  8. end
+
+. 
+. program make_panel
+  1.     syntax, time(string) samp(str) [, firstlast(int 0) last(int 0) first(i
+> nt 0) us(int 0) second(int 0)]
+  2.     // route openalex-level loads to the clinical-filtered folder when sam
+> p
+.     // ends in _no_clin; sub_athrs paths stay the same
+.     local src "openalex"
+  3.     if regexm("`samp'", "_no_clin$") local src "openalex_no_clin"
+  4.     import delimited ../external/clusters/author_static_clusters_30_ls.csv
+> , clear
+  5.     save ../temp/clusters, replace
+  6. 
+.     // Build coauthor structures from the full-authors sample so team-size
+.     // measures are correct even when the working sample restricts to a
+.     // single author position (e.g., last=1).
+.     use pmid athr_id using ../external/`src'/cleaned_`samp', clear
+  7.     gcontract pmid athr_id
+  8.     drop _freq
+  9.     save ../temp/all_athrs_`samp', replace
+ 10.     gcontract pmid, freq(paper_team_size)
+ 11.     save ../temp/paper_team_size_`samp', replace
+ 12. 
+.     use id pmid which_athr which_affl pub_date year jrnl cite_count athr_id a
+> thr_name country_code msa_comb msa_c_world inst inst_id msacode using ../exte
+> rnal/`src'/cleaned_`samp', clear
+ 13.     local suf = "" 
+ 14.     if `firstlast' == 1 {
+ 15.         use id pmid which_athr which_affl pub_date year jrnl cite_count at
+> hr_id athr_name country_code msa_comb msa_c_world inst inst_id msacode using 
+> ../external/sub_athrs/firstlast/cleaned_`samp', clear
+ 16.         local suf = "_firstlast" 
+ 17.     }
+ 18.     if `second' == 1 {
+ 19.         use id pmid which_athr which_affl pub_date year jrnl cite_count at
+> hr_id athr_name country_code msa_comb msa_c_world inst inst_id msacode using 
+> ../external/sub_athrs/second/cleaned_`samp', clear
+ 20.         local suf = "_second" 
+ 21.     }
+ 22.     if `last' == 1 {
+ 23.         use id pmid which_athr which_affl pub_date year jrnl cite_count at
+> hr_id athr_name  country_code msa_comb msa_c_world inst inst_id msacode using
+>  ../external/sub_athrs/last/cleaned_`samp', clear
+ 24.         local suf = "_last" 
+ 25.     }
+ 26.     if `first' == 1 {
+ 27.         use id pmid which_athr which_affl pub_date year jrnl cite_count at
+> hr_id athr_name country_code msa_comb msa_c_world inst inst_id msacode using 
+> ../external/sub_athrs/first/cleaned_`samp', clear
+ 28.         local suf = "_first" 
+ 29.     }
+ 30.     if `us' == 0 local suf "`suf'_global"
+ 31.     gen cns = inlist(jrnl, "Cell", "Nature", "Science") 
+ 32.     gen ppr_cnt = 1
+ 33.     gen qrtr = qofd(pub_date)
+ 34.     merge m:1 athr_id using ../temp/clusters, assert(1 2 3) keep(3) nogen
+ 35.     merge m:1 id using ../external/patents/patent_ppr_cnt, assert(1 2 3) k
+> eep(1 3) nogen keepusing(patent_count front_only body_only)
+ 36.     merge m:1 pmid using ../temp/paper_team_size_`samp', assert(2 3) keep(
+> 3) nogen
+ 37.     rename cluster_label field
+ 38. 
+.     bys pmid athr_id (which_athr which_affl): gen author_id = _n == 1
+ 39.     bys pmid (which_athr which_affl): gen which_athr2 = sum(author_id)
+ 40.     replace which_athr = which_athr2
+ 41.     drop which_athr2
+ 42. 
+.     bys pmid which_athr: gen num_affls = _N
+ 43.     assert num_affls == 1
+ 44.     bys pmid: gegen num_athrs = max(which_athr)
+ 45.     gen affl_wt = 1/num_affls * 1/num_athrs
+ 46.     gen pat_affl_wt = patent_count * 1/num_affls * 1/num_athrs
+ 47.     gen body_affl_wt = body_only * 1/num_affls * 1/num_athrs
+ 48.     gen front_affl_wt = front_only * 1/num_affls * 1/num_athrs
+ 49.     local date  date("`c(current_date)'", "DMY")
+ 50.     if "`time'" == "qrtr" {
+ 51.         gen time_since_pub = qofd(`date') - `time'+1
+ 52.         gen avg_cite = cite_count/time_since_pub
+ 53.         gen avg_pat = patent_count/time_since_pub
+ 54.         gen avg_frnt = front_only/time_since_pub
+ 55.         gen avg_body = body_only/time_since_pub
+ 56.     }
+ 57.     if "`time'" == "year" {
+ 58.         gen time_since_pub = yofd(`date') - `time'+1
+ 59.         gen avg_cite = cite_count/time_since_pub
+ 60.         gen avg_pat = patent_count/time_since_pub
+ 61.         gen avg_frnt = front_only/time_since_pub
+ 62.         gen avg_body = body_only/time_since_pub
+ 63.     }
+ 64.     bys pmid: replace avg_cite = . if _n != 1
+ 65.     by pmid: replace avg_pat = . if _n != 1
+ 66.     by pmid: replace avg_frnt = . if _n != 1
+ 67.     by pmid: replace avg_body = . if _n != 1
+ 68.     sum avg_cite
+ 69.     gen cite_wt = avg_cite/r(sum)
+ 70.     bys jrnl: gegen tot_cite_N = total(cite_wt)
+ 71.     sum avg_pat
+ 72.     gen pat_wt = avg_pat/r(sum)
+ 73.     sum avg_frnt
+ 74.     gen frnt_wt = avg_frnt/r(sum)
+ 75.     sum avg_body
+ 76.     gen body_wt = avg_body/r(sum)
+ 77.     gsort pmid cite_wt
+ 78.     qui bys pmid: replace cite_wt = cite_wt[_n-1] if mi(cite_wt)
+ 79.     gsort pmid pat_wt
+ 80.     qui bys pmid: replace pat_wt = pat_wt[_n-1] if mi(pat_wt)
+ 81.     gsort pmid frnt_wt
+ 82.     qui bys pmid: replace frnt_wt = frnt_wt[_n-1] if mi(frnt_wt)
+ 83.     gsort pmid body_wt
+ 84.     qui bys pmid: replace body_wt = body_wt[_n-1] if mi(body_wt)
+ 85.     gunique pmid
+ 86.     local articles = r(unique)
+ 87.     qui gen pat_adj_wt = affl_wt * pat_wt * `articles'
+ 88.     qui gen cite_affl_wt = affl_wt * cite_wt * `articles'
+ 89.     qui gen frnt_adj_wt  = affl_wt * frnt_wt * `articles'
+ 90.     qui gen body_adj_wt  = affl_wt * body_wt * `articles'
+ 91.     qui bys pmid: gen pmid_cntr = _n == 1
+ 92.     qui bys jrnl: gen first_jrnl = _n == 1
+ 93.     qui by jrnl: gegen jrnl_N = total(pmid_cntr)
+ 94.     /*qui sum impact_fctr if first_jrnl == 1
+>     gen impact_shr = impact_fctr/r(sum)
+>     gen reweight_N = impact_shr * `articles'
+>     replace  tot_cite_N = tot_cite_N * `articles'
+>     gen impact_wt = reweight_N/jrnl_N
+>     gen impact_affl_wt = impact_wt * affl_wt
+>     gen impact_cite_wt = reweight_N * cite_wt / tot_cite_N * `articles'
+>     gen impact_cite_affl_wt = impact_cite_wt * affl_wt*/
+.     foreach v in affl_wt cite_affl_wt pat_adj_wt { //impact_affl_wt impact_ci
+> te_affl_wt frnt_adj_wt body_adj_wt 
+ 95.        qui sum `v'
+ 96.        assert round(r(sum)-`articles') == 0
+ 97.     }
+ 98.     // restrict to USA
+.     if `us' == 1 {
+ 99.         keep if country_code == "US" & !mi(msa_comb)
+100.     }
+101.     *gen cns_impact_cite_affl_wt = impact_cite_affl_wt if cns == 1
+.     preserve
+102.     keep athr_id athr_name
+103.     bys athr_id (athr_name): keep if _n == 1
+104.     save ../temp/athr_names_`samp'`suf', replace
+105.     restore
+106.     preserve
+107.     gcontract pmid `time' athr_id msa_comb inst_id
+108.     drop _freq
+109.     rename athr_id focal_id
+110.     save ../temp/focal_list_`samp'`suf', replace
+111.     rename focal_id athr_id 
+112.     rename msa_comb coathr_msa
+113.     rename inst_id coathr_inst
+114.     save ../temp/coauthors_`samp'`suf', replace
+115.     restore
+116. 
+.     // Count distinct coauthors (self-excluded) per (focal, year) across all
+.     // of the focal's papers in the year, using the full-authors sample.
+.     preserve
+117.     use ../temp/focal_list_`samp'`suf', clear
+118.     joinby pmid using ../temp/all_athrs_`samp'
+119.     drop if focal_id == athr_id
+120.     gcontract focal_id `time' athr_id
+121.     drop _freq
+122.     gcontract focal_id `time', freq(n_coauthors_yr)
+123.     rename focal_id athr_id
+124.     save ../temp/unique_coauthors_`samp'`suf', replace
+125.     restore
+126. 
+.     if `last' != 1 & `first' != 1 {
+127.         preserve
+128.         use ../temp/focal_list_`samp'`suf',clear
+129.         joinby pmid using ../temp/coauthors_`samp'`suf'
+130.         drop if focal_id == athr_id
+131.         gcontract focal_id `time' msa_comb athr_id coathr_msa
+132.         drop _freq
+133.         keep if coathr_msa == msa_comb
+134.         gcontract focal_id `time', freq(num_coauthors_same_msa)
+135.         rename focal_id athr_id
+136.         save ../temp/coauthor_in_msa_`time'_`samp'`suf', replace
+137.         restore 
+138. 
+.         preserve
+139.         use ../temp/focal_list_`samp'`suf',clear
+140.         joinby pmid using ../temp/coauthors_`samp'`suf'
+141.         drop if focal_id == athr_id
+142.         gcontract focal_id `time' athr_id inst_id msa_comb coathr_inst coa
+> thr_msa
+143.         bys focal_id year: gen num_coauthors = _N
+144.         gen same = inst_id == coathr_inst
+145.         bys focal_id year: gegen num_coauthors_same_inst = total(same) 
+146.         replace same = msa_comb == coathr_msa
+147.         bys focal_id year: gegen num_coauthors_same_msa = total(same) 
+148.         drop _freq
+149.         gcontract focal_id year num_coauthors*
+150.         drop _freq
+151.         save ../output/num_fund_coauthors_`samp'`suf', replace
+152.         restore
+153.     }
+154.     // avg team size = mean coauthors per paper (self-excluded) across the
+.     // focal's unique pmids in the year
+.     bys athr_id pmid : gen athr_pmid_cntr = _n == 1
+155.     bys athr_id `time': gegen avg_team_size = mean(paper_team_size) if ath
+> r_pmid_cntr == 1
+156.     replace avg_team_size = avg_team_size - 1
+157. 
+.     // Paper-position metrics (only informative in the all-authors panel; in 
+> the
+.     // sub_athrs/last panel which_athr == num_athrs by construction, so
+.     // n_last_ppr = ppr_cnt and the others collapse to 0/1).
+.     //   paper_position       : the focal's slot on the paper (1 = first, num
+> _athrs = last)
+.     //   paper_position_rat   : normalized to [0,1] — 1 = last author, 0 = fi
+> rst
+.     //   paper_is_first/last/middle : dummies for role
+.     //   team_size_when_(not)last  : paper team size split by whether the foc
+> al
+.     //                               is last author on that paper
+.     // Only computed on one row per (athr, pmid) so gcollapse (sum) and (mean
+> )
+.     // aggregate paper-counts correctly rather than double-counting affiliati
+> ons.
+.     gen paper_position     = which_athr                              if athr_
+> pmid_cntr == 1
+158.     gen paper_position_rat = which_athr / num_athrs                  if at
+> hr_pmid_cntr == 1
+159.     // Solo-author papers (num_athrs == 1): the focal is both position 1 a
+> nd
+.     // position N. Convention: count them as "last / senior" only (the PI is
+.     // senior on their own solo work) so n_first + n_middle + n_last = ppr_cn
+> t.
+.     gen paper_is_first     = (which_athr == 1) & (num_athrs > 1)     if athr_
+> pmid_cntr == 1
+160.     gen paper_is_last      = (which_athr == num_athrs)               if at
+> hr_pmid_cntr == 1
+161.     gen paper_is_middle    = (which_athr > 1) & (which_athr < num_athrs) i
+> f athr_pmid_cntr == 1
+162.     gen paper_is_solo      = (num_athrs == 1)                        if at
+> hr_pmid_cntr == 1
+163.     // team-size split: last includes solo (denominator = 1). notlast is
+.     // strictly middle + non-senior first — well defined only when num_athrs 
+> > 1.
+.     gen team_size_last     = paper_team_size if athr_pmid_cntr == 1 & which_a
+> thr == num_athrs
+164.     gen team_size_notlast  = paper_team_size if athr_pmid_cntr == 1 & whic
+> h_athr <  num_athrs & num_athrs > 1
+165.     preserve
+166.     if "`time'" == "year" {
+167.         gcollapse (sum) ppr_cnt cns affl_wt pat_affl_wt cite_affl_wt pat_a
+> dj_wt pat_wt patent_count body_affl_wt front_affl_wt frnt_adj_wt body_adj_wt 
+> front_only body_only ///
+>                         n_first_ppr=paper_is_first n_middle_ppr=paper_is_midd
+> le n_last_ppr=paper_is_last n_solo_ppr=paper_is_solo ///
+>                   (mean) avg_team_size ///
+>                          avg_position=paper_position avg_position_rat=paper_p
+> osition_rat ///
+>                          avg_team_size_last=team_size_last avg_team_size_notl
+> ast=team_size_notlast ///
+>                   (firstnm) field , by(athr_id msa_comb `time')
+168.         if `last' != 1 & `first' != 1 {
+169.             merge m:1 athr_id `time' using ../temp/coauthor_in_msa_`time'_
+> `samp'`suf', assert(1 3) keep(1 3) nogen
+170.         }
+171.         cap gen num_coauthors_same_msa = 0
+172.         replace num_coauthors_same_msa = 0 if mi(num_coauthors_same_msa)
+173.         merge m:1 athr_id `time' using ../temp/unique_coauthors_`samp'`suf
+> ', keep(1 3) nogen
+174.         replace n_coauthors_yr = 0 if mi(n_coauthors_yr)
+175.         merge m:1 athr_id `time' using ../external/year_insts/filled_in_pa
+> nel_all_`time', assert(1 2 3) keep(2 3) nogen
+176.     }
+177.     if "`time'" == "qrtr" {
+178.         gcollapse (sum) ppr_cnt cns affl_wt pat_affl_wt body_affl_wt front
+> _affl_wt cite_affl_wt pat_adj_wt pat_wt patent_count frnt_adj_wt body_adj_wt 
+> front_only body_only ///
+>                         n_first_ppr=paper_is_first n_middle_ppr=paper_is_midd
+> le n_last_ppr=paper_is_last n_solo_ppr=paper_is_solo ///
+>                   (mean) avg_team_size ///
+>                          avg_position=paper_position avg_position_rat=paper_p
+> osition_rat ///
+>                          avg_team_size_last=team_size_last avg_team_size_notl
+> ast=team_size_notlast ///
+>                   (firstnm) field , by(athr_id msa_comb `time' year)
+179.         if `last' != 1  & `first' != 1 {
+180.             merge m:1 athr_id `time' using ../temp/coauthor_in_msa_`time'_
+> `samp'`suf', assert(1 3) keep(1 3) nogen
+181.         }
+182.         cap gen num_coauthors_same_msa = 0
+183.         replace num_coauthors_same_msa = 0 if mi(num_coauthors_same_msa)
+184.         merge m:1 athr_id `time' using ../temp/unique_coauthors_`samp'`suf
+> ', keep(1 3) nogen
+185.         replace n_coauthors_yr = 0 if mi(n_coauthors_yr)
+186.         // make into balanced panel
+.         merge m:1 athr_id `time' using ../external/year_insts/filled_in_panel
+> _all_`time', assert(1 2 3) keep(2 3) nogen
+187.     }
+188.     bys athr_id `time': gen name_id = _n == 1
+189.     bys `time': gegen tot_authors = total(name_id)
+190.     drop name_id
+191.     bys athr_id msa_comb `time': gen name_id = _n == 1
+192.     bys msa_comb `time': gegen msa_size = total(name_id)
+193.     replace msa_size = msa_size - 1
+194.     gen cluster_shr = msa_size/tot_authors
+195.     drop name_id
+196. 
+.     gen top_15 = !mi(affl_wt)
+197.     bys athr_id year: gegen has_top_15 = max(top_15)
+198.     bys athr_id msa_comb `time': gen name_id = _n == 1 if has_top_15 == 1
+199.     bys msa_comb `time': gegen unbal_msa_size = total(name_id)
+200.     replace unbal_msa_size = unbal_msa_size - 1 if has_top_15 == 1
+201.     drop if mi(cite_affl_wt) | mi(affl_wt)
+202. 
+.     *merge 1:1 athr_id `time' using ../temp/athr_concept_`time'_`samp', asser
+> t(1 2 3) keep(1 3) nogen
+.     *merge 1:1 athr_id `time' using ../temp/athr_mesh_`time'_`samp', assert(1
+>  2 3) keep(1 3) nogen
+.     *merge 1:1 athr_id `time' using ../temp/athr_qualifier_`time'_`samp', ass
+> ert(1 2 3) keep(1 3) nogen
+. /*    foreach var in term1 term2 gen_mesh1 gen_mesh2 qualifier_name1 qualifie
+> r_name2 {
+>         bys athr_id (`time') : replace `var' = `var'[_n-1] if mi(`var') & !mi
+> (`var'[_n-1])
+>     }*/
+.     merge m:1 athr_id using ../temp/athr_names_`samp'`suf', keep(1 3) nogen
+203.     save ../output/athr_panel_full_comb_`time'`suf'_`samp', replace
+204.     restore
+205.     preserve
+206.     if "`time'" == "year" {
+207.         gcollapse (sum) ppr_cnt cns affl_wt pat_affl_wt body_affl_wt front
+> _affl_wt cite_affl_wt pat_adj_wt pat_wt patent_count front_only body_only frn
+> t_adj_wt body_adj_wt ///
+>                         n_first_ppr=paper_is_first n_middle_ppr=paper_is_midd
+> le n_last_ppr=paper_is_last n_solo_ppr=paper_is_solo ///
+>                   (mean) avg_team_size ///
+>                          avg_position=paper_position avg_position_rat=paper_p
+> osition_rat ///
+>                          avg_team_size_last=team_size_last avg_team_size_notl
+> ast=team_size_notlast ///
+>                   (firstnm) field , by(athr_id msacode msa_comb  `time')
+208.         if `last' != 1 & `first' != 1 {
+209.             merge m:1 athr_id `time' using ../temp/coauthor_in_msa_`time'_
+> `samp'`suf', assert(1 3) keep(1 3) nogen
+210.         }
+211.         cap gen num_coauthors_same_msa = 0
+212.         replace num_coauthors_same_msa = 0 if mi(num_coauthors_same_msa)
+213.         merge m:1 athr_id `time' using ../temp/unique_coauthors_`samp'`suf
+> ', keep(1 3) nogen
+214.         replace n_coauthors_yr = 0 if mi(n_coauthors_yr)
+215.         merge m:1 athr_id `time' using ../external/year_insts/filled_in_pa
+> nel_all_`time', assert(1 2 3) keep(2 3) nogen
+216.     }
+217.     if "`time'" == "qrtr" {
+218.         gcollapse (sum) ppr_cnt cns affl_wt pat_affl_wt body_affl_wt front
+> _affl_wt cite_affl_wt frnt_adj_wt body_adj_wt body_only front_only pat_adj_wt
+>  pat_wt patent_count ///
+>                         n_first_ppr=paper_is_first n_middle_ppr=paper_is_midd
+> le n_last_ppr=paper_is_last n_solo_ppr=paper_is_solo ///
+>                   (mean) avg_team_size ///
+>                          avg_position=paper_position avg_position_rat=paper_p
+> osition_rat ///
+>                          avg_team_size_last=team_size_last avg_team_size_notl
+> ast=team_size_notlast ///
+>                   (firstnm) field , by(athr_id msacode msa_comb  `time' year)
+219.         if `last' != 1 & `first' != 1 {
+220.             merge m:1 athr_id `time' using ../temp/coauthor_in_msa_`time'_
+> `samp'`suf', assert(1 3) keep(1 3) nogen
+221.         }
+222.         cap gen num_coauthors_same_msa = 0
+223.         replace num_coauthors_same_msa = 0 if mi(num_coauthors_same_msa)
+224.         merge m:1 athr_id `time' using ../temp/unique_coauthors_`samp'`suf
+> ', keep(1 3) nogen
+225.         replace n_coauthors_yr = 0 if mi(n_coauthors_yr)
+226.         // make into balanced panel
+.         merge m:1 athr_id `time' using ../external/year_insts/filled_in_panel
+> _all_`time', assert(1 2 3) keep(2 3) nogen
+227.     }
+228.     bys athr_id `time': gen name_id = _n == 1
+229.     bys `time': gegen tot_authors = total(name_id)
+230.     drop name_id
+231.     bys athr_id msa_comb `time': gen name_id = _n == 1
+232.     bys msa_comb `time': gegen msa_size = total(name_id)
+233.     replace msa_size = msa_size - 1
+234.     gen cluster_shr = msa_size/tot_authors
+235.     drop name_id
+236. 
+.     gen top_15 = !mi(affl_wt)
+237.     bys athr_id year: gegen has_top_15 = max(top_15)
+238.     bys athr_id msa_comb `time': gen name_id = _n == 1 if has_top_15 == 1
+239.     bys msa_comb `time': gegen unbal_msa_size = total(name_id)
+240.     replace unbal_msa_size = unbal_msa_size - 1 if has_top_15 == 1
+241.     drop if mi(cite_affl_wt) | mi(affl_wt)
+242.     *merge 1:1 athr_id `time' using ../temp/athr_concept_`time'_`samp', as
+> sert(1 2 3) keep(1 3) nogen
+.    * merge 1:1 athr_id `time' using ../temp/athr_mesh_`time'_`samp', assert(1
+>  2 3) keep(1 3) nogen
+.    * merge 1:1 athr_id `time' using ../temp/athr_qualifier_`time'_`samp', ass
+> ert(1 2 3) keep(1 3) nogen
+. /*    foreach var in term1 term2 gen_mesh1 gen_mesh2 qualifier_name1 qualifie
+> r_name2 {
+>         bys athr_id (`time') : replace `var' = `var'[_n-1] if mi(`var') & !mi
+> (`var'[_n-1])
+>     }*/
+.     merge m:1 athr_id using ../temp/athr_names_`samp'`suf', keep(1 3) nogen
+243.     save ../output/athr_panel_full_`time'`suf'_`samp', replace
+244.     restore
+245. end
+
+. 
+. program merge_ipeds
+  1.     syntax, time(string) samp(str) [, last(int 0) first(int 0) firstlast(i
+> nt 0) second(int 0) us(int 0)]
+  2.     local suf = "" 
+  3.     import delimited ../external/ipeds/ipeds_openalex.csv, clear 
+  4.     contract ipeds_id inst_id type
+  5.     drop _freq
+  6.     drop if mi(inst_id)
+  7.     merge 1:1 ipeds_id using ../external/ipeds/ipeds_clean, assert(2 3) ke
+> ep(3) nogen
+  8.     contract inst_id type control
+  9.     drop _freq
+ 10.     save ../temp/ipeds_inst_id, replace
+ 11.     if `last' == 1 local suf = "_last" 
+ 12.     if `firstlast' == 1 local suf = "_firstlast" 
+ 13.     if `second' == 1 local suf = "_second" 
+ 14.     if `first' == 1 local suf = "_first" 
+ 15. 
+.     use ../output/athr_panel_full_`time'`suf'_`samp',clear 
+ 16.     merge m:1 inst_id using ../temp/ipeds_inst_id, assert(1 2 3) keep(3) n
+> ogen 
+ 17.     gen public = control == 1
+ 18.     save ../output/athr_panel_full_`time'`suf'_`samp'_r1_r2, replace
+ 19.     keep if public == 1
+ 20.     save ../output/athr_panel_full_`time'`suf'_`samp'_r1_r2_public, replac
+> e
+ 21. end
+
+. **k 
+. main
+file ../external/clusters/author_static_clusters_30_ls.csv not found
+r(601);
+
+end of do-file
+
+r(601);
+
+
+. [?1l>

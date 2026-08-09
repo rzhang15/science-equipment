@@ -1,8 +1,0 @@
-./ls_samp/   | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/clean_ls_samp/output
-./clusters/  | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/us_cluster_fields/output
-./coathrs/   | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/get_coauthors/output
-./ipeds/     | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/make_athr_yr_panel/external/ipeds
-./samp/      | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/make_athr_yr_panel/output
-./jrnls/     | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/make_jrnl_cuts/output
-./mesh/      | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/pull_openalex/output
-./sim_wts/   | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/foia_similarity_wts/output

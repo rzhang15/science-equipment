@@ -23,7 +23,7 @@ program main
     gather_external_data
     if "$QUICK_TOPJRNL" == "1" {
         cap mkdir "../output/figures/top_jrnls"
-        restrict_samp, samp(top_jrnls) r1r2(1) public(0)
+        restrict_samp, samp(top_jrnls) r1r2(1) public(0) 
         global WEIGHT_MSIM 0
         di as text _newline "=========================================="
         di as text "  RUNNING sample=top_jrnls ppr_cnt only (QUICK_TOPJRNL)"
@@ -119,6 +119,14 @@ program gather_external_data
 
     use athr_id max_sim using ../external/exposure/match_diagnostics, clear
     save ../temp/match_diag, replace
+
+    * Observed FOIA exposure held aside before any panel gate, so the "observed"
+    * curve in the distribution figures is the same 213 PIs in every variant.
+    * Drawn from the merged panel it moved with min_year/max_year, r1_only and
+    * EXPOSURE_FILTER even though the FOIA set never changes.
+    use athr_id exposure mkt_spend_shr using ../external/real_exposure/athr_exposure_${EXPOSURE_VERSION}, clear
+    rename (exposure mkt_spend_shr) (exposure_all mkt_spend_shr_all)
+    save ../temp/foia_observed_exposure, replace
 end
 
 program restrict_samp
@@ -171,8 +179,14 @@ program restrict_samp
     keep if min_year <= 2013
     keep if max_year >= 2015
     keep if inrange(year, 2010, 2019)
-    merge m:1 athr_id using ../temp/exposure, keep(3) nogen
+    * keep(1 3), not keep(3): 13 FOIA PIs have observed exposure but no imputed
+    * row (they are not in the cleaned US life-science corpus, so they never
+    * enter universe_ids). keep(3) dropped them here, before the
+    * "replace imputed = exposure" below would have used their observed value
+    * anyway. They skew high -- mean 0.0403 vs 0.0260 for the 195 survivors.
+    merge m:1 athr_id using ../temp/exposure, keep(1 3) nogen
     merge m:1 athr_id using ../external/real_exposure/athr_exposure_${EXPOSURE_VERSION}, keep(1 3) nogen
+    keep if !mi(imputed) | !mi(exposure)
     merge m:1 athr_id using ../temp/athr_cluster30, keep(1 3) nogen
     merge m:1 athr_id using ../temp/athr_min_year_any_`samp'`input_suf', keep(1 3) nogen
     replace min_year_any = min_year if mi(min_year_any)
@@ -182,26 +196,34 @@ program restrict_samp
     replace max_sim = 1 if foia_athr == 1
     replace max_sim = 0 if mi(max_sim)
     bys athr_id : gen athr_indicator = _n == 1
-    sum exposure if athr_indicator == 1, d
-    local mean : di %4.3f r(mean)
-    local sd   : di %4.3f r(sd)
-    sum imputed if athr_indicator == 1, d
-    local imputed_mean : di %4.3f r(mean)
-    local imputed_sd   : di %4.3f r(sd)
-    sum mkt_spend_shr if athr_indicator == 1, d
-    local mshr_mean : di %4.3f r(mean)
-    local mshr_sd   : di %4.3f r(sd)
-    sum imputed_mkt_spend_shr if athr_indicator == 1, d
-    local imshr_mean : di %4.3f r(mean)
-    local imshr_sd   : di %4.3f r(sd)
-    tw kdensity exposure if athr_indicator == 1, lcolor(ebblue)   || kdensity imputed if athr_indicator == 1, lcolor(dkorange)   xtitle("Exposure Measure") ytitle("Density") ///
-        xlab(#15) ///
-        legend(on label(1 "FOIA PI Observed Exposure (mean = `mean', sd = `sd')") label(2 "Imputed Exposure (mean = `imputed_mean', sd = `imputed_sd')") pos(7) ring(1) size(small))
-    graph export ../output/figures/`samp'/exposure_dist`suf'.pdf, replace
-    tw kdensity mkt_spend_shr if athr_indicator == 1, lcolor(ebblue)  || kdensity imputed_mkt_spend_shr if athr_indicator == 1, lcolor(dkorange)   xtitle("Market Spend Share") ytitle("Density") ///
-        xlab(#15) ///
-        legend(on label(1 "FOIA PI Observed (mean = `mshr_mean', sd = `mshr_sd')") label(2 "Imputed (mean = `imshr_mean', sd = `imshr_sd')") pos(7) ring(1) size(small))
-    graph export ../output/figures/`samp'/mkt_spend_shr_dist`suf'.pdf, replace
+    * Observed curve comes from ../temp/foia_observed_exposure (all 213 PIs,
+    * pre-gate) so it is invariant across samp/suf/EXPOSURE_FILTER. The imputed
+    * curve is sample-specific by design -- that is the object being compared.
+    preserve
+        keep if athr_indicator == 1
+        keep athr_id imputed imputed_mkt_spend_shr
+        append using ../temp/foia_observed_exposure
+        sum exposure_all, d
+        local mean : di %4.3f r(mean)
+        local sd   : di %4.3f r(sd)
+        sum imputed, d
+        local imputed_mean : di %4.3f r(mean)
+        local imputed_sd   : di %4.3f r(sd)
+        sum mkt_spend_shr_all, d
+        local mshr_mean : di %4.3f r(mean)
+        local mshr_sd   : di %4.3f r(sd)
+        sum imputed_mkt_spend_shr, d
+        local imshr_mean : di %4.3f r(mean)
+        local imshr_sd   : di %4.3f r(sd)
+        tw kdensity exposure_all, lcolor(ebblue)   || kdensity imputed, lcolor(dkorange)   xtitle("Exposure Measure") ytitle("Density") ///
+            xlab(#15) ///
+            legend(on label(1 "FOIA PI Observed Exposure (mean = `mean', sd = `sd')") label(2 "Imputed Exposure (mean = `imputed_mean', sd = `imputed_sd')") pos(7) ring(1) size(small))
+        graph export ../output/figures/`samp'/exposure_dist`suf'.pdf, replace
+        tw kdensity mkt_spend_shr_all, lcolor(ebblue)  || kdensity imputed_mkt_spend_shr, lcolor(dkorange)   xtitle("Market Spend Share") ytitle("Density") ///
+            xlab(#15) ///
+            legend(on label(1 "FOIA PI Observed (mean = `mshr_mean', sd = `mshr_sd')") label(2 "Imputed (mean = `imshr_mean', sd = `imshr_sd')") pos(7) ring(1) size(small))
+        graph export ../output/figures/`samp'/mkt_spend_shr_dist`suf'.pdf, replace
+    restore
     replace imputed = exposure if !mi(exposure)
     replace imputed_mkt_spend_shr = mkt_spend_shr if !mi(mkt_spend_shr)
     drop exposure

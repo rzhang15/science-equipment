@@ -7,7 +7,7 @@ pause on
 set seed 8975
 
 program main
-    foreach s in all_jrnls { //} all_jrnls_no_clin top_jrnls top_jrnls_no_clin { 
+    foreach s in all_jrnls_no_clin { //} all_jrnls_no_clin top_jrnls top_jrnls_no_clin { 
         local t year
         make_panel, time(`t') last(1) samp(`s') us(1)
         merge_ipeds, time(`t') last(1) samp(`s') us(1)
