@@ -848,26 +848,23 @@ program spend_by_age_piyr
         local ptxt "Early-career - late-career = `diff'; t-test p = `pt_s' (PI-clustered); K-S p = `pks_s'"
         di as text "`v': `ptxt'"
 
-        * both densities on one common x grid so rarea can shade the gap
-        cap drop _kx _kd_y _kd_o _kp_y _kp_o _kp_c
+        * both densities on one common x grid
+        cap drop _kx _kd_y _kd_o _kp_y _kp_o
         gen _kx = `xcap' * (_n - 1) / 199 if _n <= 200
         kdensity `v' if young == 1 & `v' <= `xcap', at(_kx) gen(_kd_y) nograph
         kdensity `v' if young == 0 & `v' <= `xcap', at(_kx) gen(_kd_o) nograph
         gen _kp_y = _kd_y * `w' * 100
         gen _kp_o = _kd_o * `w' * 100
-        gen _kp_c = min(_kp_y, _kp_o)
-        tw (rarea _kp_c _kp_y _kx, color(ebblue*0.3) lwidth(none)) ///
-           (rarea _kp_c _kp_o _kx, color(dkorange*0.3) lwidth(none)) ///
-           (line _kp_y _kx, lcolor(ebblue)) ///
+        tw (line _kp_y _kx, lcolor(ebblue)) ///
            (line _kp_o _kx, lcolor(dkorange)), ///
            xtitle("`xtitle'") ytitle("Percent of PI-years (per `wlab' bin)") ///
-           legend(order(3 "Early-Career (N=`n_y', PIs=`npi_y'): mean=`mean_y'" ///
-                        4 "Late-Career (N=`n_o', PIs=`npi_o'): mean=`mean_o'") ///
+           legend(order(1 "Early-Career (N=`n_y', PIs=`npi_y'): mean=`mean_y'" ///
+                        2 "Late-Career (N=`n_o', PIs=`npi_o'): mean=`mean_o'") ///
                pos(1) ring(0) cols(1) size(small) region(fcolor(none))) ///
            note("`ptxt'", size(small)) ///
            plotregion(margin(sides))
         graph export ../output/figures/kd_`v'_by_age_piyr`suf'.pdf, replace
-        cap drop _kx _kd_y _kd_o _kp_y _kp_o _kp_c
+        cap drop _kx _kd_y _kd_o _kp_y _kp_o
     }
 end
 
