@@ -1,0 +1,37 @@
+=== 1/4 reorder v2 into July row order ===
+order rows: 1,860,867   v2 rows: 1,860,867
+reordered rows: 1,860,867   missing text: 0
+Done. v2 rewritten in July row order.
+V2-REORDERED-OK (safe to start the foia_similarity_wts track now)
+=== 2/4 vectorize ===
+Loading Parquet data...
+Stemming Stopwords to match input data...
+Vectorizing...
+Matrix Shape: (1860867, 30000)
+=== 3/4 cluster K=30 ===
+--- CLUSTER JOB (US): K=30  svd_dim=256 ---
+Loading TF-IDF matrix...
+  TF-IDF shape: (1860867, 30000)  nnz/row mean: 120.2
+Loading helper files...
+  rows with 0 nonzero features:  2
+  rows with <5 nonzero features: 74
+
+Reducing to 256 dims via TruncatedSVD...
+  cumulative explained variance: 0.182
+  dense shape: (1860867, 256)   mem: 1.91 GB
+  L2-normalized; ready for spherical K-means semantics.
+
+Clustering into 30 clusters with MiniBatchKMeans...
+
+--- CLUSTER SIZE DISTRIBUTION ---
+  largest cluster: 186,972 authors (10.05% of pool)
+  median size: 52,010    smallest: 10,164
+  size pctiles: 10%=25,120  25%=31,866  75%=71,491  90%=113,987
+
+Saving Results...
+Writing cluster top-term descriptions...
+Saved ../output/static_cluster_descriptions_30.txt
+Done.
+=== 4/4 verify against Jul-6 clusters ===
+rows: 1,860,867   order match: True   label match: False
+MISMATCH: clusters do NOT reproduce the Jul-6 file (diffs: 48)

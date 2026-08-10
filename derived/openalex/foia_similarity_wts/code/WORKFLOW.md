@@ -29,7 +29,7 @@ Symlinked via `links.txt` under `../external/`:
 
 Not symlinked but hard-coded:
 
-- `../../us_cluster_fields/output/author_static_clusters_30.csv`, `static_cluster_descriptions_30.txt` — k=30 clustering **on the US-only corpus** (input to `cluster_sanity_check.py` and `tfidf/5_validate_shift_share.py`). Produced by `us_cluster_fields/run_sweep.sbatch`. k=30 is the project-wide default cluster count.
+- `../../us_cluster_fields/output/author_static_clusters_25.csv`, `static_cluster_descriptions_25.txt` — k=25 clustering **on the US-only corpus** (input to `cluster_sanity_check.py`). Produced by `us_cluster_fields/run_sweep.sbatch`. Uses the same universe as this pipeline, so unmapped-author rate is minimal.
 - `../../cluster_fields/output/author_text_unstemmed.parquet` — pre-stem lifetime text (input to `bert/0b_build_foia_unstemmed.py`)
 - `../../cluster_fields/output/bert/author_paper_edges.parquet`, `papers_text.parquet` — paper-level edges + text (input to `0c_get_coauthor_stemmed.py` and `bert/0c_build_coauthor_unstemmed.py`)
 - `../../get_coauthors/temp/relevant_pprs.dta` — FOIA paper IDs, excluded from coauthor texts
@@ -76,18 +76,15 @@ Run with `--tag restricted` throughout. All outputs land in `../output/` and car
 | Step | File | Produces |
 |---|---|---|
 | 2.1 | `tfidf/5_holdout_stress.py --tag restricted` | `holdout_stress_pairs_restricted.csv`, `holdout_stress_summary_restricted.csv`, `holdout_stress_overall_restricted.txt`, `holdout_scatter_restricted.png` |
-| 2.2 | `tfidf/5_validate_shift_share.py --version hc` | `validation/lofo_pi_hc_cf_k3.csv`, `lofo_cell_hc_cf_k3.csv`, `lofo_summary_hc_cf_k3.txt`, `baselines_pi_hc_cf.csv`, `support_hist_hc_cf.csv`, `coverage_vs_rmse_hc_cf_k3.csv`, `placebo_pi_hc_cf_k3.csv`, `face_validity_hc_cf_k3.csv` |
-| 2.3 | `tfidf/test_coauthor_similarity.py --tag restricted` | `coauthor_validation_pairs_tfidf.csv`, `coauthor_validation_summary_tfidf.txt` |
-| 2.4 | `plot_coauthor_validation.py --method tfidf` | `output/figures/coauthor_validation_tfidf.png`, `coauthor_validation_by_copubs_tfidf.csv`, `coauthor_validation_trend_tfidf.csv` |
-| 2.5 | `cluster_sanity_check.py --tag restricted --k 30` | `k30_cluster_sanity.csv`, `k30_cluster_sanity_overall.txt`, `output/figures/k30_cluster_sanity.png` |
+| 2.2 | `tfidf/test_coauthor_similarity.py --tag restricted` | `coauthor_validation_pairs_tfidf.csv`, `coauthor_validation_summary_tfidf.txt` |
+| 2.3 | `plot_coauthor_validation.py --method tfidf` | `output/figures/coauthor_validation_tfidf.png`, `coauthor_validation_by_copubs_tfidf.csv`, `coauthor_validation_trend_tfidf.csv` |
+| 2.4 | `cluster_sanity_check.py --tag restricted --k 25` | `k25_cluster_sanity.csv`, `k25_cluster_sanity_overall.txt`, `output/figures/k25_cluster_sanity.png` |
 
-**Step 2.1** — held-out-FOIA stress test on the **scalar** exposure `S @ g` (per-fold predictions of held-out FOIAs' exposure) — evidence that the imputation is well-calibrated when the anchor set is smaller.
+**Step 2.1** — held-out-FOIA stress test (per-fold predictions of held-out FOIAs' exposure) — evidence that the imputation is well-calibrated when the anchor set is smaller.
 
-**Step 2.2** — shift-share validation on the **share matrix** `S_hat = W @ S` under the production spec (hc + _cf, k=3). Five exhibits: LOFO CV (E1), baseline comparison vs grand-mean / k=30-cluster-mean / KNN(k=1,5,10) (E2), support diagnostics + coverage-vs-accuracy under _cf (E3), shuffled-share placebo (E4), stratified face-validity table (E5). See file docstring.
+**Steps 2.2–2.3** — coauthor validation: for each known (FOIA, coauthor) pair, imputed coauthor exposure should track FOIA true exposure. Produces the TF-IDF side of the coauthor comparison figure.
 
-**Steps 2.3–2.4** — coauthor validation: for each known (FOIA, coauthor) pair, imputed coauthor exposure should track FOIA true exposure. Produces the TF-IDF side of the coauthor comparison figure.
-
-**Step 2.5** — cross-cluster sanity check. For each k=30 cluster from `../us_cluster_fields` (US-only corpus, matches this pipeline's universe), reports (a) # FOIA authors, (b) # non-FOIA universe authors, (c) mean/median own-cluster W share (fraction of a universe author's imputation weight that lands on FOIAs in the same k=30 cluster). Own-cluster share ≫ 1/30 means TF-IDF nearest-neighbors and the k=30 clustering see the same topical signal. Summary breaks out FOIA-rich (≥5 anchors) vs thin (1–4) vs empty (0) clusters so uneven FOIA coverage doesn't muddy the read.
+**Step 2.4** — new sanity check. For each k=25 cluster from `../us_cluster_fields` (US-only corpus, matches this pipeline's universe), reports (a) # FOIA authors, (b) # non-FOIA universe authors, (c) mean/median own-cluster W share (fraction of a universe author's imputation weight that lands on FOIAs in the same k=25 cluster). Own-cluster share ≫ 1/k means TF-IDF nearest-neighbors and the k=25 clustering see the same topical signal. Summary breaks out FOIA-rich (≥5 anchors) vs thin (1–4) vs empty (0) clusters so uneven FOIA coverage doesn't muddy the read.
 
 **Prereq: run the US pipeline first.**
 
@@ -98,7 +95,7 @@ python 1_vectorize.py                        # US-only TF-IDF (reads the v2 parq
 sbatch run_sweep.sbatch                      # K sweep {10,15,20,25,30}
 ```
 
-`run_sweep.sbatch` auto-runs `0b_clean_us_corpus.py` and `1_vectorize.py` if their outputs are missing (or if `FORCE_CLEAN=1` / `FORCE_VECTORIZE=1`). Produces `us_cluster_fields/output/author_static_clusters_30.csv` and `static_cluster_descriptions_30.txt` for `cluster_sanity_check.py` and `5_validate_shift_share.py` (k=30 is the project-wide default; the sweep also produces k=10/15/20/25 for sensitivity).
+`run_sweep.sbatch` auto-runs `0b_clean_us_corpus.py` and `1_vectorize.py` if their outputs are missing (or if `FORCE_CLEAN=1` / `FORCE_VECTORIZE=1`). Produces `us_cluster_fields/output/author_static_clusters_25.csv` and `static_cluster_descriptions_25.txt` for `cluster_sanity_check.py`.
 
 **Important:** the tfidf pipeline (`tfidf/1_vectorize.py`) reads the same `cleaned_static_author_text_pre_us_v2.parquet`. If you rebuilt the v2 cleaning, re-run Phase 1 so the universe matches the clustering.
 
@@ -163,11 +160,10 @@ python export_diag_to_dta.py    --tag restricted
 
 # 3. Validation
 python 5_holdout_stress.py       --tag restricted
-python 5_validate_shift_share.py --version hc
 python test_coauthor_similarity.py --tag restricted
 cd ..
 python plot_coauthor_validation.py --method tfidf
-python cluster_sanity_check.py     --tag restricted --k 30
+python cluster_sanity_check.py     --tag restricted --k 25
 
 # 4. BERT comparison (per-model; PubMedBert shown, repeat for others)
 cd bert

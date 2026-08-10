@@ -133,29 +133,15 @@ xml_stopwords = [
     "fontstyl"
 ]
 
-# 4. Abstract-template / journal-chrome tokens that leak into cluster top-terms
-#    (jama, summary, altmetric/altmetrics, scp boilerplate, follow-up).
-#    Include both unstemmed and stemmed variants so the upstream
-#    `t not in stopwords_set` check in 0_combine_data.py and the
-#    TfidfVectorizer stop_words filter both catch them.
-template_stopwords = [
-    "jama",
-    "summary", "summaries", "summari",
-    "altmetric", "altmetrics", "altmetr",
-    "scp",
-    "follow", "follows", "followed", "following",
-]
-
 all_custom_stopwords = (
-    academic_stopwords +
-    quantitative_stopwords +
-    clinical_stopwords +
-    bio_scaffolding_stopwords +
+    academic_stopwords + 
+    quantitative_stopwords + 
+    clinical_stopwords + 
+    bio_scaffolding_stopwords + 
     unit_stopwords +
     chemical_stopwords +
     foreign_stopwords +
-    xml_stopwords +
-    template_stopwords
+    xml_stopwords
 )
 # Export the final SET (for fast checking) and LIST (for sklearn)
 stopwords_set = set(stopwords.words("english")).union(set(all_custom_stopwords))

@@ -8,13 +8,16 @@ version 17
 
 * EXPOSURE_VERSION : hc | all | treated_hc
 * EXPOSURE_FILTER  : "" | _cf | _cf2 | _cf5
+* EXPOSURE_FILE    : "" = final_imputed_shift_share_${EXPOSURE_VERSION}${EXPOSURE_FILTER}
+*                    else a literal filename under external/exposure/ (e.g. "ok")
 * FE_MODE          : author | inst_cluster | inst_cluster_fldyr
 *                    (inst_cluster modes absorb cluster_30: PIs unmatched to
 *                    the cluster file have cluster_30 missing and are silently
 *                    dropped by reghdfe/ppmlhdfe under those modes.)
 * QUICK_TOPJRNL    : 1 = top_jrnls sample, ppr_cnt only, single pass (pub=0, unweighted)
 global EXPOSURE_VERSION "hc"
-global EXPOSURE_FILTER  "_cf"
+global EXPOSURE_FILTER  ""
+global EXPOSURE_Filter "ok"
 global FE_MODE "author"
 global WEIGHT_MSIM 1
 global QUICK_TOPJRNL 0
@@ -84,7 +87,14 @@ program main
 end
 
 program gather_external_data
-    import delimited ../external/exposure/final_imputed_shift_share_${EXPOSURE_VERSION}${EXPOSURE_FILTER}, clear
+    if "$EXPOSURE_FILE" == "" {
+        import delimited ../external/exposure/final_imputed_shift_share_${EXPOSURE_VERSION}${EXPOSURE_FILTER}, clear
+    }
+    else {
+        // extensionless files: copy first, import delimited assumes .csv
+        copy ../external/exposure/$EXPOSURE_FILE ../temp/exposure_override.csv, replace
+        import delimited ../temp/exposure_override.csv, clear
+    }
     rename exposure_ss imputed
     rename sum_imputed_shares imputed_mkt_spend_shr
     save ../temp/exposure, replace
@@ -112,7 +122,7 @@ program gather_external_data
         save ../temp/nih_athr_level, replace
     }
 
-    import delimited ../external/cluster/author_static_clusters_30_ls.csv, clear varnames(1)
+    import delimited ../external/cluster/author_static_clusters_30.csv, clear varnames(1)
     cap tostring athr_id, replace
     rename cluster_label cluster_30
     save ../temp/athr_cluster30, replace
@@ -236,7 +246,7 @@ program restrict_samp
     bys athr_id inst_id: gen plc_cntr = _n == 1
     bys athr_id : egen num_place = total(plc_cntr)
     * [F5] spelled out (was `num_yrs', which relied on abbreviation)
-    drop if num_yrs_pre <= 2 
+    drop if num_yrs_pre <=2 
    * drop if num_yrs_post < 2
 *    drop if tot_yrs <= 4
     keep if num_place==1

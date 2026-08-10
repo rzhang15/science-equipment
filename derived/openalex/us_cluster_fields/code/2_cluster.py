@@ -27,13 +27,7 @@ parser.add_argument('--svd-dim', type=int, default=256,
                          "0 = skip (old behavior). Default 256 is the LSI/text-clustering "
                          "convention.")
 parser.add_argument('--seed', type=int, default=42)
-parser.add_argument('--suffix', default="",
-                    help="Read/write the _ls variant of the tfidf inputs and "
-                         "cluster outputs.")
-parser.add_argument('--sil-sample', type=int, default=50000,
-                    help="Rows sampled for the silhouette score. 0 skips it.")
 args = parser.parse_args()
-SUF = args.suffix
 
 NUM_CLUSTERS = args.clusters
 SEED = args.seed
@@ -42,16 +36,14 @@ np.random.seed(SEED)
 print(f"--- CLUSTER JOB (US): K={NUM_CLUSTERS}  svd_dim={args.svd_dim} ---")
 
 print("Loading TF-IDF matrix...")
-matrix = scipy.sparse.load_npz(f"../output/tfidf_matrix{SUF}.npz")
+matrix = scipy.sparse.load_npz("../output/tfidf_matrix.npz")
 print(f"  TF-IDF shape: {matrix.shape}  nnz/row mean: {matrix.nnz / matrix.shape[0]:.1f}")
 
 print("Loading helper files...")
-feature_names = pickle.load(open(f"../output/feature_names{SUF}.pkl", "rb"))
-pdf_ids = pd.read_parquet(f"../output/author_ids_aligned{SUF}.parquet")
+feature_names = pickle.load(open("../output/feature_names.pkl", "rb"))
+pdf_ids = pd.read_parquet("../output/author_ids_aligned.parquet")
 
-# CSR row nnz straight off the index pointer. (matrix != 0) would build a
-# whole second sparse matrix just to count.
-row_nnz = np.diff(matrix.indptr)
+row_nnz = np.asarray((matrix != 0).sum(axis=1)).ravel()
 print(f"  rows with 0 nonzero features:  {(row_nnz == 0).sum():,}")
 print(f"  rows with <5 nonzero features: {(row_nnz < 5).sum():,}")
 
@@ -101,35 +93,10 @@ if top_share > 0.5:
     print(f"  WARNING: largest cluster holds {top_share*100:.1f}% of the pool -- "
           f"the clustering looks degenerate. Try increasing --svd-dim or K.")
 
-# ---- K-selection diagnostics ----
-# Appended one row per run so a sweep builds the elbow/silhouette curve that
-# justifies the chosen K. Silhouette is on a sample: the full pairwise
-# computation is O(n^2) and infeasible at 1.8M rows.
-import os
-sil = float("nan")
-if args.sil_sample and args.sil_sample > 0:
-    from sklearn.metrics import silhouette_score
-    rng = np.random.RandomState(SEED)
-    idx = rng.choice(X.shape[0], size=min(args.sil_sample, X.shape[0]), replace=False)
-    sil = silhouette_score(X[idx], labels[idx], metric="euclidean")
-    print(f"  silhouette (n={len(idx):,}): {sil:.4f}")
-print(f"  inertia: {kmeans.inertia_:.2f}")
-
-diag_path = f"../output/k_diagnostics{SUF}.csv"
-hdr = not os.path.exists(diag_path)
-with open(diag_path, "a") as f:
-    if hdr:
-        f.write("k,n_authors,svd_dim,seed,inertia,silhouette,"
-                "largest_share,median_size,smallest_size\n")
-    f.write(f"{NUM_CLUSTERS},{len(labels)},{args.svd_dim},{SEED},"
-            f"{kmeans.inertia_:.4f},{sil:.6f},{top_share:.6f},"
-            f"{int(sizes.median())},{int(sizes.iloc[-1])}\n")
-print(f"  appended diagnostics to {diag_path}")
-
 # ---- save labels ----
 print("\nSaving Results...")
 pdf_ids['cluster_label'] = labels
-pdf_ids.to_csv(f"../output/author_static_clusters_{NUM_CLUSTERS}{SUF}.csv", index=False)
+pdf_ids.to_csv(f"../output/author_static_clusters_{NUM_CLUSTERS}.csv", index=False)
 
 # ---- top-term descriptions ----
 # With SVD on, kmeans.cluster_centers_ is in the SVD-reduced space, so we
@@ -137,20 +104,16 @@ pdf_ids.to_csv(f"../output/author_static_clusters_{NUM_CLUSTERS}{SUF}.csv", inde
 # the original TF-IDF space.
 print("Writing cluster top-term descriptions...")
 if args.svd_dim and args.svd_dim > 0:
-    # One sparse matmul instead of K fancy-index slices. S is (K x n) holding
-    # 1/cluster_size, so S @ matrix is the stack of per-cluster mean vectors.
-    counts = np.bincount(labels, minlength=NUM_CLUSTERS).astype(np.float32)
-    w = np.where(counts > 0, 1.0 / np.maximum(counts, 1), 0.0)[labels]
-    S = scipy.sparse.csr_matrix(
-        (w, (labels, np.arange(len(labels)))),
-        shape=(NUM_CLUSTERS, matrix.shape[0]),
-        dtype=np.float32,
-    )
-    centers = np.asarray((S @ matrix).todense(), dtype=np.float32)
+    centers = np.zeros((NUM_CLUSTERS, matrix.shape[1]), dtype=np.float32)
+    for c in range(NUM_CLUSTERS):
+        rows = np.where(labels == c)[0]
+        if len(rows) == 0:
+            continue
+        centers[c] = np.asarray(matrix[rows].mean(axis=0)).ravel()
 else:
     centers = kmeans.cluster_centers_
 
-out_txt = f"../output/static_cluster_descriptions_{NUM_CLUSTERS}{SUF}.txt"
+out_txt = f"../output/static_cluster_descriptions_{NUM_CLUSTERS}.txt"
 with open(out_txt, "w") as f:
     for i in range(NUM_CLUSTERS):
         n_i = int(sizes.get(i, 0))

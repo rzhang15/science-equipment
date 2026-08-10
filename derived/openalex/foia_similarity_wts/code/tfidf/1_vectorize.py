@@ -20,10 +20,10 @@ OUTPUT_DIR = "../../output/"
 # Default sources for --restrict-to-ls-clusters: author→cluster mapping plus
 # the worksheet that flags which clusters are life-science (keep=1).
 DEFAULT_CLUSTER_LABELS = (
-    "../../external/us_appended_text/author_static_clusters_100.csv"
+    "../../external/appended_text/author_static_clusters_100.csv"
 )
 DEFAULT_CLUSTER_WORKSHEET = (
-    "../../external/us_appended_text/cluster_label_worksheet_100.csv"
+    "../../external/appended_text/cluster_label_worksheet_100.csv"
 )
 
 # Vocab-shaping for universe→FOIA matching:
@@ -71,7 +71,7 @@ def restrict_to_ls_clusters(df_universe, df_foia, cluster_labels_path,
                             worksheet_path):
     """Filter universe to authors in clusters flagged life-science (keep=1).
 
-    Reads two files from us_cluster_fields/output:
+    Reads two files from cluster_fields/output:
       - cluster_labels_path: (athr_id, cluster_label) per universe author
       - worksheet_path:      (cluster_label, keep) per cluster
     Drops universe authors with no cluster assignment OR in clusters with keep=0.

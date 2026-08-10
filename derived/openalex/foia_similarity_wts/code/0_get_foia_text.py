@@ -23,8 +23,8 @@ Inputs:
   ../external/exposure_wts/athr_exposure_list.dta            (FOIA athr_ids)
   ../external/athr_panel/athr_panel_full_year_last_{panel}.dta (analysis panel)
   ../external/us_appended_text/cleaned_static_author_text_pre_us.parquet
-  ../external/us_appended_text/author_static_clusters_{K}.csv
-  ../external/us_appended_text/cluster_label_worksheet_{K}.csv  (keep + top_terms)
+  ../external/appended_text/author_static_clusters_{K}.csv
+  ../external/appended_text/cluster_label_worksheet_{K}.csv  (keep + top_terms)
 
 Outputs:
   ../output/foia_author_text_final.csv          (athr_id, processed_text,
@@ -39,7 +39,7 @@ import polars as pl
 
 ap = argparse.ArgumentParser()
 ap.add_argument("--cluster-k", type=int, default=0,
-                help="Match author_static_clusters_{K}.csv from us_cluster_fields/output. "
+                help="Match author_static_clusters_{K}.csv from cluster_fields/output. "
                      "Default 0 = skip cluster validation (build FOIA-native clusters instead).")
 ap.add_argument("--drop-non-ls", action="store_true",
                 help="Drop FOIA authors whose cluster was flagged non-life-science. "
@@ -57,8 +57,8 @@ args = ap.parse_args()
 # --- PATHS ---
 foia_path      = "../external/exposure_wts/athr_exposure_list.dta"
 text_data_path = "../external/us_appended_text/cleaned_static_author_text_pre_us.parquet"
-clusters_path  = f"../external/us_appended_text/author_static_clusters_{args.cluster_k}.csv"
-worksheet_path = f"../external/us_appended_text/cluster_label_worksheet_{args.cluster_k}.csv"
+clusters_path  = f"../external/appended_text/author_static_clusters_{args.cluster_k}.csv"
+worksheet_path = f"../external/appended_text/cluster_label_worksheet_{args.cluster_k}.csv"
 output_path    = "../output/foia_author_text_final.csv"
 dropped_path   = output_path.replace(".csv", "_dropped.csv")
 
