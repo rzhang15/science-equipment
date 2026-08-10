@@ -6,12 +6,15 @@
 #SBATCH --time=02:00:00
 #SBATCH --output=slurm-%j.out
 
-# _cf chain: reuses the untagged k=3 weight_matrix.npz from run_k3_impute.sbatch
+# Filtered k=3 variants only -- reuses weight_matrix_k3.npz from
+# run_k3_impute.sbatch. Use after refreshing the cluster worksheet / _ls file
+# without rebuilding weights.
 set -e
 cd "${SLURM_SUBMIT_DIR:-$(dirname "$0")}"
 
-CL30=../../external/us_appended_text/author_static_clusters_30_ls.csv
+CL30=../../external/us_appended_text/author_static_clusters_30.csv
+CL30_LS=../../external/us_appended_text/author_static_clusters_30_ls.csv
 
-for MIN in 1 2 5; do
-    python -u 4_impute_shift_share.py --cluster-filter "$CL30" --min-foia-per-cluster $MIN
-done
+python -u 4_impute_shift_share.py --k 3 --cluster-filter "$CL30"
+python -u 4_impute_shift_share.py --k 3 --ls-filter "$CL30_LS"
+python -u 4_impute_shift_share.py --k 3 --cluster-filter "$CL30" --ls-filter "$CL30_LS"

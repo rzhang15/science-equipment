@@ -1,0 +1,641 @@
+Recipe: K=3  sharpen=2.0  floor=0.05  unmatched<0.05  L1_normalize=True
+Using N_JOBS=48 threads  tag=''
+Loading TF-IDF Matrices...
+Universe Authors: 1,860,867
+FOIA PIs (Targets): 208
+X_foia dense size: 21.2 MB
+Computing top-3 weights in parallel (batch=25,000)...
+[Parallel(n_jobs=48)]: Using backend ThreadingBackend with 48 concurrent workers.
+[Parallel(n_jobs=48)]: Done  12 out of  75 | elapsed:    1.8s remaining:    9.3s
+[Parallel(n_jobs=48)]: Done  28 out of  75 | elapsed:    2.1s remaining:    3.5s
+[Parallel(n_jobs=48)]: Done  44 out of  75 | elapsed:    2.2s remaining:    1.5s
+[Parallel(n_jobs=48)]: Done  60 out of  75 | elapsed:    2.5s remaining:    0.6s
+[Parallel(n_jobs=48)]: Done  75 out of  75 | elapsed:    2.7s finished
+Merging results...
+Total non-zero weights: 5,011,841
+Unmatched authors (max sim < 0.05): 77,864 (4.18%)
+Mean max-similarity:   0.1139
+Median max-similarity: 0.1030
+Saving weight matrix -> ../../output/weight_matrix_k3.npz
+Saving per-author match diagnostics...
+Done. Weights precomputed.
+Loading universe + FOIA id orders ...
+Loading shocks from /n/holylabs/LABS/pakes_lab/Lab/sci_eq/analysis/first_stage/output/did_coefs_eb_price.dta ...
+  markets with shocks: 46
+  g_k stats: mean=0.0669  sd=0.1804  min=-0.3961  max=0.7120
+Loading W (tag='', k=3) ...
+  W shape: (1860867, 208)  nnz: 5,011,841
+  W rows with any weight: 1,783,003/1,860,867
+  W row-sum stats (nonzero rows): mean=1.0000  p5=1.0000  p95=1.0000
+Computing FOIA pre-period characteristics ...
+
+==============================================================================
+version=hc   method=knn   tag=''
+==============================================================================
+Building FOIA share matrix S from ../../external/exposure_wts/athr_exposure_by_category_hc.dta (version=hc) ...
+  S shape: (208, 46)  nnz: 1,414  density: 0.1478
+  FOIA PIs with >=1 treated-market share: 208 / 208
+  per-market coverage: min=3  p5=3  p50=27  p95=66  max=106
+Imputing shares  (method=knn)  ...
+Aggregating: z_hat = S_hat @ g,  S_sum = rowsum(S_hat) ...
+  effective number of shocks (BHJ-style): 18.21
+
+  --- Exposure level comparison ---
+  Self-imputed FOIA exposure (S @ g):
+    n nonzero PIs: 208/208
+    mean=+0.02785  sd=0.06257  med=+0.01274
+  Universe imputed exposure (S_hat @ g):
+    n nonzero authors: 1,783,003/1,860,867
+    mean=+0.02988  sd=0.04229  med=+0.01981
+
+--- Shock balance (Borusyak-Hull-Jaravel) ---
+  Regression: g_k = a + b * X_bar_k + e,  weights = Sum_i s_ik
+  H0: shocks are quasi-randomly assigned wrt pre-period X => b approx 0
+
+  characteristic                beta          se        t       p
+  log_total_spend            +0.1198      0.0402    +2.98   0.003
+  log_lab_spend              +0.1076      0.0365    +2.95   0.003
+  n_cats                     +0.0034      0.0013    +2.57   0.010
+  lab_share                  +0.0342      0.4011    +0.09   0.932
+  top-10 |Rotemberg weight| markets:
+    us fbs                                    alpha_k=+0.711  s_bar=0.0423  g=+0.4812
+    site-directed mutagenesis systems         alpha_k=-0.135  s_bar=0.0098  g=-0.3961
+    chemiluminescent substrates               alpha_k=+0.118  s_bar=0.0218  g=+0.1540
+    column-based microbial dna purification kits  alpha_k=+0.093  s_bar=0.0069  g=+0.3817
+    first-strand cdna synthesis systems       alpha_k=+0.083  s_bar=0.0121  g=+0.1964
+    column-based gel dna extraction kits      alpha_k=-0.073  s_bar=0.0217  g=-0.0957
+    pre-cast bis-tris gels                    alpha_k=+0.072  s_bar=0.0069  g=+0.2985
+    cell culture nutritional supplements - tryptone  alpha_k=+0.047  s_bar=0.0091  g=+0.1471
+    rnase inhibitors                          alpha_k=-0.043  s_bar=0.0056  g=-0.2215
+    cell culture dissociation reagents        alpha_k=+0.035  s_bar=0.0039  g=+0.2543
+  Saved ../../output/shock_balance_hc_k3.csv
+  Saved ../../output/final_imputed_shift_share_hc_k3.csv
+  Saved ../../output/imputed_shares_matrix_hc_k3.npz  (universe x K_treated imputed share matrix)
+  Saved ../../output/imputed_shares_markets_hc_k3.csv
+
+==============================================================================
+version=all   method=knn   tag=''
+==============================================================================
+Building FOIA share matrix S from ../../external/exposure_wts/athr_exposure_by_category_all.dta (version=all) ...
+  S shape: (208, 46)  nnz: 1,414  density: 0.1478
+  FOIA PIs with >=1 treated-market share: 208 / 208
+  per-market coverage: min=3  p5=3  p50=27  p95=66  max=106
+Imputing shares  (method=knn)  ...
+Aggregating: z_hat = S_hat @ g,  S_sum = rowsum(S_hat) ...
+  effective number of shocks (BHJ-style): 17.95
+
+  --- Exposure level comparison ---
+  Self-imputed FOIA exposure (S @ g):
+    n nonzero PIs: 208/208
+    mean=+0.01248  sd=0.03320  med=+0.00472
+  Universe imputed exposure (S_hat @ g):
+    n nonzero authors: 1,783,003/1,860,867
+    mean=+0.01409  sd=0.02331  med=+0.00834
+
+--- Shock balance (Borusyak-Hull-Jaravel) ---
+  Regression: g_k = a + b * X_bar_k + e,  weights = Sum_i s_ik
+  H0: shocks are quasi-randomly assigned wrt pre-period X => b approx 0
+
+  characteristic                beta          se        t       p
+  log_total_spend            +0.0543      0.0310    +1.75   0.080
+  log_lab_spend              +0.0541      0.0299    +1.81   0.071
+  n_cats                     +0.0020      0.0013    +1.56   0.120
+  lab_share                  -0.2409      0.4557    -0.53   0.597
+  top-10 |Rotemberg weight| markets:
+    us fbs                                    alpha_k=+0.583  s_bar=0.0164  g=+0.4812
+    column-based microbial dna purification kits  alpha_k=+0.176  s_bar=0.0062  g=+0.3817
+    chemiluminescent substrates               alpha_k=+0.116  s_bar=0.0101  g=+0.1540
+    first-strand cdna synthesis systems       alpha_k=+0.101  s_bar=0.0069  g=+0.1964
+    site-directed mutagenesis systems         alpha_k=-0.092  s_bar=0.0031  g=-0.3961
+    pre-cast bis-tris gels                    alpha_k=+0.062  s_bar=0.0028  g=+0.2985
+    column-based gel dna extraction kits      alpha_k=-0.055  s_bar=0.0077  g=-0.0957
+    cell culture nutritional supplements - tryptone  alpha_k=+0.049  s_bar=0.0045  g=+0.1471
+    rnase inhibitors                          alpha_k=-0.033  s_bar=0.0020  g=-0.2215
+    cell culture dissociation reagents        alpha_k=+0.028  s_bar=0.0015  g=+0.2543
+  Saved ../../output/shock_balance_all_k3.csv
+  Saved ../../output/final_imputed_shift_share_all_k3.csv
+  Saved ../../output/imputed_shares_matrix_all_k3.npz  (universe x K_treated imputed share matrix)
+  Saved ../../output/imputed_shares_markets_all_k3.csv
+
+==============================================================================
+version=treated_hc   method=knn   tag=''
+==============================================================================
+Building FOIA share matrix S from ../../external/exposure_wts/athr_exposure_by_category_treated_hc.dta (version=treated_hc) ...
+  S shape: (208, 46)  nnz: 1,414  density: 0.1478
+  FOIA PIs with >=1 treated-market share: 208 / 208
+  per-market coverage: min=3  p5=3  p50=27  p95=66  max=106
+Imputing shares  (method=knn)  ...
+Aggregating: z_hat = S_hat @ g,  S_sum = rowsum(S_hat) ...
+  effective number of shocks (BHJ-style): 19.08
+
+  --- Exposure level comparison ---
+  Self-imputed FOIA exposure (S @ g):
+    n nonzero PIs: 208/208
+    mean=+0.08214  sd=0.13374  med=+0.06186
+  Universe imputed exposure (S_hat @ g):
+    n nonzero authors: 1,783,003/1,860,867
+    mean=+0.09706  sd=0.09479  med=+0.08698
+
+--- Shock balance (Borusyak-Hull-Jaravel) ---
+  Regression: g_k = a + b * X_bar_k + e,  weights = Sum_i s_ik
+  H0: shocks are quasi-randomly assigned wrt pre-period X => b approx 0
+
+  characteristic                beta          se        t       p
+  log_total_spend            +0.1895      0.0558    +3.40   0.001
+  log_lab_spend              +0.1772      0.0520    +3.41   0.001
+  n_cats                     +0.0044      0.0016    +2.67   0.008
+  lab_share                  +0.1381      0.5837    +0.24   0.813
+  top-10 |Rotemberg weight| markets:
+    us fbs                                    alpha_k=+0.632  s_bar=0.1222  g=+0.4812
+    chemiluminescent substrates               alpha_k=+0.152  s_bar=0.0919  g=+0.1540
+    site-directed mutagenesis systems         alpha_k=-0.127  s_bar=0.0297  g=-0.3961
+    first-strand cdna synthesis systems       alpha_k=+0.120  s_bar=0.0567  g=+0.1964
+    cell culture nutritional supplements - tryptone  alpha_k=+0.058  s_bar=0.0366  g=+0.1471
+    pre-cast bis-tris gels                    alpha_k=+0.056  s_bar=0.0176  g=+0.2985
+    column-based gel dna extraction kits      alpha_k=-0.051  s_bar=0.0497  g=-0.0957
+    acrylamide-bis solution                   alpha_k=+0.050  s_bar=0.0428  g=+0.1082
+    column-based dna plasmid miniprep         alpha_k=+0.031  s_bar=0.0223  g=+0.1307
+    rnase inhibitors                          alpha_k=-0.030  s_bar=0.0127  g=-0.2215
+  Saved ../../output/shock_balance_treated_hc_k3.csv
+  Saved ../../output/final_imputed_shift_share_treated_hc_k3.csv
+  Saved ../../output/imputed_shares_matrix_treated_hc_k3.npz  (universe x K_treated imputed share matrix)
+  Saved ../../output/imputed_shares_markets_treated_hc_k3.csv
+
+==============================================================================
+Per-version shift-share imputation summary
+==============================================================================
+   version method  n_foia_with_shares  z_hat_mean_universe  z_hat_sd_universe  S_sum_mean_universe  S_sum_sd_universe  eff_n_shocks
+        hc    knn                 208               0.0286             0.0418               0.2835             0.1322       18.2087
+       all    knn                 208               0.0135             0.0230               0.1193             0.0769       17.9457
+treated_hc    knn                 208               0.0930             0.0948               0.9582             0.2002       19.0831
+
+Saved ../../output/shift_share_summary_k3.csv
+Done!
+Loading universe + FOIA id orders ...
+Loading shocks from /n/holylabs/LABS/pakes_lab/Lab/sci_eq/analysis/first_stage/output/did_coefs_eb_price.dta ...
+  markets with shocks: 46
+  g_k stats: mean=0.0669  sd=0.1804  min=-0.3961  max=0.7120
+Loading W (tag='', k=3) ...
+  W shape: (1860867, 208)  nnz: 5,011,841
+  W rows with any weight: 1,783,003/1,860,867
+  W row-sum stats (nonzero rows): mean=1.0000  p5=1.0000  p95=1.0000
+Computing FOIA pre-period characteristics ...
+
+==============================================================================
+version=hc   method=knn   tag=''
+==============================================================================
+Building FOIA share matrix S from ../../external/exposure_wts/athr_exposure_by_category_hc.dta (version=hc) ...
+  S shape: (208, 46)  nnz: 1,414  density: 0.1478
+  FOIA PIs with >=1 treated-market share: 208 / 208
+  per-market coverage: min=3  p5=3  p50=27  p95=66  max=106
+Imputing shares  (method=knn)  ...
+Aggregating: z_hat = S_hat @ g,  S_sum = rowsum(S_hat) ...
+  effective number of shocks (BHJ-style): 18.21
+
+  --- Exposure level comparison ---
+  Self-imputed FOIA exposure (S @ g):
+    n nonzero PIs: 208/208
+    mean=+0.02785  sd=0.06257  med=+0.01274
+  Universe imputed exposure (S_hat @ g):
+    n nonzero authors: 1,783,003/1,860,867
+    mean=+0.02988  sd=0.04229  med=+0.01981
+
+--- Shock balance (Borusyak-Hull-Jaravel) ---
+  Regression: g_k = a + b * X_bar_k + e,  weights = Sum_i s_ik
+  H0: shocks are quasi-randomly assigned wrt pre-period X => b approx 0
+
+  characteristic                beta          se        t       p
+  log_total_spend            +0.1198      0.0402    +2.98   0.003
+  log_lab_spend              +0.1076      0.0365    +2.95   0.003
+  n_cats                     +0.0034      0.0013    +2.57   0.010
+  lab_share                  +0.0342      0.4011    +0.09   0.932
+  top-10 |Rotemberg weight| markets:
+    us fbs                                    alpha_k=+0.711  s_bar=0.0423  g=+0.4812
+    site-directed mutagenesis systems         alpha_k=-0.135  s_bar=0.0098  g=-0.3961
+    chemiluminescent substrates               alpha_k=+0.118  s_bar=0.0218  g=+0.1540
+    column-based microbial dna purification kits  alpha_k=+0.093  s_bar=0.0069  g=+0.3817
+    first-strand cdna synthesis systems       alpha_k=+0.083  s_bar=0.0121  g=+0.1964
+    column-based gel dna extraction kits      alpha_k=-0.073  s_bar=0.0217  g=-0.0957
+    pre-cast bis-tris gels                    alpha_k=+0.072  s_bar=0.0069  g=+0.2985
+    cell culture nutritional supplements - tryptone  alpha_k=+0.047  s_bar=0.0091  g=+0.1471
+    rnase inhibitors                          alpha_k=-0.043  s_bar=0.0056  g=-0.2215
+    cell culture dissociation reagents        alpha_k=+0.035  s_bar=0.0039  g=+0.2543
+  cluster filter (../../external/us_appended_text/author_static_clusters_30.csv, min-foia-per-cluster=1): kept 1,613,853/1,860,867
+  Saved ../../output/shock_balance_hc_cf_k3.csv
+  Saved ../../output/final_imputed_shift_share_hc_cf_k3.csv
+  Saved ../../output/imputed_shares_matrix_hc_cf_k3.npz  (universe x K_treated imputed share matrix)
+  Saved ../../output/imputed_shares_markets_hc_cf_k3.csv
+
+==============================================================================
+version=all   method=knn   tag=''
+==============================================================================
+Building FOIA share matrix S from ../../external/exposure_wts/athr_exposure_by_category_all.dta (version=all) ...
+  S shape: (208, 46)  nnz: 1,414  density: 0.1478
+  FOIA PIs with >=1 treated-market share: 208 / 208
+  per-market coverage: min=3  p5=3  p50=27  p95=66  max=106
+Imputing shares  (method=knn)  ...
+Aggregating: z_hat = S_hat @ g,  S_sum = rowsum(S_hat) ...
+  effective number of shocks (BHJ-style): 17.95
+
+  --- Exposure level comparison ---
+  Self-imputed FOIA exposure (S @ g):
+    n nonzero PIs: 208/208
+    mean=+0.01248  sd=0.03320  med=+0.00472
+  Universe imputed exposure (S_hat @ g):
+    n nonzero authors: 1,783,003/1,860,867
+    mean=+0.01409  sd=0.02331  med=+0.00834
+
+--- Shock balance (Borusyak-Hull-Jaravel) ---
+  Regression: g_k = a + b * X_bar_k + e,  weights = Sum_i s_ik
+  H0: shocks are quasi-randomly assigned wrt pre-period X => b approx 0
+
+  characteristic                beta          se        t       p
+  log_total_spend            +0.0543      0.0310    +1.75   0.080
+  log_lab_spend              +0.0541      0.0299    +1.81   0.071
+  n_cats                     +0.0020      0.0013    +1.56   0.120
+  lab_share                  -0.2409      0.4557    -0.53   0.597
+  top-10 |Rotemberg weight| markets:
+    us fbs                                    alpha_k=+0.583  s_bar=0.0164  g=+0.4812
+    column-based microbial dna purification kits  alpha_k=+0.176  s_bar=0.0062  g=+0.3817
+    chemiluminescent substrates               alpha_k=+0.116  s_bar=0.0101  g=+0.1540
+    first-strand cdna synthesis systems       alpha_k=+0.101  s_bar=0.0069  g=+0.1964
+    site-directed mutagenesis systems         alpha_k=-0.092  s_bar=0.0031  g=-0.3961
+    pre-cast bis-tris gels                    alpha_k=+0.062  s_bar=0.0028  g=+0.2985
+    column-based gel dna extraction kits      alpha_k=-0.055  s_bar=0.0077  g=-0.0957
+    cell culture nutritional supplements - tryptone  alpha_k=+0.049  s_bar=0.0045  g=+0.1471
+    rnase inhibitors                          alpha_k=-0.033  s_bar=0.0020  g=-0.2215
+    cell culture dissociation reagents        alpha_k=+0.028  s_bar=0.0015  g=+0.2543
+  cluster filter (../../external/us_appended_text/author_static_clusters_30.csv, min-foia-per-cluster=1): kept 1,613,853/1,860,867
+  Saved ../../output/shock_balance_all_cf_k3.csv
+  Saved ../../output/final_imputed_shift_share_all_cf_k3.csv
+  Saved ../../output/imputed_shares_matrix_all_cf_k3.npz  (universe x K_treated imputed share matrix)
+  Saved ../../output/imputed_shares_markets_all_cf_k3.csv
+
+==============================================================================
+version=treated_hc   method=knn   tag=''
+==============================================================================
+Building FOIA share matrix S from ../../external/exposure_wts/athr_exposure_by_category_treated_hc.dta (version=treated_hc) ...
+  S shape: (208, 46)  nnz: 1,414  density: 0.1478
+  FOIA PIs with >=1 treated-market share: 208 / 208
+  per-market coverage: min=3  p5=3  p50=27  p95=66  max=106
+Imputing shares  (method=knn)  ...
+Aggregating: z_hat = S_hat @ g,  S_sum = rowsum(S_hat) ...
+  effective number of shocks (BHJ-style): 19.08
+
+  --- Exposure level comparison ---
+  Self-imputed FOIA exposure (S @ g):
+    n nonzero PIs: 208/208
+    mean=+0.08214  sd=0.13374  med=+0.06186
+  Universe imputed exposure (S_hat @ g):
+    n nonzero authors: 1,783,003/1,860,867
+    mean=+0.09706  sd=0.09479  med=+0.08698
+
+--- Shock balance (Borusyak-Hull-Jaravel) ---
+  Regression: g_k = a + b * X_bar_k + e,  weights = Sum_i s_ik
+  H0: shocks are quasi-randomly assigned wrt pre-period X => b approx 0
+
+  characteristic                beta          se        t       p
+  log_total_spend            +0.1895      0.0558    +3.40   0.001
+  log_lab_spend              +0.1772      0.0520    +3.41   0.001
+  n_cats                     +0.0044      0.0016    +2.67   0.008
+  lab_share                  +0.1381      0.5837    +0.24   0.813
+  top-10 |Rotemberg weight| markets:
+    us fbs                                    alpha_k=+0.632  s_bar=0.1222  g=+0.4812
+    chemiluminescent substrates               alpha_k=+0.152  s_bar=0.0919  g=+0.1540
+    site-directed mutagenesis systems         alpha_k=-0.127  s_bar=0.0297  g=-0.3961
+    first-strand cdna synthesis systems       alpha_k=+0.120  s_bar=0.0567  g=+0.1964
+    cell culture nutritional supplements - tryptone  alpha_k=+0.058  s_bar=0.0366  g=+0.1471
+    pre-cast bis-tris gels                    alpha_k=+0.056  s_bar=0.0176  g=+0.2985
+    column-based gel dna extraction kits      alpha_k=-0.051  s_bar=0.0497  g=-0.0957
+    acrylamide-bis solution                   alpha_k=+0.050  s_bar=0.0428  g=+0.1082
+    column-based dna plasmid miniprep         alpha_k=+0.031  s_bar=0.0223  g=+0.1307
+    rnase inhibitors                          alpha_k=-0.030  s_bar=0.0127  g=-0.2215
+  cluster filter (../../external/us_appended_text/author_static_clusters_30.csv, min-foia-per-cluster=1): kept 1,613,853/1,860,867
+  Saved ../../output/shock_balance_treated_hc_cf_k3.csv
+  Saved ../../output/final_imputed_shift_share_treated_hc_cf_k3.csv
+  Saved ../../output/imputed_shares_matrix_treated_hc_cf_k3.npz  (universe x K_treated imputed share matrix)
+  Saved ../../output/imputed_shares_markets_treated_hc_cf_k3.csv
+
+==============================================================================
+Per-version shift-share imputation summary
+==============================================================================
+   version method  n_foia_with_shares  z_hat_mean_universe  z_hat_sd_universe  S_sum_mean_universe  S_sum_sd_universe  eff_n_shocks
+        hc    knn                 208               0.0286             0.0418               0.2835             0.1322       18.2087
+       all    knn                 208               0.0135             0.0230               0.1193             0.0769       17.9457
+treated_hc    knn                 208               0.0930             0.0948               0.9582             0.2002       19.0831
+
+Saved ../../output/shift_share_summary_cf_k3.csv
+Done!
+Loading universe + FOIA id orders ...
+Loading shocks from /n/holylabs/LABS/pakes_lab/Lab/sci_eq/analysis/first_stage/output/did_coefs_eb_price.dta ...
+  markets with shocks: 46
+  g_k stats: mean=0.0669  sd=0.1804  min=-0.3961  max=0.7120
+Loading W (tag='', k=3) ...
+  W shape: (1860867, 208)  nnz: 5,011,841
+  W rows with any weight: 1,783,003/1,860,867
+  W row-sum stats (nonzero rows): mean=1.0000  p5=1.0000  p95=1.0000
+Computing FOIA pre-period characteristics ...
+
+==============================================================================
+version=hc   method=knn   tag=''
+==============================================================================
+Building FOIA share matrix S from ../../external/exposure_wts/athr_exposure_by_category_hc.dta (version=hc) ...
+  S shape: (208, 46)  nnz: 1,414  density: 0.1478
+  FOIA PIs with >=1 treated-market share: 208 / 208
+  per-market coverage: min=3  p5=3  p50=27  p95=66  max=106
+Imputing shares  (method=knn)  ...
+Aggregating: z_hat = S_hat @ g,  S_sum = rowsum(S_hat) ...
+  effective number of shocks (BHJ-style): 18.21
+
+  --- Exposure level comparison ---
+  Self-imputed FOIA exposure (S @ g):
+    n nonzero PIs: 208/208
+    mean=+0.02785  sd=0.06257  med=+0.01274
+  Universe imputed exposure (S_hat @ g):
+    n nonzero authors: 1,783,003/1,860,867
+    mean=+0.02988  sd=0.04229  med=+0.01981
+
+--- Shock balance (Borusyak-Hull-Jaravel) ---
+  Regression: g_k = a + b * X_bar_k + e,  weights = Sum_i s_ik
+  H0: shocks are quasi-randomly assigned wrt pre-period X => b approx 0
+
+  characteristic                beta          se        t       p
+  log_total_spend            +0.1198      0.0402    +2.98   0.003
+  log_lab_spend              +0.1076      0.0365    +2.95   0.003
+  n_cats                     +0.0034      0.0013    +2.57   0.010
+  lab_share                  +0.0342      0.4011    +0.09   0.932
+  top-10 |Rotemberg weight| markets:
+    us fbs                                    alpha_k=+0.711  s_bar=0.0423  g=+0.4812
+    site-directed mutagenesis systems         alpha_k=-0.135  s_bar=0.0098  g=-0.3961
+    chemiluminescent substrates               alpha_k=+0.118  s_bar=0.0218  g=+0.1540
+    column-based microbial dna purification kits  alpha_k=+0.093  s_bar=0.0069  g=+0.3817
+    first-strand cdna synthesis systems       alpha_k=+0.083  s_bar=0.0121  g=+0.1964
+    column-based gel dna extraction kits      alpha_k=-0.073  s_bar=0.0217  g=-0.0957
+    pre-cast bis-tris gels                    alpha_k=+0.072  s_bar=0.0069  g=+0.2985
+    cell culture nutritional supplements - tryptone  alpha_k=+0.047  s_bar=0.0091  g=+0.1471
+    rnase inhibitors                          alpha_k=-0.043  s_bar=0.0056  g=-0.2215
+    cell culture dissociation reagents        alpha_k=+0.035  s_bar=0.0039  g=+0.2543
+  ls filter (../../external/us_appended_text/author_static_clusters_30_ls.csv): kept 1,621,063/1,860,867
+  Saved ../../output/shock_balance_hc_ls_k3.csv
+  Saved ../../output/final_imputed_shift_share_hc_ls_k3.csv
+  Saved ../../output/imputed_shares_matrix_hc_ls_k3.npz  (universe x K_treated imputed share matrix)
+  Saved ../../output/imputed_shares_markets_hc_ls_k3.csv
+
+==============================================================================
+version=all   method=knn   tag=''
+==============================================================================
+Building FOIA share matrix S from ../../external/exposure_wts/athr_exposure_by_category_all.dta (version=all) ...
+  S shape: (208, 46)  nnz: 1,414  density: 0.1478
+  FOIA PIs with >=1 treated-market share: 208 / 208
+  per-market coverage: min=3  p5=3  p50=27  p95=66  max=106
+Imputing shares  (method=knn)  ...
+Aggregating: z_hat = S_hat @ g,  S_sum = rowsum(S_hat) ...
+  effective number of shocks (BHJ-style): 17.95
+
+  --- Exposure level comparison ---
+  Self-imputed FOIA exposure (S @ g):
+    n nonzero PIs: 208/208
+    mean=+0.01248  sd=0.03320  med=+0.00472
+  Universe imputed exposure (S_hat @ g):
+    n nonzero authors: 1,783,003/1,860,867
+    mean=+0.01409  sd=0.02331  med=+0.00834
+
+--- Shock balance (Borusyak-Hull-Jaravel) ---
+  Regression: g_k = a + b * X_bar_k + e,  weights = Sum_i s_ik
+  H0: shocks are quasi-randomly assigned wrt pre-period X => b approx 0
+
+  characteristic                beta          se        t       p
+  log_total_spend            +0.0543      0.0310    +1.75   0.080
+  log_lab_spend              +0.0541      0.0299    +1.81   0.071
+  n_cats                     +0.0020      0.0013    +1.56   0.120
+  lab_share                  -0.2409      0.4557    -0.53   0.597
+  top-10 |Rotemberg weight| markets:
+    us fbs                                    alpha_k=+0.583  s_bar=0.0164  g=+0.4812
+    column-based microbial dna purification kits  alpha_k=+0.176  s_bar=0.0062  g=+0.3817
+    chemiluminescent substrates               alpha_k=+0.116  s_bar=0.0101  g=+0.1540
+    first-strand cdna synthesis systems       alpha_k=+0.101  s_bar=0.0069  g=+0.1964
+    site-directed mutagenesis systems         alpha_k=-0.092  s_bar=0.0031  g=-0.3961
+    pre-cast bis-tris gels                    alpha_k=+0.062  s_bar=0.0028  g=+0.2985
+    column-based gel dna extraction kits      alpha_k=-0.055  s_bar=0.0077  g=-0.0957
+    cell culture nutritional supplements - tryptone  alpha_k=+0.049  s_bar=0.0045  g=+0.1471
+    rnase inhibitors                          alpha_k=-0.033  s_bar=0.0020  g=-0.2215
+    cell culture dissociation reagents        alpha_k=+0.028  s_bar=0.0015  g=+0.2543
+  ls filter (../../external/us_appended_text/author_static_clusters_30_ls.csv): kept 1,621,063/1,860,867
+  Saved ../../output/shock_balance_all_ls_k3.csv
+  Saved ../../output/final_imputed_shift_share_all_ls_k3.csv
+  Saved ../../output/imputed_shares_matrix_all_ls_k3.npz  (universe x K_treated imputed share matrix)
+  Saved ../../output/imputed_shares_markets_all_ls_k3.csv
+
+==============================================================================
+version=treated_hc   method=knn   tag=''
+==============================================================================
+Building FOIA share matrix S from ../../external/exposure_wts/athr_exposure_by_category_treated_hc.dta (version=treated_hc) ...
+  S shape: (208, 46)  nnz: 1,414  density: 0.1478
+  FOIA PIs with >=1 treated-market share: 208 / 208
+  per-market coverage: min=3  p5=3  p50=27  p95=66  max=106
+Imputing shares  (method=knn)  ...
+Aggregating: z_hat = S_hat @ g,  S_sum = rowsum(S_hat) ...
+  effective number of shocks (BHJ-style): 19.08
+
+  --- Exposure level comparison ---
+  Self-imputed FOIA exposure (S @ g):
+    n nonzero PIs: 208/208
+    mean=+0.08214  sd=0.13374  med=+0.06186
+  Universe imputed exposure (S_hat @ g):
+    n nonzero authors: 1,783,003/1,860,867
+    mean=+0.09706  sd=0.09479  med=+0.08698
+
+--- Shock balance (Borusyak-Hull-Jaravel) ---
+  Regression: g_k = a + b * X_bar_k + e,  weights = Sum_i s_ik
+  H0: shocks are quasi-randomly assigned wrt pre-period X => b approx 0
+
+  characteristic                beta          se        t       p
+  log_total_spend            +0.1895      0.0558    +3.40   0.001
+  log_lab_spend              +0.1772      0.0520    +3.41   0.001
+  n_cats                     +0.0044      0.0016    +2.67   0.008
+  lab_share                  +0.1381      0.5837    +0.24   0.813
+  top-10 |Rotemberg weight| markets:
+    us fbs                                    alpha_k=+0.632  s_bar=0.1222  g=+0.4812
+    chemiluminescent substrates               alpha_k=+0.152  s_bar=0.0919  g=+0.1540
+    site-directed mutagenesis systems         alpha_k=-0.127  s_bar=0.0297  g=-0.3961
+    first-strand cdna synthesis systems       alpha_k=+0.120  s_bar=0.0567  g=+0.1964
+    cell culture nutritional supplements - tryptone  alpha_k=+0.058  s_bar=0.0366  g=+0.1471
+    pre-cast bis-tris gels                    alpha_k=+0.056  s_bar=0.0176  g=+0.2985
+    column-based gel dna extraction kits      alpha_k=-0.051  s_bar=0.0497  g=-0.0957
+    acrylamide-bis solution                   alpha_k=+0.050  s_bar=0.0428  g=+0.1082
+    column-based dna plasmid miniprep         alpha_k=+0.031  s_bar=0.0223  g=+0.1307
+    rnase inhibitors                          alpha_k=-0.030  s_bar=0.0127  g=-0.2215
+  ls filter (../../external/us_appended_text/author_static_clusters_30_ls.csv): kept 1,621,063/1,860,867
+  Saved ../../output/shock_balance_treated_hc_ls_k3.csv
+  Saved ../../output/final_imputed_shift_share_treated_hc_ls_k3.csv
+  Saved ../../output/imputed_shares_matrix_treated_hc_ls_k3.npz  (universe x K_treated imputed share matrix)
+  Saved ../../output/imputed_shares_markets_treated_hc_ls_k3.csv
+
+==============================================================================
+Per-version shift-share imputation summary
+==============================================================================
+   version method  n_foia_with_shares  z_hat_mean_universe  z_hat_sd_universe  S_sum_mean_universe  S_sum_sd_universe  eff_n_shocks
+        hc    knn                 208               0.0286             0.0418               0.2835             0.1322       18.2087
+       all    knn                 208               0.0135             0.0230               0.1193             0.0769       17.9457
+treated_hc    knn                 208               0.0930             0.0948               0.9582             0.2002       19.0831
+
+Saved ../../output/shift_share_summary_ls_k3.csv
+Done!
+Loading universe + FOIA id orders ...
+Loading shocks from /n/holylabs/LABS/pakes_lab/Lab/sci_eq/analysis/first_stage/output/did_coefs_eb_price.dta ...
+  markets with shocks: 46
+  g_k stats: mean=0.0669  sd=0.1804  min=-0.3961  max=0.7120
+Loading W (tag='', k=3) ...
+  W shape: (1860867, 208)  nnz: 5,011,841
+  W rows with any weight: 1,783,003/1,860,867
+  W row-sum stats (nonzero rows): mean=1.0000  p5=1.0000  p95=1.0000
+Computing FOIA pre-period characteristics ...
+
+==============================================================================
+version=hc   method=knn   tag=''
+==============================================================================
+Building FOIA share matrix S from ../../external/exposure_wts/athr_exposure_by_category_hc.dta (version=hc) ...
+  S shape: (208, 46)  nnz: 1,414  density: 0.1478
+  FOIA PIs with >=1 treated-market share: 208 / 208
+  per-market coverage: min=3  p5=3  p50=27  p95=66  max=106
+Imputing shares  (method=knn)  ...
+Aggregating: z_hat = S_hat @ g,  S_sum = rowsum(S_hat) ...
+  effective number of shocks (BHJ-style): 18.21
+
+  --- Exposure level comparison ---
+  Self-imputed FOIA exposure (S @ g):
+    n nonzero PIs: 208/208
+    mean=+0.02785  sd=0.06257  med=+0.01274
+  Universe imputed exposure (S_hat @ g):
+    n nonzero authors: 1,783,003/1,860,867
+    mean=+0.02988  sd=0.04229  med=+0.01981
+
+--- Shock balance (Borusyak-Hull-Jaravel) ---
+  Regression: g_k = a + b * X_bar_k + e,  weights = Sum_i s_ik
+  H0: shocks are quasi-randomly assigned wrt pre-period X => b approx 0
+
+  characteristic                beta          se        t       p
+  log_total_spend            +0.1198      0.0402    +2.98   0.003
+  log_lab_spend              +0.1076      0.0365    +2.95   0.003
+  n_cats                     +0.0034      0.0013    +2.57   0.010
+  lab_share                  +0.0342      0.4011    +0.09   0.932
+  top-10 |Rotemberg weight| markets:
+    us fbs                                    alpha_k=+0.711  s_bar=0.0423  g=+0.4812
+    site-directed mutagenesis systems         alpha_k=-0.135  s_bar=0.0098  g=-0.3961
+    chemiluminescent substrates               alpha_k=+0.118  s_bar=0.0218  g=+0.1540
+    column-based microbial dna purification kits  alpha_k=+0.093  s_bar=0.0069  g=+0.3817
+    first-strand cdna synthesis systems       alpha_k=+0.083  s_bar=0.0121  g=+0.1964
+    column-based gel dna extraction kits      alpha_k=-0.073  s_bar=0.0217  g=-0.0957
+    pre-cast bis-tris gels                    alpha_k=+0.072  s_bar=0.0069  g=+0.2985
+    cell culture nutritional supplements - tryptone  alpha_k=+0.047  s_bar=0.0091  g=+0.1471
+    rnase inhibitors                          alpha_k=-0.043  s_bar=0.0056  g=-0.2215
+    cell culture dissociation reagents        alpha_k=+0.035  s_bar=0.0039  g=+0.2543
+  cluster filter (../../external/us_appended_text/author_static_clusters_30.csv, min-foia-per-cluster=1): kept 1,613,853/1,860,867
+  ls filter (../../external/us_appended_text/author_static_clusters_30_ls.csv): kept 1,476,884/1,613,853
+  Saved ../../output/shock_balance_hc_cf_ls_k3.csv
+  Saved ../../output/final_imputed_shift_share_hc_cf_ls_k3.csv
+  Saved ../../output/imputed_shares_matrix_hc_cf_ls_k3.npz  (universe x K_treated imputed share matrix)
+  Saved ../../output/imputed_shares_markets_hc_cf_ls_k3.csv
+
+==============================================================================
+version=all   method=knn   tag=''
+==============================================================================
+Building FOIA share matrix S from ../../external/exposure_wts/athr_exposure_by_category_all.dta (version=all) ...
+  S shape: (208, 46)  nnz: 1,414  density: 0.1478
+  FOIA PIs with >=1 treated-market share: 208 / 208
+  per-market coverage: min=3  p5=3  p50=27  p95=66  max=106
+Imputing shares  (method=knn)  ...
+Aggregating: z_hat = S_hat @ g,  S_sum = rowsum(S_hat) ...
+  effective number of shocks (BHJ-style): 17.95
+
+  --- Exposure level comparison ---
+  Self-imputed FOIA exposure (S @ g):
+    n nonzero PIs: 208/208
+    mean=+0.01248  sd=0.03320  med=+0.00472
+  Universe imputed exposure (S_hat @ g):
+    n nonzero authors: 1,783,003/1,860,867
+    mean=+0.01409  sd=0.02331  med=+0.00834
+
+--- Shock balance (Borusyak-Hull-Jaravel) ---
+  Regression: g_k = a + b * X_bar_k + e,  weights = Sum_i s_ik
+  H0: shocks are quasi-randomly assigned wrt pre-period X => b approx 0
+
+  characteristic                beta          se        t       p
+  log_total_spend            +0.0543      0.0310    +1.75   0.080
+  log_lab_spend              +0.0541      0.0299    +1.81   0.071
+  n_cats                     +0.0020      0.0013    +1.56   0.120
+  lab_share                  -0.2409      0.4557    -0.53   0.597
+  top-10 |Rotemberg weight| markets:
+    us fbs                                    alpha_k=+0.583  s_bar=0.0164  g=+0.4812
+    column-based microbial dna purification kits  alpha_k=+0.176  s_bar=0.0062  g=+0.3817
+    chemiluminescent substrates               alpha_k=+0.116  s_bar=0.0101  g=+0.1540
+    first-strand cdna synthesis systems       alpha_k=+0.101  s_bar=0.0069  g=+0.1964
+    site-directed mutagenesis systems         alpha_k=-0.092  s_bar=0.0031  g=-0.3961
+    pre-cast bis-tris gels                    alpha_k=+0.062  s_bar=0.0028  g=+0.2985
+    column-based gel dna extraction kits      alpha_k=-0.055  s_bar=0.0077  g=-0.0957
+    cell culture nutritional supplements - tryptone  alpha_k=+0.049  s_bar=0.0045  g=+0.1471
+    rnase inhibitors                          alpha_k=-0.033  s_bar=0.0020  g=-0.2215
+    cell culture dissociation reagents        alpha_k=+0.028  s_bar=0.0015  g=+0.2543
+  cluster filter (../../external/us_appended_text/author_static_clusters_30.csv, min-foia-per-cluster=1): kept 1,613,853/1,860,867
+  ls filter (../../external/us_appended_text/author_static_clusters_30_ls.csv): kept 1,476,884/1,613,853
+  Saved ../../output/shock_balance_all_cf_ls_k3.csv
+  Saved ../../output/final_imputed_shift_share_all_cf_ls_k3.csv
+  Saved ../../output/imputed_shares_matrix_all_cf_ls_k3.npz  (universe x K_treated imputed share matrix)
+  Saved ../../output/imputed_shares_markets_all_cf_ls_k3.csv
+
+==============================================================================
+version=treated_hc   method=knn   tag=''
+==============================================================================
+Building FOIA share matrix S from ../../external/exposure_wts/athr_exposure_by_category_treated_hc.dta (version=treated_hc) ...
+  S shape: (208, 46)  nnz: 1,414  density: 0.1478
+  FOIA PIs with >=1 treated-market share: 208 / 208
+  per-market coverage: min=3  p5=3  p50=27  p95=66  max=106
+Imputing shares  (method=knn)  ...
+Aggregating: z_hat = S_hat @ g,  S_sum = rowsum(S_hat) ...
+  effective number of shocks (BHJ-style): 19.08
+
+  --- Exposure level comparison ---
+  Self-imputed FOIA exposure (S @ g):
+    n nonzero PIs: 208/208
+    mean=+0.08214  sd=0.13374  med=+0.06186
+  Universe imputed exposure (S_hat @ g):
+    n nonzero authors: 1,783,003/1,860,867
+    mean=+0.09706  sd=0.09479  med=+0.08698
+
+--- Shock balance (Borusyak-Hull-Jaravel) ---
+  Regression: g_k = a + b * X_bar_k + e,  weights = Sum_i s_ik
+  H0: shocks are quasi-randomly assigned wrt pre-period X => b approx 0
+
+  characteristic                beta          se        t       p
+  log_total_spend            +0.1895      0.0558    +3.40   0.001
+  log_lab_spend              +0.1772      0.0520    +3.41   0.001
+  n_cats                     +0.0044      0.0016    +2.67   0.008
+  lab_share                  +0.1381      0.5837    +0.24   0.813
+  top-10 |Rotemberg weight| markets:
+    us fbs                                    alpha_k=+0.632  s_bar=0.1222  g=+0.4812
+    chemiluminescent substrates               alpha_k=+0.152  s_bar=0.0919  g=+0.1540
+    site-directed mutagenesis systems         alpha_k=-0.127  s_bar=0.0297  g=-0.3961
+    first-strand cdna synthesis systems       alpha_k=+0.120  s_bar=0.0567  g=+0.1964
+    cell culture nutritional supplements - tryptone  alpha_k=+0.058  s_bar=0.0366  g=+0.1471
+    pre-cast bis-tris gels                    alpha_k=+0.056  s_bar=0.0176  g=+0.2985
+    column-based gel dna extraction kits      alpha_k=-0.051  s_bar=0.0497  g=-0.0957
+    acrylamide-bis solution                   alpha_k=+0.050  s_bar=0.0428  g=+0.1082
+    column-based dna plasmid miniprep         alpha_k=+0.031  s_bar=0.0223  g=+0.1307
+    rnase inhibitors                          alpha_k=-0.030  s_bar=0.0127  g=-0.2215
+  cluster filter (../../external/us_appended_text/author_static_clusters_30.csv, min-foia-per-cluster=1): kept 1,613,853/1,860,867
+  ls filter (../../external/us_appended_text/author_static_clusters_30_ls.csv): kept 1,476,884/1,613,853
+  Saved ../../output/shock_balance_treated_hc_cf_ls_k3.csv
+  Saved ../../output/final_imputed_shift_share_treated_hc_cf_ls_k3.csv
+  Saved ../../output/imputed_shares_matrix_treated_hc_cf_ls_k3.npz  (universe x K_treated imputed share matrix)
+  Saved ../../output/imputed_shares_markets_treated_hc_cf_ls_k3.csv
+
+==============================================================================
+Per-version shift-share imputation summary
+==============================================================================
+   version method  n_foia_with_shares  z_hat_mean_universe  z_hat_sd_universe  S_sum_mean_universe  S_sum_sd_universe  eff_n_shocks
+        hc    knn                 208               0.0286             0.0418               0.2835             0.1322       18.2087
+       all    knn                 208               0.0135             0.0230               0.1193             0.0769       17.9457
+treated_hc    knn                 208               0.0930             0.0948               0.9582             0.2002       19.0831
+
+Saved ../../output/shift_share_summary_cf_ls_k3.csv
+Done!

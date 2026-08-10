@@ -1,33 +1,36 @@
 """
-Flag US clusters as life-science vs not by top-term inspection, and emit an
-author-level keep mask.
+Flag US clusters as life-science vs not by top-term inspection, and emit the
+author-level mask the rest of the pipeline reads
+(author_static_clusters_{K}_ls.csv).
 
-Differs from cluster_fields/3_filter_life_science.py in the keep rule. That
-version put environmental, materials-science and imaging roots ("water",
-"soil", "plant", "nanoparticl", "polym", "electrod", "imag") in the same
-lexicon as "protein" and "neuron", so an ecology or nanomaterials cluster
-scored as life science on those terms alone. At K=100 that kept 7 clusters /
-355k authors that are not lab life science.
+The lexicon is split: BIO_CORE terms are unambiguous lab-science evidence;
+BIO_ADJACENT terms (water, plant, nanoparticl, imag, ...) support but never
+carry a cluster; ANTI_LEXICON terms mark non-lab-science fields.
 
-Here the lexicon is split: a cluster must show BIO_CORE evidence to be kept.
-BIO_ADJACENT terms only break ties among clusters that already have core
-evidence, so "soil, plant, water, contamin" no longer carries a cluster on
-its own.
+The mask asks "does this work happen at a bench / in a lab", not "does it
+publish in bio journals": ecology & field biology, environmental
+microbiology and polymer/biomaterials clusters are lab science (their roots
+sit in BIO_CORE); social/behavioral science, education, health
+economics/services, pure computational methods, optics and publisher/scraper
+junk are the cut targets (ANTI_LEXICON).
 
-Run at high K. At K=30 the clusters are too coarse to split cleanly (a single
-US K=30 cluster mixes pain, asthma, stroke and hepatology); at K=100 the
-keep/drop call is close to unambiguous. Use the K=100 output as an
-author-level mask and keep the K=30 labels for field fixed effects.
+Keep rule: a cluster survives when its top terms show at least --min-core
+(default 1) BIO_CORE hits AND anti hits do not outnumber core hits. The
+anti-domination clause is what cuts clusters riding on 1-2 incidental core
+terms (a health-econ cluster matching "diabet", a network-methods cluster
+matching "neuron"). Ties keep, so isolated anti hits never cut a
+core-supported cluster.
 
 Workflow:
-  1. First pass: heuristic scoring, writes a worksheet CSV with a
-     pre-populated `keep` column.
-  2. Skim the audit text file, hand-edit `keep` in the worksheet.
-  3. Re-run with --use-manual to apply the edits and emit the author list.
+  1. Run once: writes cluster_label_worksheet_{K}.csv with `keep` pre-filled,
+     plus the author mask and audit file.
+  2. To override a call, hand-edit `keep` in the worksheet and re-run. An
+     existing worksheet is never rewritten, so edits survive; overrides are
+     tagged MANUAL in the audit. --reset-worksheet discards edits.
 
 Outputs:
-  ../output/cluster_label_worksheet_{K}.csv     human-editable
-  ../output/life_science_authors_{K}.csv        filtered (athr_id, cluster_label)
+  ../output/cluster_label_worksheet_{K}.csv     human-editable keep flags
+  ../output/author_static_clusters_{K}_ls.csv   filtered (athr_id, cluster_label)
   ../output/cluster_filter_audit_{K}.txt        kept/dropped breakdown
 """
 import argparse
@@ -118,18 +121,25 @@ BIO_CORE = {
     "treadmil", "aerob", "athlet", "endur",
     "lymphocyt", "macrophag", "neutrophil", "monocyt", "marrow",
     "resect", "prognosi", "morbid", "syndrom", "lesion", "sympt",
+    # field / environmental / materials / chemistry lab science
+    "ecolog", "ecosystem", "habitat", "biodivers", "fisheri", "predat",
+    "taxonom", "phylogenet", "phylogeni", "marin", "sea", "ocean", "wildlif",
+    "bacteria", "anaerob", "microbi", "microbial", "microbiom", "wastewat",
+    "salmonella", "coli", "escherichia", "campylobact",
+    "polym", "polymer", "copolym", "scaffold", "hydrogel", "biomateri",
+    "catalyz", "catalyt", "chiral", "enantioselect", "stereoselect",
+    "aerosol", "ozon", "pollut", "arsen", "chlorin",
 }
 
 # Supporting evidence only. Never enough on its own: these are the roots that
 # let ecology, water quality, nanomaterials and generic imaging clusters pass
 # in the worldwide version.
 BIO_ADJACENT = {
-    "water", "pollut", "contamin", "sediment", "wastewat", "river", "lake",
+    "water", "contamin", "sediment", "river", "lake", "groundwat",
     "drink", "environment", "toxicolog", "toxic", "exposur",
-    "soil", "plant", "microbi", "microbiom", "microbial", "agricultur",
-    "crop", "forest", "rhizospher", "phyt",
+    "soil", "plant", "agricultur",
+    "crop", "forest", "rhizospher", "phyt", "vegetat", "sludg",
     "nanotub", "nanoparticl", "graphen", "electrod", "biosensor",
-    "biomateri", "scaffold", "polym",
     "mri", "ct", "pet", "scan", "imag", "tomographi", "reson", "magnet",
     "ultrasound", "ultrason", "radiolog", "radiat", "ultras",
     "fatti",
@@ -151,19 +161,24 @@ ANTI_LEXICON = {
     "polici", "polit", "economi", "econom", "tax", "wage", "marketing",
     "welfare", "poverti", "unemploy", "cost", "insur", "reimburs",
     "demograph", "geograph",
+    "servic", "medicar", "medicaid", "healthcar",
+    "parent", "child", "childhood", "emot",
     "music", "literatur", "religi", "religion", "theolog", "philosoph",
     "bibliograph", "bibliometri", "citat", "scholar",
-    # ecology / earth science
-    "ecolog", "ecosystem", "habitat", "biodivers", "marin", "sea", "ocean",
-    "climat", "fisheri", "predat", "phylogeograph", "taxonom", "vegetat",
-    "groundwat", "atmospher", "emiss", "geolog", "mineral",
+    # publisher / scraper junk
+    "jama", "cooki", "forum", "archiv", "altmetr",
+    # earth / climate science ("emiss" excluded: collides with positron
+    # emission tomography)
+    "climat", "atmospher", "geolog", "mineral",
     # materials / physical science / engineering
-    "copolym", "nanowir", "electrochem", "photovolta", "semiconductor",
+    "nanowir", "electrochem", "photovolta", "semiconductor",
     "laser", "photon", "wavelength", "infrar", "fiber", "optic",
-    "coat", "adsorpt", "sludg", "wast", "reactor", "corros", "alloy",
+    "coat", "adsorpt", "wast", "reactor", "corros", "alloy",
     "thermodynam", "turbul", "aerodynam", "finit",
     # computing / bibliometric methods
     "algorithm", "softwar", "processor", "wireless", "encrypt",
+    "comput", "simul", "machin", "network", "informat", "databas",
+    "statist", "bayesian", "regress",
 }
 
 
@@ -194,19 +209,19 @@ def score_terms(terms):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--k", type=int, default=100)
-    ap.add_argument("--min-core", type=int, default=2,
+    ap.add_argument("--k", type=int, default=30)
+    ap.add_argument("--min-core", type=int, default=1,
                     help="Minimum BIO_CORE top-term hits required to keep a "
                          "cluster. Raise to drop more.")
-    ap.add_argument("--use-manual", action="store_true",
-                    help="Apply the hand-edited 'keep' column from "
-                         "cluster_label_worksheet_{k}.csv.")
+    ap.add_argument("--reset-worksheet", action="store_true",
+                    help="Regenerate cluster_label_worksheet_{k}.csv from the "
+                         "heuristic, discarding hand edits.")
     args = ap.parse_args()
 
     clusters_csv = f"{OUT_DIR}/author_static_clusters_{args.k}.csv"
     desc_txt     = f"{OUT_DIR}/static_cluster_descriptions_{args.k}.txt"
     work_csv     = f"{OUT_DIR}/cluster_label_worksheet_{args.k}.csv"
-    out_authors  = f"{OUT_DIR}/life_science_authors_{args.k}.csv"
+    out_authors  = f"{OUT_DIR}/author_static_clusters_{args.k}_ls.csv"
     audit_txt    = f"{OUT_DIR}/cluster_filter_audit_{args.k}.txt"
 
     for p in (clusters_csv, desc_txt):
@@ -223,7 +238,7 @@ def main():
     rows = []
     for cid, terms in descs.items():
         core, adj, anti = score_terms(terms)
-        auto_keep = int(len(core) >= args.min_core and len(core) > len(anti))
+        auto_keep = int(len(core) >= args.min_core and len(anti) <= len(core))
         rows.append({
             "cluster_label": cid,
             "n_authors": int(sizes.get(cid, 0)),
@@ -239,8 +254,9 @@ def main():
         })
     agg = pd.DataFrame(rows).sort_values("score", ascending=False).reset_index(drop=True)
 
-    if args.use_manual and os.path.exists(work_csv):
-        print(f"Reading manual keep flags from {work_csv}")
+    manual = os.path.exists(work_csv) and not args.reset_worksheet
+    if manual:
+        print(f"Applying keep flags from existing worksheet: {work_csv}")
         prior = pd.read_csv(work_csv)[["cluster_label", "keep"]]
         agg = agg.merge(prior, on="cluster_label", how="left")
         agg["keep"] = agg["keep"].fillna(agg["keep_auto"]).astype(int)
@@ -251,8 +267,9 @@ def main():
             "anti_hits", "keep_auto", "keep", "matched_core", "matched_adj",
             "matched_anti", "top_terms"]
     agg = agg[cols]
-    agg.to_csv(work_csv, index=False)
-    print(f"Saved worksheet (edit 'keep' column here): {work_csv}")
+    if not manual:
+        agg.to_csv(work_csv, index=False)
+        print(f"Saved worksheet (edit 'keep' column here): {work_csv}")
 
     keep_clusters = set(agg.loc[agg["keep"] == 1, "cluster_label"])
     df_keep = df[df["cluster_label"].isin(keep_clusters)][["athr_id", "cluster_label"]]
@@ -264,7 +281,7 @@ def main():
 
     with open(audit_txt, "w") as f:
         f.write(f"US cluster filter audit  K={args.k}  min_core={args.min_core}  "
-                f"({'MANUAL' if args.use_manual else 'HEURISTIC'} keep flags)\n")
+                f"({'MANUAL' if manual else 'HEURISTIC'} keep flags)\n")
         f.write(f"  total authors: {len(df):,}\n")
         f.write(f"  kept clusters: {(agg['keep']==1).sum()}   "
                 f"kept authors: {df_keep.shape[0]:,}\n")
@@ -275,7 +292,7 @@ def main():
             f.write(f"== {status} ==\n")
             for _, r in sub.iterrows():
                 tag = ""
-                if args.use_manual and r["keep"] != r["keep_auto"]:
+                if r["keep"] != r["keep_auto"]:
                     tag = "  [MANUAL OVERRIDE]"
                 f.write(f"  C{int(r['cluster_label']):3d}  "
                         f"n={int(r['n_authors']):>8,}  "

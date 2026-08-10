@@ -16,8 +16,7 @@ version 17
 *                    dropped by reghdfe/ppmlhdfe under those modes.)
 * QUICK_TOPJRNL    : 1 = top_jrnls sample, ppr_cnt only, single pass (pub=0, unweighted)
 global EXPOSURE_VERSION "hc"
-global EXPOSURE_FILTER  ""
-global EXPOSURE_Filter "ok"
+global EXPOSURE_FILTER  "_cf_k3"
 global FE_MODE "author"
 global WEIGHT_MSIM 1
 global QUICK_TOPJRNL 0

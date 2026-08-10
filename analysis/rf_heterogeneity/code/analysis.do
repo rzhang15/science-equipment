@@ -173,11 +173,11 @@ program define_group_labels
     local ic_lbl_subrf "Subrecipient Funding"
     local ic_lbl_busf  "Business Funding"
     local ic_lbl_fedf  "Total Federal Funding"
-    local ic_lbl_tfnd  "Total R&D Funding"
+    local ic_lbl_tfnd  "Institutional R&D Funding"
     local ic_lbl_instf "Institutional Funding"
     local ic_lbl_nonpf "Non-Profit Funding"
     local ic_lbl_statf "State Funding"
-    local ic_lbl_lsf   "Life-Sci Funding"
+    local ic_lbl_lsf   "Institutional Life-Sci Funding"
     local ic_lbl_hsf   "Health-Sci Funding"
     local ic_lbl_biof  "Biology Funding"
     local ic_lbl_applx "Applied Research Expenditures"
@@ -188,7 +188,7 @@ program define_group_labels
     local ic_lbl_devx  "Development Expenditures"
     local ic_lbl_lscx  "Life-Sci Capital Expenditures"
     local ic_lbl_medx  "Medical School Expenditures"
-    local ic_lbl_endow "Endowment"
+    local ic_lbl_endow "Institutional Endowment"
     foreach a of global IC_ALIASES {
         global LBL_ic_`a'   "`ic_lbl_`a''"
         global LBL_hi_`a'   "High `ic_lbl_`a''"
@@ -1606,13 +1606,10 @@ program ppml_het_coefplot
             local groups_ic_expx
         }
         else if "`st'" == "med" {
-            local groups_pi     young old young_nih old_nih r1 r2 pub_inst priv_inst ///
+            local groups_pi     young old r1 r2 pub_inst priv_inst ///
                                 high_pre_ppr low_pre_ppr ///
-                                big_team small_team ///
-                                high_nihg low_nihg high_nihd low_nihd ///
-                                big_net small_net new_lab est_lab ///
-                                crwd_inst sprs_inst big_msa small_msa ///
-                                yhigh_nihd ylow_nihd yq4_nihd yq1_nihd
+                                high_nihd low_nihd ///
+                                big_msa small_msa
             local groups_ic_fund
             foreach a of local ic_fund_aliases {
                 local groups_ic_fund `groups_ic_fund' hi_`a' lo_`a'
@@ -1625,13 +1622,10 @@ program ppml_het_coefplot
         else if "`st'" == "med_pi" {
             * PI-weighted inst-char medians. PI-level splits are the same
             * variables as under med so they render in the pi panel too.
-            local groups_pi     young old young_nih old_nih r1 r2 pub_inst priv_inst ///
+            local groups_pi     young old r1 r2 pub_inst priv_inst ///
                                 high_pre_ppr low_pre_ppr ///
-                                big_team small_team ///
-                                high_nihg low_nihg high_nihd low_nihd ///
-                                big_net small_net new_lab est_lab ///
-                                crwd_inst sprs_inst big_msa small_msa ///
-                                yhigh_nihd ylow_nihd yq4_nihd yq1_nihd
+                                high_nihd low_nihd ///
+                                big_msa small_msa
             local groups_ic_fund
             foreach a of local ic_fund_aliases {
                 local groups_ic_fund `groups_ic_fund' hiw_`a' low_`a'

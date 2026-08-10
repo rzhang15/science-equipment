@@ -28,7 +28,7 @@ Inputs:
   ../../external/exposure_wts/athr_category_spend.dta       PI x category x year
   --betas-path (default did_coefs_eb_price.dta)             per-market shocks g_k = b
   # for --method knn:
-  ../../output/weight_matrix{tag}.npz                       universe x FOIA W
+  ../../output/weight_matrix{tag}{k_sfx}.npz                universe x FOIA W
   # for --method ridge:
   ../../output/tfidf_foia{tag}.npz                          n_foia x V TF-IDF
   ../../output/tfidf_universe{tag}.npz                      n_univ x V TF-IDF
@@ -36,18 +36,28 @@ Inputs:
   ../../output/universe_ids{tag}.parquet                    row order
 
 Outputs (per --version, per --method):
-  ../../output/final_imputed_shift_share_{version}{tag}{method_sfx}{filter_sfx}.csv
+  ../../output/final_imputed_shift_share_{version}{tag}{method_sfx}{filter_sfx}{k_sfx}.csv
        columns: athr_id, exposure_ss, sum_imputed_shares
-  ../../output/imputed_shares_matrix_{version}{tag}{method_sfx}{filter_sfx}.npz
+  ../../output/imputed_shares_matrix_{version}{tag}{method_sfx}{filter_sfx}{k_sfx}.npz
        S_hat as CSR
-  ../../output/imputed_shares_markets_{version}{tag}{method_sfx}{filter_sfx}.csv
+  ../../output/imputed_shares_markets_{version}{tag}{method_sfx}{filter_sfx}{k_sfx}.csv
        per-market diagnostics: category, g, s_bar, rotemberg_wt, n_foia_pis
        (+ alpha, in_r2 for --method ridge)
-  ../../output/shock_balance_{version}{tag}{method_sfx}{filter_sfx}.csv
+  ../../output/shock_balance_{version}{tag}{method_sfx}{filter_sfx}{k_sfx}.csv
        BHJ shock-balance regression coefficients.
 
-method_sfx = ""     for knn (backward-compat with existing K-NN outputs)
+method_sfx = ""       for knn (backward-compat with existing K-NN outputs)
            = "_ridge" for ridge
+filter_sfx = "_cf[N]" --cluster-filter on the full label file, N =
+                      --min-foia-per-cluster when > 1
+           + "_ls"    --ls-filter (life-science author mask; suffix via --ls-sfx,
+                      e.g. "_ls100" for a K=100-based mask)
+           + "_msNNN" --min-max-sim
+k_sfx      = ""       --k 5 (default, untagged weight_matrix.npz)
+           = "_k3"    --k 3 (reads weight_matrix_k3.npz; knn only)
+
+The 2x2 of interest: bare (full universe), _cf (FOIA-anchored clusters),
+_ls (life-science authors), _cf_ls (both).
 """
 import argparse
 import os
@@ -272,7 +282,7 @@ def impute_ridge(S, X_foia, X_univ, alphas, clip_nonneg=True, verbose=True):
 
 
 def apply_filters(df_univ, S_hat, args, df_foia, diag_file):
-    """Apply --min-max-sim and --cluster-filter (mirrors 3_impute_exposure.py).
+    """Apply --min-max-sim, --cluster-filter and --ls-filter.
     Returns filtered (df_univ, S_hat)."""
     if args.min_max_sim > 0:
         if not os.path.exists(diag_file):
@@ -311,6 +321,22 @@ def apply_filters(df_univ, S_hat, args, df_foia, diag_file):
         print(f"  cluster filter ({args.cluster_filter}, min-foia-per-cluster={min_n}): "
               f"kept {len(df_univ):,}/{n_before:,}")
 
+    if args.ls_filter:
+        if not os.path.exists(args.ls_filter):
+            raise SystemExit(f"--ls-filter not found: {args.ls_filter}")
+        ls = pd.read_csv(args.ls_filter, dtype={"athr_id": str})
+        if "athr_id" not in ls.columns:
+            raise SystemExit(
+                f"--ls-filter needs an athr_id column: got {list(ls.columns)}"
+            )
+        n_before = len(df_univ)
+        keep_mask = df_univ["athr_id"].isin(set(ls["athr_id"]))
+        keep_idx_mask = keep_mask.to_numpy()
+        df_univ = df_univ.loc[keep_mask]
+        S_hat = S_hat[keep_idx_mask]
+        print(f"  ls filter ({args.ls_filter}): "
+              f"kept {len(df_univ):,}/{n_before:,}")
+
     return df_univ, S_hat
 
 
@@ -333,14 +359,30 @@ def main():
                     help="Ridge alpha grid (only used if --method ridge). "
                          "Default logspace(-3, 4, 30).")
     ap.add_argument("--cluster-filter", default="",
-                    help="author_static_clusters_K.csv from openalex/cluster_fields. "
-                         "After imputation, drop universe authors whose K-cluster "
-                         "has fewer FOIA PIs than --min-foia-per-cluster "
-                         "(same logic as 3_impute_exposure.py).")
+                    help="author_static_clusters_{K}.csv (full labels) from "
+                         "us_cluster_fields. After imputation, drop universe "
+                         "authors whose cluster has fewer FOIA PIs than "
+                         "--min-foia-per-cluster. Adds '_cf' to output names. "
+                         "Combine with --ls-filter for '_cf_ls'.")
     ap.add_argument("--min-foia-per-cluster", type=int, default=1,
                     help="Minimum FOIA count required for a cluster to be kept "
                          "under --cluster-filter. 1 -> '_cf', 2 -> '_cf2', "
                          "5 -> '_cf5'. Matches 3_impute_exposure.py.")
+    ap.add_argument("--ls-filter", default="",
+                    help="author_static_clusters_{K}_ls.csv from "
+                         "us_cluster_fields. After imputation, drop universe "
+                         "authors not on this life-science author list. Adds "
+                         "--ls-sfx to output names.")
+    ap.add_argument("--ls-sfx", default="_ls",
+                    help="Output suffix used when --ls-filter is set. Use e.g. "
+                         "'_ls100' for a mask built on the K=100 clustering so "
+                         "it coexists with the K=30 '_ls' outputs.")
+    ap.add_argument("--k", type=int, default=5,
+                    help="Which K-NN weight matrix to load (knn only): 5 = the "
+                         "untagged weight_matrix.npz (default), any other k "
+                         "reads weight_matrix_k{k}.npz (built by "
+                         "2_similarity_wts.py --k {k} --out-tag k{k}) and "
+                         "appends '_k{k}' to output names.")
     ap.add_argument("--min-max-sim", type=float, default=0.0,
                     help="Drop universe authors whose max cosine to any FOIA PI is "
                          "below this threshold. Default 0.0 = keep all.")
@@ -354,8 +396,11 @@ def main():
     filter_sfx = ""
     if args.cluster_filter:
         filter_sfx += "_cf" if args.min_foia_per_cluster <= 1 else f"_cf{args.min_foia_per_cluster}"
+    if args.ls_filter:
+        filter_sfx += args.ls_sfx if args.ls_sfx.startswith("_") else "_" + args.ls_sfx
     if args.min_max_sim > 0:
         filter_sfx += f"_ms{int(round(args.min_max_sim * 100)):03d}"
+    k_sfx = "" if (args.k == 5 or args.method != "knn") else f"_k{args.k}"
 
     # ---- Load ids and shocks (shared across versions) ----
     universe_ids_file = f"{OUT_DIR}/universe_ids{tag}.parquet"
@@ -390,10 +435,10 @@ def main():
     X_foia = None
     X_univ = None
     if args.method == "knn":
-        weights_file = f"{OUT_DIR}/weight_matrix{tag}.npz"
+        weights_file = f"{OUT_DIR}/weight_matrix{tag}{k_sfx}.npz"
         if not os.path.exists(weights_file):
             raise SystemExit(f"missing: {weights_file}")
-        print(f"Loading W (tag={args.tag!r}) ...")
+        print(f"Loading W (tag={args.tag!r}, k={args.k}) ...")
         W = sp.load_npz(weights_file)
         print(f"  W shape: {W.shape}  nnz: {W.nnz:,}")
         report_W_health(W)
@@ -502,7 +547,7 @@ def main():
         df_univ, S_hat = apply_filters(df_univ, S_hat, args, df_foia, diag_file)
 
         # ---- Save outputs (version-specific filenames) ----
-        stem = f"_{version}{tag}{method_sfx}{filter_sfx}"
+        stem = f"_{version}{tag}{method_sfx}{filter_sfx}{k_sfx}"
         out_csv = f"{OUT_DIR}/final_imputed_shift_share{stem}.csv"
         out_npz = f"{OUT_DIR}/imputed_shares_matrix{stem}.npz"
         out_markets = f"{OUT_DIR}/imputed_shares_markets{stem}.csv"
@@ -553,7 +598,7 @@ def main():
                            "display.max_columns", None,
                            "display.float_format", "{:.4f}".format):
         print(df_summary.to_string(index=False))
-    summary_out = f"{OUT_DIR}/shift_share_summary{tag}{method_sfx}{filter_sfx}.csv"
+    summary_out = f"{OUT_DIR}/shift_share_summary{tag}{method_sfx}{filter_sfx}{k_sfx}.csv"
     df_summary.to_csv(summary_out, index=False)
     print(f"\nSaved {summary_out}")
     print("Done!")

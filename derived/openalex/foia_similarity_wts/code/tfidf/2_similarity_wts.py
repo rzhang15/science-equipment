@@ -9,15 +9,21 @@ from joblib import Parallel, delayed
 OUT_DIR = "../../output"
 
 
-def _paths(tag: str) -> dict:
+def _norm_tag(tag):
     if tag and not tag.startswith("_"):
-        tag = "_" + tag
+        return "_" + tag
+    return tag or ""
+
+
+def _paths(tag: str, out_tag: str = None) -> dict:
+    tag = _norm_tag(tag)
+    out_tag = _norm_tag(out_tag) if out_tag is not None else tag
     return {
         "universe_matrix": f"{OUT_DIR}/tfidf_universe{tag}.npz",
         "foia_matrix":     f"{OUT_DIR}/tfidf_foia{tag}.npz",
         "universe_ids":    f"{OUT_DIR}/universe_ids{tag}.parquet",
-        "out_weights":     f"{OUT_DIR}/weight_matrix{tag}.npz",
-        "out_diag":        f"{OUT_DIR}/match_diagnostics{tag}.parquet",
+        "out_weights":     f"{OUT_DIR}/weight_matrix{out_tag}.npz",
+        "out_diag":        f"{OUT_DIR}/match_diagnostics{out_tag}.parquet",
     }
 
 # Each universe author gets weight on its top-K most-similar FOIA PIs. The weights
@@ -122,6 +128,11 @@ def main():
     ap.add_argument("--tag", default="",
                     help="Suffix matching the --tag passed to 1_vectorize.py. "
                          "Empty = baseline artifacts.")
+    ap.add_argument("--out-tag", default=None,
+                    help="Suffix for the outputs (weight_matrix, "
+                         "match_diagnostics) when it should differ from --tag. "
+                         "E.g. --k 3 --out-tag k3 builds weight_matrix_k3.npz "
+                         "from the untagged TF-IDF inputs.")
     ap.add_argument("--k", type=int, default=K_NEIGHBORS,
                     help=f"Top-K nearest FOIAs to keep per universe author "
                          f"(default {K_NEIGHBORS}). Use --k 1 for nearest-neighbor "
@@ -143,7 +154,7 @@ def main():
                          "step-3's confidence-scaled imputation to preserve "
                          "cross-PI variance.")
     args = ap.parse_args()
-    paths = _paths(args.tag)
+    paths = _paths(args.tag, args.out_tag)
 
     # Override module-level constants so process_batch sees the chosen recipe.
     K_NEIGHBORS = args.k
