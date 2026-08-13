@@ -11,7 +11,7 @@ global EXPOSURE_VERSION "hc"
 global EXPOSURE_FILTER  "_cf"
 global FE_MODE "author"
 global HET_RUN_OLS 0
-global DEBUG_YVAR "n_grants"
+global DEBUG_YVAR "nih_total_cost"
 global HET_INCLUDE_INSTWTD 0
 global HET_RUN_QUARTILES 0
 global HET_IC_FULL 0

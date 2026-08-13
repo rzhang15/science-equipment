@@ -286,11 +286,9 @@ program restrict_samp
     gen age_2014 = 2014 - min_year_any + 30
     drop if mi(exposure)
     drop if mi(mkt_spend_shr) | mkt_spend_shr <= 0
+    // avg_num_coathrs is computed over last-author papers only: missing when
+    // the PI has no last-author paper that year, matching avg_team_size_last.
     merge 1:1 athr_id year using ../external/coathrs/avg_coathrs, keep(1 3) nogen
-    replace avg_num_coathrs = 0 if mi(avg_num_coathrs)
-    // [F6] Intensive margin: undefined when the PI publishes nothing that
-    // year IN ANY POSITION (was keyed to last-author ppr_cnt only).
-    replace avg_num_coathrs = . if ppr_cnt_any == 0
     * NIH outcomes are estimated only on PIs who match RePORTER AND hold at
     * least one research award 2010-19. A PI who never matches, or whose measure
     * is zero in every year, carries no NIH information: set the measures
