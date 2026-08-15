@@ -1,0 +1,45 @@
+Loading TF-IDF artifacts ...
+  matrix 1,860,867 x 30,000  nnz 223,711,492
+  vocab classes: core=377  adj=56  anti=89
+Scoring top 15 terms per author ...
+  kept 1,603,892/1,860,867 authors  (top-terms clause 1,408,690, rescued by core-mass clause 195,202; dropped 256,975, of which 2 empty rows)
+Saved ../output/author_ls_scores_indiv.csv
+Saved ../output/author_ls_authors_indiv.csv
+
+Author-level keep rate by k=30 cluster:
+               keep_rate       n
+cluster_label                   
+0                  0.786   34785
+1                  0.938   69221
+2                  0.948  164311
+3                  0.998   31461
+4                  0.550   78318
+5                  0.492  102835
+6                  0.890  186972
+7                  0.794   72046
+8                  0.980   39647
+9                  0.884   29530
+10                 0.925  109067
+11                 0.747   36847
+12                 0.995   51978
+13                 0.970   62073
+14                 0.483   58651
+15                 0.981   69827
+16                 0.913   52043
+17                 0.853   10164
+18                 0.788   67885
+19                 0.983   75142
+20                 0.954   39587
+21                 0.981   30935
+22                 0.997   19941
+23                 0.909  158270
+24                 0.966   25678
+25                 0.993   20105
+26                 0.995   49324
+27                 0.785   55340
+28                 0.976   25802
+29                 0.822   33082
+
+Agreement with cluster-level _ls mask: 86.0%
+  kept here but cluster-dropped: 122,010
+  dropped here but cluster-kept: 139,181

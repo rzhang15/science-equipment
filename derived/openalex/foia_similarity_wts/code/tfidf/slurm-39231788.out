@@ -1,0 +1,62 @@
+Loading universe + FOIA id orders ...
+Loading shocks from /n/holylabs/LABS/pakes_lab/Lab/sci_eq/analysis/first_stage/output/did_coefs_eb_price.dta ...
+  markets with shocks: 46
+  g_k stats: mean=0.0669  sd=0.1804  min=-0.3961  max=0.7120
+Loading W (tag='', k=3) ...
+  W shape: (1860867, 208)  nnz: 5,011,841
+  W rows with any weight: 1,783,003/1,860,867
+  W row-sum stats (nonzero rows): mean=1.0000  p5=1.0000  p95=1.0000
+Computing FOIA pre-period characteristics ...
+
+==============================================================================
+version=hc   method=knn   tag=''
+==============================================================================
+Building FOIA share matrix S from ../../external/exposure_wts/athr_exposure_by_category_hc.dta (version=hc) ...
+  S shape: (208, 46)  nnz: 1,414  density: 0.1478
+  FOIA PIs with >=1 treated-market share: 208 / 208
+  per-market coverage: min=3  p5=3  p50=27  p95=66  max=106
+
+  --- EB shrinkage (alpha=$2,500, prior=global) ---
+  rows shrunk: 208/208  (T=0 rows left at zero)
+  self-exposure sd across anchors: raw=0.0563  shrunk=0.0358  (retained 64%)
+  own-data weight T/(T+alpha): p25=0.64  p50=0.83  p75=0.92
+  largest self-exposure changes:
+    A5009411980: -0.2589 -> -0.0257  (T=$661, own_wt=0.21)
+    A5087101891: +0.3817 -> +0.2052  (T=$2,397, own_wt=0.49)
+    A5014945614: +0.2768 -> +0.1332  (T=$1,694, own_wt=0.40)
+    A5067529915: -0.1451 -> -0.0221  (T=$1,179, own_wt=0.32)
+    A5006559011: -0.0819 -> +0.0020  (T=$1,014, own_wt=0.29)
+Imputing shares  (method=knn)  ...
+Aggregating: z_hat = S_hat @ g,  S_sum = rowsum(S_hat) ...
+  effective number of shocks (BHJ-style): 15.72
+
+  --- Exposure level comparison ---
+  Self-imputed FOIA exposure (S @ g):
+    n nonzero PIs: 208/208
+    mean=+0.02874  sd=0.03583  med=+0.01933
+  Universe imputed exposure (S_hat @ g):
+    n nonzero authors: 1,783,003/1,860,867
+    mean=+0.03095  sd=0.02372  med=+0.02348
+
+--- Shock balance (Borusyak-Hull-Jaravel) ---
+  Regression: g_k = a + b * X_bar_k + e,  weights = Sum_i s_ik
+  H0: shocks are quasi-randomly assigned wrt pre-period X => b approx 0
+
+  characteristic                beta          se        t       p
+  log_total_spend            +0.2199      0.0932    +2.36   0.018
+  log_lab_spend              +0.1999      0.0910    +2.20   0.028
+  n_cats                     +0.0038      0.0026    +1.50   0.134
+  lab_share                  -0.9670      0.9342    -1.04   0.301
+  top-10 |Rotemberg weight| markets:
+    us fbs                                    alpha_k=+0.698  s_bar=0.0430  g=+0.4812
+    chemiluminescent substrates               alpha_k=+0.113  s_bar=0.0218  g=+0.1540
+    first-strand cdna synthesis systems       alpha_k=+0.080  s_bar=0.0121  g=+0.1964
+    site-directed mutagenesis systems         alpha_k=-0.080  s_bar=0.0060  g=-0.3961
+    column-based microbial dna purification kits  alpha_k=+0.048  s_bar=0.0037  g=+0.3817
+    pre-cast bis-tris gels                    alpha_k=+0.045  s_bar=0.0045  g=+0.2985
+    cell culture dissociation reagents        alpha_k=+0.040  s_bar=0.0047  g=+0.2543
+    rnase inhibitors                          alpha_k=-0.028  s_bar=0.0037  g=-0.2215
+    cell culture nutritional supplements - tryptone  alpha_k=+0.026  s_bar=0.0053  g=+0.1471
+    column-based dna plasmid miniprep         alpha_k=+0.025  s_bar=0.0056  g=+0.1307
+  ls filter (../../external/us_appended_text/author_ls_authors_indiv.csv): kept 1,642,289/1,860,867
+[2026-08-14T16:30:08.700] error: *** JOB 39231788 ON holy8a32603 CANCELLED AT 2026-08-14T16:30:08 DUE to SIGNAL Terminated ***

@@ -11,10 +11,11 @@ global EXPOSURE_VERSION "hc"
 global EXPOSURE_FILTER  "_cf"
 global FE_MODE "author"
 global HET_RUN_OLS 0
-global DEBUG_YVAR "nih_total_cost"
+global DEBUG_YVAR "ppr_cnt"
 global HET_INCLUDE_INSTWTD 0
 global HET_RUN_QUARTILES 0
 global HET_IC_FULL 0
+global HET_AGE_NBINS 10
 
 program main
     gather_inst_chars
@@ -24,11 +25,13 @@ program main
     add_het_splits, samp(`s') r1r2(1) public(0)
     desc_pre_output_by_age, samp(`s') r1r2(1) public(0)
     event_study_het, samp(`s') r1r2(1) public(0)
+    ppml_age_gradient, samp(`s') r1r2(1) public(0)
     output_het_tables, samp(`s') r1r2(1) public(0)
 
     add_het_splits, samp(all_jrnls) r1r2(1) public(1)
     desc_pre_output_by_age, samp(all_jrnls) r1r2(1) public(1)
     event_study_het, samp(all_jrnls) r1r2(1) public(1)
+    ppml_age_gradient, samp(all_jrnls) r1r2(1) public(1)
     output_het_tables, samp(all_jrnls) r1r2(1) public(1)
 end
 
@@ -1404,6 +1407,118 @@ program ppml_pdid_het_binscatter
             }
         }
     restore
+end
+
+program ppml_age_gradient
+    * Age gradient of the pooled-DiD beta: one joint PPML with Z_it and the
+    * share control fully interacted with career-age bins (HET_AGE_NBINS
+    * PI-level quantiles of age_2014), plotted as each bin's beta vs the bin's
+    * mean age. Same spec as the posted "mshrctrl" median splits, K bins
+    * instead of 2.
+    syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0)]
+    local fes athr_id year
+    local vce_cl athr_id
+    if "$FE_MODE" == "inst_cluster" {
+        local fes inst_id cluster_30 year
+        local vce_cl inst_id
+    }
+    if "$FE_MODE" == "inst_cluster_fldyr" {
+        local fes inst_id i.cluster_30#i.year
+        local vce_cl inst_id
+    }
+    local suf ""
+    if (`r1r2' == 1 & `public' == 0 & `r1_only' == 0) local suf "_r1_r2"
+    if (`r1r2' == 1 & `public' == 1 & `r1_only' == 0) local suf "_r1_r2_public"
+    if (`r1_only' == 1 & `public' == 0) local suf "_r1"
+    if (`r1_only' == 1 & `public' == 1) local suf "_r1_public"
+    cap mkdir "../output/figures/`samp'"
+
+    local yvar_list ppr_cnt cite_affl_wt
+    if "$DEBUG_YVAR" != "" local yvar_list $DEBUG_YVAR
+    local ppml_skip avg_position avg_team_size_last avg_team_size_notlast
+
+    use ../temp/es_`samp'`suf', clear
+    gen post       = year >= 2014
+    gen Z_it       = exposure      * post
+    gen Z_share_it = mkt_spend_shr * post
+
+    local K = $HET_AGE_NBINS
+    xtile _agebin_pi = age_2014 if athr_indicator == 1, n(`K')
+    bys athr_id: egen agebin = max(_agebin_pi)
+    drop _agebin_pi
+
+    local zvars
+    local svars
+    local bins_used
+    forval k = 1/`K' {
+        qui count if agebin == `k' & athr_indicator == 1
+        if r(N) == 0 {
+            di as error "ppml_age_gradient `samp'`suf': age bin `k' empty -- skipped."
+            continue
+        }
+        gen Z_a`k' = Z_it       * (agebin == `k')
+        gen S_a`k' = Z_share_it * (agebin == `k')
+        local zvars `zvars' Z_a`k'
+        local svars `svars' S_a`k'
+        local bins_used `bins_used' `k'
+    }
+    * post x bin shifts for all but the last bin: the full set sums to post,
+    * collinear with year FE (last bin's post shift is the absorbed base).
+    local ptvars
+    local nb : word count `bins_used'
+    forval i = 1/`=`nb'-1' {
+        local k : word `i' of `bins_used'
+        gen PT_a`k' = post * (agebin == `k')
+        local ptvars `ptvars' PT_a`k'
+    }
+
+    foreach yvar of local yvar_list {
+        if strpos(" `ppml_skip' ", " `yvar' ") > 0 {
+            di as text "ppml_age_gradient: `yvar' not a count outcome -- skipped."
+            continue
+        }
+        local ppml_ytit "Output-Cost Elasticity"
+        if "`yvar'" == "n_grants"       local ppml_ytit "{&Delta} Log Expected Active NIH Research Grants"
+        if "`yvar'" == "n_new_grants"   local ppml_ytit "{&Delta} Log Expected New NIH Research Grants"
+        if "`yvar'" == "nih_total_cost" local ppml_ytit "{&Delta} Log Expected NIH Award Dollars"
+
+        cap noi ppmlhdfe `yvar' `zvars' `svars' `ptvars' if !mi(agebin), ///
+            absorb(`fes') vce(cluster `vce_cl')
+        local rc = _rc
+        if `rc' {
+            di as error "ppml_age_gradient `samp'`suf' `yvar' failed (rc=`rc'); skipping."
+            continue
+        }
+        gunique athr_id if e(sample)
+        local n_pis = r(unique)
+        gunique inst_id if e(sample)
+        local n_insts = r(unique)
+        cap mat drop AG
+        foreach k of local bins_used {
+            if _se[Z_a`k'] == 0 {
+                di as error "ppml_age_gradient `samp'`suf' `yvar': Z_a`k' dropped/degenerate -- omitted from plot."
+                continue
+            }
+            qui sum age_2014 if athr_indicator == 1 & agebin == `k'
+            mat AG = nullmat(AG) \ (`k', r(mean), r(N), _b[Z_a`k'], _se[Z_a`k'])
+        }
+        preserve
+        clear
+        svmat AG
+        rename (AG1 AG2 AG3 AG4 AG5) (bin age_mean n_pis b se)
+        gen ub = b + 1.96*se
+        gen lb = b - 1.96*se
+        save ../temp/age_gradient_`samp'`suf'_`yvar', replace
+        tw rcap ub lb age_mean, lcolor(ebblue%70) msize(vsmall) || ///
+           scatter b age_mean, mcolor(ebblue) || ///
+           lfit b age_mean [aw=1/(se*se)], lcolor(dkorange) lpattern(dash) ///
+           xtitle("Career Age in 2014") ytitle("`ppml_ytit'") ///
+           yline(0, lcolor(gs10) lpattern(solid)) ///
+           legend(on order(- "Num. PIs: `n_pis'" "Num. Insts: `n_insts'") pos(7) ring(1) rows(2) bmargin(zero) size(small)) ///
+           plotregion(margin(sides))
+        graph export ../output/figures/`samp'/agegrad_`yvar'`suf'_ppml_mshrctrl.pdf, replace
+        restore
+    }
 end
 
 program desc_pre_output_by_age

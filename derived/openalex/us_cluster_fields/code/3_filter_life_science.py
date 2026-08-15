@@ -129,6 +129,72 @@ BIO_CORE = {
     "polym", "polymer", "copolym", "scaffold", "hydrogel", "biomateri",
     "catalyz", "catalyt", "chiral", "enantioselect", "stereoselect",
     "aerosol", "ozon", "pollut", "arsen", "chlorin",
+    # wet-lab methods, reagents, model systems (the ubiquitous bench stems --
+    # cell, cultur, vitro, assay, mice -- are excluded from the TF-IDF vocab
+    # by max_df, so the author-level mask leans on these instead)
+    "qpcr", "primer", "plasmid", "transfect", "knockdown", "immunoblot",
+    "electrophoresi", "gel", "stain", "immunostain", "immunohistochem",
+    "immunofluoresc", "histolog", "confoc", "immunoassay", "reagent",
+    "incub", "centrifug", "xenopu", "xenograft", "lysat", "recombin",
+    "monoclon", "hybridoma", "immunoprecipit", "luciferas", "gfp",
+    "cytometri", "microarray", "hela", "fibroblast", "keratinocyt",
+    "hepatocyt", "myocyt", "chondrocyt", "osteoblast", "osteoclast",
+    "explant", "perfus", "bioreactor", "organoid", "spheroid", "agaros",
+    "pipett", "dissect",
+    # enzyme / protein-modification biochemistry
+    "acetyltransferas", "acetylas", "deacetylas", "methyltransferas",
+    "acetyl", "ubiquitin", "proteasom", "phosphatas", "peptidas", "ligas",
+    "repressor", "immunotherapi", "epigenom",
+    # immunology / vaccinology bench work
+    "epitop", "adjuv", "immunogen", "antisera", "titer", "inocul",
+    "seroconvers", "virul",
+    # parasitology life stages
+    "sporozoit", "merozoit", "gametocyt", "trophozoit", "antimalari",
+}
+
+# Subset of BIO_CORE that is evidence of BENCH WORK specifically -- methods,
+# reagents, model systems, molecular assays -- as opposed to biological
+# subject matter (knee, tumor, asthma) that a clinician or epidemiologist
+# shares with a wet lab. Used by 3b_author_ls_score.py --require-bench and
+# exported as the continuous bench_shr score. The ubiquitous bench words
+# (cell, cultur, vitro, assay, mice) are absent from the TF-IDF vocab by
+# max_df, so they cannot appear here.
+BENCH_METHODS = {
+    "qpcr", "primer", "plasmid", "transfect", "knockdown", "immunoblot",
+    "electrophoresi", "gel", "stain", "immunostain", "immunohistochem",
+    "immunofluoresc", "histolog", "confoc", "immunoassay", "reagent",
+    "incub", "centrifug", "xenopu", "xenograft", "lysat", "recombin",
+    "monoclon", "hybridoma", "immunoprecipit", "luciferas", "gfp",
+    "cytometri", "microarray", "hela", "fibroblast", "keratinocyt",
+    "hepatocyt", "myocyt", "chondrocyt", "osteoblast", "osteoclast",
+    "explant", "perfus", "bioreactor", "organoid", "spheroid", "agaros",
+    "pipett", "dissect", "pcr", "blot", "elisa", "sirna", "shrna", "crispr",
+    "knockout", "rodent", "zebrafish", "drosophila", "genotyp",
+    "acetyltransferas", "acetylas", "deacetylas", "methyltransferas",
+    "acetyl", "ubiquitin", "proteasom", "phosphatas", "peptidas", "ligas",
+    "repressor", "epitop", "adjuv", "immunogen", "antisera", "titer",
+    "inocul", "seroconvers", "virul", "sporozoit", "merozoit", "gametocyt",
+    "trophozoit", "enzym", "kinas", "receptor", "mrna", "rna",
+    "dna", "chromatin", "histon", "apoptosi", "phosphoryl",
+}
+
+# Clinical practice / trial / health-services vocabulary. NOT anti-lexicon:
+# these authors are doing life science, they are just not doing it at a
+# bench, and their anatomy/disease nouns sit in BIO_CORE, so the core-vs-anti
+# rule alone keeps every RCT and case series. 3b_author_ls_score.py uses this
+# for the clinical-dominance veto (clin mass > bench mass => not a lab).
+# Vetted: each stem carries ~1% of its mass in the molecular-biology cluster
+# vs 20-58% in the surgical/clinical clusters. Ambiguous stems are excluded
+# on purpose -- arm (chromosome arm), resid (residue), doubl (double-strand),
+# consensu (consensus sequence), adher (cell adhesion), qualiti, safeti.
+CLINICAL_PRACTICE = {
+    "randomis", "multicent", "noninferior", "prophylaxi", "enrol",
+    "complianc", "guidelin", "practition", "questionnair", "survey",
+    "interview", "readmiss", "discharg", "admiss", "triag", "referr",
+    "fellowship", "malpractic", "satisfact", "symptomat", "arthroplasti",
+    "rehabilit", "discectomi", "herniat", "spondylosi", "radiculopathi",
+    "outpati", "inpati", "comorbid", "ambulatori", "disabl", "tomographi",
+    "followup", "counsel",
 }
 
 # Supporting evidence only. Never enough on its own: these are the roots that
@@ -140,6 +206,7 @@ BIO_ADJACENT = {
     "soil", "plant", "agricultur",
     "crop", "forest", "rhizospher", "phyt", "vegetat", "sludg",
     "nanotub", "nanoparticl", "graphen", "electrod", "biosensor",
+    "coat", "fiber",
     "mri", "ct", "pet", "scan", "imag", "tomographi", "reson", "magnet",
     "ultrasound", "ultrason", "radiolog", "radiat", "ultras",
     "fatti",
@@ -171,9 +238,13 @@ ANTI_LEXICON = {
     # emission tomography)
     "climat", "atmospher", "geolog", "mineral",
     # materials / physical science / engineering
+    # "coat" (clathrin/COPI coated pits, collagen-coated plates) and "fiber"
+    # (muscle, nerve, dietary) are bio-ambiguous, so they sit in
+    # BIO_ADJACENT instead: support, never a cut. The rest concentrate in the
+    # dry clusters by 3-8x over base rate even in bio-nano work.
     "nanowir", "electrochem", "photovolta", "semiconductor",
-    "laser", "photon", "wavelength", "infrar", "fiber", "optic",
-    "coat", "adsorpt", "wast", "reactor", "corros", "alloy",
+    "laser", "photon", "wavelength", "infrar", "optic",
+    "adsorpt", "wast", "reactor", "corros", "alloy",
     "thermodynam", "turbul", "aerodynam", "finit",
     # computing / bibliometric methods
     "algorithm", "softwar", "processor", "wireless", "encrypt",

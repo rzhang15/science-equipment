@@ -26,7 +26,7 @@ program fit_and_predict
     gen Z_it       = exposure      * post
     gen Z_share_it = mkt_spend_shr * post
 
-    ppmlhdfe ppr_cnt Z_it Z_share_it `wt', absorb(athr_id year) vce(cluster athr_id)
+    ppmlhdfe ppr_cnt Z_it Z_share_it `wt', absorb(athr_id year) vce(cluster athr_id) d
     local b   = _b[Z_it]
     local se  = _se[Z_it]
     local blo = `b' - 1.96*`se'
@@ -91,10 +91,23 @@ program fit_and_predict
             format(%20.4f) replace
     restore
 
-    collapse (sum) mu mu_cf loss (max) exposure mkt_spend_shr max_sim if year >= 2014, by(athr_id)
+    collapse (sum) mu mu_cf loss (max) exposure mkt_spend_shr max_sim ///
+        (firstnm) cluster_30 if year >= 2014, by(athr_id)
     gen double pct_loss = 100 * loss / mu_cf
     sum loss, d
     save ../temp/output_loss_by_athr`suf'`wsuf', replace
+
+    collapse (mean) avg_exposure = exposure avg_loss = loss ///
+             (sum) tot_loss = loss tot_cf = mu_cf ///
+             (count) n_athr = mu_cf, by(cluster_30)
+    gen double pct_loss = 100 * tot_loss / tot_cf
+    list cluster_30 n_athr avg_exposure avg_loss pct_loss, sep(0) noobs abbrev(12)
+    mkmat cluster_30 n_athr avg_exposure avg_loss tot_loss pct_loss, ///
+        matrix(output_loss_by_cluster)
+    mat colnames output_loss_by_cluster = cluster n_athr avg_exposure avg_loss tot_loss pct_loss
+    qui matrix_to_txt, saving("../output/tables/`samp'/output_loss_by_cluster`suf'`wsuf'.txt") ///
+        matrix(output_loss_by_cluster) title(<tab:output_loss_by_cluster`suf'`wsuf'>) ///
+        format(%20.4f) replace
 end
 
 main

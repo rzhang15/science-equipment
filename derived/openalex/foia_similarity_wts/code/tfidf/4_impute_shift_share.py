@@ -48,6 +48,12 @@ Outputs (per --version, per --method):
 
 method_sfx = ""       for knn (backward-compat with existing K-NN outputs)
            = "_ridge" for ridge
+eb_sfx     = ""       --eb-alpha 0 (default, no shrinkage)
+           = "_eb{a}k"/"_ebmed" EB-shrink anchor share rows with prior
+                      pseudo-spend a before imputation; also saves
+                      foia_self_exposure{stem}.csv. --eb-prior cluster/peer
+                      shrink toward local (field-specific) baskets instead of
+                      the pool mean: "_ebc{a}k" / "_ebp{a}k".
 filter_sfx = "_cf[N]" --cluster-filter on the full label file, N =
                       --min-foia-per-cluster when > 1
            + "_ls"    --ls-filter (life-science author mask; suffix via --ls-sfx,
@@ -118,6 +124,11 @@ def build_share_matrix(share_path, foia_ids, market_index, version):
     df = df[(df["spend"] > 0) & (df["tot_shr_spend"] > 0)]
     df["share"] = df["spend"].astype(float) / df["tot_shr_spend"].astype(float)
 
+    # Denominator spend per anchor (constant within athr_id), captured before
+    # the treated-market restriction; 0 for anchors with no visible spend.
+    denom = df.drop_duplicates("athr_id").set_index("athr_id")["tot_shr_spend"]
+    T = denom.reindex(foia_ids).fillna(0.0).to_numpy(dtype=np.float64)
+
     # Restrict to the 46 treated categories (columns of S).
     df = df[df["category"].isin(market_index)]
 
@@ -140,7 +151,7 @@ def build_share_matrix(share_path, foia_ids, market_index, version):
         index=market_index,
         name="n_foia_pis",
     )
-    return S, coverage
+    return S, coverage, T
 
 
 def compute_pi_characteristics(spend_path, foia_ids):
@@ -235,6 +246,70 @@ def report_W_health(W):
             "  WARN: W is not L1-normalized. S_hat entries will be similarity-"
             "weighted SUMS, not averages."
         )
+
+
+def eb_shrink_shares(S, T, alpha, prior=None):
+    """Dirichlet-style shrinkage of each anchor's share row toward a prior
+    basket:
+        s~_ik = (T_i * s_ik + alpha * prior_ik) / (T_i + alpha)
+    T_i is the anchor's denominator spend, so own-data weight T_i/(T_i+alpha)
+    grows with how much of the anchor's purchasing we actually observe.
+    prior is an n x K matrix of per-anchor prior baskets; None = the spend-
+    weighted pool mean for every anchor. Rows with T_i = 0 (no visible
+    denominator spend) are left all-zero rather than assigned the prior.
+    Returns (S_tilde csr, sbar, own_wt)."""
+    Sd = np.asarray(S.todense(), dtype=np.float64)
+    obs = T > 0
+    sbar = (T[obs] @ Sd[obs]) / T[obs].sum()
+    if prior is None:
+        prior = np.tile(sbar, (len(T), 1))
+    own_wt = np.zeros_like(T)
+    own_wt[obs] = T[obs] / (T[obs] + alpha)
+    St = Sd.copy()
+    St[obs] = own_wt[obs, None] * Sd[obs] + (1.0 - own_wt[obs, None]) * prior[obs]
+    return sp.csr_matrix(St), sbar, own_wt
+
+
+def build_local_priors(S, T, args, foia_ids, tag, alpha):
+    """Per-anchor prior baskets for --eb-prior cluster/peer. Both are leave-
+    one-out and spend-weighted, so well-measured anchors define their
+    neighborhood's prior and no anchor is its own prior.
+
+    cluster: LOO spend-weighted mean basket of same-cluster anchors, itself
+             blended toward the global mean with weight T_cluster/(T_cluster
+             + alpha) so single-anchor / thin clusters fall back gracefully.
+    peer   : LOO mean basket over all other anchors, weighted by
+             (TF-IDF cosine to the anchor) x (denominator spend)."""
+    Sd = np.asarray(S.todense(), dtype=np.float64)
+    n = len(T)
+    tw = T[:, None] * Sd
+    gbar = tw.sum(axis=0) / T.sum()
+    prior = np.zeros_like(Sd)
+    if args.eb_prior == "peer":
+        X = sp.load_npz(f"{OUT_DIR}/tfidf_foia{tag}.npz").tocsr().astype(np.float64)
+        if X.shape[0] != n:
+            raise SystemExit(f"tfidf_foia{tag}.npz rows {X.shape[0]} != n_foia {n}")
+        A = np.asarray((X @ X.T).todense())
+        np.fill_diagonal(A, 0.0)
+        num = A @ tw
+        den = A @ T
+        ok = den > 0
+        prior[ok] = num[ok] / den[ok, None]
+        prior[~ok] = gbar
+    else:
+        cf = args.eb_cluster_file or args.cluster_filter
+        if not cf or not os.path.exists(cf):
+            raise SystemExit("--eb-prior cluster needs --eb-cluster-file (or --cluster-filter)")
+        cl = pd.read_csv(cf, dtype={"athr_id": str})
+        labels = cl.set_index("athr_id")["cluster_label"].reindex(foia_ids).to_numpy()
+        idx = np.arange(n)
+        for i in range(n):
+            same = (labels == labels[i]) & (idx != i) if pd.notna(labels[i]) else np.zeros(n, bool)
+            Tc = T[same].sum()
+            cbar = (T[same] @ Sd[same]) / Tc if Tc > 0 else gbar
+            w = Tc / (Tc + alpha)
+            prior[i] = w * cbar + (1.0 - w) * gbar
+    return prior
 
 
 def impute_knn(S, W):
@@ -386,6 +461,27 @@ def main():
     ap.add_argument("--min-max-sim", type=float, default=0.0,
                     help="Drop universe authors whose max cosine to any FOIA PI is "
                          "below this threshold. Default 0.0 = keep all.")
+    ap.add_argument("--eb-alpha", default="0",
+                    help="Empirical-Bayes shrinkage of anchor share rows toward "
+                         "the spend-weighted pool-mean basket before imputation: "
+                         "s_ik <- (T_i*s_ik + a*sbar_k)/(T_i + a), where T_i is "
+                         "the anchor's denominator spend. Give a in dollars, or "
+                         "'median' = median T_i among observed anchors, computed "
+                         "per version. 0 = off. Appends '_eb{a}k'/'_ebmed' to "
+                         "output names and saves foia_self_exposure{stem}.csv.")
+    ap.add_argument("--eb-prior", choices=["global", "cluster", "peer"], default="global",
+                    help="Prior basket for --eb-alpha shrinkage. global: spend-"
+                         "weighted pool mean ('_eb'). cluster: leave-one-out "
+                         "spend-weighted mean of same-cluster anchors, blended "
+                         "toward the global mean by cluster spend ('_ebc'; needs "
+                         "--eb-cluster-file or --cluster-filter). peer: leave-one-"
+                         "out TF-IDF-similarity x spend weighted mean over all "
+                         "other anchors ('_ebp'). Local priors preserve cross-"
+                         "field basket differences; only within-neighborhood "
+                         "idiosyncrasy is shrunk.")
+    ap.add_argument("--eb-cluster-file", default="",
+                    help="athr_id,cluster_label csv defining --eb-prior cluster "
+                         "neighborhoods; defaults to --cluster-filter when set.")
     args = ap.parse_args()
 
     tag = args.tag
@@ -401,6 +497,17 @@ def main():
     if args.min_max_sim > 0:
         filter_sfx += f"_ms{int(round(args.min_max_sim * 100)):03d}"
     k_sfx = "" if (args.k == 5 or args.method != "knn") else f"_k{args.k}"
+    eb_alpha = None
+    eb_sfx = ""
+    if args.eb_alpha != "0":
+        prior_tag = {"global": "", "cluster": "c", "peer": "p"}[args.eb_prior]
+        if args.eb_alpha == "median":
+            eb_sfx = f"_eb{prior_tag}med"
+        else:
+            eb_alpha = float(args.eb_alpha)
+            if eb_alpha <= 0:
+                raise SystemExit(f"--eb-alpha must be positive or 'median': {args.eb_alpha}")
+            eb_sfx = f"_eb{prior_tag}{eb_alpha / 1000:g}k"
 
     # ---- Load ids and shocks (shared across versions) ----
     universe_ids_file = f"{OUT_DIR}/universe_ids{tag}.parquet"
@@ -476,7 +583,7 @@ def main():
 
         share_path = CATEGORY_SHARE_FILE.format(version=version)
         print(f"Building FOIA share matrix S from {share_path} (version={version}) ...")
-        S, coverage = build_share_matrix(
+        S, coverage, T = build_share_matrix(
             share_path, foia_ids, market_index, version,
         )
         print(f"  S shape: {S.shape}  nnz: {S.nnz:,}  "
@@ -487,6 +594,38 @@ def main():
         print(f"  per-market coverage: min={cov.min()}  "
               f"p5={int(np.percentile(cov,5))}  p50={int(np.percentile(cov,50))}  "
               f"p95={int(np.percentile(cov,95))}  max={cov.max()}")
+
+        eb_df = None
+        if eb_sfx:
+            obs = T > 0
+            alpha_v = eb_alpha if eb_alpha is not None else float(np.median(T[obs]))
+            self_raw = np.asarray(S @ g).ravel()
+            prior = None
+            if args.eb_prior != "global":
+                prior = build_local_priors(S, T, args, foia_ids, tag, alpha_v)
+            S, sbar, own_wt = eb_shrink_shares(S, T, alpha_v, prior=prior)
+            self_eb = np.asarray(S @ g).ravel()
+            print(f"\n  --- EB shrinkage (alpha=${alpha_v:,.0f}, prior={args.eb_prior}) ---")
+            print(f"  rows shrunk: {obs.sum()}/{len(T)}  (T=0 rows left at zero)")
+            print(f"  self-exposure sd across anchors: raw={self_raw[obs].std():.4f}"
+                  f"  shrunk={self_eb[obs].std():.4f}"
+                  f"  (retained {self_eb[obs].std() / max(self_raw[obs].std(), 1e-12):.0%})")
+            q = np.percentile(own_wt[obs], [25, 50, 75])
+            print(f"  own-data weight T/(T+alpha): p25={q[0]:.2f}  "
+                  f"p50={q[1]:.2f}  p75={q[2]:.2f}")
+            movers = np.argsort(np.abs(self_eb - self_raw))[::-1][:5]
+            print("  largest self-exposure changes:")
+            for i in movers:
+                print(f"    {foia_ids[i]}: {self_raw[i]:+.4f} -> {self_eb[i]:+.4f}"
+                      f"  (T=${T[i]:,.0f}, own_wt={own_wt[i]:.2f})")
+            eb_df = pd.DataFrame({
+                "athr_id": foia_ids,
+                "T_denom_spend": T,
+                "own_wt": own_wt,
+                "self_exposure_raw": self_raw,
+                "self_exposure_eb": self_eb,
+                "sum_shares_eb": np.asarray(S.sum(axis=1)).ravel(),
+            })
 
         print(f"Imputing shares  (method={args.method})  ...")
         if args.method == "knn":
@@ -547,7 +686,7 @@ def main():
         df_univ, S_hat = apply_filters(df_univ, S_hat, args, df_foia, diag_file)
 
         # ---- Save outputs (version-specific filenames) ----
-        stem = f"_{version}{tag}{method_sfx}{filter_sfx}{k_sfx}"
+        stem = f"_{version}{tag}{method_sfx}{eb_sfx}{filter_sfx}{k_sfx}"
         out_csv = f"{OUT_DIR}/final_imputed_shift_share{stem}.csv"
         out_npz = f"{OUT_DIR}/imputed_shares_matrix{stem}.npz"
         out_markets = f"{OUT_DIR}/imputed_shares_markets{stem}.csv"
@@ -575,6 +714,11 @@ def main():
             balance_df.to_csv(out_balance, index=False)
             print(f"  Saved {out_balance}")
 
+        if eb_df is not None:
+            out_self = f"{OUT_DIR}/foia_self_exposure{stem}.csv"
+            eb_df.to_csv(out_self, index=False)
+            print(f"  Saved {out_self}  (shrunk anchor-level self exposure)")
+
         print(f"  Saved {out_csv}")
         print(f"  Saved {out_npz}  (universe x K_treated imputed share matrix)")
         print(f"  Saved {out_markets}")
@@ -598,7 +742,7 @@ def main():
                            "display.max_columns", None,
                            "display.float_format", "{:.4f}".format):
         print(df_summary.to_string(index=False))
-    summary_out = f"{OUT_DIR}/shift_share_summary{tag}{method_sfx}{filter_sfx}{k_sfx}.csv"
+    summary_out = f"{OUT_DIR}/shift_share_summary{tag}{method_sfx}{eb_sfx}{filter_sfx}{k_sfx}.csv"
     df_summary.to_csv(summary_out, index=False)
     print(f"\nSaved {summary_out}")
     print("Done!")

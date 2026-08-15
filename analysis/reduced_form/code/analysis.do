@@ -87,7 +87,7 @@ end
 
 program gather_external_data
     if "$EXPOSURE_FILE" == "" {
-        import delimited ../external/exposure/final_imputed_shift_share_${EXPOSURE_VERSION}${EXPOSURE_FILTER}, clear
+        import delimited "../external/exposure/final_imputed_shift_share_${EXPOSURE_VERSION}${EXPOSURE_FILTER}.csv", clear
     }
     else {
         // extensionless files: copy first, import delimited assumes .csv
@@ -129,11 +129,28 @@ program gather_external_data
     use athr_id max_sim using ../external/exposure/match_diagnostics, clear
     save ../temp/match_diag, replace
 
-    * Observed FOIA exposure held aside before any panel gate, so the "observed"
-    * curve in the distribution figures is the same 213 PIs in every variant.
-    * Drawn from the merged panel it moved with min_year/max_year, r1_only and
-    * EXPOSURE_FILTER even though the FOIA set never changes.
+    * Observed FOIA exposure, roster fixed by athr_exposure_${EXPOSURE_VERSION}.
+    * Under an _eb EXPOSURE_FILTER the matching foia_self_exposure csv (the same
+    * shrunk share rows the imputation used) replaces the raw values; PIs outside
+    * the similarity corpus have no shrunk row and keep raw values.
     use athr_id exposure mkt_spend_shr using ../external/real_exposure/athr_exposure_${EXPOSURE_VERSION}, clear
+    cap confirm file ../external/exposure/foia_self_exposure_${EXPOSURE_VERSION}${EXPOSURE_FILTER}.csv
+    if _rc == 0 {
+        preserve
+            import delimited ../external/exposure/foia_self_exposure_${EXPOSURE_VERSION}${EXPOSURE_FILTER}.csv, ///
+                clear varnames(1)
+            cap tostring athr_id, replace
+            keep athr_id self_exposure_eb sum_shares_eb
+            save ../temp/foia_self_exposure_eb, replace
+        restore
+        merge 1:1 athr_id using ../temp/foia_self_exposure_eb, keep(1 3)
+        qui count if _merge == 1
+        di as text "observed exposure: EB-shrunk via foia_self_exposure_${EXPOSURE_VERSION}${EXPOSURE_FILTER} (`r(N)' PIs w/o shrunk row stay raw)"
+        replace exposure = self_exposure_eb if _merge == 3
+        replace mkt_spend_shr = sum_shares_eb if _merge == 3
+        drop self_exposure_eb sum_shares_eb _merge
+    }
+    save ../temp/observed_exposure, replace
     rename (exposure mkt_spend_shr) (exposure_all mkt_spend_shr_all)
     save ../temp/foia_observed_exposure, replace
 end
@@ -194,7 +211,7 @@ program restrict_samp
     * "replace imputed = exposure" below would have used their observed value
     * anyway. They skew high -- mean 0.0403 vs 0.0260 for the 195 survivors.
     merge m:1 athr_id using ../temp/exposure, keep(1 3) nogen
-    merge m:1 athr_id using ../external/real_exposure/athr_exposure_${EXPOSURE_VERSION}, keep(1 3) nogen
+    merge m:1 athr_id using ../temp/observed_exposure, keep(1 3) nogen
     keep if !mi(imputed) | !mi(exposure)
     merge m:1 athr_id using ../temp/athr_cluster30, keep(1 3) nogen
     merge m:1 athr_id using ../temp/athr_min_year_any_`samp'`input_suf', keep(1 3) nogen
@@ -206,7 +223,8 @@ program restrict_samp
     replace max_sim = 0 if mi(max_sim)
     bys athr_id : gen athr_indicator = _n == 1
     * Observed curve comes from ../temp/foia_observed_exposure (all 213 PIs,
-    * pre-gate) so it is invariant across samp/suf/EXPOSURE_FILTER. The imputed
+    * pre-gate) so it is invariant across samp/suf; under an _eb
+    * EXPOSURE_FILTER it shows the shrunk observed values. The imputed
     * curve is sample-specific by design -- that is the object being compared.
     preserve
         keep if athr_indicator == 1

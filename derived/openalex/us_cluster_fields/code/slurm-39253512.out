@@ -1,0 +1,47 @@
+Loading TF-IDF artifacts ...
+  matrix 1,860,867 x 30,000  nnz 223,711,492
+  vocab classes: core=448  adj=56  anti=89  bench=85  clin=34
+Scoring top 15 terms per author ...
+  clinical-dominance veto (clin>bench & clin >= 0.01): 197,982 otherwise-kept authors cut
+  always-keep list (/n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/foia_similarity_wts/output/foia_ids_ordered.csv): 208 ids, 1 force-kept beyond the rule
+  kept 1,462,984/1,860,867 authors  (top-terms clause 1,452,130, rescued by core-mass clause 208,835, forced 1; dropped 397,883, of which 2 empty rows)
+Saved ../output/author_ls_scores_indiv.csv
+Saved ../output/author_ls_authors_indiv.csv
+
+Author-level keep rate by k=30 cluster:
+               keep_rate       n
+cluster_label                   
+0                  0.859   34785
+1                  0.932   69221
+2                  0.981  164311
+3                  0.949   31461
+4                  0.624   78318
+5                  0.217  102835
+6                  0.879  186972
+7                  0.879   72046
+8                  0.797   39647
+9                  0.796   29530
+10                 0.732  109067
+11                 0.644   36847
+12                 0.971   51978
+13                 0.885   62073
+14                 0.530   58651
+15                 0.827   69827
+16                 0.646   52043
+17                 0.646   10164
+18                 0.723   67885
+19                 0.981   75142
+20                 0.947   39587
+21                 0.957   30935
+22                 0.932   19941
+23                 0.718  158270
+24                 0.867   25678
+25                 0.870   20105
+26                 0.859   49324
+27                 0.793   55340
+28                 0.759   25802
+29                 0.542   33082
+
+Agreement with cluster-level _ls mask: 80.5%
+  kept here but cluster-dropped: 102,255
+  dropped here but cluster-kept: 260,334

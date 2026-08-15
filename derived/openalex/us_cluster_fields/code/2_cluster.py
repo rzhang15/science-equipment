@@ -27,6 +27,20 @@ parser.add_argument('--svd-dim', type=int, default=256,
                          "0 = skip (old behavior). Default 256 is the LSI/text-clustering "
                          "convention.")
 parser.add_argument('--seed', type=int, default=42)
+parser.add_argument('--restrict-ids', default="",
+                    help="csv with an athr_id column; cluster only these "
+                         "authors (e.g. author_ls_authors_indiv.csv, the "
+                         "author-level life-science mask). Fields are then "
+                         "defined on the analysis population instead of the "
+                         "full US corpus, so mixed clusters re-form around "
+                         "their wet subpopulation. Uses the SAME TF-IDF "
+                         "matrix -- the vocabulary is NOT recomputed, which "
+                         "keeps the mask that produced the id list "
+                         "independent of this clustering.")
+parser.add_argument('--out-sfx', default="",
+                    help="Suffix for output filenames, e.g. '_lsa' writes "
+                         "author_static_clusters_{K}_lsa.csv. Empty "
+                         "overwrites the full-corpus labels.")
 args = parser.parse_args()
 
 NUM_CLUSTERS = args.clusters
@@ -42,6 +56,14 @@ print(f"  TF-IDF shape: {matrix.shape}  nnz/row mean: {matrix.nnz / matrix.shape
 print("Loading helper files...")
 feature_names = pickle.load(open("../output/feature_names.pkl", "rb"))
 pdf_ids = pd.read_parquet("../output/author_ids_aligned.parquet")
+
+if args.restrict_ids:
+    keep_ids = set(pd.read_csv(args.restrict_ids, dtype={"athr_id": str})["athr_id"])
+    sel = pdf_ids["athr_id"].astype(str).isin(keep_ids).to_numpy()
+    print(f"Restricting to {args.restrict_ids}: "
+          f"{sel.sum():,}/{len(sel):,} authors")
+    matrix = matrix[sel]
+    pdf_ids = pdf_ids.loc[sel].reset_index(drop=True)
 
 row_nnz = np.asarray((matrix != 0).sum(axis=1)).ravel()
 print(f"  rows with 0 nonzero features:  {(row_nnz == 0).sum():,}")
@@ -96,7 +118,7 @@ if top_share > 0.5:
 # ---- save labels ----
 print("\nSaving Results...")
 pdf_ids['cluster_label'] = labels
-pdf_ids.to_csv(f"../output/author_static_clusters_{NUM_CLUSTERS}.csv", index=False)
+pdf_ids.to_csv(f"../output/author_static_clusters_{NUM_CLUSTERS}{args.out_sfx}.csv", index=False)
 
 # ---- top-term descriptions ----
 # With SVD on, kmeans.cluster_centers_ is in the SVD-reduced space, so we
@@ -113,7 +135,7 @@ if args.svd_dim and args.svd_dim > 0:
 else:
     centers = kmeans.cluster_centers_
 
-out_txt = f"../output/static_cluster_descriptions_{NUM_CLUSTERS}.txt"
+out_txt = f"../output/static_cluster_descriptions_{NUM_CLUSTERS}{args.out_sfx}.txt"
 with open(out_txt, "w") as f:
     for i in range(NUM_CLUSTERS):
         n_i = int(sizes.get(i, 0))

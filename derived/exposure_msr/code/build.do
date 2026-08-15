@@ -72,7 +72,7 @@ end
 program build_exposure_version
     args version
     keep if year <= 2013
-    gcollapse (mean) spend lab_spend keep, by(athr_id category)
+    gcollapse (sum) spend lab_spend (max) keep, by(athr_id category)
     bys athr_id: egen tot_spend = total(spend)
     bys athr_id: egen tot_lab_spend = total(lab_spend)
     gen lab_spend_shr = tot_lab_spend / tot_spend
