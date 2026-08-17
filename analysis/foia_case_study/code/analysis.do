@@ -155,7 +155,7 @@ end
 
 * ---------------------------------------------------------------------------
 * NIH grant counts and amounts for young vs old PIs, same split as
-* spend_by_age (median age_2014, age = 2014 - first pub year + 30).
+* spend_by_age (median min_year = first last-author pub year; young = after).
 * samp(foia) = the FOIA PIs in the analysis sample; samp(all) = the full
 * analysis sample. Pre-merger only: per-PI annual averages over FY2010-2013,
 * always dividing by 4 so grantless years count as zeros.
@@ -173,7 +173,7 @@ program nih_by_age
     keep if athr_indicator == 1
     if "`samp'" == "foia" keep if foia_athr == 1
     gen byte nih_matched = !mi(nih_pi_name)
-    keep athr_id age_2014 nih_matched
+    keep athr_id min_year age_2014 nih_matched
     save ../temp/nih_age_pis_`samp'`suf', replace
 
     use ../temp/nih_pre_amt, clear
@@ -187,10 +187,10 @@ program nih_by_age
     di as text "nih_by_age `samp'`suf': `n_pis' PIs, `n_match' matched to RePORTER, " ///
         "`n_grants_pi' with grant records in 2010-2013"
 
-    qui sum age_2014, d
-    local med_age = r(p50)
-    gen young = age_2014 < `med_age'
-    di as text "nih_by_age `samp'`suf': median age_2014 = `med_age' (young = below median)"
+    qui sum min_year, d
+    local med_yr = r(p50)
+    gen young = min_year > `med_yr' if !mi(min_year)
+    di as text "nih_by_age `samp'`suf': median min_year (first last-author yr) = `med_yr' (young = after median)"
 
     * composition before the restriction: unmatched vs matched-but-unfunded
     foreach g in 1 0 {
@@ -223,7 +223,7 @@ program nih_by_age
     mat nih_age = nih_age \ (`n_zero_1', ., `n_zero_1', `n_zero_0', ., `n_zero_0')
     local rownames "n_pis_sample n_pis_unmatched_dropped n_pis_nopregrant_dropped"
     local rownames "`rownames' n_pis_kept n_pis_zero_amt"
-    foreach v in age_2014 nih_amt_yr nih_active_yr nih_new_yr {
+    foreach v in min_year nih_amt_yr nih_active_yr nih_new_yr {
         qui sum `v' if young == 1, d
         local y_mean = r(mean)
         local y_p50  = r(p50)
@@ -258,14 +258,14 @@ end
 * ---------------------------------------------------------------------------
 * Same young/old comparison at the PI-YEAR level: one obs per PI-year of NIH
 * funding over 2010-2013, rectangular so grantless years enter as zeros.
-* Young/old uses the same PI-level median age as nih_by_age.
+* Young/old uses the same PI-level median min_year as nih_by_age.
 * ---------------------------------------------------------------------------
 program nih_by_age_piyr
     syntax, samp(string) [suf(string)]
 
     use ../temp/nih_age_pis_`samp'`suf', clear
-    qui sum age_2014, d
-    local med_age = r(p50)
+    qui sum min_year, d
+    local med_yr = r(p50)
     keep if nih_matched == 1
     merge 1:1 athr_id using ../temp/nih_pre_pis, keep(3) nogen
     expand 4
@@ -275,16 +275,16 @@ program nih_by_age_piyr
         replace `v' = 0 if mi(`v')
     }
 
-    gen young = age_2014 < `med_age'
+    gen young = min_year > `med_yr' if !mi(min_year)
     egen _tag = tag(athr_id)
     qui count if _tag & young == 1
     local npi_y = r(N)
     qui count if _tag & young == 0
     local npi_o = r(N)
     drop _tag
-    di as text "nih_by_age_piyr `samp'`suf': median age = `med_age'; PIs young/old = `npi_y'/`npi_o'"
+    di as text "nih_by_age_piyr `samp'`suf': median min_year = `med_yr'; PIs young/old = `npi_y'/`npi_o'"
 
-    keep athr_id year age_2014 young nih_amt nih_active nih_new_grants
+    keep athr_id year min_year age_2014 young nih_amt nih_active nih_new_grants
     save ../output/nih_by_age_piyrs_`samp'`suf', replace
 
     cap mat drop nih_age_piyr
@@ -325,7 +325,7 @@ end
 
 * ---------------------------------------------------------------------------
 * Pre-period publication output for young vs old PIs, same split as
-* nih_by_age (median age_2014 within the sample). Two measures: total pubs
+* nih_by_age (median min_year within the sample). Two measures: total pubs
 * over the pre-period and pubs per year. The panel is rectangular over
 * 2010-2019, so the per-year average always divides by the 4 pre-merger
 * years and non-publishing years enter as zeros. pre_ppr_cnt_* are
@@ -333,7 +333,7 @@ end
 * ---------------------------------------------------------------------------
 program gather_pubs
     syntax [, suf(string)]
-    use athr_id year age_2014 athr_indicator foia_athr nih_pi_name ppr_cnt_any ///
+    use athr_id year min_year age_2014 athr_indicator foia_athr nih_pi_name ppr_cnt_any ///
         pre_ppr_cnt_sum pre_ppr_cnt_avg ///
         using ../external/pi_samp/pi_desc_all_jrnls_r1_r2`suf', clear
     gen pre_any = ppr_cnt_any if year < 2014
@@ -343,7 +343,7 @@ program gather_pubs
     replace foia_athr = 0 if mi(foia_athr)
     gen byte nih_matched = !mi(nih_pi_name)
     rename (pre_ppr_cnt_sum pre_ppr_cnt_avg) (pre_ppr_sum pre_ppr_avg)
-    keep athr_id age_2014 foia_athr nih_matched ///
+    keep athr_id min_year age_2014 foia_athr nih_matched ///
          pre_ppr_sum pre_ppr_avg pre_ppr_any_sum pre_ppr_any_avg
     save ../temp/pubs_pre_pis`suf', replace
 end
@@ -357,11 +357,11 @@ program pubs_by_age
     if "`samp'" == "foia" keep if foia_athr == 1
     drop foia_athr nih_matched
 
-    qui sum age_2014, d
-    local med_age = r(p50)
-    gen young = age_2014 < `med_age'
+    qui sum min_year, d
+    local med_yr = r(p50)
+    gen young = min_year > `med_yr' if !mi(min_year)
     qui count
-    di as text "pubs_by_age `samp'`suf': `r(N)' PIs, median age_2014 = `med_age' (young = below median)"
+    di as text "pubs_by_age `samp'`suf': `r(N)' PIs, median min_year = `med_yr' (young = after median)"
 
     save ../output/pubs_by_age_pis_`samp'`suf', replace
 
@@ -372,7 +372,7 @@ program pubs_by_age
     local n_old = r(N)
     mat pubs_age = (`n_young', ., `n_young', `n_old', ., `n_old')
     local rownames "n_pis"
-    foreach v in age_2014 pre_ppr_sum pre_ppr_avg pre_ppr_any_sum pre_ppr_any_avg {
+    foreach v in min_year pre_ppr_sum pre_ppr_avg pre_ppr_any_sum pre_ppr_any_avg {
         qui sum `v' if young == 1, d
         local y_mean = r(mean)
         local y_p50  = r(p50)
@@ -431,7 +431,7 @@ end
 * winsorized at p99 for the table and plots, and the table also reports the
 * aggregate ratio (group total pubs / group total dollars), which is the
 * summary to quote. The saved PI-level .dta keeps the raw ratios.
-* Young/old uses the median age of the sample before these restrictions,
+* Young/old uses the median min_year of the sample before these restrictions,
 * matching nih_by_age.
 * ---------------------------------------------------------------------------
 program prod_per_dollar
@@ -444,9 +444,9 @@ program prod_per_dollar
     qui count
     local n_start = r(N)
 
-    qui sum age_2014, d
-    local med_age = r(p50)
-    gen young = age_2014 < `med_age'
+    qui sum min_year, d
+    local med_yr = r(p50)
+    gen young = min_year > `med_yr' if !mi(min_year)
 
     keep if nih_matched == 1
     qui count
@@ -479,7 +479,7 @@ program prod_per_dollar
     di as text "prod_per_dollar `samp'`suf': `n_start' PIs -> `n_match' NIH-matched -> " ///
         "`n_grant' with 2010-2013 grants -> `n_pos' with positive funding -> " ///
         "`n_floor' above the $10k/yr floor -> `n_kept' kept"
-    di as text "prod_per_dollar `samp'`suf': median age_2014 = `med_age' (young = below median)"
+    di as text "prod_per_dollar `samp'`suf': median min_year = `med_yr' (young = after median)"
 
     gen double ppr_per_100k_nih     = pre_ppr_avg     / (nih_amt_yr / 100000)
     gen double ppr_any_per_100k_nih = pre_ppr_any_avg / (nih_amt_yr / 100000)
@@ -537,7 +537,7 @@ program prod_per_dollar
     local n_old = r(N)
     mat prod = (`n_young', ., `n_young', `n_old', ., `n_old')
     local rownames "n_pis"
-    foreach v in age_2014 pre_ppr_avg pre_ppr_any_avg `dvars' `vars' {
+    foreach v in min_year pre_ppr_avg pre_ppr_any_avg `dvars' `vars' {
         qui sum `v' if young == 1, d
         local y_mean = r(mean)
         local y_p50  = r(p50)
@@ -611,10 +611,10 @@ program bs_stats
 end
 
 * ---------------------------------------------------------------------------
-* FOIA PI spending by young vs old. Age from pi_descriptives analysis sample
-* (age_2014 = 2014 - first pub year + 30, so "young" = short pub history).
-* Split at the median age among matched FOIA PIs. Pre-period spend only
-* (year <= 2013), same cleaning as boe.
+* FOIA PI spending by young vs old. Split on min_year (first last-author pub
+* year) from the pi_descriptives analysis sample, at the median among matched
+* FOIA PIs; young = after the median. Pre-period spend only (year <= 2013),
+* same cleaning as boe.
 * ---------------------------------------------------------------------------
 program spend_by_age
     syntax [, suf(string)]
@@ -623,7 +623,7 @@ program spend_by_age
 
     use ../external/pi_samp/pi_desc_all_jrnls_r1_r2`suf', clear
     keep if athr_indicator == 1 & foia_athr == 1
-    keep athr_id age_2014
+    keep athr_id min_year age_2014
     save ../temp/foia_pi_age`suf', replace
 
     use ../external/samp/merged_foias_with_pis, clear
@@ -654,14 +654,14 @@ program spend_by_age
     keep if _merge == 3
     drop _merge
 
-    qui sum age_2014, d
-    local med_age = r(p50)
-    gen young = age_2014 < `med_age'
-    di as text "spend_by_age`suf': median age_2014 = `med_age' (young = below median)"
+    qui sum min_year, d
+    local med_yr = r(p50)
+    gen young = min_year > `med_yr' if !mi(min_year)
+    di as text "spend_by_age`suf': median min_year = `med_yr' (young = after median)"
 
     * PI-level dataset behind the table/plots (incl. young/old flag)
     preserve
-        keep athr_id age_2014 young tot_spend lab_spend nonlab_spend ///
+        keep athr_id min_year age_2014 young tot_spend lab_spend nonlab_spend ///
              hq_labspend perc_lab_spend n_yrs
         save ../output/spend_by_age_pis`suf', replace
     restore
@@ -673,7 +673,7 @@ program spend_by_age
     local n_old = r(N)
     mat spend_age = (`n_young', ., `n_young', `n_old', ., `n_old')
     local rownames "n_pis"
-    foreach v in age_2014 tot_spend lab_spend nonlab_spend hq_labspend perc_lab_spend n_yrs {
+    foreach v in min_year tot_spend lab_spend nonlab_spend hq_labspend perc_lab_spend n_yrs {
         qui sum `v' if young == 1, d
         local y_mean = r(mean)
         local y_p50  = r(p50)
@@ -692,9 +692,10 @@ program spend_by_age
     * distribution — the long right tail otherwise flattens everything.
     * Density is rescaled to percent of PIs per fixed bin (raw densities
     * over dollar amounts are unreadable 1e-5-scale numbers).
-    foreach v in tot_spend lab_spend nonlab_spend perc_lab_spend {
+    foreach v in tot_spend lab_spend hq_labspend nonlab_spend perc_lab_spend {
         if "`v'" == "tot_spend"      local xtitle "Avg annual total spend ($)"
         if "`v'" == "lab_spend"      local xtitle "Avg annual lab spend ($)"
+        if "`v'" == "hq_labspend"    local xtitle "Avg annual high-confidence lab spend ($)"
         if "`v'" == "nonlab_spend"   local xtitle "Avg annual non-lab spend ($)"
         if "`v'" == "perc_lab_spend" local xtitle "Lab share of spend (%)"
         local w 5000
@@ -751,8 +752,9 @@ program spend_by_age
     * logs drop PIs with no lab spend; N in the legend shows how many
     gen double ln_lab_spend = ln(lab_spend) if lab_spend > 0
     gen double ln_tot_spend = ln(tot_spend) if tot_spend > 0
-    foreach v in lab_spend tot_spend ln_lab_spend ln_tot_spend {
+    foreach v in lab_spend hq_labspend tot_spend ln_lab_spend ln_tot_spend {
         if "`v'" == "lab_spend"    local ytitle "Avg annual lab spend ($)"
+        if "`v'" == "hq_labspend"  local ytitle "Avg annual high-confidence lab spend ($)"
         if "`v'" == "tot_spend"    local ytitle "Avg annual total spend ($)"
         if "`v'" == "ln_lab_spend" local ytitle "Log avg annual lab spend"
         if "`v'" == "ln_tot_spend" local ytitle "Log avg annual total spend"
@@ -766,7 +768,7 @@ end
 * ---------------------------------------------------------------------------
 * Same young/old comparison at the PI-YEAR level: each obs is one PI-year of
 * spending (no averaging across years). Young/old split uses the same
-* PI-level median age as spend_by_age.
+* PI-level median min_year as spend_by_age.
 * ---------------------------------------------------------------------------
 program spend_by_age_piyr
     syntax [, suf(string)]
@@ -774,18 +776,18 @@ program spend_by_age_piyr
     merge m:1 athr_id using ../temp/foia_pi_age`suf', keep(3) nogen
 
     egen _tag = tag(athr_id)
-    qui sum age_2014 if _tag, d
-    local med_age = r(p50)
-    gen young = age_2014 < `med_age'
+    qui sum min_year if _tag, d
+    local med_yr = r(p50)
+    gen young = min_year > `med_yr' if !mi(min_year)
     qui count if _tag & young == 1
     local npi_y = r(N)
     qui count if _tag & young == 0
     local npi_o = r(N)
     drop _tag
-    di as text "spend_by_age_piyr`suf': median age = `med_age'; PIs young/old = `npi_y'/`npi_o'"
+    di as text "spend_by_age_piyr`suf': median min_year = `med_yr'; PIs young/old = `npi_y'/`npi_o'"
 
     preserve
-        keep athr_id year age_2014 young tot_spend lab_spend nonlab_spend ///
+        keep athr_id year min_year age_2014 young tot_spend lab_spend nonlab_spend ///
              hq_labspend perc_lab_spend
         save ../output/spend_by_age_piyrs`suf', replace
     restore
@@ -813,9 +815,10 @@ program spend_by_age_piyr
     qui matrix_to_txt, saving("../output/tables/spend_by_age_piyr`suf'.txt") ///
         matrix(spend_age_piyr) title(<tab:spend_by_age_piyr`suf'>) format(%14.2f) replace
 
-    foreach v in tot_spend lab_spend nonlab_spend perc_lab_spend {
+    foreach v in tot_spend lab_spend hq_labspend nonlab_spend perc_lab_spend {
         if "`v'" == "tot_spend"      local xtitle "Annual total spend ($, PI-year)"
         if "`v'" == "lab_spend"      local xtitle "Annual lab spend ($, PI-year)"
+        if "`v'" == "hq_labspend"    local xtitle "Annual high-confidence lab spend ($, PI-year)"
         if "`v'" == "nonlab_spend"   local xtitle "Annual non-lab spend ($, PI-year)"
         if "`v'" == "perc_lab_spend" local xtitle "Lab share of spend (%, PI-year)"
         local w 5000
@@ -870,7 +873,7 @@ end
 
 program boe
     use ../external/samp/merged_foias_with_pis,  clear
-   * keep if inlist(uni , "utdallas", "umich")
+    keep if inlist(uni , "utdallas", "umich")
     drop if mi(athr_id)
     gen year = year(date(date, "YMD"))
     drop if year > 2013
@@ -895,9 +898,6 @@ program boe
     collapse (sum) tot_spend = spend nonlab_spend lab_spend hq_labspend lq_labspend  , by(athr_id year)
     gen perc_lab_spend = lab_spend/tot_spend* 100
     gen perc_nonlab_spend = nonlab_spend/tot_spend* 100
-    collapse (mean) tot_spend nonlab_spend lab_spend hq_labspend lq_labspend perc_lab_spend perc_nonlab_spend, by(athr_id)
-    graph bar lab_spend nonlab_spend, over(athr_id ,sort((mean) tot_spend) descending) stack bar(1, color(lavender%70)) bar(2, color(dkorange%70)) legend(on order(- "Lab Spend" - "Non-Lab Spend") pos(1) ring(0) size(small) region(fcolor(none))) ytitle("Average Annual Spend ($)") plotregion(margin(sides))
-    graph export ../output/figures/avg_spend_by_athr.pdf, replace
     sum lab_spend if lab_spend >50, d
     local mean_lab_spend : di %6.2f r(mean)
     local sd_lab_spend : di %6.2f r(sd)
@@ -907,10 +907,24 @@ program boe
     local q1_lab_spend : di %6.2f r(p25)
     local q3_lab_spend : di %6.2f r(p75)
     local median_lab_spend : di %6.2f r(p50)
-    local cut = r(p1)
    tw hist lab_spend if lab_spend >50,  color(edkblue) frac width(5000) xlab(0(7500)150000, angle(45)) ///
        xtitle("Consumables Expenditure ($)") ytitle("Fraction of PI-Years") legend(on order(- "N = `N_lab_spend'" "Mean = `mean_lab_spend'" "SD = `sd_lab_spend'" "Min = `min_lab_spend'" "Q1 = `q1_lab_spend'" "Median = `median_lab_spend'" "Q3 = `q3_lab_spend'" "Max = `max_lab_spend'") pos(1) ring(0) region(fcolor(none)) size(small))
    graph export ../output/figures/lab_spend.pdf, replace
+    sum hq_labspend if hq_labspend >50, d
+    local mean_hq : di %6.2f r(mean)
+    local sd_hq : di %6.2f r(sd)
+    local min_hq : di %6.2f r(min)
+    local max_hq : di %10.2f r(max)
+    local N_hq : di %6.0f r(N)
+    local q1_hq : di %6.2f r(p25)
+    local q3_hq : di %6.2f r(p75)
+    local median_hq : di %6.2f r(p50)
+   tw hist hq_labspend if hq_labspend >50,  color(edkblue) frac width(5000) xlab(0(7500)150000, angle(45)) ///
+       xtitle("High-Confidence Consumables Expenditure ($)") ytitle("Fraction of PI-Years") legend(on order(- "N = `N_hq'" "Mean = `mean_hq'" "SD = `sd_hq'" "Min = `min_hq'" "Q1 = `q1_hq'" "Median = `median_hq'" "Q3 = `q3_hq'" "Max = `max_hq'") pos(1) ring(0) region(fcolor(none)) size(small))
+   graph export ../output/figures/hq_labspend.pdf, replace
+    collapse (mean) tot_spend nonlab_spend lab_spend hq_labspend lq_labspend perc_lab_spend perc_nonlab_spend, by(athr_id)
+    graph bar lab_spend nonlab_spend, over(athr_id ,sort((mean) tot_spend) descending) stack bar(1, color(lavender%70)) bar(2, color(dkorange%70)) legend(on order(- "Lab Spend" - "Non-Lab Spend") pos(1) ring(0) size(small) region(fcolor(none))) ytitle("Average Annual Spend ($)") plotregion(margin(sides))
+    graph export ../output/figures/avg_spend_by_athr.pdf, replace
    kdensity perc_lab_spend
    graph export ../output/figures/perc_lab_spend.pdf, replace
    kdensity perc_nonlab_spend

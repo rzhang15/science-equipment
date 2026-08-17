@@ -1,0 +1,48 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1.1in]{geometry}
+\usepackage{amsmath, amssymb}
+
+\begin{document}
+
+\section*{Appendix: Empirical Bayes shrinkage of market-level price effects}
+
+Each of the 46 matched treated markets $m$ yields a difference-in-differences
+estimate $\hat\beta_m$ of the post-2014 change in log prices, with standard
+error $\widehat{se}_m$ (university $\times$ market $\times$ year panel,
+2013-spend weights, errors clustered by market). Because the coefficients are
+estimated market by market---some from thin cells---the raw cross-market
+distribution overstates the true dispersion in price effects, and the noisiest
+estimates would otherwise enter the exposure measure at face value. We
+therefore apply normal--normal empirical Bayes shrinkage. The sampling model
+is $\hat\beta_m \mid \beta_m \sim N(\beta_m, \widehat{se}_m^{\,2})$ and the
+prior is $\beta_m \sim N(\mu, \tau^2)$, with the prior parameters estimated
+from the cross-market distribution: $\hat\tau^2$ by method of moments,
+$\hat\tau^2 = \max\{0,\ \mathrm{Var}(\hat\beta_m) -
+\overline{\widehat{se}_m^{\,2}}\} = 0.031$, and $\hat\mu$ as the
+precision-weighted ($1/\widehat{se}_m^{\,2}$) mean of the $\hat\beta_m$,
+$\hat\mu = 0.18$ (precision weighting places more mass on tightly estimated
+markets, which have larger price increases than the unweighted mean of
+$0.07$). The posterior mean shrinks each estimate toward $\hat\mu$ in
+proportion to its noise,
+\[
+\hat\beta^{EB}_m = w_m \hat\beta_m + (1 - w_m)\,\hat\mu,
+\qquad
+w_m = \frac{\hat\tau^2}{\hat\tau^2 + \widehat{se}_m^{\,2}},
+\]
+with posterior standard error $\widehat{se}^{EB}_m = \sqrt{w_m}\,
+\widehat{se}_m$. Estimated cross-market heterogeneity is large relative to
+sampling noise---$\hat\tau^2 / (\hat\tau^2 +
+\overline{\widehat{se}_m^{\,2}}) = 0.94$---so shrinkage is mild for most
+markets: the median weight is $0.99$, eight of 46 markets have $w_m < 0.9$,
+and the smallest weight is $0.60$. The average estimate moves by $0.011$ log
+points, the largest move is $0.10$ (site-directed mutagenesis systems,
+$-0.40$ to $-0.29$), the cross-market standard deviation falls from $0.182$
+to $0.164$, and the correlation between raw and shrunk estimates is $0.996$.
+% NB: verify before compiling into the draft -- exposure_msr/build.do:106 and
+% 4_impute_shift_share.py currently read the raw b column, not b_eb.
+The shrunk coefficients $\hat\beta^{EB}_m$ are the market-level shifts carried
+into the shift-share exposure measure. The same procedure is applied to the
+market-level spending coefficients ($\hat\tau^2 = 0.093$, $\hat\mu = 0.37$),
+which are used only descriptively.
+
+\end{document}

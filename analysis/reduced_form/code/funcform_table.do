@@ -4,7 +4,7 @@ capture log close
 version 17
 
 * Numbers for tab:rf_funcform: {Poisson, OLS levels, OLS log(1+y)} x
-* {author+year FE, university+cluster+year FE}, with and without the S_i
+* {author+year FE, university+cluster-by-year FE}, with and without the S_i
 * control, on the prepped sample from the last analysis.do run. Writes the
 * filled table to ../output/tables/<samp>/robustness/rf_funcform<suf>.tex;
 * column (1) keeps the paper's \RFCoef / \RFObs / \OutputDecline macros.
@@ -28,12 +28,17 @@ foreach est in ppml ols ols_ln {
         local ++col
         local fes    athr_id year
         local vce_cl athr_id
+        local mainx  ""
+        local mains  ""
         if "`fe'" == "inst" {
-            local fes    inst_id cluster_30 year
+            local fes    inst_id i.cluster_30#i.year
             local vce_cl inst_id
+            * exposure/share levels are absorbed by athr_id but not by inst FEs
+            local mainx  exposure
+            local mains  exposure mkt_spend_shr
         }
 
-        `cmd' `yvar' Z_it Z_share_it, absorb(`fes') vce(cluster `vce_cl')
+        `cmd' `yvar' Z_it Z_share_it `mains', absorb(`fes') vce(cluster `vce_cl')
         mat funcform[1,`col'] = _b[Z_it]
         mat funcform[2,`col'] = _se[Z_it]
         local b = _b[Z_it]
@@ -50,7 +55,7 @@ foreach est in ppml ols ols_ln {
         mat funcform[7,`col'] = e(N)
         mat funcform[8,`col'] = `xbar'
 
-        `cmd' `yvar' Z_it, absorb(`fes') vce(cluster `vce_cl')
+        `cmd' `yvar' Z_it `mainx', absorb(`fes') vce(cluster `vce_cl')
         mat funcform[3,`col'] = _b[Z_it]
         mat funcform[4,`col'] = _se[Z_it]
         mat funcform[9,`col'] = e(N)
@@ -105,7 +110,7 @@ file write `fh' "\addlinespace" _n
 file write `fh' "Implied output decline (\%) & \OutputDecline & `dc2' & `dc3' & `dc4' & `dc5' & `dc6' \\" _n
 file write `fh' "\midrule" _n
 file write `fh' "Author \$+\$ year FE          & \$\checkmark\$ &              & \$\checkmark\$ &              & \$\checkmark\$ &              \\" _n
-file write `fh' "University \$+\$ cluster + year FE    &              & \$\checkmark\$ &              & \$\checkmark\$ &              & \$\checkmark\$ \\" _n
+file write `fh' "University \$+\$ cluster \$\times\$ year FE    &              & \$\checkmark\$ &              & \$\checkmark\$ &              & \$\checkmark\$ \\" _n
 file write `fh' "\midrule" _n
 file write `fh' "Pre-period mean             & \PoisMean & \PoisMean & \PoisMean & \PoisMean & \PoisMean & \PoisMean \\" _n
 file write `fh' "Observations                & \RFObs & `nn2' & `nn3' & `nn4' & `nn5' & `nn6' \\" _n
@@ -113,7 +118,8 @@ file write `fh' "\bottomrule" _n
 file write `fh' "\end{tabular}" _n
 file write `fh' "\floatfoot{\textit{Notes:} Each column is a separate difference-in-differences regression of annual publication counts on the interaction of post-merger timing with PI exposure, estimated on the panel of \NPIs\ PIs observed 2010--2019\ with PI and year fixed effects." _n
 file write `fh' "Columns (1) and (2) estimate a Poisson (PPML) model, columns (3) and (4) ordinary least squares in levels, and columns (5) and (6) ordinary least squares in the log of one plus the count." _n
-file write `fh' "Odd columns use author and year fixed effects, even columns replace the author fixed effect with university and cluster fixed effects, as indicated at the foot of the table." _n
+file write `fh' "Odd columns use author and year fixed effects, even columns replace the author and year fixed effects with university and cluster-by-year fixed effects, as indicated at the foot of the table." _n
+file write `fh' "The even columns additionally control for the levels of exposure and of the treated-market share, which are absorbed by the author fixed effect in the odd columns." _n
 file write `fh' "Each specification is reported with and without the treated-market share \$S_i\$ as a control, following \citet{borusyak_quasi-experimental_2022}." _n
 file write `fh' "The implied output decline is the reduction for the average PI, at exposure \AvgExposure, implied by the with-\$S_i\$ coefficient and expressed as a percent of the pre-period mean, so that it is comparable across estimators whose coefficients are in different units." _n
 file write `fh' "The pre-period mean is the average pre-merger publication count per PI-year on the estimation sample." _n

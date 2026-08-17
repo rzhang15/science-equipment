@@ -11,27 +11,37 @@ global EXPOSURE_VERSION "hc"
 global EXPOSURE_FILTER  "_cf"
 global FE_MODE "author"
 global HET_RUN_OLS 0
-global DEBUG_YVAR "ppr_cnt"
+global DEBUG_YVAR "n_grants"
 global HET_INCLUDE_INSTWTD 0
 global HET_RUN_QUARTILES 0
 global HET_IC_FULL 0
 global HET_AGE_NBINS 10
+* `do analysis.do horserace` runs only horse_race_nih on the existing
+* ../temp/es_* panels (no rebuild of splits / event studies).
+global HET_HORSERACE_ONLY 0
+if "`1'" == "horserace" global HET_HORSERACE_ONLY 1
 
 program main
     gather_inst_chars
     define_group_labels
     local s all_jrnls
     cap mkdir "../output/figures/`s'"
-    add_het_splits, samp(`s') r1r2(1) public(0)
-    desc_pre_output_by_age, samp(`s') r1r2(1) public(0)
-    event_study_het, samp(`s') r1r2(1) public(0)
-    ppml_age_gradient, samp(`s') r1r2(1) public(0)
+    if $HET_HORSERACE_ONLY == 0 {
+        add_het_splits, samp(`s') r1r2(1) public(0)
+        desc_pre_output_by_age, samp(`s') r1r2(1) public(0)
+        event_study_het, samp(`s') r1r2(1) public(0)
+        ppml_age_gradient, samp(`s') r1r2(1) public(0)
+    }
+    horse_race_nih, samp(`s') r1r2(1) public(0)
     output_het_tables, samp(`s') r1r2(1) public(0)
 
-    add_het_splits, samp(all_jrnls) r1r2(1) public(1)
-    desc_pre_output_by_age, samp(all_jrnls) r1r2(1) public(1)
-    event_study_het, samp(all_jrnls) r1r2(1) public(1)
-    ppml_age_gradient, samp(all_jrnls) r1r2(1) public(1)
+    if $HET_HORSERACE_ONLY == 0 {
+        add_het_splits, samp(all_jrnls) r1r2(1) public(1)
+        desc_pre_output_by_age, samp(all_jrnls) r1r2(1) public(1)
+        event_study_het, samp(all_jrnls) r1r2(1) public(1)
+        ppml_age_gradient, samp(all_jrnls) r1r2(1) public(1)
+    }
+    horse_race_nih, samp(all_jrnls) r1r2(1) public(1)
     output_het_tables, samp(all_jrnls) r1r2(1) public(1)
 end
 
@@ -126,6 +136,13 @@ global PI_CHAR_LOLEG_team  "Smaller Team Size"
 program define_group_labels
     global LBL_young        "Early-Career Scientists"
     global LBL_old          "Late-Career Scientists"
+    global LBL_lab_lt10     "Early-Career Scientists (<10 Yrs)"
+    global LBL_lab_10_20    "Mid-Career Scientists (10-20 Yrs)"
+    global LBL_lab_20p      "Late-Career Scientists (20+ Yrs)"
+    global LBL_q1_labage    "Q1 Lab Age (Newest Labs)"
+    global LBL_q2_labage    "Q2 Lab Age"
+    global LBL_q3_labage    "Q3 Lab Age"
+    global LBL_q4_labage    "Q4 Lab Age (Most Established)"
     global LBL_r1           "R1"
     global LBL_r2           "R2"
     global LBL_pub_inst     "Public"
@@ -244,11 +261,12 @@ program add_het_splits
     gen high_pre_ppr = pre_ppr_cnt_sum >= `ppr_cut' if !mi(pre_ppr_cnt_sum)
     gen low_pre_ppr  = pre_ppr_cnt_sum <  `ppr_cut' if !mi(pre_ppr_cnt_sum)
 
-    qui sum age_2014 if athr_indicator == 1, d
-    local age_med = r(p50)
-    di as text "add_het_splits `samp'`suf' age_2014 median = `age_med'"
-    gen young = age_2014 <  `age_med' if !mi(age_2014)
-    gen old   = age_2014 >= `age_med' if !mi(age_2014)
+    * young/old split on first last-author year (min_year), not career age
+    qui sum min_year if athr_indicator == 1, d
+    local lastyr_med = r(p50)
+    di as text "add_het_splits `samp'`suf' min_year (first last-author yr) median = `lastyr_med'"
+    gen young = min_year >  `lastyr_med' if !mi(min_year)
+    gen old   = min_year <= `lastyr_med' if !mi(min_year)
 
     gen r1 = type == "r1" if !mi(type)
     gen r2 = type == "r2" if !mi(type)
@@ -498,6 +516,17 @@ program add_het_splits
         di as text "add_het_splits `samp'`suf' lab_age median = `lab_med'"
         gen byte new_lab = lab_age_2014 <  `lab_med' if !mi(lab_age_2014)
         gen byte est_lab = lab_age_2014 >= `lab_med' if !mi(lab_age_2014)
+        gen byte lab_lt10  = lab_age_2014 < 10             if !mi(lab_age_2014)
+        gen byte lab_10_20 = inrange(lab_age_2014, 10, 19) if !mi(lab_age_2014)
+        gen byte lab_20p   = lab_age_2014 >= 20            if !mi(lab_age_2014)
+        qui sum lab_age_2014 if athr_indicator == 1, d
+        di as text "add_het_splits `samp'`suf' lab_age quartile cuts: p25=" r(p25) " p50=" r(p50) " p75=" r(p75)
+        xtile _labq_pi = lab_age_2014 if athr_indicator == 1, nq(4)
+        bys athr_id: egen _labq = max(_labq_pi)
+        forval q = 1/4 {
+            gen byte q`q'_labage = _labq == `q' if !mi(_labq)
+        }
+        drop _labq_pi _labq
     }
     * (3) Same-field PIs at the institution (sample roster, inst x cluster) --
     * shared cores / borrowable equipment down the hall.
@@ -634,7 +663,8 @@ program event_study_het
                      big_team small_team high_nihg low_nihg high_nihd low_nihd ///
                      young_nih old_nih big_net small_net new_lab est_lab ///
                      crwd_inst sprs_inst big_msa small_msa yhigh_nihd ylow_nihd ///
-                     yq4_nihd yq1_nihd
+                     yq4_nihd yq1_nihd lab_lt10 lab_10_20 lab_20p ///
+                     q1_labage q2_labage q3_labage q4_labage
     * Only groups the active config actually fits get lead/lag interactions.
     foreach a of global IC_ALIASES {
         local het_groups `het_groups' hiw_`a' low_`a'
@@ -934,6 +964,127 @@ program event_study_het
                 }
             }
             }  // close foreach mmethod
+
+            * ---- Multi-group lab-age splits: 3-way (<10/10-19/20+) and quartiles ----
+            foreach aspec in age3 ageq4 {
+                if "`aspec'" == "age3"  local agrps lab_lt10 lab_10_20 lab_20p
+                if "`aspec'" == "ageq4" local agrps q1_labage q2_labage q3_labage q4_labage
+                local aok 1
+                foreach grp of local agrps {
+                    if strpos(" ${HET_GROUPS_ACTIVE} ", " `grp' ") == 0 local aok 0
+                }
+                if `aok' {
+                * [H11] the last (most senior) group x post is the omitted base
+                local nb : word count `agrps'
+                local abase : word `nb' of `agrps'
+                local Zs
+                local Ss
+                local PTs
+                foreach grp of local agrps {
+                    cap drop Z_`grp'
+                    cap drop S_`grp'
+                    cap drop PT_`grp'
+                    gen Z_`grp' = Z_it       * `grp'
+                    gen S_`grp' = Z_share_it * `grp'
+                    local Zs `Zs' Z_`grp'
+                    local Ss `Ss' S_`grp'
+                    if "`grp'" != "`abase'" {
+                        gen PT_`grp' = post * `grp'
+                        local PTs `PTs' PT_`grp'
+                    }
+                }
+                cap noi ppmlhdfe `yvar' `Zs' `Ss' `PTs', ///
+                               absorb(`fes') vce(cluster `vce_cl')
+                local rc = _rc
+                if `rc' {
+                    di as error "event_study_het `samp'`suf' `yvar' `aspec' pooled-DiD int ppml failed (rc=`rc'); skipping."
+                }
+                else {
+                    local Nppml = e(N)
+                    local r2ppml = e(r2_p)
+                    foreach grp of local agrps {
+                        gunique athr_id if e(sample) & `grp' == 1
+                        local num_athrs = r(unique)
+                        gunique inst_id if e(sample) & `grp' == 1
+                        local num_insts = r(unique)
+                        local b_post  = _b[Z_`grp']
+                        local se_post = _se[Z_`grp']
+                        di as text "pooled-DiD int PPML `samp'`suf' `yvar' `grp' `aspec': b=" %8.4f `b_post' ///
+                            " (se=" %8.4f `se_post' ")   N=" %9.0f `Nppml' " PIs=`num_athrs' Insts=`num_insts'"
+                        post `ph_handle' ("`yvar'") ("`grp'") ("mshrctrl") ("`aspec'") ///
+                            (`b_post') (`se_post') (.) (.) (`Nppml') (`r2ppml')
+                    }
+
+                    * --- Joint event-study PPML for per-group ES PDFs only (not posted) ---
+                    local all_leads
+                    local all_lags
+                    local all_mshr
+                    foreach grp of local agrps {
+                        local all_leads `all_leads' `leads_`grp''
+                        local all_lags  `all_lags'  `lags_`grp''
+                        local all_mshr  `all_mshr'  `mleads_`grp'' `mlags_`grp''
+                    }
+                    local plot_suf "_ppml_`aspec'_mshrctrl"
+                    cap noi ppmlhdfe `yvar' `all_leads' `all_lags' ///
+                                            `all_mshr' `PTs', ///
+                                            absorb(`fes') vce(cluster `vce_cl')
+                    if _rc {
+                        di as error "event_study_het `samp'`suf' `yvar' `aspec' joint ES for PDFs failed; skipping ES plots."
+                    }
+                    else {
+                        foreach grp of local agrps {
+                            local grp_label = "${LBL_`grp'}"
+                            if "`grp_label'" == "" local grp_label "`grp'"
+                            gunique athr_id if e(sample) & `grp' == 1
+                            local num_athrs = r(unique)
+                            gunique inst_id if e(sample) & `grp' == 1
+                            local num_insts = r(unique)
+                            sum `yvar' if rel <= -1 & e(sample) & `grp' == 1, d
+                            local pre_mean : dis %4.3f r(mean)
+                            preserve
+                            cap mat drop es
+                            foreach var in `leads_`grp'' `lags_`grp'' int_lead1_`grp' {
+                                if "`var'" == "int_lead1_`grp'" {
+                                    mat row = 0,0
+                                }
+                                else {
+                                    mat row = _b[`var'], _se[`var']
+                                }
+                                mat es = nullmat(es) \ row
+                            }
+                            svmat es
+                            keep es1 es2
+                            drop if mi(es1)
+                            rename (es1 es2) (b se)
+                            gen ub = b + 1.96*se
+                            sum ub, d
+                            local ymax = round(r(max), 0.1)
+                            gen lb = b - 1.96*se
+                            sum lb, d
+                            local ymin = round(r(min), 0.1)
+                            if `ymin' > 0 local ymin = 0
+                            gen rel = -`abs_lead' if _n == 1
+                            replace rel = rel[_n-1]+1 if _n > 1
+                            replace rel = rel + 1 if rel >= -1
+                            replace rel = -1 if rel == `abs_lag' + 1
+                            gen year = rel + 2014
+                            hashsort rel
+                            tw rcap ub lb year if year != 2013, lcolor(ebblue%70) msize(vsmall) || ///
+                              scatter b year, mcolor(ebblue) || ///
+                            scatteri `ymax' 2013.75 `ymax' 2014.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
+                              xlab(2010(1)2019, labsize(small)) xtitle("Year") ///
+                              ytitle("`ppml_ytit'") ylab(`ymin'(0.1)`ymax') ///
+                              subtitle("`grp_label'", pos(11) size(small)) ///
+                              legend(on order(- "Num. PIs: `num_athrs'" "Num. Insts: `num_insts'" "Pre-Period Avg : `pre_mean'") pos(7) ring(1) rows(3) bmargin(zero) size(small)) ///
+                              yline(0, lcolor(gs10) lpattern(solid)) plotregion(margin(sides))
+                            graph export ../output/figures/`samp'/es_ppml/es_`yvar'`suf'_`grp'`plot_suf'.pdf, replace
+                            save ../temp/es_`yvar'`suf'_`grp'`plot_suf', replace
+                            restore
+                        }
+                    }
+                }
+                }
+            }
 
             * ---- PPML quartile split (inst-weighted + PI-weighted variants) ----
             * Gated by HET_RUN_QUARTILES; off by default per user request.
@@ -1406,6 +1557,91 @@ program ppml_pdid_het_binscatter
                     replace
             }
         }
+
+        * ---- Multi-group lab-age splits: joint fit, per-group FWL binscatter ----
+        foreach aspec in age3 ageq4 {
+            if "`aspec'" == "age3"  local agrps lab_lt10 lab_10_20 lab_20p
+            if "`aspec'" == "ageq4" local agrps q1_labage q2_labage q3_labage q4_labage
+            local aok 1
+            foreach grp of local agrps {
+                if strpos(" ${HET_GROUPS_ACTIVE} ", " `grp' ") == 0 local aok 0
+            }
+            if `aok' {
+            foreach v in _mu _z_work _dvar _fwlw _y_r _Z_r {
+                cap drop `v'
+            }
+            local nb : word count `agrps'
+            local abase : word `nb' of `agrps'
+            local Zs
+            local Ss
+            local PTs
+            foreach grp of local agrps {
+                cap drop Z_`grp'
+                cap drop S_`grp'
+                cap drop PT_`grp'
+                gen Z_`grp' = Z_it       * `grp'
+                gen S_`grp' = Z_share_it * `grp'
+                local Zs `Zs' Z_`grp'
+                local Ss `Ss' S_`grp'
+                if "`grp'" != "`abase'" {
+                    gen PT_`grp' = post * `grp'
+                    local PTs `PTs' PT_`grp'
+                }
+            }
+
+            * [H11] PT matches the posted `aspec' pooled-DiD spec (most senior group x post is the base)
+            cap noi ppmlhdfe `yvar' `Zs' `Ss' `PTs', ///
+                    absorb(`fes') vce(cluster `vce_cl') d(_dvar)
+            local rc = _rc
+            if `rc' {
+                di as error "ppml_pdid_het_bs `samp'`suf' `yvar' `aspec' joint failed (rc=`rc'); skipping."
+            }
+            else {
+                foreach grp of local agrps {
+                    local b_`grp'  = _b[Z_`grp']
+                    local se_`grp' = _se[Z_`grp']
+                }
+
+                predict double _mu, mu
+                gen double _z_work = ln(_mu) + (`yvar' - _mu)/_mu if !mi(_mu) & _mu > 0
+                gen double _fwlw = _mu if !mi(_mu) & _mu > 0
+
+                foreach grp of local agrps {
+                    local others
+                    foreach o of local agrps {
+                        if "`o'" != "`grp'" local others `others' Z_`o'
+                    }
+                    foreach v in _y_r _Z_r {
+                        cap drop `v'
+                    }
+                    cap noi qui reghdfe _z_work `others' `Ss' `PTs' if !mi(_fwlw) [pw=_fwlw], ///
+                            absorb(`fes') residuals(_y_r)
+                    if _rc == 0 cap noi qui reghdfe Z_`grp' `others' `Ss' `PTs' if !mi(_fwlw) [pw=_fwlw], ///
+                            absorb(`fes') residuals(_Z_r)
+                    if _rc {
+                        di as error "ppml_pdid_het_bs FWL `grp' failed; skipping plot."
+                        continue
+                    }
+                    gunique athr_id if `grp' == 1 & !mi(_y_r) & !mi(_Z_r)
+                    local n_pis = r(unique)
+                    gunique inst_id if `grp' == 1 & !mi(_y_r) & !mi(_Z_r)
+                    local n_insts = r(unique)
+                    local b_str  : dis %7.3f `b_`grp''
+                    local se_str : dis %7.3f `se_`grp''
+                    binscatter _y_r _Z_r [aw=_fwlw] if `grp' == 1 & !mi(_y_r) & !mi(_Z_r), n(30) ///
+                        xtitle("Exposure x Post") ///
+                        ytitle("{&Delta} Log Expected `bs_lbl'") ///
+                        xlab(-0.06(0.015)0.06, format(%5.3f)) ///
+                        msymbol(O) mcolors(gs6) lcolors(ebblue) ///
+                        note("Num. PIs: `n_pis'   Num. Insts: `n_insts'" "{&beta} = `b_str' (SE: `se_str')", size(small) pos(7) ring(1) justification(left)) ///
+                        plotregion(margin(sides))
+                    graph export ///
+                        ../output/figures/`samp'/ppml_pdid_het_bs/ppml_pdid_`yvar'_`grp'_mshrctrl`suf'.pdf, ///
+                        replace
+                }
+            }
+            }
+        }
     restore
 end
 
@@ -1443,7 +1679,24 @@ program ppml_age_gradient
     gen Z_share_it = mkt_spend_shr * post
 
     local K = $HET_AGE_NBINS
-    xtile _agebin_pi = age_2014 if athr_indicator == 1, n(`K')
+    * Two age bases: career age (first any-position pub, +30) writes agegrad_*;
+    * lab age (years since first last-author pub) writes labgrad_*.
+    foreach agevar in age_2014 lab_age_2014 {
+    cap confirm variable `agevar'
+    if _rc {
+        di as error "ppml_age_gradient `samp'`suf': `agevar' not in panel -- skipped."
+        continue
+    }
+    local gpfx agegrad
+    local gtmp age_gradient
+    local gxtit "Career Age in 2014"
+    if "`agevar'" == "lab_age_2014" {
+        local gpfx labgrad
+        local gtmp lab_gradient
+        local gxtit "Years Running Lab in 2014"
+    }
+    cap drop agebin
+    xtile _agebin_pi = `agevar' if athr_indicator == 1, n(`K')
     bys athr_id: egen agebin = max(_agebin_pi)
     drop _agebin_pi
 
@@ -1456,6 +1709,8 @@ program ppml_age_gradient
             di as error "ppml_age_gradient `samp'`suf': age bin `k' empty -- skipped."
             continue
         }
+        cap drop Z_a`k'
+        cap drop S_a`k'
         gen Z_a`k' = Z_it       * (agebin == `k')
         gen S_a`k' = Z_share_it * (agebin == `k')
         local zvars `zvars' Z_a`k'
@@ -1468,6 +1723,7 @@ program ppml_age_gradient
     local nb : word count `bins_used'
     forval i = 1/`=`nb'-1' {
         local k : word `i' of `bins_used'
+        cap drop PT_a`k'
         gen PT_a`k' = post * (agebin == `k')
         local ptvars `ptvars' PT_a`k'
     }
@@ -1499,7 +1755,7 @@ program ppml_age_gradient
                 di as error "ppml_age_gradient `samp'`suf' `yvar': Z_a`k' dropped/degenerate -- omitted from plot."
                 continue
             }
-            qui sum age_2014 if athr_indicator == 1 & agebin == `k'
+            qui sum `agevar' if athr_indicator == 1 & agebin == `k'
             mat AG = nullmat(AG) \ (`k', r(mean), r(N), _b[Z_a`k'], _se[Z_a`k'])
         }
         preserve
@@ -1508,16 +1764,17 @@ program ppml_age_gradient
         rename (AG1 AG2 AG3 AG4 AG5) (bin age_mean n_pis b se)
         gen ub = b + 1.96*se
         gen lb = b - 1.96*se
-        save ../temp/age_gradient_`samp'`suf'_`yvar', replace
+        save ../temp/`gtmp'_`samp'`suf'_`yvar', replace
         tw rcap ub lb age_mean, lcolor(ebblue%70) msize(vsmall) || ///
            scatter b age_mean, mcolor(ebblue) || ///
            lfit b age_mean [aw=1/(se*se)], lcolor(dkorange) lpattern(dash) ///
-           xtitle("Career Age in 2014") ytitle("`ppml_ytit'") ///
+           xtitle("`gxtit'") ytitle("`ppml_ytit'") ///
            yline(0, lcolor(gs10) lpattern(solid)) ///
            legend(on order(- "Num. PIs: `n_pis'" "Num. Insts: `n_insts'") pos(7) ring(1) rows(2) bmargin(zero) size(small)) ///
            plotregion(margin(sides))
-        graph export ../output/figures/`samp'/agegrad_`yvar'`suf'_ppml_mshrctrl.pdf, replace
+        graph export ../output/figures/`samp'/`gpfx'_`yvar'`suf'_ppml_mshrctrl.pdf, replace
         restore
+    }
     }
 end
 
@@ -1642,6 +1899,126 @@ program desc_pre_output_by_age
     }
 
     save ../temp/desc_pre_output_`samp'`suf', replace
+end
+
+program horse_race_nih
+    * Experience-vs-money horse race on the NIH-matched sample: one PPML with
+    * Z_it interacted with young (early-career) AND low_nihd (below-median
+    * baseline NIH funding) jointly, plus the post x dummy shifts and the
+    * uninteracted share control. Base Z_it = late-career, above-median-NIH.
+    * Reports both triple-interaction betas and the Wald test of equality.
+    syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0)]
+    local fes athr_id year
+    local vce_cl athr_id
+    if "$FE_MODE" == "inst_cluster" {
+        local fes inst_id cluster_30 year
+        local vce_cl inst_id
+    }
+    if "$FE_MODE" == "inst_cluster_fldyr" {
+        local fes inst_id i.cluster_30#i.year
+        local vce_cl inst_id
+    }
+    local suf ""
+    if (`r1r2' == 1 & `public' == 0 & `r1_only' == 0) local suf "_r1_r2"
+    if (`r1r2' == 1 & `public' == 1 & `r1_only' == 0) local suf "_r1_r2_public"
+    if (`r1_only' == 1 & `public' == 0) local suf "_r1"
+    if (`r1_only' == 1 & `public' == 1) local suf "_r1_public"
+
+    cap confirm file "../temp/es_`samp'`suf'.dta"
+    if _rc {
+        di as error "horse_race_nih `samp'`suf': ../temp/es_`samp'`suf'.dta not found -- run add_het_splits first."
+        exit
+    }
+    use ../temp/es_`samp'`suf', clear
+    foreach v in young low_nihd nih_pi {
+        cap confirm variable `v'
+        if _rc {
+            di as error "horse_race_nih `samp'`suf': `v' not in panel -- SKIPPED."
+            exit
+        }
+    }
+    keep if nih_pi == 1 & !mi(young) & !mi(low_nihd)
+    foreach v in young low_nihd {
+        qui sum `v'
+        if r(N) == 0 | r(min) == r(max) {
+            di as error "horse_race_nih `samp'`suf': `v' degenerate on the NIH-matched sample -- SKIPPED."
+            exit
+        }
+    }
+
+    gen post       = year >= 2014
+    gen Z_it       = exposure      * post
+    gen Z_share_it = mkt_spend_shr * post
+    gen Z_early    = Z_it * young
+    gen Z_lownih   = Z_it * low_nihd
+    gen PT_early   = post * young
+    gen PT_lownih  = post * low_nihd
+
+    local yvar_list ppr_cnt cite_affl_wt
+    if "$DEBUG_YVAR" != "" local yvar_list $DEBUG_YVAR
+    local nyv : word count `yvar_list'
+
+    mat hrace`suf' = J(14, `nyv', .)
+    mat rownames hrace`suf' = b_z_base se_z_base b_z_early se_z_early ///
+                              b_z_lownih se_z_lownih b_diff se_diff ///
+                              stat_eq p_eq N n_pis n_pis_early n_pis_lownih
+    mat colnames hrace`suf' = `yvar_list'
+
+    local col 0
+    foreach yvar of local yvar_list {
+        local ++col
+        cap noi ppmlhdfe `yvar' Z_it Z_early Z_lownih PT_early PT_lownih Z_share_it, ///
+            absorb(`fes') vce(cluster `vce_cl')
+        local rc = _rc
+        if `rc' {
+            di as error "horse_race_nih `samp'`suf' `yvar' failed (rc=`rc'); column left missing."
+            continue
+        }
+        local Nppml = e(N)
+        local b_early   = _b[Z_early]
+        local se_early  = _se[Z_early]
+        local b_lownih  = _b[Z_lownih]
+        local se_lownih = _se[Z_lownih]
+        gunique athr_id if e(sample)
+        local n_pis = r(unique)
+        gunique athr_id if e(sample) & young == 1
+        local n_early = r(unique)
+        gunique athr_id if e(sample) & low_nihd == 1
+        local n_lownih = r(unique)
+        qui lincom Z_early - Z_lownih
+        local b_diff  = r(estimate)
+        local se_diff = r(se)
+        qui test Z_early = Z_lownih
+        local stat_eq = cond(r(F) < ., r(F), r(chi2))
+        local p_eq = r(p)
+
+        mat hrace`suf'[1,`col']  = _b[Z_it]
+        mat hrace`suf'[2,`col']  = _se[Z_it]
+        mat hrace`suf'[3,`col']  = `b_early'
+        mat hrace`suf'[4,`col']  = `se_early'
+        mat hrace`suf'[5,`col']  = `b_lownih'
+        mat hrace`suf'[6,`col']  = `se_lownih'
+        mat hrace`suf'[7,`col']  = `b_diff'
+        mat hrace`suf'[8,`col']  = `se_diff'
+        mat hrace`suf'[9,`col']  = `stat_eq'
+        mat hrace`suf'[10,`col'] = `p_eq'
+        mat hrace`suf'[11,`col'] = `Nppml'
+        mat hrace`suf'[12,`col'] = `n_pis'
+        mat hrace`suf'[13,`col'] = `n_early'
+        mat hrace`suf'[14,`col'] = `n_lownih'
+
+        di as text "horse_race_nih `samp'`suf' `yvar' (NIH-matched sample):"
+        di as text "  Z x EarlyCareer     = " %9.4f `b_early'  "  (se " %7.4f `se_early' ")"
+        di as text "  Z x BelowMedianNIH  = " %9.4f `b_lownih' "  (se " %7.4f `se_lownih' ")"
+        di as text "  diff (early-lownih) = " %9.4f `b_diff'   "  (se " %7.4f `se_diff' ")   H0 equal: stat = " %8.4f `stat_eq' "  p = " %6.4f `p_eq'
+        di as text "  base Z (late-career x above-median) = " %9.4f _b[Z_it] "  (se " %7.4f _se[Z_it] ")"
+        di as text "  N = " %9.0f `Nppml' "  PIs = `n_pis' (early = `n_early', below-median NIH = `n_lownih')"
+    }
+
+    cap mkdir ../output/tables
+    cap mkdir ../output/tables/`samp'
+    qui matrix_to_txt, saving("../output/tables/`samp'/horse_race_nih`suf'.txt") ///
+        matrix(hrace`suf') title(<tab:horse_race_nih`suf'>) format(%20.4f) replace
 end
 
 program output_het_tables

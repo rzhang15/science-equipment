@@ -1,0 +1,2697 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 120,000; see help set_maxvar.
+
+. do analysis.do horserace 
+
+. set more off
+
+. clear all
+
+. capture log close
+
+. program drop _all
+
+. set scheme modern
+
+. preliminaries
+
+. version 17
+
+. set maxvar 20000
+
+
+. 
+. global EXPOSURE_VERSION "hc"
+
+. global EXPOSURE_FILTER  "_cf"
+
+. global FE_MODE "author"
+
+. global HET_RUN_OLS 0
+
+. global DEBUG_YVAR "ppr_cnt"
+
+. global HET_INCLUDE_INSTWTD 0
+
+. global HET_RUN_QUARTILES 0
+
+. global HET_IC_FULL 0
+
+. global HET_AGE_NBINS 10
+
+. * `do analysis.do horserace` runs only horse_race_nih on the existing
+. * ../temp/es_* panels (no rebuild of splits / event studies).
+. global HET_HORSERACE_ONLY 0
+
+. if "`1'" == "horserace" global HET_HORSERACE_ONLY 1
+
+. 
+. program main
+  1.     gather_inst_chars
+  2.     define_group_labels
+  3.     local s all_jrnls
+  4.     cap mkdir "../output/figures/`s'"
+  5.     if $HET_HORSERACE_ONLY == 0 {
+  6.         add_het_splits, samp(`s') r1r2(1) public(0)
+  7.         desc_pre_output_by_age, samp(`s') r1r2(1) public(0)
+  8.         event_study_het, samp(`s') r1r2(1) public(0)
+  9.         ppml_age_gradient, samp(`s') r1r2(1) public(0)
+ 10.     }
+ 11.     horse_race_nih, samp(`s') r1r2(1) public(0)
+ 12.     output_het_tables, samp(`s') r1r2(1) public(0)
+ 13. 
+.     if $HET_HORSERACE_ONLY == 0 {
+ 14.         add_het_splits, samp(all_jrnls) r1r2(1) public(1)
+ 15.         desc_pre_output_by_age, samp(all_jrnls) r1r2(1) public(1)
+ 16.         event_study_het, samp(all_jrnls) r1r2(1) public(1)
+ 17.         ppml_age_gradient, samp(all_jrnls) r1r2(1) public(1)
+ 18.     }
+ 19.     horse_race_nih, samp(all_jrnls) r1r2(1) public(1)
+ 20.     output_het_tables, samp(all_jrnls) r1r2(1) public(1)
+ 21. end
+
+. 
+. program gather_inst_chars
+  1.     import delimited ../external/college/ipeds_openalex.csv, ///
+>         clear varn(1) stringcols(_all)
+  2.     keep ipeds_id inst_id
+  3.     drop if inst_id == "" | ipeds_id == ""
+  4.     destring ipeds_id, replace
+  5.     duplicates drop
+  6.     bys ipeds_id: gen _ndup = _N
+  7.     qui count if _ndup > 1
+  8.     if r(N) > 0 {
+  9.         di as error "gather_inst_chars: " r(N) " rows with duplicate ipeds_id in crosswalk; keeping first inst_id per ipeds_id. VERIFY the crosswalk."
+ 10.         bys ipeds_id (inst_id): keep if _n == 1
+ 11.     }
+ 12.     drop _ndup
+ 13.     save ../temp/ipeds_openalex_xw, replace
+ 14. 
+.     use ../external/inst_chars/combined_pre, clear
+ 15.     merge 1:1 ipeds_id using ../temp/ipeds_openalex_xw, keep(3) nogen
+ 16.     drop ipeds_id
+ 17.     bys inst_id: gen _ndup = _N
+ 18.     qui count if _ndup > 1
+ 19.     if r(N) > 0 {
+ 20.         di as error "gather_inst_chars: " r(N) " rows with duplicate inst_id after ipeds merge; keeping first row per inst_id. VERIFY the crosswalk."
+ 21.         bys inst_id: keep if _n == 1
+ 22.     }
+ 23.     drop _ndup
+ 24. 
+.     rename contracts_fund      ic_contr
+ 25.     rename fed_ls_bio_fund     ic_fdlsb
+ 26.     rename fed_ls_fund         ic_fdls
+ 27.     rename fed_ls_hs_fund      ic_fdlsh
+ 28.     rename grants_fund         ic_gntsf
+ 29.     rename hhs_ls_bio_fund     ic_hhlsb
+ 30.     rename hhs_ls_fund         ic_hhls
+ 31.     rename hhs_ls_hs_fund      ic_hhlsh
+ 32.     rename nonfed_ls_bio_fund  ic_nflsb
+ 33.     rename nonfed_ls_fund      ic_nfls
+ 34.     rename nonfed_ls_hs_fund   ic_nflsh
+ 35.     rename subrecipient_fund   ic_subrf
+ 36.     rename tot_bus_fund        ic_busf
+ 37.     rename tot_fed_fund        ic_fedf
+ 38.     rename tot_fund            ic_tfnd
+ 39.     rename tot_inst_fund       ic_instf
+ 40.     rename tot_nonprof_fund    ic_nonpf
+ 41.     rename tot_state_fund      ic_statf
+ 42.     rename ls_fund             ic_lsf
+ 43.     rename hs_fund             ic_hsf
+ 44.     rename bio_fund            ic_biof
+ 45.     rename applied_expend      ic_applx
+ 46.     rename applied_fed_expend  ic_apfx
+ 47.     rename basic_expend        ic_basx
+ 48.     rename basic_fed_expend    ic_bfx
+ 49.     rename clin_trial_expend   ic_clinx
+ 50.     rename dev_expend          ic_devx
+ 51.     rename ls_cap_expend       ic_lscx
+ 52.     rename med_sch_expend      ic_medx
+ 53.     rename endowment           ic_endow
+ 54. 
+.     order inst_id
+ 55.     compress
+ 56.     save ../temp/inst_chars_pre, replace
+ 57. end
+
+. 
+. * Reduced set: total R&D + total federal + institutional + life-sci + federal life-sci
+. * (funding); endowment + basic + applied (expenditures).
+. global IC_ALIASES tfnd lsf endow
+
+. if $HET_IC_FULL == 1 {
+.     global IC_ALIASES contr fdlsb fdls fdlsh gntsf hhlsb hhls hhlsh nflsb nfls nflsh subrf busf fedf tfnd instf nonpf statf lsf hsf biof applx apfx basx bfx clinx devx lscx medx endow
+. }
+
+. global PI_Q_BASES pre_ppr team nihg nihd
+
+. 
+. * Joint 2x2 axes for PI-split × inst-char paired coefplots. Each axis defines:
+. *   SRC   -- 0/1 PI-level dummy (1 = "hi" side of the axis)
+. *   HIPFX -- 2-char subgroup prefix for the "hi" side, used in dummy names
+. *   LOPFX -- 2-char subgroup prefix for the "lo" side
+. *   HILEG -- legend label for the "hi" side; LOLEG same for "lo" side
+. global PI_CHAR_ALIASES   prppr
+
+. global PI_CHAR_SRC_prppr   high_pre_ppr
+
+. global PI_CHAR_HIPFX_prppr hp
+
+. global PI_CHAR_LOPFX_prppr lp
+
+. global PI_CHAR_HILEG_prppr "High Baseline Productivity"
+
+. global PI_CHAR_LOLEG_prppr "Low Baseline Productivity"
+
+. global PI_CHAR_SRC_team    big_team
+
+. global PI_CHAR_HIPFX_team  bt
+
+. global PI_CHAR_LOPFX_team  sm
+
+. global PI_CHAR_HILEG_team  "Larger Team Size"
+
+. global PI_CHAR_LOLEG_team  "Smaller Team Size"
+
+. 
+. program define_group_labels
+  1.     global LBL_young        "Early-Career Scientists"
+  2.     global LBL_old          "Late-Career Scientists"
+  3.     global LBL_lab_lt10     "Early-Career Scientists (<10 Yrs)"
+  4.     global LBL_lab_10_20    "Mid-Career Scientists (10-20 Yrs)"
+  5.     global LBL_lab_20p      "Late-Career Scientists (20+ Yrs)"
+  6.     global LBL_q1_labage    "Q1 Lab Age (Newest Labs)"
+  7.     global LBL_q2_labage    "Q2 Lab Age"
+  8.     global LBL_q3_labage    "Q3 Lab Age"
+  9.     global LBL_q4_labage    "Q4 Lab Age (Most Established)"
+ 10.     global LBL_r1           "R1"
+ 11.     global LBL_r2           "R2"
+ 12.     global LBL_pub_inst     "Public"
+ 13.     global LBL_priv_inst    "Private"
+ 14.     global LBL_high_pre_ppr "More Productive at Baseline"
+ 15.     global LBL_low_pre_ppr  "Less Productive at Baseline"
+ 16.     global LBL_big_team     "Larger Team Size"
+ 17.     global LBL_small_team   "Smaller Team Size"
+ 18.     global LBL_high_nihg    "More NIH Grants at Baseline"
+ 19.     global LBL_low_nihg     "Fewer NIH Grants at Baseline"
+ 20.     global LBL_high_nihd    "More NIH Funding at Baseline"
+ 21.     global LBL_low_nihd     "Less NIH Funding at Baseline"
+ 22.     global LBL_young_nih    "Early-Career Scientists (NIH-Matched PIs)"
+ 23.     global LBL_old_nih      "Late-Career Scientists (NIH-Matched PIs)"
+ 24.     global LBL_yhigh_nihd   "Early-Career, More NIH (Young Median)"
+ 25.     global LBL_ylow_nihd    "Early-Career, Less NIH (Young Median)"
+ 26.     global LBL_yq4_nihd     "Early-Career, Q4 NIH (Young Quartiles)"
+ 27.     global LBL_yq1_nihd     "Early-Career, Q1 NIH (Young Quartiles)"
+ 28.     global LBL_big_net      "Larger Coauthor Network"
+ 29.     global LBL_small_net    "Smaller Coauthor Network"
+ 30.     global LBL_new_lab      "Newer Labs"
+ 31.     global LBL_est_lab      "Established Labs"
+ 32.     global LBL_crwd_inst    "More Same-Field PIs at Inst."
+ 33.     global LBL_sprs_inst    "Fewer Same-Field PIs at Inst."
+ 34.     global LBL_big_msa      "Larger MSAs"
+ 35.     global LBL_small_msa    "Smaller MSAs"
+ 36. 
+.     global LBL_q1_pre_ppr   "Q1 Baseline Productivity"
+ 37.     global LBL_q4_pre_ppr   "Q4 Baseline Productivity"
+ 38.     global LBL_q1_team      "Q1 Team Size"
+ 39.     global LBL_q4_team      "Q4 Team Size"
+ 40.     global LBL_q1_nihg      "Q1 Baseline NIH Grants"
+ 41.     global LBL_q4_nihg      "Q4 Baseline NIH Grants"
+ 42.     global LBL_q1_nihd      "Q1 Baseline NIH Funding"
+ 43.     global LBL_q4_nihd      "Q4 Baseline NIH Funding"
+ 44. 
+.     local ic_lbl_contr "Total Contract Funding"
+ 45.     local ic_lbl_fdlsb "Federal Life-Sci Biology Funding"
+ 46.     local ic_lbl_fdls  "Federal Life-Sci Funding"
+ 47.     local ic_lbl_fdlsh "Federal Life-Sci Health-Sci Funding"
+ 48.     local ic_lbl_gntsf "Grants Funding"
+ 49.     local ic_lbl_hhlsb "HHS Life-Sci Biology Funding"
+ 50.     local ic_lbl_hhls  "HHS Life-Sci Funding"
+ 51.     local ic_lbl_hhlsh "HHS Life-Sci Health-Sci Funding"
+ 52.     local ic_lbl_nflsb "Non-Federal Life-Sci Biology Funding"
+ 53.     local ic_lbl_nfls  "Non-Federal Life-Sci Funding"
+ 54.     local ic_lbl_nflsh "Non-Federal Life-Sci Health-Sci Funding"
+ 55.     local ic_lbl_subrf "Subrecipient Funding"
+ 56.     local ic_lbl_busf  "Business Funding"
+ 57.     local ic_lbl_fedf  "Total Federal Funding"
+ 58.     local ic_lbl_tfnd  "Institutional R&D Funding"
+ 59.     local ic_lbl_instf "Institutional Funding"
+ 60.     local ic_lbl_nonpf "Non-Profit Funding"
+ 61.     local ic_lbl_statf "State Funding"
+ 62.     local ic_lbl_lsf   "Institutional Life-Sci Funding"
+ 63.     local ic_lbl_hsf   "Health-Sci Funding"
+ 64.     local ic_lbl_biof  "Biology Funding"
+ 65.     local ic_lbl_applx "Applied Research Expenditures"
+ 66.     local ic_lbl_apfx  "Federal Applied Research Expenditures"
+ 67.     local ic_lbl_basx  "Basic Research Expenditures"
+ 68.     local ic_lbl_bfx   "Federal Basic Research Expenditures"
+ 69.     local ic_lbl_clinx "Clinical Trial Expenditures"
+ 70.     local ic_lbl_devx  "Development Expenditures"
+ 71.     local ic_lbl_lscx  "Life-Sci Capital Expenditures"
+ 72.     local ic_lbl_medx  "Medical School Expenditures"
+ 73.     local ic_lbl_endow "Institutional Endowment"
+ 74.     foreach a of global IC_ALIASES {
+ 75.         global LBL_ic_`a'   "`ic_lbl_`a''"
+ 76.         global LBL_hi_`a'   "High `ic_lbl_`a''"
+ 77.         global LBL_lo_`a'   "Low `ic_lbl_`a''"
+ 78.         global LBL_q1_`a'   "Q1 `ic_lbl_`a''"
+ 79.         global LBL_q4_`a'   "Q4 `ic_lbl_`a''"
+ 80.         global LBL_mid_`a'  "Mid `ic_lbl_`a''"
+ 81.         global LBL_hiw_`a'  "High `ic_lbl_`a''"
+ 82.         global LBL_low_`a'  "Low `ic_lbl_`a''"
+ 83.         global LBL_q1w_`a'  "Q1 `ic_lbl_`a''"
+ 84.         global LBL_q4w_`a'  "Q4 `ic_lbl_`a''"
+ 85.         global LBL_midw_`a' "Mid `ic_lbl_`a''"
+ 86.         global LBL_y_hi_`a' "Early-Career x Hi `ic_lbl_`a''"
+ 87.         global LBL_y_lo_`a' "Early-Career x Lo `ic_lbl_`a''"
+ 88.         global LBL_o_hi_`a' "Late-Career x Hi `ic_lbl_`a''"
+ 89.         global LBL_o_lo_`a' "Late-Career x Lo `ic_lbl_`a''"
+ 90.     }
+ 91. 
+.     global IC_PAIRS_MED
+ 92.     global IC_PAIRS_MED_PW
+ 93.     global IC_PAIRS_Q
+ 94.     global IC_PAIRS_Q_PW
+ 95.     foreach a of global IC_ALIASES {
+ 96.         global IC_PAIRS_MED    `"${IC_PAIRS_MED} "hi_`a' lo_`a'" "'
+ 97.         global IC_PAIRS_MED_PW `"${IC_PAIRS_MED_PW} "hiw_`a' low_`a'" "'
+ 98.         global IC_PAIRS_Q      `"${IC_PAIRS_Q} "q4_`a' q1_`a'" "'
+ 99.         global IC_PAIRS_Q_PW   `"${IC_PAIRS_Q_PW} "q4w_`a' q1w_`a'" "'
+100.     }
+101.     global PI_PAIRS_Q
+102.     foreach b of global PI_Q_BASES {
+103.         global PI_PAIRS_Q `"${PI_PAIRS_Q} "q4_`b' q1_`b'" "'
+104.     }
+105. end
+
+. 
+. program add_het_splits
+  1.     syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0)]
+  2.     local suf ""
+  3.     if (`r1r2' == 1 & `public' == 0 & `r1_only' == 0) local suf "_r1_r2"
+  4.     if (`r1r2' == 1 & `public' == 1 & `r1_only' == 0) local suf "_r1_r2_public"
+  5.     if (`r1_only' == 1 & `public' == 0) local suf "_r1"
+  6.     if (`r1_only' == 1 & `public' == 1) local suf "_r1_public"
+  7. 
+.     use ../external/prepped_samples/es_`samp'`suf', clear
+  8. 
+.     cap drop athr_indicator
+  9.     bys athr_id : gen athr_indicator = _n == 1
+ 10. 
+.     qui sum pre_ppr_cnt_sum if athr_indicator == 1, d
+ 11.     local ppr_cut = r(p50)
+ 12.     gen high_pre_ppr = pre_ppr_cnt_sum >= `ppr_cut' if !mi(pre_ppr_cnt_sum)
+ 13.     gen low_pre_ppr  = pre_ppr_cnt_sum <  `ppr_cut' if !mi(pre_ppr_cnt_sum)
+ 14. 
+.     * young/old split on first last-author year (min_year), not career age
+.     qui sum min_year if athr_indicator == 1, d
+ 15.     local lastyr_med = r(p50)
+ 16.     di as text "add_het_splits `samp'`suf' min_year (first last-author yr) median = `lastyr_med'"
+ 17.     gen young = min_year >  `lastyr_med' if !mi(min_year)
+ 18.     gen old   = min_year <= `lastyr_med' if !mi(min_year)
+ 19. 
+.     gen r1 = type == "r1" if !mi(type)
+ 20.     gen r2 = type == "r2" if !mi(type)
+ 21. 
+.     cap confirm variable public
+ 22.     if !_rc {
+ 23.         gen pub_inst  = public == 1 if !mi(public)
+ 24.         gen priv_inst = public == 0 if !mi(public)
+ 25.     }
+ 26.     else di as error "add_het_splits `samp'`suf': public not in panel -- pub_inst/priv_inst SKIPPED (rerun reduced_form/restrict_samp to add it)."
+ 27. 
+.     cap confirm variable avg_team_size_last
+ 28.     if !_rc {
+ 29.         gen pre_team_yr = avg_team_size_last if year < 2014
+ 30.         bys athr_id: egen pre_team_avg = mean(pre_team_yr)
+ 31.         drop pre_team_yr
+ 32.         qui sum pre_team_avg if athr_indicator == 1, d
+ 33.         local team_med = r(p50)
+ 34.         di as text "add_het_splits `samp'`suf' pre-team median = `team_med'"
+ 35.         gen big_team   = pre_team_avg >= `team_med' if !mi(pre_team_avg)
+ 36.         gen small_team = pre_team_avg <  `team_med' if !mi(pre_team_avg)
+ 37.     }
+ 38.     else di as error "add_het_splits `samp'`suf': avg_team_size_last not in panel -- team split SKIPPED."
+ 39. 
+.     * Baseline NIH scale: pre-2014 means of the derived author-year measures
+.     * (n_grants, nih_total_cost from derived/nih/match_pi_athr). Both are missing
+.     * for PIs excluded upstream, so the NIH splits estimate on the NIH sample.
+.     local nih_src   n_grants nih_total_cost
+ 40.     local nih_alias nihg     nihd
+ 41.     forvalues i = 1/2 {
+ 42.         local src : word `i' of `nih_src'
+ 43.         local alias : word `i' of `nih_alias'
+ 44.         cap confirm variable `src'
+ 45.         if _rc {
+ 46.             di as error "add_het_splits `samp'`suf': `src' not in panel -- `alias' split SKIPPED (rerun reduced_form/restrict_samp)."
+ 47.             continue
+ 48.         }
+ 49.         gen pre_`alias'_yr = `src' if year < 2014
+ 50.         bys athr_id: egen pre_`alias' = mean(pre_`alias'_yr)
+ 51.         drop pre_`alias'_yr
+ 52.         local src pre_`alias'
+ 53.         qui sum `src' if athr_indicator == 1, d
+ 54.         local nih_n = r(N)
+ 55.         local nih_p50 = r(p50)
+ 56.         di as text "add_het_splits `samp'`suf' `alias' N_pi=`nih_n' p50=`nih_p50'"
+ 57.         gen byte high_`alias' = `src' >= `nih_p50' if !mi(`src')
+ 58.         gen byte low_`alias'  = `src' <  `nih_p50' if !mi(`src')
+ 59.     }
+ 60. 
+.     * Young-only NIH funding split: pre_nihd median re-cut WITHIN young
+.     * NIH-matched PIs. Dummies stay missing for old PIs, so every fit using
+.     * the pair estimates on the young sample only.
+.     cap confirm variable pre_nihd
+ 61.     if !_rc {
+ 62.         qui sum pre_nihd if athr_indicator == 1 & young == 1, d
+ 63.         local ynih_n = r(N)
+ 64.         local ynih_med = r(p50)
+ 65.         local ynih_p25 = r(p25)
+ 66.         local ynih_p75 = r(p75)
+ 67.         di as text "add_het_splits `samp'`suf' young-only nihd N_pi=`ynih_n' p25=`ynih_p25' p50=`ynih_med' p75=`ynih_p75'"
+ 68.         gen byte yhigh_nihd = pre_nihd >= `ynih_med' if !mi(pre_nihd) & young == 1
+ 69.         gen byte ylow_nihd  = pre_nihd <  `ynih_med' if !mi(pre_nihd) & young == 1
+ 70.         * Q1-vs-Q4 tails of the same young-only distribution; middle 50%
+.         * left missing so pair fits compare tails only.
+.         gen byte yq4_nihd = pre_nihd >= `ynih_p75' if !mi(pre_nihd) & young == 1 ///
+>                             & (pre_nihd >= `ynih_p75' | pre_nihd <= `ynih_p25')
+ 71.         gen byte yq1_nihd = 1 - yq4_nihd
+ 72.     }
+ 73. 
+.     * Age split restricted to PIs matched to RePORTER (n_grants non-missing).
+.     * Dummies stay missing off the NIH sample, so every fit using them drops
+.     * unmatched PIs rather than pooling them into the base category.
+.     * nih_matched comes from reduced_form (RePORTER PI-name match). Fall back to
+.     * an n_grants-based proxy only if the panel predates it.
+.     cap drop nih_pi
+ 74.     cap confirm variable nih_matched
+ 75.     if !_rc {
+ 76.         bys athr_id: egen byte nih_pi = max(nih_matched == 1)
+ 77.     }
+ 78.     else {
+ 79.         cap confirm variable n_grants
+ 80.         if !_rc bys athr_id: egen byte nih_pi = max(!mi(n_grants))
+ 81.     }
+ 82.     cap confirm variable nih_pi
+ 83.     if !_rc {
+ 84.         qui count if nih_pi == 1 & athr_indicator == 1
+ 85.         di as text "add_het_splits `samp'`suf' NIH-matched PIs = " r(N)
+ 86.         gen byte young_nih = young if nih_pi == 1 & !mi(young)
+ 87.         gen byte old_nih   = old   if nih_pi == 1 & !mi(old)
+ 88.     }
+ 89.     else di as error "add_het_splits `samp'`suf': no NIH match flag in panel -- young_nih/old_nih SKIPPED."
+ 90. 
+.     cap confirm variable avg_num_coathrs
+ 91.     if !_rc {
+ 92.         gen pre_coauth_yr = avg_num_coathrs if year < 2014
+ 93.         bys athr_id: egen pre_coauth_avg = mean(pre_coauth_yr)
+ 94.         drop pre_coauth_yr
+ 95.     }
+ 96. 
+.     cap confirm variable msa_size
+ 97.     if !_rc {
+ 98.         gen msa_size_2014 = msa_size if year == 2014
+ 99.         bys athr_id: egen msa_size_at = max(msa_size_2014)
+100.         drop msa_size_2014
+101.     }
+102. 
+.     merge m:1 inst_id using ../temp/inst_chars_pre, keep(1 3) nogen
+103.     cap drop inst_indicator
+104.     bys inst_id : gen inst_indicator = _n == 1
+105.     foreach a of global IC_ALIASES {
+106.         cap confirm variable ic_`a'
+107.         if _rc continue
+108.         * Inst-weighted cutoffs (each institution counts once).
+.         qui sum ic_`a' if inst_indicator == 1, d
+109.         local ic_n = r(N)
+110.         local ic_p50 = r(p50)
+111.         local ic_p25 = r(p25)
+112.         local ic_p75 = r(p75)
+113.         di as text "add_het_splits `samp'`suf' ic_`a' inst-wtd N_inst=`ic_n' p25=`ic_p25' p50=`ic_p50' p75=`ic_p75'"
+114.         gen byte hi_`a'  = ic_`a' >= `ic_p50' if !mi(ic_`a')
+115.         gen byte lo_`a'  = ic_`a' <  `ic_p50' if !mi(ic_`a')
+116.         gen byte q1_`a'  = ic_`a' <= `ic_p25' if !mi(ic_`a')
+117.         gen byte q4_`a'  = ic_`a' >= `ic_p75' if !mi(ic_`a')
+118.         gen byte mid_`a' = (ic_`a' > `ic_p25' & ic_`a' < `ic_p75') if !mi(ic_`a')
+119.         * PI-weighted cutoffs (each PI counts once; big institutions dominate).
+.         qui sum ic_`a' if athr_indicator == 1, d
+120.         local ic_p25w = r(p25)
+121.         local ic_p50w = r(p50)
+122.         local ic_p75w = r(p75)
+123.         di as text "add_het_splits `samp'`suf' ic_`a' pi-wtd N_pi=" r(N) " p25=`ic_p25w' p50=`ic_p50w' p75=`ic_p75w'"
+124.         gen byte hiw_`a'  = ic_`a' >= `ic_p50w' if !mi(ic_`a')
+125.         gen byte low_`a'  = ic_`a' <  `ic_p50w' if !mi(ic_`a')
+126.         gen byte q1w_`a'  = ic_`a' <= `ic_p25w' if !mi(ic_`a')
+127.         gen byte q4w_`a'  = ic_`a' >= `ic_p75w' if !mi(ic_`a')
+128.         gen byte midw_`a' = (ic_`a' > `ic_p25w' & ic_`a' < `ic_p75w') if !mi(ic_`a')
+129.     }
+130. 
+.     local pi_q_source pre_ppr_cnt_sum pre_team_avg pre_nihg pre_nihd
+131.     local pi_q_alias  pre_ppr        team         nihg     nihd
+132.     local nq : word count `pi_q_alias'
+133.     forvalues i = 1/`nq' {
+134.         local src : word `i' of `pi_q_source'
+135.         local alias : word `i' of `pi_q_alias'
+136.         cap confirm variable `src'
+137.         if _rc {
+138.             di as error "add_het_splits `samp'`suf': `src' unavailable -- `alias' quartiles SKIPPED."
+139.             continue
+140.         }
+141.         qui sum `src' if athr_indicator == 1, d
+142.         local p25 = r(p25)
+143.         local p75 = r(p75)
+144.         di as text "add_het_splits `samp'`suf' `alias' p25=`p25' p75=`p75'"
+145.         gen byte q1_`alias'  = `src' <= `p25' if !mi(`src')
+146.         gen byte q4_`alias'  = `src' >= `p75' if !mi(`src')
+147.         gen byte mid_`alias' = (`src' > `p25' & `src' < `p75') if !mi(`src')
+148.     }
+149. 
+.     * Joint young x hiw_<char> 2x2 for every ic char (PI-weighted median cutoff).
+.     foreach a of global IC_ALIASES {
+150.         cap confirm variable hiw_`a'
+151.         if _rc continue
+152.         gen byte y_hi_`a' = (young == 1 & hiw_`a' == 1) if !mi(young) & !mi(hiw_`a')
+153.         gen byte y_lo_`a' = (young == 1 & hiw_`a' == 0) if !mi(young) & !mi(hiw_`a')
+154.         gen byte o_hi_`a' = (young == 0 & hiw_`a' == 1) if !mi(young) & !mi(hiw_`a')
+155.         gen byte o_lo_`a' = (young == 0 & hiw_`a' == 0) if !mi(young) & !mi(hiw_`a')
+156.     }
+157. 
+.     * Joint age x baseline-productivity 2x2 (no inst char). Four subgroups.
+.     cap confirm variable high_pre_ppr
+158.     if !_rc {
+159.         gen byte y_hp = (young == 1 & high_pre_ppr == 1) if !mi(young) & !mi(high_pre_ppr)
+160.         gen byte y_lp = (young == 1 & high_pre_ppr == 0) if !mi(young) & !mi(high_pre_ppr)
+161.         gen byte o_hp = (young == 0 & high_pre_ppr == 1) if !mi(young) & !mi(high_pre_ppr)
+162.         gen byte o_lp = (young == 0 & high_pre_ppr == 0) if !mi(young) & !mi(high_pre_ppr)
+163.     }
+164. 
+.     * Joint age x baseline-NIH-funding 2x2. Cells missing off the NIH-matched
+.     * sample, so fits using them drop unmatched PIs rather than pooling them
+.     * into the base category.
+.     cap confirm variable high_nihd
+165.     if !_rc {
+166.         gen byte y_hn = (young == 1 & high_nihd == 1) if !mi(young) & !mi(high_nihd)
+167.         gen byte y_ln = (young == 1 & high_nihd == 0) if !mi(young) & !mi(high_nihd)
+168.         gen byte o_hn = (young == 0 & high_nihd == 1) if !mi(young) & !mi(high_nihd)
+169.         gen byte o_ln = (young == 0 & high_nihd == 0) if !mi(young) & !mi(high_nihd)
+170.     }
+171. 
+.     * Joint baseline-productivity x baseline-NIH-funding 2x2 (NIH-matched
+.     * sample, same missingness logic as the age x nihd cells).
+.     cap confirm variable high_pre_ppr
+172.     local rc_pr = _rc
+173.     cap confirm variable high_nihd
+174.     if !`rc_pr' & !_rc {
+175.         gen byte hp_hn = (high_pre_ppr == 1 & high_nihd == 1) if !mi(high_pre_ppr) & !mi(high_nihd)
+176.         gen byte hp_ln = (high_pre_ppr == 1 & high_nihd == 0) if !mi(high_pre_ppr) & !mi(high_nihd)
+177.         gen byte lp_hn = (high_pre_ppr == 0 & high_nihd == 1) if !mi(high_pre_ppr) & !mi(high_nihd)
+178.         gen byte lp_ln = (high_pre_ppr == 0 & high_nihd == 0) if !mi(high_pre_ppr) & !mi(high_nihd)
+179.     }
+180. 
+.     * Team-size 2x2 cells: x age, x baseline NIH funding, x baseline
+.     * productivity.
+.     cap confirm variable big_team
+181.     if !_rc {
+182.         gen byte y_bt = (young == 1 & big_team == 1) if !mi(young) & !mi(big_team)
+183.         gen byte y_sm = (young == 1 & big_team == 0) if !mi(young) & !mi(big_team)
+184.         gen byte o_bt = (young == 0 & big_team == 1) if !mi(young) & !mi(big_team)
+185.         gen byte o_sm = (young == 0 & big_team == 0) if !mi(young) & !mi(big_team)
+186.         cap confirm variable high_nihd
+187.         if !_rc {
+188.             gen byte bt_hn = (big_team == 1 & high_nihd == 1) if !mi(big_team) & !mi(high_nihd)
+189.             gen byte bt_ln = (big_team == 1 & high_nihd == 0) if !mi(big_team) & !mi(high_nihd)
+190.             gen byte sm_hn = (big_team == 0 & high_nihd == 1) if !mi(big_team) & !mi(high_nihd)
+191.             gen byte sm_ln = (big_team == 0 & high_nihd == 0) if !mi(big_team) & !mi(high_nihd)
+192.         }
+193.         cap confirm variable high_pre_ppr
+194.         if !_rc {
+195.             gen byte bt_hp = (big_team == 1 & high_pre_ppr == 1) if !mi(big_team) & !mi(high_pre_ppr)
+196.             gen byte bt_lp = (big_team == 1 & high_pre_ppr == 0) if !mi(big_team) & !mi(high_pre_ppr)
+197.             gen byte sm_hp = (big_team == 0 & high_pre_ppr == 1) if !mi(big_team) & !mi(high_pre_ppr)
+198.             gen byte sm_lp = (big_team == 0 & high_pre_ppr == 0) if !mi(big_team) & !mi(high_pre_ppr)
+199.         }
+200.     }
+201. 
+.     * Non-funding mechanism splits for the young result.
+.     * (1) Pre-2014 unique-coauthor network (n_coauthors_yr is distinct
+.     * coauthors per year, self-excluded) -- access to equipment through
+.     * collaborators.
+.     cap confirm variable n_coauthors_yr
+202.     if !_rc {
+203.         gen pre_net_yr = n_coauthors_yr if year < 2014
+204.         bys athr_id: egen pre_net_avg = mean(pre_net_yr)
+205.         drop pre_net_yr
+206.         qui sum pre_net_avg if athr_indicator == 1, d
+207.         local net_med = r(p50)
+208.         di as text "add_het_splits `samp'`suf' pre-net median = `net_med'"
+209.         gen byte big_net   = pre_net_avg >= `net_med' if !mi(pre_net_avg)
+210.         gen byte small_net = pre_net_avg <  `net_med' if !mi(pre_net_avg)
+211.     }
+212.     * (2) Lab age: years since first last-authored paper (min_year), distinct
+.     * from career age (min_year_any, which age_2014 is built on) -- lab
+.     * capital vintage: recently-started labs have not accumulated equipment.
+.     cap confirm variable min_year
+213.     if !_rc {
+214.         gen lab_age_2014 = 2014 - min_year
+215.         qui sum lab_age_2014 if athr_indicator == 1, d
+216.         local lab_med = r(p50)
+217.         di as text "add_het_splits `samp'`suf' lab_age median = `lab_med'"
+218.         gen byte new_lab = lab_age_2014 <  `lab_med' if !mi(lab_age_2014)
+219.         gen byte est_lab = lab_age_2014 >= `lab_med' if !mi(lab_age_2014)
+220.         gen byte lab_lt10  = lab_age_2014 < 10             if !mi(lab_age_2014)
+221.         gen byte lab_10_20 = inrange(lab_age_2014, 10, 19) if !mi(lab_age_2014)
+222.         gen byte lab_20p   = lab_age_2014 >= 20            if !mi(lab_age_2014)
+223.         qui sum lab_age_2014 if athr_indicator == 1, d
+224.         di as text "add_het_splits `samp'`suf' lab_age quartile cuts: p25=" r(p25) " p50=" r(p50) " p75=" r(p75)
+225.         xtile _labq_pi = lab_age_2014 if athr_indicator == 1, nq(4)
+226.         bys athr_id: egen _labq = max(_labq_pi)
+227.         forval q = 1/4 {
+228.             gen byte q`q'_labage = _labq == `q' if !mi(_labq)
+229.         }
+230.         drop _labq_pi _labq
+231.     }
+232.     * (3) Same-field PIs at the institution (sample roster, inst x cluster) --
+.     * shared cores / borrowable equipment down the hall.
+.     cap confirm variable cluster_30
+233.     if !_rc {
+234.         bys inst_id cluster_30 athr_id: gen byte _fld_tag = _n == 1
+235.         bys inst_id cluster_30: egen fld_pis = total(_fld_tag)
+236.         drop _fld_tag
+237.         qui sum fld_pis if athr_indicator == 1, d
+238.         local fld_med = r(p50)
+239.         di as text "add_het_splits `samp'`suf' fld_pis median = `fld_med'"
+240.         gen byte crwd_inst = fld_pis >= `fld_med' if !mi(fld_pis)
+241.         gen byte sprs_inst = fld_pis <  `fld_med' if !mi(fld_pis)
+242.     }
+243.     * (4) MSA size -- thick local equipment / core-facility market. NOTE
+.     * msa_size_at is missing for ~27% of PIs (no 2014 MSA row).
+.     cap confirm variable msa_size_at
+244.     if !_rc {
+245.         qui sum msa_size_at if athr_indicator == 1, d
+246.         local msa_med = r(p50)
+247.         gen byte big_msa   = msa_size_at >= `msa_med' if !mi(msa_size_at)
+248.         gen byte small_msa = msa_size_at <  `msa_med' if !mi(msa_size_at)
+249.     }
+250.     * Age x mechanism cells.
+.     cap confirm variable big_net
+251.     if !_rc {
+252.         gen byte y_bn = (young == 1 & big_net == 1) if !mi(young) & !mi(big_net)
+253.         gen byte y_sn = (young == 1 & big_net == 0) if !mi(young) & !mi(big_net)
+254.         gen byte o_bn = (young == 0 & big_net == 1) if !mi(young) & !mi(big_net)
+255.         gen byte o_sn = (young == 0 & big_net == 0) if !mi(young) & !mi(big_net)
+256.     }
+257.     cap confirm variable new_lab
+258.     if !_rc {
+259.         gen byte y_nl = (young == 1 & new_lab == 1) if !mi(young) & !mi(new_lab)
+260.         gen byte y_el = (young == 1 & new_lab == 0) if !mi(young) & !mi(new_lab)
+261.         gen byte o_nl = (young == 0 & new_lab == 1) if !mi(young) & !mi(new_lab)
+262.         gen byte o_el = (young == 0 & new_lab == 0) if !mi(young) & !mi(new_lab)
+263.     }
+264.     cap confirm variable crwd_inst
+265.     if !_rc {
+266.         gen byte y_ci = (young == 1 & crwd_inst == 1) if !mi(young) & !mi(crwd_inst)
+267.         gen byte y_si = (young == 1 & crwd_inst == 0) if !mi(young) & !mi(crwd_inst)
+268.         gen byte o_ci = (young == 0 & crwd_inst == 1) if !mi(young) & !mi(crwd_inst)
+269.         gen byte o_si = (young == 0 & crwd_inst == 0) if !mi(young) & !mi(crwd_inst)
+270.     }
+271.     cap confirm variable big_msa
+272.     if !_rc {
+273.         gen byte y_bmsa = (young == 1 & big_msa == 1) if !mi(young) & !mi(big_msa)
+274.         gen byte y_smsa = (young == 1 & big_msa == 0) if !mi(young) & !mi(big_msa)
+275.         gen byte o_bmsa = (young == 0 & big_msa == 1) if !mi(young) & !mi(big_msa)
+276.         gen byte o_smsa = (young == 0 & big_msa == 0) if !mi(young) & !mi(big_msa)
+277.     }
+278. 
+.     * Joint PI-split x inst-char 2x2. For each axis (baseline productivity,
+.     * coauthors), build 4 subgroup dummies per inst char keyed on the PI split
+.     * and the PI-wtd inst-char hi/lo indicator.
+.     foreach axis of global PI_CHAR_ALIASES {
+279.         local src "${PI_CHAR_SRC_`axis'}"
+280.         local hp  "${PI_CHAR_HIPFX_`axis'}"
+281.         local lp  "${PI_CHAR_LOPFX_`axis'}"
+282.         cap confirm variable `src'
+283.         if _rc continue
+284.         foreach a of global IC_ALIASES {
+285.             cap confirm variable hiw_`a'
+286.             if _rc continue
+287.             gen byte `hp'_hi_`a' = (`src' == 1 & hiw_`a' == 1) if !mi(`src') & !mi(hiw_`a')
+288.             gen byte `hp'_lo_`a' = (`src' == 1 & hiw_`a' == 0) if !mi(`src') & !mi(hiw_`a')
+289.             gen byte `lp'_hi_`a' = (`src' == 0 & hiw_`a' == 1) if !mi(`src') & !mi(hiw_`a')
+290.             gen byte `lp'_lo_`a' = (`src' == 0 & hiw_`a' == 0) if !mi(`src') & !mi(hiw_`a')
+291.         }
+292.     }
+293. 
+.     compress
+294.     save ../temp/es_`samp'`suf', replace
+295. end
+
+. 
+. program event_study_het
+  1.     * Split-interaction PPML het regressions (+ OLS if HET_RUN_OLS=1).
+.     * Writes ../temp/phet_results_<samp><suf>.dta.
+.     syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0)]
+  2.     local fes athr_id year
+  3.     local vce_cl athr_id
+  4.     if "$FE_MODE" == "inst_cluster" {
+  5.         local fes inst_id cluster_30 year
+  6.         local vce_cl inst_id
+  7.     }
+  8.     if "$FE_MODE" == "inst_cluster_fldyr" {
+  9.         local fes inst_id i.cluster_30#i.year
+ 10.         local vce_cl inst_id
+ 11.     }
+ 12.     local suf ""
+ 13.     if (`r1r2' == 1 & `public' == 0 & `r1_only' == 0) local suf "_r1_r2"
+ 14.     if (`r1r2' == 1 & `public' == 1 & `r1_only' == 0) local suf "_r1_r2_public"
+ 15.     if (`r1_only' == 1 & `public' == 0) local suf "_r1"
+ 16.     if (`r1_only' == 1 & `public' == 1) local suf "_r1_public"
+ 17.     use ../temp/es_`samp'`suf', clear
+ 18. 
+.     gen rel = year - 2014
+ 19.     qui sum rel, d
+ 20.     local abs_lag = abs(r(max))
+ 21.     local abs_lead = abs(r(min))
+ 22.     * [H8] only the observed window; unused time dummies removed
+.     forval i = 1/`abs_lead' {
+ 23.         gen int_lead`i'  = exposure      if rel == -`i'
+ 24.         gen mshr_lead`i' = mkt_spend_shr if rel == -`i'
+ 25.     }
+ 26.     forval i = 0/`abs_lag' {
+ 27.         gen int_lag`i'  = exposure      if rel == `i'
+ 28.         gen mshr_lag`i' = mkt_spend_shr if rel == `i'
+ 29.     }
+ 30.     ds int_lead* int_lag* mshr_lead* mshr_lag*
+ 31.     foreach var in `r(varlist)' {
+ 32.         replace `var' = 0 if mi(`var')
+ 33.     }
+ 34.     local int_leads
+ 35.     local mshr_leads
+ 36.     local int_lags
+ 37.     local mshr_lags
+ 38.     forval i = 2/`abs_lead' {
+ 39.         local int_leads int_lead`i' `int_leads'
+ 40.         local mshr_leads mshr_lead`i' `mshr_leads'
+ 41.     }
+ 42.     forval i = 0/`abs_lag' {
+ 43.         local int_lags `int_lags' int_lag`i'
+ 44.         local mshr_lags `mshr_lags' mshr_lag`i'
+ 45.     }
+ 46.     foreach v in ppr_cnt cite_affl_wt {
+ 47.         gen ln_`v' = ln(1+`v')
+ 48.     }
+ 49. 
+.     * Skip dummies that are missing or degenerate (all 0 / all 1) so
+.     * downstream loops don't try to fit collinear specs.
+.     local het_groups young old r1 r2 pub_inst priv_inst high_pre_ppr low_pre_ppr ///
+>                      big_team small_team high_nihg low_nihg high_nihd low_nihd ///
+>                      young_nih old_nih big_net small_net new_lab est_lab ///
+>                      crwd_inst sprs_inst big_msa small_msa yhigh_nihd ylow_nihd ///
+>                      yq4_nihd yq1_nihd lab_lt10 lab_10_20 lab_20p ///
+>                      q1_labage q2_labage q3_labage q4_labage
+ 50.     * Only groups the active config actually fits get lead/lag interactions.
+.     foreach a of global IC_ALIASES {
+ 51.         local het_groups `het_groups' hiw_`a' low_`a'
+ 52.         if "$HET_INCLUDE_INSTWTD" == "1" local het_groups `het_groups' hi_`a' lo_`a'
+ 53.         if "$HET_RUN_QUARTILES" == "1" {
+ 54.             local het_groups `het_groups' q1w_`a' midw_`a' q4w_`a'
+ 55.             if "$HET_INCLUDE_INSTWTD" == "1" local het_groups `het_groups' q1_`a' mid_`a' q4_`a'
+ 56.         }
+ 57.     }
+ 58.     if "$HET_RUN_QUARTILES" == "1" {
+ 59.         foreach b of global PI_Q_BASES {
+ 60.             local het_groups `het_groups' q1_`b' mid_`b' q4_`b'
+ 61.         }
+ 62.     }
+ 63.     global HET_GROUPS_ACTIVE
+ 64.     foreach grp of local het_groups {
+ 65.         cap confirm variable `grp'
+ 66.         if _rc {
+ 67.             di as text "event_study_het `samp'`suf': dummy `grp' not built -- skipping."
+ 68.             continue
+ 69.         }
+ 70.         qui sum `grp'
+ 71.         if r(N) == 0 | r(min) == r(max) {
+ 72.             di as text "event_study_het `samp'`suf': dummy `grp' degenerate -- skipping."
+ 73.             continue
+ 74.         }
+ 75.         foreach v of local int_leads {
+ 76.             gen `v'_`grp' = `v' * `grp'
+ 77.         }
+ 78.         foreach v of local int_lags {
+ 79.             gen `v'_`grp' = `v' * `grp'
+ 80.         }
+ 81.         gen int_lead1_`grp' = int_lead1 * `grp'
+ 82.         foreach v of local mshr_leads {
+ 83.             gen `v'_`grp' = `v' * `grp'
+ 84.         }
+ 85.         foreach v of local mshr_lags {
+ 86.             gen `v'_`grp' = `v' * `grp'
+ 87.         }
+ 88.         local leads_`grp'
+ 89.         local lags_`grp'
+ 90.         local mleads_`grp'
+ 91.         local mlags_`grp'
+ 92.         foreach v of local int_leads {
+ 93.             local leads_`grp' `leads_`grp'' `v'_`grp'
+ 94.         }
+ 95.         foreach v of local int_lags {
+ 96.             local lags_`grp' `lags_`grp'' `v'_`grp'
+ 97.         }
+ 98.         foreach v of local mshr_leads {
+ 99.             local mleads_`grp' `mleads_`grp'' `v'_`grp'
+100.         }
+101.         foreach v of local mshr_lags {
+102.             local mlags_`grp' `mlags_`grp'' `v'_`grp'
+103.         }
+104.         global HET_GROUPS_ACTIVE `"${HET_GROUPS_ACTIVE} `grp'"'
+105.     }
+106. 
+.     if "$POSITION_OUTCOMES_AVAIL" == "" {
+107.         cap confirm variable n_first_ppr
+108.         global POSITION_OUTCOMES_AVAIL = cond(_rc == 0, 1, 0)
+109.     }
+110.     local position_outcomes ""
+111.     if "$POSITION_OUTCOMES_AVAIL" == "1" {
+112.         local position_outcomes n_middle_ppr avg_position avg_team_size_last avg_team_size_notlast
+113.     }
+114. 
+.     * Pooled DiD building blocks (used by the coefplot-feeding fits below).
+.     cap drop post Z_it Z_share_it
+115.     gen post       = year >= 2014
+116.     gen Z_it       = exposure      * post
+117.     gen Z_share_it = mkt_spend_shr * post
+118. 
+.     local pi_pairs `" "young old" "young_nih old_nih" "r1 r2" "pub_inst priv_inst" "high_pre_ppr low_pre_ppr" "big_team small_team" "high_nihg low_nihg" "high_nihd low_nihd" "big_net small_net" "new_lab est_lab" "crwd_inst sprs_inst" "big_msa small_msa"
+>  "yhigh_nihd ylow_nihd" "yq4_nihd yq1_nihd" "'
+119.     global DUMMY_PAIRS_MED    `" `pi_pairs' ${IC_PAIRS_MED} "'
+120.     * PI-level splits included in both med and med_pi so PI-char coefplots
+.     * still emit when HET_INCLUDE_INSTWTD=0 (only PI-weighted median runs).
+.     global DUMMY_PAIRS_MED_PW `" `pi_pairs' ${IC_PAIRS_MED_PW} "'
+121. 
+.     * Skip PPML on avg_* outcomes (conditional means, not counts).
+.     local ppml_het_skip avg_position avg_team_size_last avg_team_size_notlast
+122. 
+.     mat drop _all
+123.     * Write per-yvar phet_results files (postfile has no append option); combine into
+.     * master ../temp/phet_results_<samp><suf>.dta after the loop.
+.     local yvar_list ppr_cnt cite_affl_wt avg_num_coathrs ///
+>                     n_grants n_new_grants nih_total_cost ///
+>                     `position_outcomes'
+124.     if "$DEBUG_YVAR" != "" {
+125.         local yvar_list $DEBUG_YVAR
+126.         di as text "DEBUG_YVAR set -- restricting yvar loop to: $DEBUG_YVAR"
+127.     }
+128. 
+.     foreach yvar of local yvar_list {
+129.         tempname ph_handle
+130.         postfile `ph_handle' str30 yvar str24 grp str12 spec str20 split_type ///
+>             double(post_b post_se pre_b pre_se N r2_p) ///
+>             using "../temp/phet_results_`samp'`suf'_`yvar'", replace
+131.         local gap 0.5
+132.         if regexm("`yvar'", "^cite_affl_wt") local gap 1
+133.         local ppml_ytit "Output-Cost Elasticity"
+134.         if "`yvar'" == "n_grants"       local ppml_ytit "{&Delta} Log Expected Active NIH Research Grants"
+135.         if "`yvar'" == "n_new_grants"   local ppml_ytit "{&Delta} Log Expected New NIH Research Grants"
+136.         if "`yvar'" == "nih_total_cost" local ppml_ytit "{&Delta} Log Expected NIH Award Dollars"
+137. 
+.         * ---- OLS median het (gated by $HET_RUN_OLS, headline outcomes only)
+.         * leads_g1/lags_g1 are the differential vs the dummy=0 (`g2') group
+.         * absorbed by un-interacted int_lead/int_lag.
+.         if "$HET_RUN_OLS" == "1" & inlist("`yvar'", "ppr_cnt", "cite_affl_wt") {
+138.             foreach pair of global DUMMY_PAIRS_MED {
+139.                 local g1: word 1 of `pair'
+140.                 local g2: word 2 of `pair'
+141.                 if strpos(" ${HET_GROUPS_ACTIVE} ", " `g1' ") == 0 continue
+142.                 if strpos(" ${HET_GROUPS_ACTIVE} ", " `g2' ") == 0 continue
+143.                 local g1_label = "${LBL_`g1'}"
+144.                 if "`g1_label'" == "" local g1_label "`g1'"
+145.                 local mshr_ctrls `mshr_leads' `mshr_lags' `mleads_`g1'' `mlags_`g1''
+146.                 local plot_suf "_mshrctrl"
+147.                 cap drop PT_`g1'
+148.                 gen PT_`g1' = post * `g1'
+149.                 cap noi reghdfe `yvar' `int_leads' `int_lags' ///
+>                                `leads_`g1'' `lags_`g1'' ///
+>                                `mshr_ctrls' PT_`g1', ///
+>                                absorb(`fes') vce(cluster `vce_cl')
+150.                 local rc = _rc
+151.                 if `rc' {
+152.                     di as error "event_study_het `samp'`suf' `yvar' `g1' failed (rc=`rc'); skipping."
+153.                     continue
+154.                 }
+155.                 gunique athr_id if e(sample) & `g1' == 1
+156.                 local num_athrs = r(unique)
+157.                 gunique inst_id if e(sample) & `g1' == 1
+158.                 local num_insts = r(unique)
+159.                 sum `yvar' if rel <= -1 & e(sample) & `g1' == 1, d
+160.                 local pre_mean : dis %4.3f r(mean)
+161.                 preserve
+162.                 cap mat drop es
+163.                 foreach var in `leads_`g1'' `lags_`g1'' int_lead1_`g1' {
+164.                     if "`var'" == "int_lead1_`g1'" {
+165.                         mat row = 0,0
+166.                     }
+167.                     else {
+168.                         mat row = _b[`var'], _se[`var']
+169.                     }
+170.                     mat es = nullmat(es) \ row
+171.                 }
+172.                 svmat es
+173.                 keep es1 es2
+174.                 drop if mi(es1)
+175.                 rename (es1 es2) (b se)
+176.                 gen ub = b + 1.96*se
+177.                 sum ub, d
+178.                 local ymax = round(r(max),`gap')
+179.                 gen lb = b - 1.96*se
+180.                 sum lb, d
+181.                 local ymin = round(r(min),`gap')
+182.                 if `ymin' > 0 local ymin = 0
+183.                 gen rel = -`abs_lead' if _n == 1
+184.                 replace rel = rel[_n-1]+1 if _n > 1
+185.                 replace rel = rel + 1 if rel >= -1
+186.                 replace rel = -1 if rel == `abs_lag' + 1
+187.                 gen year = rel + 2014
+188.                 hashsort rel
+189.                 tw rcap ub lb year if year != 2013 , lcolor(ebblue%70) msize(vsmall) || ///
+>                   scatter b year, mcolor(ebblue) || ///
+>                 scatteri `ymax' 2013.75 `ymax' 2014.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
+>                   xlab(2010(1)2019, labsize(small)) xtitle("Year") ///
+>                   ytitle("Exposure x Post") ylab(`ymin'(`gap')`ymax') ///
+>                   subtitle("`g1_label'", pos(11) size(small)) ///
+>                   legend(on order(- "Num. PIs: `num_athrs'" "Num. Insts: `num_insts'" "Pre-Period Avg : `pre_mean'") pos(7) ring(1) rows(3) bmargin(zero) size(small)) ///
+>                   yline(0, lcolor(gs10) lpattern(solid)) plotregion(margin(sides))
+190.                 graph export ../output/figures/`samp'/es_`yvar'`suf'_`g1'`plot_suf'.pdf, replace
+191.                 save ../temp/es_`yvar'`suf'_`g1'`plot_suf', replace
+192.                 restore
+193.             }
+194. 
+.         }
+195. 
+.         * ---- PPML heterogeneity ----
+.         * Posts "mshrctrl": joint pooled DiD with fully-interacted Z_it and Z_share_it
+.         * on the full sample. grp coefficient = _b[Z_grp]; matches ppml_pdid_het_binscatter.
+.         if strpos(" `ppml_het_skip' ", " `yvar' ") == 0 {
+196.             cap mkdir "../output/figures/`samp'/es_ppml"
+197.             * ---- PPML median split (inst-weighted + PI-weighted variants) ----
+.             local mmethods pw
+198.             if "$HET_INCLUDE_INSTWTD" == "1" local mmethods inst pw
+199.             foreach mmethod of local mmethods {
+200.             local pairs_current
+201.             if "`mmethod'" == "inst" {
+202.                 foreach pair of global DUMMY_PAIRS_MED {
+203.                     local pairs_current `"`pairs_current' `"`pair'"' "'
+204.                 }
+205.                 local st_tag "med"
+206.                 local mplot_suf "_ppml_mshrctrl"
+207.             }
+208.             else {
+209.                 foreach pair of global DUMMY_PAIRS_MED_PW {
+210.                     local pairs_current `"`pairs_current' `"`pair'"' "'
+211.                 }
+212.                 local st_tag "med_pi"
+213.                 local mplot_suf "_ppml_medpi_mshrctrl"
+214.             }
+215.             foreach pair of local pairs_current {
+216.                 local g1: word 1 of `pair'
+217.                 local g2: word 2 of `pair'
+218.                 if strpos(" ${HET_GROUPS_ACTIVE} ", " `g1' ") == 0 continue
+219.                 if strpos(" ${HET_GROUPS_ACTIVE} ", " `g2' ") == 0 continue
+220. 
+.                 * --- Pooled-DiD PPML with fully-interacted Z and share; posted as "mshrctrl" ---
+.                 * [H11] PT_`g1' absorbs the group-level post shift; `g2' x post is the base
+.                 cap drop Z_`g1' Z_`g2' S_`g1' S_`g2' PT_`g1'
+221.                 gen Z_`g1' = Z_it       * `g1'
+222.                 gen Z_`g2' = Z_it       * `g2'
+223.                 gen S_`g1' = Z_share_it * `g1'
+224.                 gen S_`g2' = Z_share_it * `g2'
+225.                 gen PT_`g1' = post * `g1'
+226.                 cap noi ppmlhdfe `yvar' Z_`g1' Z_`g2' S_`g1' S_`g2' PT_`g1', ///
+>                                absorb(`fes') vce(cluster `vce_cl')
+227.                 local rc = _rc
+228.                 if `rc' {
+229.                     di as error "event_study_het `samp'`suf' `yvar' `g1'/`g2' `st_tag' pooled-DiD int ppml failed (rc=`rc'); skipping pair."
+230.                     continue
+231.                 }
+232.                 local Nppml = e(N)
+233.                 local r2ppml = e(r2_p)
+234.                 foreach grp in `g1' `g2' {
+235.                     gunique athr_id if e(sample) & `grp' == 1
+236.                     local num_athrs = r(unique)
+237.                     gunique inst_id if e(sample) & `grp' == 1
+238.                     local num_insts = r(unique)
+239.                     local b_post  = _b[Z_`grp']
+240.                     local se_post = _se[Z_`grp']
+241.                     di as text "pooled-DiD int PPML `samp'`suf' `yvar' `grp' `st_tag': b=" %8.4f `b_post' ///
+>                         " (se=" %8.4f `se_post' ")   N=" %9.0f `Nppml' " PIs=`num_athrs' Insts=`num_insts'"
+242.                     post `ph_handle' ("`yvar'") ("`grp'") ("mshrctrl") ("`st_tag'") ///
+>                         (`b_post') (`se_post') (.) (.) (`Nppml') (`r2ppml')
+243.                 }
+244. 
+.                 * --- Joint event-study PPML for per-group ES PDFs only (not posted) ---
+.                 local mshr_ctrls `mleads_`g1'' `mlags_`g1'' `mleads_`g2'' `mlags_`g2''
+245.                 local plot_suf "`mplot_suf'"
+246.                 cap noi ppmlhdfe `yvar' `leads_`g1'' `lags_`g1'' `leads_`g2'' `lags_`g2'' ///
+>                                `mshr_ctrls' PT_`g1', ///
+>                                absorb(`fes') vce(cluster `vce_cl')
+247.                 if _rc {
+248.                     di as error "event_study_het `samp'`suf' `yvar' `g1'/`g2' `st_tag' joint ES for PDFs failed; skipping ES plots."
+249.                     continue
+250.                 }
+251.                 foreach grp in `g1' `g2' {
+252.                     local grp_label = "${LBL_`grp'}"
+253.                     if "`grp_label'" == "" local grp_label "`grp'"
+254.                     gunique athr_id if e(sample) & `grp' == 1
+255.                     local num_athrs = r(unique)
+256.                     gunique inst_id if e(sample) & `grp' == 1
+257.                     local num_insts = r(unique)
+258.                     sum `yvar' if rel <= -1 & e(sample) & `grp' == 1, d
+259.                     local pre_mean : dis %4.3f r(mean)
+260.                     preserve
+261.                     cap mat drop es
+262.                     foreach var in `leads_`grp'' `lags_`grp'' int_lead1_`grp' {
+263.                         if "`var'" == "int_lead1_`grp'" {
+264.                             mat row = 0,0
+265.                         }
+266.                         else {
+267.                             mat row = _b[`var'], _se[`var']
+268.                         }
+269.                         mat es = nullmat(es) \ row
+270.                     }
+271.                     svmat es
+272.                     keep es1 es2
+273.                     drop if mi(es1)
+274.                     rename (es1 es2) (b se)
+275.                     gen ub = b + 1.96*se
+276.                     sum ub, d
+277.                     local ymax = round(r(max), 0.1)
+278.                     gen lb = b - 1.96*se
+279.                     sum lb, d
+280.                     local ymin = round(r(min), 0.1)
+281.                     if `ymin' > 0 local ymin = 0
+282.                     gen rel = -`abs_lead' if _n == 1
+283.                     replace rel = rel[_n-1]+1 if _n > 1
+284.                     replace rel = rel + 1 if rel >= -1
+285.                     replace rel = -1 if rel == `abs_lag' + 1
+286.                     gen year = rel + 2014
+287.                     hashsort rel
+288.                     tw rcap ub lb year if year != 2013, lcolor(ebblue%70) msize(vsmall) || ///
+>                       scatter b year, mcolor(ebblue) || ///
+>                     scatteri `ymax' 2013.75 `ymax' 2014.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
+>                       xlab(2010(1)2019, labsize(small)) xtitle("Year") ///
+>                       ytitle("`ppml_ytit'") ylab(`ymin'(0.1)`ymax') ///
+>                       subtitle("`grp_label'", pos(11) size(small)) ///
+>                       legend(on order(- "Num. PIs: `num_athrs'" "Num. Insts: `num_insts'" "Pre-Period Avg : `pre_mean'") pos(7) ring(1) rows(3) bmargin(zero) size(small)) ///
+>                       yline(0, lcolor(gs10) lpattern(solid)) plotregion(margin(sides))
+289.                     graph export ../output/figures/`samp'/es_ppml/es_`yvar'`suf'_`grp'`plot_suf'.pdf, replace
+290.                     save ../temp/es_`yvar'`suf'_`grp'`plot_suf', replace
+291.                     restore
+292.                 }
+293.             }
+294.             }  // close foreach mmethod
+295. 
+.             * ---- Multi-group lab-age splits: 3-way (<10/10-19/20+) and quartiles ----
+.             foreach aspec in age3 ageq4 {
+296.                 if "`aspec'" == "age3"  local agrps lab_lt10 lab_10_20 lab_20p
+297.                 if "`aspec'" == "ageq4" local agrps q1_labage q2_labage q3_labage q4_labage
+298.                 local aok 1
+299.                 foreach grp of local agrps {
+300.                     if strpos(" ${HET_GROUPS_ACTIVE} ", " `grp' ") == 0 local aok 0
+301.                 }
+302.                 if `aok' {
+303.                 * [H11] the last (most senior) group x post is the omitted base
+.                 local nb : word count `agrps'
+304.                 local abase : word `nb' of `agrps'
+305.                 local Zs
+306.                 local Ss
+307.                 local PTs
+308.                 foreach grp of local agrps {
+309.                     cap drop Z_`grp'
+310.                     cap drop S_`grp'
+311.                     cap drop PT_`grp'
+312.                     gen Z_`grp' = Z_it       * `grp'
+313.                     gen S_`grp' = Z_share_it * `grp'
+314.                     local Zs `Zs' Z_`grp'
+315.                     local Ss `Ss' S_`grp'
+316.                     if "`grp'" != "`abase'" {
+317.                         gen PT_`grp' = post * `grp'
+318.                         local PTs `PTs' PT_`grp'
+319.                     }
+320.                 }
+321.                 cap noi ppmlhdfe `yvar' `Zs' `Ss' `PTs', ///
+>                                absorb(`fes') vce(cluster `vce_cl')
+322.                 local rc = _rc
+323.                 if `rc' {
+324.                     di as error "event_study_het `samp'`suf' `yvar' `aspec' pooled-DiD int ppml failed (rc=`rc'); skipping."
+325.                 }
+326.                 else {
+327.                     local Nppml = e(N)
+328.                     local r2ppml = e(r2_p)
+329.                     foreach grp of local agrps {
+330.                         gunique athr_id if e(sample) & `grp' == 1
+331.                         local num_athrs = r(unique)
+332.                         gunique inst_id if e(sample) & `grp' == 1
+333.                         local num_insts = r(unique)
+334.                         local b_post  = _b[Z_`grp']
+335.                         local se_post = _se[Z_`grp']
+336.                         di as text "pooled-DiD int PPML `samp'`suf' `yvar' `grp' `aspec': b=" %8.4f `b_post' ///
+>                             " (se=" %8.4f `se_post' ")   N=" %9.0f `Nppml' " PIs=`num_athrs' Insts=`num_insts'"
+337.                         post `ph_handle' ("`yvar'") ("`grp'") ("mshrctrl") ("`aspec'") ///
+>                             (`b_post') (`se_post') (.) (.) (`Nppml') (`r2ppml')
+338.                     }
+339. 
+.                     * --- Joint event-study PPML for per-group ES PDFs only (not posted) ---
+.                     local all_leads
+340.                     local all_lags
+341.                     local all_mshr
+342.                     foreach grp of local agrps {
+343.                         local all_leads `all_leads' `leads_`grp''
+344.                         local all_lags  `all_lags'  `lags_`grp''
+345.                         local all_mshr  `all_mshr'  `mleads_`grp'' `mlags_`grp''
+346.                     }
+347.                     local plot_suf "_ppml_`aspec'_mshrctrl"
+348.                     cap noi ppmlhdfe `yvar' `all_leads' `all_lags' ///
+>                                             `all_mshr' `PTs', ///
+>                                             absorb(`fes') vce(cluster `vce_cl')
+349.                     if _rc {
+350.                         di as error "event_study_het `samp'`suf' `yvar' `aspec' joint ES for PDFs failed; skipping ES plots."
+351.                     }
+352.                     else {
+353.                         foreach grp of local agrps {
+354.                             local grp_label = "${LBL_`grp'}"
+355.                             if "`grp_label'" == "" local grp_label "`grp'"
+356.                             gunique athr_id if e(sample) & `grp' == 1
+357.                             local num_athrs = r(unique)
+358.                             gunique inst_id if e(sample) & `grp' == 1
+359.                             local num_insts = r(unique)
+360.                             sum `yvar' if rel <= -1 & e(sample) & `grp' == 1, d
+361.                             local pre_mean : dis %4.3f r(mean)
+362.                             preserve
+363.                             cap mat drop es
+364.                             foreach var in `leads_`grp'' `lags_`grp'' int_lead1_`grp' {
+365.                                 if "`var'" == "int_lead1_`grp'" {
+366.                                     mat row = 0,0
+367.                                 }
+368.                                 else {
+369.                                     mat row = _b[`var'], _se[`var']
+370.                                 }
+371.                                 mat es = nullmat(es) \ row
+372.                             }
+373.                             svmat es
+374.                             keep es1 es2
+375.                             drop if mi(es1)
+376.                             rename (es1 es2) (b se)
+377.                             gen ub = b + 1.96*se
+378.                             sum ub, d
+379.                             local ymax = round(r(max), 0.1)
+380.                             gen lb = b - 1.96*se
+381.                             sum lb, d
+382.                             local ymin = round(r(min), 0.1)
+383.                             if `ymin' > 0 local ymin = 0
+384.                             gen rel = -`abs_lead' if _n == 1
+385.                             replace rel = rel[_n-1]+1 if _n > 1
+386.                             replace rel = rel + 1 if rel >= -1
+387.                             replace rel = -1 if rel == `abs_lag' + 1
+388.                             gen year = rel + 2014
+389.                             hashsort rel
+390.                             tw rcap ub lb year if year != 2013, lcolor(ebblue%70) msize(vsmall) || ///
+>                               scatter b year, mcolor(ebblue) || ///
+>                             scatteri `ymax' 2013.75 `ymax' 2014.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
+>                               xlab(2010(1)2019, labsize(small)) xtitle("Year") ///
+>                               ytitle("`ppml_ytit'") ylab(`ymin'(0.1)`ymax') ///
+>                               subtitle("`grp_label'", pos(11) size(small)) ///
+>                               legend(on order(- "Num. PIs: `num_athrs'" "Num. Insts: `num_insts'" "Pre-Period Avg : `pre_mean'") pos(7) ring(1) rows(3) bmargin(zero) size(small)) ///
+>                               yline(0, lcolor(gs10) lpattern(solid)) plotregion(margin(sides))
+391.                             graph export ../output/figures/`samp'/es_ppml/es_`yvar'`suf'_`grp'`plot_suf'.pdf, replace
+392.                             save ../temp/es_`yvar'`suf'_`grp'`plot_suf', replace
+393.                             restore
+394.                         }
+395.                     }
+396.                 }
+397.                 }
+398.             }
+399. 
+.             * ---- PPML quartile split (inst-weighted + PI-weighted variants) ----
+.             * Gated by HET_RUN_QUARTILES; off by default per user request.
+.             local qmethods
+400.             if "$HET_RUN_QUARTILES" == "1" local qmethods pw
+401.             if "$HET_RUN_QUARTILES" == "1" & "$HET_INCLUDE_INSTWTD" == "1" local qmethods inst pw
+402.             foreach qmethod of local qmethods {
+403.             local quart_all
+404.             if "`qmethod'" == "inst" {
+405.                 foreach pair of global IC_PAIRS_Q {
+406.                     local quart_all `"`quart_all' `"`pair'"' "'
+407.                 }
+408.                 local st_tag "quart"
+409.                 local qplot_suf "_ppml_q_mshrctrl"
+410.             }
+411.             else {
+412.                 foreach pair of global IC_PAIRS_Q_PW {
+413.                     local quart_all `"`quart_all' `"`pair'"' "'
+414.                 }
+415.                 local st_tag "quart_pi"
+416.                 local qplot_suf "_ppml_qpi_mshrctrl"
+417.             }
+418.             * PI-continuous quartiles run under BOTH methods (same dummies
+.             * either way) so quart and quart_pi coefplots each fill their
+.             * pi panel — mirrors pi_pairs in DUMMY_PAIRS_MED / _MED_PW.
+.             foreach pair of global PI_PAIRS_Q {
+419.                 local quart_all `"`quart_all' `"`pair'"' "'
+420.             }
+421.             foreach pair of local quart_all {
+422.                 local g1: word 1 of `pair'
+423.                 local g2: word 2 of `pair'
+424.                 * mid-group name: q4w_<char> -> midw_<char>; q4_<base> -> mid_<base>
+.                 if substr("`g1'", 1, 4) == "q4w_" {
+425.                     local base = substr("`g1'", 5, .)
+426.                     local gm "midw_`base'"
+427.                 }
+428.                 else {
+429.                     local base = substr("`g1'", 4, .)
+430.                     local gm "mid_`base'"
+431.                 }
+432.                 if strpos(" ${HET_GROUPS_ACTIVE} ", " `g1' ") == 0 continue
+433.                 if strpos(" ${HET_GROUPS_ACTIVE} ", " `g2' ") == 0 continue
+434.                 if strpos(" ${HET_GROUPS_ACTIVE} ", " `gm' ") == 0 continue
+435. 
+.                 * --- Pooled-DiD PPML with fully-interacted Z and share (Q4/Mid/Q1); posted as "mshrctrl" ---
+.                 * [H11] Q1 x post is the omitted base
+.                 cap drop Z_`g1' Z_`g2' Z_`gm' S_`g1' S_`g2' S_`gm' PT_`g1' PT_`gm'
+436.                 gen Z_`g1' = Z_it       * `g1'
+437.                 gen Z_`g2' = Z_it       * `g2'
+438.                 gen Z_`gm' = Z_it       * `gm'
+439.                 gen S_`g1' = Z_share_it * `g1'
+440.                 gen S_`g2' = Z_share_it * `g2'
+441.                 gen S_`gm' = Z_share_it * `gm'
+442.                 gen PT_`g1' = post * `g1'
+443.                 gen PT_`gm' = post * `gm'
+444.                 cap noi ppmlhdfe `yvar' Z_`g1' Z_`g2' Z_`gm' S_`g1' S_`g2' S_`gm' PT_`g1' PT_`gm', ///
+>                                         absorb(`fes') vce(cluster `vce_cl')
+445.                 local rc = _rc
+446.                 if `rc' {
+447.                     di as error "event_study_het `samp'`suf' `yvar' `g1'/`g2' `st_tag' pooled-DiD int ppml failed (rc=`rc'); skipping pair."
+448.                     continue
+449.                 }
+450.                 local Nppml = e(N)
+451.                 local r2ppml = e(r2_p)
+452.                 foreach grp in `g1' `g2' {
+453.                     gunique athr_id if e(sample) & `grp' == 1
+454.                     local num_athrs = r(unique)
+455.                     gunique inst_id if e(sample) & `grp' == 1
+456.                     local num_insts = r(unique)
+457.                     local b_post  = _b[Z_`grp']
+458.                     local se_post = _se[Z_`grp']
+459.                     di as text "pooled-DiD int PPML `samp'`suf' `yvar' `grp' `st_tag': b=" %8.4f `b_post' ///
+>                         " (se=" %8.4f `se_post' ")   N=" %9.0f `Nppml' " PIs=`num_athrs' Insts=`num_insts'"
+460.                     post `ph_handle' ("`yvar'") ("`grp'") ("mshrctrl") ("`st_tag'") ///
+>                         (`b_post') (`se_post') (.) (.) (`Nppml') (`r2ppml')
+461.                 }
+462. 
+.                 * --- Joint event-study PPML for per-group ES PDFs only (not posted) ---
+.                 local mshr_ctrls `mleads_`g1'' `mlags_`g1'' ///
+>                                  `mleads_`g2'' `mlags_`g2'' ///
+>                                  `mleads_`gm'' `mlags_`gm''
+463.                 local plot_suf "`qplot_suf'"
+464.                 cap noi ppmlhdfe `yvar' `leads_`g1'' `lags_`g1'' ///
+>                                         `leads_`g2'' `lags_`g2'' ///
+>                                         `leads_`gm'' `lags_`gm'' ///
+>                                         `mshr_ctrls' PT_`g1' PT_`gm', ///
+>                                         absorb(`fes') vce(cluster `vce_cl')
+465.                 if _rc {
+466.                     di as error "event_study_het `samp'`suf' `yvar' `g1'/`g2' `st_tag' joint ES for PDFs failed; skipping ES plots."
+467.                     continue
+468.                 }
+469.                 foreach grp in `g1' `g2' {
+470.                     local grp_label = "${LBL_`grp'}"
+471.                     if "`grp_label'" == "" local grp_label "`grp'"
+472.                     gunique athr_id if e(sample) & `grp' == 1
+473.                     local num_athrs = r(unique)
+474.                     gunique inst_id if e(sample) & `grp' == 1
+475.                     local num_insts = r(unique)
+476.                     sum `yvar' if rel <= -1 & e(sample) & `grp' == 1, d
+477.                     local pre_mean : dis %4.3f r(mean)
+478.                     preserve
+479.                     cap mat drop es
+480.                     foreach var in `leads_`grp'' `lags_`grp'' int_lead1_`grp' {
+481.                         if "`var'" == "int_lead1_`grp'" {
+482.                             mat row = 0,0
+483.                         }
+484.                         else {
+485.                             mat row = _b[`var'], _se[`var']
+486.                         }
+487.                         mat es = nullmat(es) \ row
+488.                     }
+489.                     svmat es
+490.                     keep es1 es2
+491.                     drop if mi(es1)
+492.                     rename (es1 es2) (b se)
+493.                     gen ub = b + 1.96*se
+494.                     sum ub, d
+495.                     local ymax = round(r(max), 0.1)
+496.                     gen lb = b - 1.96*se
+497.                     sum lb, d
+498.                     local ymin = round(r(min), 0.1)
+499.                     if `ymin' > 0 local ymin = 0
+500.                     gen rel = -`abs_lead' if _n == 1
+501.                     replace rel = rel[_n-1]+1 if _n > 1
+502.                     replace rel = rel + 1 if rel >= -1
+503.                     replace rel = -1 if rel == `abs_lag' + 1
+504.                     gen year = rel + 2014
+505.                     hashsort rel
+506.                     tw rcap ub lb year if year != 2013, lcolor(ebblue%70) msize(vsmall) || ///
+>                       scatter b year, mcolor(ebblue) || ///
+>                     scatteri `ymax' 2013.75 `ymax' 2014.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
+>                       xlab(2010(1)2019, labsize(small)) xtitle("Year") ///
+>                       ytitle("`ppml_ytit'") ylab(`ymin'(0.1)`ymax') ///
+>                       subtitle("`grp_label'", pos(11) size(small)) ///
+>                       legend(on order(- "Num. PIs: `num_athrs'" "Num. Insts: `num_insts'" "Pre-Period Avg : `pre_mean'") pos(7) ring(1) rows(3) bmargin(zero) size(small)) ///
+>                       yline(0, lcolor(gs10) lpattern(solid)) plotregion(margin(sides))
+507.                     graph export ../output/figures/`samp'/es_ppml/es_`yvar'`suf'_`grp'`plot_suf'.pdf, replace
+508.                     save ../temp/es_`yvar'`suf'_`grp'`plot_suf', replace
+509.                     restore
+510.                 }
+511.             }
+512.             }  // close foreach qmethod
+513. 
+.             * ---- PPML young x hiw_<char> joint 2x2 for every ic char.
+.             * One pooled-DiD interaction fit per char; posts 4 rows per char.
+.             foreach a of global IC_ALIASES {
+514.                 cap confirm variable y_hi_`a'
+515.                 if _rc continue
+516.                 foreach grp in y_hi_`a' y_lo_`a' o_hi_`a' o_lo_`a' {
+517.                     cap drop Z_`grp' S_`grp' PT_`grp'
+518.                     gen Z_`grp' = Z_it       * `grp'
+519.                     gen S_`grp' = Z_share_it * `grp'
+520.                     gen PT_`grp' = post * `grp'
+521.                 }
+522.                 * [H11] o_lo x post is the omitted base (the four PTs sum to post)
+.                 cap noi ppmlhdfe `yvar' Z_y_hi_`a' Z_y_lo_`a' Z_o_hi_`a' Z_o_lo_`a' ///
+>                                         S_y_hi_`a' S_y_lo_`a' S_o_hi_`a' S_o_lo_`a' ///
+>                                         PT_y_hi_`a' PT_y_lo_`a' PT_o_hi_`a', ///
+>                                         absorb(`fes') vce(cluster `vce_cl')
+523.                 if _rc {
+524.                     di as error "event_study_het `samp'`suf' `yvar' joint-ae `a' ppml failed; skipping."
+525.                     continue
+526.                 }
+527.                 local Nppml = e(N)
+528.                 local r2ppml = e(r2_p)
+529.                 foreach grp in y_hi_`a' y_lo_`a' o_hi_`a' o_lo_`a' {
+530.                     gunique athr_id if e(sample) & `grp' == 1
+531.                     local num_athrs = r(unique)
+532.                     gunique inst_id if e(sample) & `grp' == 1
+533.                     local num_insts = r(unique)
+534.                     local b_post  = _b[Z_`grp']
+535.                     local se_post = _se[Z_`grp']
+536.                     di as text "joint-ae PPML `samp'`suf' `yvar' `grp': b=" %8.4f `b_post' ///
+>                         " (se=" %8.4f `se_post' ")   N=" %9.0f `Nppml' " PIs=`num_athrs' Insts=`num_insts'"
+537.                     post `ph_handle' ("`yvar'") ("`grp'") ("mshrctrl") ("joint_ae") ///
+>                         (`b_post') (`se_post') (.) (.) (`Nppml') (`r2ppml')
+538.                 }
+539.                 * Hi-vs-Lo differential per age; SEs via lincom use full VCE.
+.                 foreach age in y o {
+540.                     cap noi lincom Z_`age'_hi_`a' - Z_`age'_lo_`a'
+541.                     if _rc continue
+542.                     local b_diff  = r(estimate)
+543.                     local se_diff = r(se)
+544.                     local p_diff  = r(p)
+545.                     di as text "joint-ae DIFF `samp'`suf' `yvar' `age'_`a': b=" %8.4f `b_diff' ///
+>                         " (se=" %8.4f `se_diff' ") p=" %6.4f `p_diff'
+546.                     post `ph_handle' ("`yvar'") ("`age'_diff_`a'") ("mshrctrl") ("joint_ae_diff") ///
+>                         (`b_diff') (`se_diff') (`p_diff') (.) (`Nppml') (`r2ppml')
+547.                 }
+548.             }
+549. 
+.             * ---- PPML joint 2x2 for each PI-split axis (baseline productivity,
+.             * coauthors) crossed with each inst char. One fit per (axis, char).
+.             foreach axis of global PI_CHAR_ALIASES {
+550.                 local hp "${PI_CHAR_HIPFX_`axis'}"
+551.                 local lp "${PI_CHAR_LOPFX_`axis'}"
+552.                 foreach a of global IC_ALIASES {
+553.                     cap confirm variable `hp'_hi_`a'
+554.                     if _rc continue
+555.                     foreach grp in `hp'_hi_`a' `hp'_lo_`a' `lp'_hi_`a' `lp'_lo_`a' {
+556.                         cap drop Z_`grp' S_`grp' PT_`grp'
+557.                         gen Z_`grp' = Z_it       * `grp'
+558.                         gen S_`grp' = Z_share_it * `grp'
+559.                         gen PT_`grp' = post * `grp'
+560.                     }
+561.                     * [H11] `lp'_lo x post is the omitted base
+.                     cap noi ppmlhdfe `yvar' ///
+>                         Z_`hp'_hi_`a' Z_`hp'_lo_`a' Z_`lp'_hi_`a' Z_`lp'_lo_`a' ///
+>                         S_`hp'_hi_`a' S_`hp'_lo_`a' S_`lp'_hi_`a' S_`lp'_lo_`a' ///
+>                         PT_`hp'_hi_`a' PT_`hp'_lo_`a' PT_`lp'_hi_`a', ///
+>                         absorb(`fes') vce(cluster `vce_cl')
+562.                     if _rc {
+563.                         di as error "event_study_het `samp'`suf' `yvar' joint-ae-`axis' `a' ppml failed; skipping."
+564.                         continue
+565.                     }
+566.                     local Nppml = e(N)
+567.                     local r2ppml = e(r2_p)
+568.                     foreach grp in `hp'_hi_`a' `hp'_lo_`a' `lp'_hi_`a' `lp'_lo_`a' {
+569.                         gunique athr_id if e(sample) & `grp' == 1
+570.                         local num_athrs = r(unique)
+571.                         gunique inst_id if e(sample) & `grp' == 1
+572.                         local num_insts = r(unique)
+573.                         local b_post  = _b[Z_`grp']
+574.                         local se_post = _se[Z_`grp']
+575.                         di as text "joint-ae-`axis' PPML `samp'`suf' `yvar' `grp': b=" %8.4f `b_post' ///
+>                             " (se=" %8.4f `se_post' ")   N=" %9.0f `Nppml' " PIs=`num_athrs' Insts=`num_insts'"
+576.                         post `ph_handle' ("`yvar'") ("`grp'") ("mshrctrl") ("joint_ae_`axis'") ///
+>                             (`b_post') (`se_post') (.) (.) (`Nppml') (`r2ppml')
+577.                     }
+578.                     * Within-tier hp-vs-lp: low-res row is the thin cell that would carry the reversal claim.
+.                     foreach side in hi lo {
+579.                         cap noi lincom Z_`hp'_`side'_`a' - Z_`lp'_`side'_`a'
+580.                         if _rc continue
+581.                         local b_diff  = r(estimate)
+582.                         local se_diff = r(se)
+583.                         local t_diff  = cond(`se_diff' > 0, `b_diff'/`se_diff', .)
+584.                         local p_diff  = r(p)
+585.                         local ci_l    = r(lb)
+586.                         local ci_h    = r(ub)
+587.                         di as text "joint-ae-`axis' DIFF `samp'`suf' `yvar' `side'res_`a' (`hp'-`lp'): " ///
+>                             "b=" %8.4f `b_diff' " se=" %8.4f `se_diff' ///
+>                             " t=" %6.2f `t_diff' " p=" %6.4f `p_diff' ///
+>                             " CI95=[" %6.3f `ci_l' "," %6.3f `ci_h' "]"
+588.                         post `ph_handle' ("`yvar'") ("`side'res_diff_`a'") ("mshrctrl") ("joint_ae_`axis'_diff") ///
+>                             (`b_diff') (`se_diff') (`p_diff') (.) (`Nppml') (`r2ppml')
+589.                     }
+590.                 }
+591.             }
+592. 
+.             * ---- PI-split x PI-split joint 2x2s. One PPML per spec: four
+.             * cell coefficients (4th cell x post is the omitted base [H11])
+.             * posted under split_type = <jt>, plus four lincom contrasts
+.             * (c1-c2, c3-c4, c1-c3, c2-c4) posted under <jt>_diff. Spec =
+.             * "<jt> c1 c2 c3 c4 dname1 dname2 dname3 dname4".
+.             local joint_specs
+593.             local joint_specs `" `joint_specs' "joint_agepr y_hp y_lp o_hp o_lp y_diff_pr o_diff_pr hp_diff_age lp_diff_age" "'
+594.             local joint_specs `" `joint_specs' "joint_agenih y_hn y_ln o_hn o_ln y_diff_nihd o_diff_nihd hi_diff_age lo_diff_age" "'
+595.             local joint_specs `" `joint_specs' "joint_prnih hp_hn hp_ln lp_hn lp_ln hp_diff_nihd lp_diff_nihd hn_diff_pr ln_diff_pr" "'
+596.             local joint_specs `" `joint_specs' "joint_ageteam y_bt y_sm o_bt o_sm y_diff_team o_diff_team bt_diff_age sm_diff_age" "'
+597.             local joint_specs `" `joint_specs' "joint_tmnih bt_hn bt_ln sm_hn sm_ln bt_diff_nihd sm_diff_nihd hn_diff_team ln_diff_team" "'
+598.             local joint_specs `" `joint_specs' "joint_tmpr bt_hp bt_lp sm_hp sm_lp bt_diff_pr sm_diff_pr hp_diff_team lp_diff_team" "'
+599.             local joint_specs `" `joint_specs' "joint_agenet y_bn y_sn o_bn o_sn y_diff_net o_diff_net bn_diff_age sn_diff_age" "'
+600.             local joint_specs `" `joint_specs' "joint_agelab y_nl y_el o_nl o_el y_diff_lab o_diff_lab nl_diff_age el_diff_age" "'
+601.             local joint_specs `" `joint_specs' "joint_agecrwd y_ci y_si o_ci o_si y_diff_crwd o_diff_crwd ci_diff_age si_diff_age" "'
+602.             local joint_specs `" `joint_specs' "joint_agemsa y_bmsa y_smsa o_bmsa o_smsa y_diff_msa o_diff_msa bmsa_diff_age smsa_diff_age" "'
+603.             foreach js of local joint_specs {
+604.                 local jt : word 1 of `js'
+605.                 forvalues k = 1/4 {
+606.                     local c`k'  : word `=1+`k'' of `js'
+607.                     local dn`k' : word `=5+`k'' of `js'
+608.                 }
+609.                 * Skip if any cell is missing or empty (e.g. NIH cells off the
+.                 * matched sample, degenerate joint cells).
+.                 local jt_bad 0
+610.                 foreach grp in `c1' `c2' `c3' `c4' {
+611.                     cap confirm variable `grp'
+612.                     if _rc {
+613.                         local jt_bad 1
+614.                         continue, break
+615.                     }
+616.                     qui count if `grp' == 1
+617.                     if r(N) == 0 local jt_bad 1
+618.                 }
+619.                 if `jt_bad' {
+620.                     di as text "event_study_het `samp'`suf' `yvar': `jt' cells missing/empty -- skipping."
+621.                     continue
+622.                 }
+623.                 foreach grp in `c1' `c2' `c3' `c4' {
+624.                     cap drop Z_`grp' S_`grp' PT_`grp'
+625.                     gen Z_`grp' = Z_it       * `grp'
+626.                     gen S_`grp' = Z_share_it * `grp'
+627.                     gen PT_`grp' = post * `grp'
+628.                 }
+629.                 cap noi ppmlhdfe `yvar' Z_`c1' Z_`c2' Z_`c3' Z_`c4' ///
+>                                         S_`c1' S_`c2' S_`c3' S_`c4' ///
+>                                         PT_`c1' PT_`c2' PT_`c3', ///
+>                                         absorb(`fes') vce(cluster `vce_cl')
+630.                 if _rc {
+631.                     di as error "event_study_het `samp'`suf' `yvar' `jt' ppml failed; skipping."
+632.                     continue
+633.                 }
+634.                 local Nppml = e(N)
+635.                 local r2ppml = e(r2_p)
+636.                 foreach grp in `c1' `c2' `c3' `c4' {
+637.                     gunique athr_id if e(sample) & `grp' == 1
+638.                     local num_athrs = r(unique)
+639.                     gunique inst_id if e(sample) & `grp' == 1
+640.                     local num_insts = r(unique)
+641.                     local b_post  = _b[Z_`grp']
+642.                     local se_post = _se[Z_`grp']
+643.                     di as text "`jt' PPML `samp'`suf' `yvar' `grp': b=" %8.4f `b_post' ///
+>                         " (se=" %8.4f `se_post' ")   N=" %9.0f `Nppml' " PIs=`num_athrs' Insts=`num_insts'"
+644.                     post `ph_handle' ("`yvar'") ("`grp'") ("mshrctrl") ("`jt'") ///
+>                         (`b_post') (`se_post') (.) (.) (`Nppml') (`r2ppml')
+645.                 }
+646.                 * Within-first-axis and within-second-axis contrasts; SEs via
+.                 * lincom use the full VCE.
+.                 foreach d in "`dn1' Z_`c1' Z_`c2'" "`dn2' Z_`c3' Z_`c4'" ///
+>                              "`dn3' Z_`c1' Z_`c3'" "`dn4' Z_`c2' Z_`c4'" {
+647.                     local dname : word 1 of `d'
+648.                     local d1    : word 2 of `d'
+649.                     local d2    : word 3 of `d'
+650.                     cap noi lincom `d1' - `d2'
+651.                     if _rc continue
+652.                     local b_diff  = r(estimate)
+653.                     local se_diff = r(se)
+654.                     local p_diff  = r(p)
+655.                     di as text "`jt' DIFF `samp'`suf' `yvar' `dname': b=" %8.4f `b_diff' ///
+>                         " (se=" %8.4f `se_diff' ") p=" %6.4f `p_diff'
+656.                     post `ph_handle' ("`yvar'") ("`dname'") ("mshrctrl") ("`jt'_diff") ///
+>                         (`b_diff') (`se_diff') (`p_diff') (.) (`Nppml') (`r2ppml')
+657.                 }
+658.             }
+659. 
+.         }
+660.         postclose `ph_handle'
+661. 
+.         * pdid binscatter + coefplot for this yvar, so PDFs land continuously
+.         if strpos(" `ppml_het_skip' ", " `yvar' ") == 0 {
+662.             cap noi ppml_pdid_het_binscatter, samp(`samp') r1r2(`r1r2') public(`public') r1_only(`r1_only') yvar(`yvar')
+663.         }
+664.         cap noi ppml_het_coefplot, samp(`samp') r1r2(`r1r2') public(`public') r1_only(`r1_only') yvar(`yvar')
+665.     }
+666. 
+.     * Combine per-yvar phet_results files into master (consumed by output_het_tables).
+.     preserve
+667.     clear
+668.     foreach yvar of local yvar_list {
+669.         cap append using ../temp/phet_results_`samp'`suf'_`yvar'
+670.     }
+671.     save ../temp/phet_results_`samp'`suf', replace
+672.     restore
+673. end
+
+. 
+. program ppml_pdid_het_binscatter
+  1.     * Joint PPML pooled-DiD FWL binscatter of `yvar' on Z_it, mshr partialled.
+.     * Fit ppmlhdfe on FULL sample with fully-interacted Z and share, then
+.     * residualize _z_work and Z_grp against the sibling group + shares + FEs.
+.     * On grp==1 rows the sibling interactions are 0 so FWL slope = _b[Z_grp].
+.     * NOTE: residualization runs on the full sample while the plot keeps
+.     * grp==1 rows, so the binned slope approximates the (exactly displayed)
+.     * joint-fit coefficient.
+.     syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0) yvar(string)]
+  2.     if "`yvar'" == "" local yvar ppr_cnt
+  3.     local fes athr_id year
+  4.     local vce_cl athr_id
+  5.     if "$FE_MODE" == "inst_cluster" {
+  6.         local fes inst_id cluster_30 year
+  7.         local vce_cl inst_id
+  8.     }
+  9.     if "$FE_MODE" == "inst_cluster_fldyr" {
+ 10.         local fes inst_id i.cluster_30#i.year
+ 11.         local vce_cl inst_id
+ 12.     }
+ 13.     local suf ""
+ 14.     if (`r1r2' == 1 & `public' == 0 & `r1_only' == 0) local suf "_r1_r2"
+ 15.     if (`r1r2' == 1 & `public' == 1 & `r1_only' == 0) local suf "_r1_r2_public"
+ 16.     if (`r1_only' == 1 & `public' == 0) local suf "_r1"
+ 17.     if (`r1_only' == 1 & `public' == 1) local suf "_r1_public"
+ 18.     cap mkdir "../output/figures/`samp'/ppml_pdid_het_bs"
+ 19. 
+.     * [H9] y-axis label per outcome (was hard-coded "Publications")
+.     local bs_lbl "`yvar'"
+ 20.     if "`yvar'" == "ppr_cnt"           local bs_lbl "Publications"
+ 21.     if "`yvar'" == "cite_affl_wt"      local bs_lbl "Citation-Weighted Output"
+ 22.     if "`yvar'" == "avg_num_coathrs"   local bs_lbl "Coauthors"
+ 23.     if "`yvar'" == "n_grants"          local bs_lbl "Active NIH Research Grants"
+ 24.     if "`yvar'" == "n_new_grants"      local bs_lbl "New NIH Research Grants"
+ 25.     if "`yvar'" == "nih_total_cost"    local bs_lbl "NIH Award Dollars"
+ 26.     if "`yvar'" == "n_middle_ppr"      local bs_lbl "Middle-Author Papers"
+ 27. 
+.     local dummy_pairs `" "young old" "young_nih old_nih" "r1 r2" "pub_inst priv_inst" "high_pre_ppr low_pre_ppr" "big_team small_team" "high_nihg low_nihg" "high_nihd low_nihd" "big_net small_net" "new_lab est_lab" "crwd_inst sprs_inst" "big_msa small_m
+> sa" "yhigh_nihd ylow_nihd" "yq4_nihd yq1_nihd" ${IC_PAIRS_MED_PW} "'
+ 28.     if "$HET_INCLUDE_INSTWTD" == "1" local dummy_pairs `" `dummy_pairs' ${IC_PAIRS_MED} "'
+ 29. 
+.     * Load panel once; per-pair vars are cap-dropped and rebuilt in place.
+.     preserve
+ 30.         use ../temp/es_`samp'`suf', clear
+ 31.         gen post       = year >= 2014
+ 32.         gen Z_it       = exposure      * post
+ 33.         gen Z_share_it = mkt_spend_shr * post
+ 34. 
+.         foreach pair of local dummy_pairs {
+ 35.             local g1 : word 1 of `pair'
+ 36.             local g2 : word 2 of `pair'
+ 37. 
+.             * HET_GROUPS_ACTIVE (set by event_study_het before this is called)
+.             * screens missing AND degenerate dummies — a no-obs group would
+.             * crash binscatter and abort the remaining pairs.
+.             if strpos(" ${HET_GROUPS_ACTIVE} ", " `g1' ") == 0 continue
+ 38.             if strpos(" ${HET_GROUPS_ACTIVE} ", " `g2' ") == 0 continue
+ 39. 
+.             * one at a time — a `drop' list is all-or-nothing, and a missing
+.             * Z_<grp> would leave _mu/_dvar alive to crash d() below
+.             foreach v in Z_`g1' Z_`g2' S_`g1' S_`g2' PT_`g1' _mu _z_work _dvar _fwlw _y_r _Z_r {
+ 40.                 cap drop `v'
+ 41.             }
+ 42.             gen Z_`g1' = Z_it       * `g1'
+ 43.             gen Z_`g2' = Z_it       * `g2'
+ 44.             gen S_`g1' = Z_share_it * `g1'
+ 45.             gen S_`g2' = Z_share_it * `g2'
+ 46.             gen PT_`g1' = post * `g1'
+ 47. 
+.             * [H11] PT matches the posted pooled-DiD spec so displayed beta agrees
+.             cap noi ppmlhdfe `yvar' Z_`g1' Z_`g2' S_`g1' S_`g2' PT_`g1', ///
+>                     absorb(`fes') vce(cluster `vce_cl') d(_dvar)
+ 48.             local rc = _rc
+ 49.             if `rc' {
+ 50.                 di as error "ppml_pdid_het_bs `samp'`suf' `yvar' `g1'/`g2' joint failed (rc=`rc'); skipping pair."
+ 51.                 continue
+ 52.             }
+ 53.             local b_`g1'  = _b[Z_`g1']
+ 54.             local se_`g1' = _se[Z_`g1']
+ 55.             local b_`g2'  = _b[Z_`g2']
+ 56.             local se_`g2' = _se[Z_`g2']
+ 57. 
+.             * IRLS working response + FWL weight from the joint fit.
+.             predict double _mu, mu
+ 58.             gen double _z_work = ln(_mu) + (`yvar' - _mu)/_mu if !mi(_mu) & _mu > 0
+ 59.             gen double _fwlw = _mu if !mi(_mu) & _mu > 0
+ 60. 
+.             foreach grp in `g1' `g2' {
+ 61.                 local other = cond("`grp'" == "`g1'", "`g2'", "`g1'")
+ 62. 
+.                 foreach v in _y_r _Z_r {
+ 63.                     cap drop `v'
+ 64.                 }
+ 65.                 cap noi qui reghdfe _z_work Z_`other' S_`g1' S_`g2' PT_`g1' if !mi(_fwlw) [pw=_fwlw], ///
+>                         absorb(`fes') residuals(_y_r)
+ 66.                 if _rc == 0 cap noi qui reghdfe Z_`grp' Z_`other' S_`g1' S_`g2' PT_`g1' if !mi(_fwlw) [pw=_fwlw], ///
+>                         absorb(`fes') residuals(_Z_r)
+ 67.                 if _rc {
+ 68.                     di as error "ppml_pdid_het_bs FWL `grp' failed; skipping plot."
+ 69.                     continue
+ 70.                 }
+ 71.                 gunique athr_id if `grp' == 1 & !mi(_y_r) & !mi(_Z_r)
+ 72.                 local n_pis = r(unique)
+ 73.                 gunique inst_id if `grp' == 1 & !mi(_y_r) & !mi(_Z_r)
+ 74.                 local n_insts = r(unique)
+ 75.                 local b_str  : dis %7.3f `b_`grp''
+ 76.                 local se_str : dis %7.3f `se_`grp''
+ 77.                 binscatter _y_r _Z_r [aw=_fwlw] if `grp' == 1 & !mi(_y_r) & !mi(_Z_r), n(30) ///
+>                     xtitle("Exposure x Post") ///
+>                     ytitle("{&Delta} Log Expected `bs_lbl'") ///
+>                     xlab(-0.06(0.015)0.06, format(%5.3f)) ///
+>                     msymbol(O) mcolors(gs6) lcolors(ebblue) ///
+>                     note("Num. PIs: `n_pis'   Num. Insts: `n_insts'" "{&beta} = `b_str' (SE: `se_str')", size(small) pos(7) ring(1) justification(left)) ///
+>                     plotregion(margin(sides))
+ 78.                 graph export ///
+>                     ../output/figures/`samp'/ppml_pdid_het_bs/ppml_pdid_`yvar'_`grp'_mshrctrl`suf'.pdf, ///
+>                     replace
+ 79.             }
+ 80.         }
+ 81. 
+.         * ---- Multi-group lab-age splits: joint fit, per-group FWL binscatter ----
+.         foreach aspec in age3 ageq4 {
+ 82.             if "`aspec'" == "age3"  local agrps lab_lt10 lab_10_20 lab_20p
+ 83.             if "`aspec'" == "ageq4" local agrps q1_labage q2_labage q3_labage q4_labage
+ 84.             local aok 1
+ 85.             foreach grp of local agrps {
+ 86.                 if strpos(" ${HET_GROUPS_ACTIVE} ", " `grp' ") == 0 local aok 0
+ 87.             }
+ 88.             if `aok' {
+ 89.             foreach v in _mu _z_work _dvar _fwlw _y_r _Z_r {
+ 90.                 cap drop `v'
+ 91.             }
+ 92.             local nb : word count `agrps'
+ 93.             local abase : word `nb' of `agrps'
+ 94.             local Zs
+ 95.             local Ss
+ 96.             local PTs
+ 97.             foreach grp of local agrps {
+ 98.                 cap drop Z_`grp'
+ 99.                 cap drop S_`grp'
+100.                 cap drop PT_`grp'
+101.                 gen Z_`grp' = Z_it       * `grp'
+102.                 gen S_`grp' = Z_share_it * `grp'
+103.                 local Zs `Zs' Z_`grp'
+104.                 local Ss `Ss' S_`grp'
+105.                 if "`grp'" != "`abase'" {
+106.                     gen PT_`grp' = post * `grp'
+107.                     local PTs `PTs' PT_`grp'
+108.                 }
+109.             }
+110. 
+.             * [H11] PT matches the posted `aspec' pooled-DiD spec (most senior group x post is the base)
+.             cap noi ppmlhdfe `yvar' `Zs' `Ss' `PTs', ///
+>                     absorb(`fes') vce(cluster `vce_cl') d(_dvar)
+111.             local rc = _rc
+112.             if `rc' {
+113.                 di as error "ppml_pdid_het_bs `samp'`suf' `yvar' `aspec' joint failed (rc=`rc'); skipping."
+114.             }
+115.             else {
+116.                 foreach grp of local agrps {
+117.                     local b_`grp'  = _b[Z_`grp']
+118.                     local se_`grp' = _se[Z_`grp']
+119.                 }
+120. 
+.                 predict double _mu, mu
+121.                 gen double _z_work = ln(_mu) + (`yvar' - _mu)/_mu if !mi(_mu) & _mu > 0
+122.                 gen double _fwlw = _mu if !mi(_mu) & _mu > 0
+123. 
+.                 foreach grp of local agrps {
+124.                     local others
+125.                     foreach o of local agrps {
+126.                         if "`o'" != "`grp'" local others `others' Z_`o'
+127.                     }
+128.                     foreach v in _y_r _Z_r {
+129.                         cap drop `v'
+130.                     }
+131.                     cap noi qui reghdfe _z_work `others' `Ss' `PTs' if !mi(_fwlw) [pw=_fwlw], ///
+>                             absorb(`fes') residuals(_y_r)
+132.                     if _rc == 0 cap noi qui reghdfe Z_`grp' `others' `Ss' `PTs' if !mi(_fwlw) [pw=_fwlw], ///
+>                             absorb(`fes') residuals(_Z_r)
+133.                     if _rc {
+134.                         di as error "ppml_pdid_het_bs FWL `grp' failed; skipping plot."
+135.                         continue
+136.                     }
+137.                     gunique athr_id if `grp' == 1 & !mi(_y_r) & !mi(_Z_r)
+138.                     local n_pis = r(unique)
+139.                     gunique inst_id if `grp' == 1 & !mi(_y_r) & !mi(_Z_r)
+140.                     local n_insts = r(unique)
+141.                     local b_str  : dis %7.3f `b_`grp''
+142.                     local se_str : dis %7.3f `se_`grp''
+143.                     binscatter _y_r _Z_r [aw=_fwlw] if `grp' == 1 & !mi(_y_r) & !mi(_Z_r), n(30) ///
+>                         xtitle("Exposure x Post") ///
+>                         ytitle("{&Delta} Log Expected `bs_lbl'") ///
+>                         xlab(-0.06(0.015)0.06, format(%5.3f)) ///
+>                         msymbol(O) mcolors(gs6) lcolors(ebblue) ///
+>                         note("Num. PIs: `n_pis'   Num. Insts: `n_insts'" "{&beta} = `b_str' (SE: `se_str')", size(small) pos(7) ring(1) justification(left)) ///
+>                         plotregion(margin(sides))
+144.                     graph export ///
+>                         ../output/figures/`samp'/ppml_pdid_het_bs/ppml_pdid_`yvar'_`grp'_mshrctrl`suf'.pdf, ///
+>                         replace
+145.                 }
+146.             }
+147.             }
+148.         }
+149.     restore
+150. end
+
+. 
+. program ppml_age_gradient
+  1.     * Age gradient of the pooled-DiD beta: one joint PPML with Z_it and the
+.     * share control fully interacted with career-age bins (HET_AGE_NBINS
+.     * PI-level quantiles of age_2014), plotted as each bin's beta vs the bin's
+.     * mean age. Same spec as the posted "mshrctrl" median splits, K bins
+.     * instead of 2.
+.     syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0)]
+  2.     local fes athr_id year
+  3.     local vce_cl athr_id
+  4.     if "$FE_MODE" == "inst_cluster" {
+  5.         local fes inst_id cluster_30 year
+  6.         local vce_cl inst_id
+  7.     }
+  8.     if "$FE_MODE" == "inst_cluster_fldyr" {
+  9.         local fes inst_id i.cluster_30#i.year
+ 10.         local vce_cl inst_id
+ 11.     }
+ 12.     local suf ""
+ 13.     if (`r1r2' == 1 & `public' == 0 & `r1_only' == 0) local suf "_r1_r2"
+ 14.     if (`r1r2' == 1 & `public' == 1 & `r1_only' == 0) local suf "_r1_r2_public"
+ 15.     if (`r1_only' == 1 & `public' == 0) local suf "_r1"
+ 16.     if (`r1_only' == 1 & `public' == 1) local suf "_r1_public"
+ 17.     cap mkdir "../output/figures/`samp'"
+ 18. 
+.     local yvar_list ppr_cnt cite_affl_wt
+ 19.     if "$DEBUG_YVAR" != "" local yvar_list $DEBUG_YVAR
+ 20.     local ppml_skip avg_position avg_team_size_last avg_team_size_notlast
+ 21. 
+.     use ../temp/es_`samp'`suf', clear
+ 22.     gen post       = year >= 2014
+ 23.     gen Z_it       = exposure      * post
+ 24.     gen Z_share_it = mkt_spend_shr * post
+ 25. 
+.     local K = $HET_AGE_NBINS
+ 26.     * Two age bases: career age (first any-position pub, +30) writes agegrad_*;
+.     * lab age (years since first last-author pub) writes labgrad_*.
+.     foreach agevar in age_2014 lab_age_2014 {
+ 27.     cap confirm variable `agevar'
+ 28.     if _rc {
+ 29.         di as error "ppml_age_gradient `samp'`suf': `agevar' not in panel -- skipped."
+ 30.         continue
+ 31.     }
+ 32.     local gpfx agegrad
+ 33.     local gtmp age_gradient
+ 34.     local gxtit "Career Age in 2014"
+ 35.     if "`agevar'" == "lab_age_2014" {
+ 36.         local gpfx labgrad
+ 37.         local gtmp lab_gradient
+ 38.         local gxtit "Years Running Lab in 2014"
+ 39.     }
+ 40.     cap drop agebin
+ 41.     xtile _agebin_pi = `agevar' if athr_indicator == 1, n(`K')
+ 42.     bys athr_id: egen agebin = max(_agebin_pi)
+ 43.     drop _agebin_pi
+ 44. 
+.     local zvars
+ 45.     local svars
+ 46.     local bins_used
+ 47.     forval k = 1/`K' {
+ 48.         qui count if agebin == `k' & athr_indicator == 1
+ 49.         if r(N) == 0 {
+ 50.             di as error "ppml_age_gradient `samp'`suf': age bin `k' empty -- skipped."
+ 51.             continue
+ 52.         }
+ 53.         cap drop Z_a`k'
+ 54.         cap drop S_a`k'
+ 55.         gen Z_a`k' = Z_it       * (agebin == `k')
+ 56.         gen S_a`k' = Z_share_it * (agebin == `k')
+ 57.         local zvars `zvars' Z_a`k'
+ 58.         local svars `svars' S_a`k'
+ 59.         local bins_used `bins_used' `k'
+ 60.     }
+ 61.     * post x bin shifts for all but the last bin: the full set sums to post,
+.     * collinear with year FE (last bin's post shift is the absorbed base).
+.     local ptvars
+ 62.     local nb : word count `bins_used'
+ 63.     forval i = 1/`=`nb'-1' {
+ 64.         local k : word `i' of `bins_used'
+ 65.         cap drop PT_a`k'
+ 66.         gen PT_a`k' = post * (agebin == `k')
+ 67.         local ptvars `ptvars' PT_a`k'
+ 68.     }
+ 69. 
+.     foreach yvar of local yvar_list {
+ 70.         if strpos(" `ppml_skip' ", " `yvar' ") > 0 {
+ 71.             di as text "ppml_age_gradient: `yvar' not a count outcome -- skipped."
+ 72.             continue
+ 73.         }
+ 74.         local ppml_ytit "Output-Cost Elasticity"
+ 75.         if "`yvar'" == "n_grants"       local ppml_ytit "{&Delta} Log Expected Active NIH Research Grants"
+ 76.         if "`yvar'" == "n_new_grants"   local ppml_ytit "{&Delta} Log Expected New NIH Research Grants"
+ 77.         if "`yvar'" == "nih_total_cost" local ppml_ytit "{&Delta} Log Expected NIH Award Dollars"
+ 78. 
+.         cap noi ppmlhdfe `yvar' `zvars' `svars' `ptvars' if !mi(agebin), ///
+>             absorb(`fes') vce(cluster `vce_cl')
+ 79.         local rc = _rc
+ 80.         if `rc' {
+ 81.             di as error "ppml_age_gradient `samp'`suf' `yvar' failed (rc=`rc'); skipping."
+ 82.             continue
+ 83.         }
+ 84.         gunique athr_id if e(sample)
+ 85.         local n_pis = r(unique)
+ 86.         gunique inst_id if e(sample)
+ 87.         local n_insts = r(unique)
+ 88.         cap mat drop AG
+ 89.         foreach k of local bins_used {
+ 90.             if _se[Z_a`k'] == 0 {
+ 91.                 di as error "ppml_age_gradient `samp'`suf' `yvar': Z_a`k' dropped/degenerate -- omitted from plot."
+ 92.                 continue
+ 93.             }
+ 94.             qui sum `agevar' if athr_indicator == 1 & agebin == `k'
+ 95.             mat AG = nullmat(AG) \ (`k', r(mean), r(N), _b[Z_a`k'], _se[Z_a`k'])
+ 96.         }
+ 97.         preserve
+ 98.         clear
+ 99.         svmat AG
+100.         rename (AG1 AG2 AG3 AG4 AG5) (bin age_mean n_pis b se)
+101.         gen ub = b + 1.96*se
+102.         gen lb = b - 1.96*se
+103.         save ../temp/`gtmp'_`samp'`suf'_`yvar', replace
+104.         tw rcap ub lb age_mean, lcolor(ebblue%70) msize(vsmall) || ///
+>            scatter b age_mean, mcolor(ebblue) || ///
+>            lfit b age_mean [aw=1/(se*se)], lcolor(dkorange) lpattern(dash) ///
+>            xtitle("`gxtit'") ytitle("`ppml_ytit'") ///
+>            yline(0, lcolor(gs10) lpattern(solid)) ///
+>            legend(on order(- "Num. PIs: `n_pis'" "Num. Insts: `n_insts'") pos(7) ring(1) rows(2) bmargin(zero) size(small)) ///
+>            plotregion(margin(sides))
+105.         graph export ../output/figures/`samp'/`gpfx'_`yvar'`suf'_ppml_mshrctrl.pdf, replace
+106.         restore
+107.     }
+108.     }
+109. end
+
+. 
+. program desc_pre_output_by_age
+  1.     * PI-level pre-period research-output densities, young vs old.
+.     * Log-scale and raw (x capped at pooled p95) overlays per outcome.
+.     syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0)]
+  2.     local suf ""
+  3.     if (`r1r2' == 1 & `public' == 0 & `r1_only' == 0) local suf "_r1_r2"
+  4.     if (`r1r2' == 1 & `public' == 1 & `r1_only' == 0) local suf "_r1_r2_public"
+  5.     if (`r1_only' == 1 & `public' == 0) local suf "_r1"
+  6.     if (`r1_only' == 1 & `public' == 1) local suf "_r1_public"
+  7.     cap mkdir "../output/figures/`samp'"
+  8. 
+.     use ../temp/es_`samp'`suf', clear
+  9.     keep if year < 2014
+ 10.     qui sum year
+ 11.     local y0 = r(min)
+ 12.     local y1 = r(max)
+ 13. 
+.     * Productivity: total pre-period papers and papers per pre-period year.
+.     * Citations and authorship-position counts ride along as totals.
+.     local sum_src   ppr_cnt cite_affl_wt n_first_ppr n_last_ppr
+ 14.     local sum_alias ppr_tot cite         first       last
+ 15.     local mean_src   ppr_cnt
+ 16.     local mean_alias ppr_yr
+ 17.     local lbl_ppr_tot "Total Papers"
+ 18.     local lbl_ppr_yr  "Papers per Year"
+ 19.     local lbl_cite    "Affiliation-Weighted Citations"
+ 20.     local lbl_first   "First-Authored Papers"
+ 21.     local lbl_last    "Last-Authored Papers"
+ 22.     local fmt_ppr_tot %6.1f
+ 23.     local fmt_ppr_yr  %5.2f
+ 24.     local fmt_cite    %8.1f
+ 25.     local fmt_first   %6.1f
+ 26.     local fmt_last    %6.1f
+ 27. 
+.     local coll_sum
+ 28.     local coll_mean
+ 29.     local keep_alias
+ 30.     foreach stat in sum mean {
+ 31.         local nsrc : word count ``stat'_src'
+ 32.         forvalues i = 1/`nsrc' {
+ 33.             local src : word `i' of ``stat'_src'
+ 34.             local a   : word `i' of ``stat'_alias'
+ 35.             cap confirm variable `src'
+ 36.             if _rc {
+ 37.                 di as error "desc_pre_output_by_age `samp'`suf': `src' not in panel -- `a' density SKIPPED."
+ 38.                 continue
+ 39.             }
+ 40.             local coll_`stat' `coll_`stat'' pre_`a'=`src'
+ 41.             local keep_alias `keep_alias' `a'
+ 42.         }
+ 43.     }
+ 44.     if "`keep_alias'" == "" {
+ 45.         di as error "desc_pre_output_by_age `samp'`suf': no outcomes available -- nothing plotted."
+ 46.         exit
+ 47.     }
+ 48.     local coll_sum_part = cond("`coll_sum'" == "", "", "(sum) `coll_sum'")
+ 49.     local coll_mean_part = cond("`coll_mean'" == "", "", "(mean) `coll_mean'")
+ 50. 
+.     egen long inst_num = group(inst_id)
+ 51.     gcollapse `coll_sum_part' `coll_mean_part' (firstnm) young inst_num, by(athr_id)
+ 52.     drop if mi(young)
+ 53. 
+.     qui count if young == 1
+ 54.     local n_y = r(N)
+ 55.     qui count if young == 0
+ 56.     local n_o = r(N)
+ 57.     di as text _n "desc_pre_output_by_age `samp'`suf': pre-period = `y0'-`y1', N young = `n_y', N old = `n_o'"
+ 58. 
+.     foreach a of local keep_alias {
+ 59.         local f "`fmt_`a''"
+ 60.         qui sum pre_`a' if young == 1, d
+ 61.         local mu_y = strtrim(string(r(mean), "`f'"))
+ 62.         local md_y = strtrim(string(r(p50),  "`f'"))
+ 63.         qui sum pre_`a' if young == 0, d
+ 64.         local mu_o = strtrim(string(r(mean), "`f'"))
+ 65.         local md_o = strtrim(string(r(p50),  "`f'"))
+ 66.         local leg_y "Early-Career (N=`n_y'): mean=`mu_y'"
+ 67.         local leg_o "Late-Career (N=`n_o'): mean=`mu_o'"
+ 68.         di as text "  `a': young mean=`mu_y' p50=`md_y' | old mean=`mu_o' p50=`md_o'"
+ 69.         cap noi ksmirnov pre_`a', by(young)
+ 70.         qui reg pre_`a' young, vce(cluster inst_num)
+ 71.         di as text "  `a': young-old diff = " %8.3f _b[young] " (se " %8.3f _se[young] ")"
+ 72. 
+.         gen double ln_pre_`a' = ln(1 + pre_`a')
+ 73.         * both densities on one common x grid so rarea can shade the gap
+.         qui sum ln_pre_`a'
+ 74.         cap drop _kx _kd_y _kd_o _kd_c
+ 75.         gen _kx = r(min) + (r(max) - r(min)) * (_n - 1) / 199 if _n <= 200
+ 76.         kdensity ln_pre_`a' if young == 1, at(_kx) gen(_kd_y) nograph
+ 77.         kdensity ln_pre_`a' if young == 0, at(_kx) gen(_kd_o) nograph
+ 78.         gen _kd_c = min(_kd_y, _kd_o)
+ 79.         tw (rarea _kd_c _kd_y _kx, color(ebblue*0.3) lwidth(none)) ///
+>            (rarea _kd_c _kd_o _kx, color(dkorange*0.3) lwidth(none)) ///
+>            (line _kd_y _kx, lcolor(ebblue) lwidth(medthick)) ///
+>            (line _kd_o _kx, lcolor(dkorange) lwidth(medthick)) ///
+>            , xtitle("ln(1 + Pre-Period `lbl_`a'', `y0'-`y1')") ytitle("Density") ///
+>              legend(order(3 "`leg_y'" 4 "`leg_o'") ///
+>                     pos(2) ring(0) rows(2) size(small)) ///
+>              plotregion(margin(sides))
+ 80.         graph export ../output/figures/`samp'/desc_kd_pre_`a'_ln`suf'.pdf, replace
+ 81. 
+.         qui sum pre_`a', d
+ 82.         local xcap = r(p95)
+ 83.         cap drop _kx _kd_y _kd_o _kd_c
+ 84.         gen _kx = `xcap' * (_n - 1) / 199 if _n <= 200
+ 85.         kdensity pre_`a' if young == 1 & pre_`a' <= `xcap', at(_kx) gen(_kd_y) nograph
+ 86.         kdensity pre_`a' if young == 0 & pre_`a' <= `xcap', at(_kx) gen(_kd_o) nograph
+ 87.         gen _kd_c = min(_kd_y, _kd_o)
+ 88.         tw (rarea _kd_c _kd_y _kx, color(ebblue*0.3) lwidth(none)) ///
+>            (rarea _kd_c _kd_o _kx, color(dkorange*0.3) lwidth(none)) ///
+>            (line _kd_y _kx, lcolor(ebblue) lwidth(medthick)) ///
+>            (line _kd_o _kx, lcolor(dkorange) lwidth(medthick)) ///
+>            , xtitle("Pre-Period `lbl_`a'', `y0'-`y1' (x capped at pooled p95)") ytitle("Density") ///
+>              legend(order(3 "`leg_y'" 4 "`leg_o'") ///
+>                     pos(2) ring(0) rows(2) size(small)) ///
+>              plotregion(margin(sides))
+ 89.         graph export ../output/figures/`samp'/desc_kd_pre_`a'_raw`suf'.pdf, replace
+ 90.         cap drop _kx _kd_y _kd_o _kd_c
+ 91.     }
+ 92. 
+.     save ../temp/desc_pre_output_`samp'`suf', replace
+ 93. end
+
+. 
+. program horse_race_nih
+  1.     * Experience-vs-money horse race on the NIH-matched sample: one PPML with
+.     * Z_it interacted with young (early-career) AND low_nihd (below-median
+.     * baseline NIH funding) jointly, plus the post x dummy shifts and the
+.     * uninteracted share control. Base Z_it = late-career, above-median-NIH.
+.     * Reports both triple-interaction betas and the Wald test of equality.
+.     syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0)]
+  2.     local fes athr_id year
+  3.     local vce_cl athr_id
+  4.     if "$FE_MODE" == "inst_cluster" {
+  5.         local fes inst_id cluster_30 year
+  6.         local vce_cl inst_id
+  7.     }
+  8.     if "$FE_MODE" == "inst_cluster_fldyr" {
+  9.         local fes inst_id i.cluster_30#i.year
+ 10.         local vce_cl inst_id
+ 11.     }
+ 12.     local suf ""
+ 13.     if (`r1r2' == 1 & `public' == 0 & `r1_only' == 0) local suf "_r1_r2"
+ 14.     if (`r1r2' == 1 & `public' == 1 & `r1_only' == 0) local suf "_r1_r2_public"
+ 15.     if (`r1_only' == 1 & `public' == 0) local suf "_r1"
+ 16.     if (`r1_only' == 1 & `public' == 1) local suf "_r1_public"
+ 17. 
+.     cap confirm file "../temp/es_`samp'`suf'.dta"
+ 18.     if _rc {
+ 19.         di as error "horse_race_nih `samp'`suf': ../temp/es_`samp'`suf'.dta not found -- run add_het_splits first."
+ 20.         exit
+ 21.     }
+ 22.     use ../temp/es_`samp'`suf', clear
+ 23.     foreach v in young low_nihd nih_pi {
+ 24.         cap confirm variable `v'
+ 25.         if _rc {
+ 26.             di as error "horse_race_nih `samp'`suf': `v' not in panel -- SKIPPED."
+ 27.             exit
+ 28.         }
+ 29.     }
+ 30.     keep if nih_pi == 1 & !mi(young) & !mi(low_nihd)
+ 31.     foreach v in young low_nihd {
+ 32.         qui sum `v'
+ 33.         if r(N) == 0 | r(min) == r(max) {
+ 34.             di as error "horse_race_nih `samp'`suf': `v' degenerate on the NIH-matched sample -- SKIPPED."
+ 35.             exit
+ 36.         }
+ 37.     }
+ 38. 
+.     gen post       = year >= 2014
+ 39.     gen Z_it       = exposure      * post
+ 40.     gen Z_share_it = mkt_spend_shr * post
+ 41.     gen Z_early    = Z_it * young
+ 42.     gen Z_lownih   = Z_it * low_nihd
+ 43.     gen PT_early   = post * young
+ 44.     gen PT_lownih  = post * low_nihd
+ 45. 
+.     local yvar_list ppr_cnt cite_affl_wt
+ 46.     if "$DEBUG_YVAR" != "" local yvar_list $DEBUG_YVAR
+ 47.     local nyv : word count `yvar_list'
+ 48. 
+.     mat hrace`suf' = J(14, `nyv', .)
+ 49.     mat rownames hrace`suf' = b_z_base se_z_base b_z_early se_z_early ///
+>                               b_z_lownih se_z_lownih b_diff se_diff ///
+>                               stat_eq p_eq N n_pis n_pis_early n_pis_lownih
+ 50.     mat colnames hrace`suf' = `yvar_list'
+ 51. 
+.     local col 0
+ 52.     foreach yvar of local yvar_list {
+ 53.         local ++col
+ 54.         cap noi ppmlhdfe `yvar' Z_it Z_early Z_lownih PT_early PT_lownih Z_share_it, ///
+>             absorb(`fes') vce(cluster `vce_cl')
+ 55.         local rc = _rc
+ 56.         if `rc' {
+ 57.             di as error "horse_race_nih `samp'`suf' `yvar' failed (rc=`rc'); column left missing."
+ 58.             continue
+ 59.         }
+ 60.         local Nppml = e(N)
+ 61.         local b_early   = _b[Z_early]
+ 62.         local se_early  = _se[Z_early]
+ 63.         local b_lownih  = _b[Z_lownih]
+ 64.         local se_lownih = _se[Z_lownih]
+ 65.         gunique athr_id if e(sample)
+ 66.         local n_pis = r(unique)
+ 67.         gunique athr_id if e(sample) & young == 1
+ 68.         local n_early = r(unique)
+ 69.         gunique athr_id if e(sample) & low_nihd == 1
+ 70.         local n_lownih = r(unique)
+ 71.         qui lincom Z_early - Z_lownih
+ 72.         local b_diff  = r(estimate)
+ 73.         local se_diff = r(se)
+ 74.         qui test Z_early = Z_lownih
+ 75.         local stat_eq = cond(r(F) < ., r(F), r(chi2))
+ 76.         local p_eq = r(p)
+ 77. 
+.         mat hrace`suf'[1,`col']  = _b[Z_it]
+ 78.         mat hrace`suf'[2,`col']  = _se[Z_it]
+ 79.         mat hrace`suf'[3,`col']  = `b_early'
+ 80.         mat hrace`suf'[4,`col']  = `se_early'
+ 81.         mat hrace`suf'[5,`col']  = `b_lownih'
+ 82.         mat hrace`suf'[6,`col']  = `se_lownih'
+ 83.         mat hrace`suf'[7,`col']  = `b_diff'
+ 84.         mat hrace`suf'[8,`col']  = `se_diff'
+ 85.         mat hrace`suf'[9,`col']  = `stat_eq'
+ 86.         mat hrace`suf'[10,`col'] = `p_eq'
+ 87.         mat hrace`suf'[11,`col'] = `Nppml'
+ 88.         mat hrace`suf'[12,`col'] = `n_pis'
+ 89.         mat hrace`suf'[13,`col'] = `n_early'
+ 90.         mat hrace`suf'[14,`col'] = `n_lownih'
+ 91. 
+.         di as text "horse_race_nih `samp'`suf' `yvar' (NIH-matched sample):"
+ 92.         di as text "  Z x EarlyCareer     = " %9.4f `b_early'  "  (se " %7.4f `se_early' ")"
+ 93.         di as text "  Z x BelowMedianNIH  = " %9.4f `b_lownih' "  (se " %7.4f `se_lownih' ")"
+ 94.         di as text "  diff (early-lownih) = " %9.4f `b_diff'   "  (se " %7.4f `se_diff' ")   H0 equal: stat = " %8.4f `stat_eq' "  p = " %6.4f `p_eq'
+ 95.         di as text "  base Z (late-career x above-median) = " %9.4f _b[Z_it] "  (se " %7.4f _se[Z_it] ")"
+ 96.         di as text "  N = " %9.0f `Nppml' "  PIs = `n_pis' (early = `n_early', below-median NIH = `n_lownih')"
+ 97.     }
+ 98. 
+.     cap mkdir ../output/tables
+ 99.     cap mkdir ../output/tables/`samp'
+100.     qui matrix_to_txt, saving("../output/tables/`samp'/horse_race_nih`suf'.txt") ///
+>         matrix(hrace`suf') title(<tab:horse_race_nih`suf'>) format(%20.4f) replace
+101. end
+
+. 
+. program output_het_tables
+  1.     syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0)]
+  2.     local suf ""
+  3.     if (`r1r2' == 1 & `public' == 0 & `r1_only' == 0) local suf "_r1_r2"
+  4.     if (`r1r2' == 1 & `public' == 1 & `r1_only' == 0) local suf "_r1_r2_public"
+  5.     if (`r1_only' == 1 & `public' == 0) local suf "_r1"
+  6.     if (`r1_only' == 1 & `public' == 1) local suf "_r1_public"
+  7.     cap mkdir ../output/tables
+  8.     cap mkdir ../output/tables/`samp'
+  9. 
+.     cap confirm file "../temp/phet_results_`samp'`suf'.dta"
+ 10.     if !_rc {
+ 11.         preserve
+ 12.         use "../temp/phet_results_`samp'`suf'.dta", clear
+ 13.         export delimited using "../output/tables/`samp'/phet_results`suf'.txt", replace delim(tab)
+ 14.         restore
+ 15.     }
+ 16. end
+
+. 
+. program ppml_het_coefplot
+  1.     * Three panels per yvar (pi / ic_fund / ic_expx).
+.     * If yvar() is supplied, plot only that outcome; otherwise loop all.
+.     syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0) yvar(string)]
+  2.     local suf ""
+  3.     if (`r1r2' == 1 & `public' == 0 & `r1_only' == 0) local suf "_r1_r2"
+  4.     if (`r1r2' == 1 & `public' == 1 & `r1_only' == 0) local suf "_r1_r2_public"
+  5.     if (`r1_only' == 1 & `public' == 0) local suf "_r1"
+  6.     if (`r1_only' == 1 & `public' == 1) local suf "_r1_public"
+  7. 
+.     * When called inline per-yvar, read the per-yvar postfile; otherwise the combined master.
+.     if "`yvar'" != "" {
+  8.         local resfile "../temp/phet_results_`samp'`suf'_`yvar'.dta"
+  9.     }
+ 10.     else {
+ 11.         local resfile "../temp/phet_results_`samp'`suf'.dta"
+ 12.     }
+ 13.     cap confirm file "`resfile'"
+ 14.     if _rc {
+ 15.         di as error "ppml_het_coefplot: `resfile' not found -- skipping"
+ 16.         exit 0
+ 17.     }
+ 18. 
+.     local ppml_het_yvars ppr_cnt cite_affl_wt avg_num_coathrs ///
+>                         n_grants n_new_grants nih_total_cost ///
+>                         n_middle_ppr
+ 19.     if "`yvar'" != "" local ppml_het_yvars `yvar'
+ 20. 
+.     local ic_fund_aliases tfnd lsf
+ 21.     local ic_expx_aliases endow
+ 22.     if $HET_IC_FULL == 1 {
+ 23.         local ic_fund_aliases contr fdlsb fdls fdlsh gntsf hhlsb hhls hhlsh nflsb nfls nflsh subrf busf fedf tfnd instf nonpf statf lsf hsf biof
+ 24.         local ic_expx_aliases applx apfx basx bfx clinx devx lscx medx endow
+ 25.     }
+ 26. 
+.     * joint_ae_<axis> types track PI_CHAR_ALIASES so dropping an axis there
+.     * removes its coefplot too.
+.     local axis_sts
+ 27.     foreach axis of global PI_CHAR_ALIASES {
+ 28.         local axis_sts `axis_sts' joint_ae_`axis'
+ 29.     }
+ 30.     local st_list med_pi joint_ae `axis_sts' joint_agepr joint_agenih joint_prnih ///
+>                   joint_ageteam joint_tmnih joint_tmpr ///
+>                   joint_agenet joint_agelab joint_agecrwd joint_agemsa
+ 31.     if "$HET_INCLUDE_INSTWTD" == "1" local st_list med `st_list'
+ 32.     if "$HET_RUN_QUARTILES" == "1" {
+ 33.         local st_list `st_list' quart_pi
+ 34.         if "$HET_INCLUDE_INSTWTD" == "1" local st_list `st_list' quart
+ 35.     }
+ 36.     foreach st of local st_list {
+ 37.         if strpos("`st'", "joint_") == 1 {
+ 38.             * Custom paired rendering used instead of the standard panel loop.
+.             * Leaving all groups empty causes the standard loop to skip.
+.             local groups_pi
+ 39.             local groups_ic_fund
+ 40.             local groups_ic_expx
+ 41.         }
+ 42.         else if "`st'" == "med" {
+ 43.             local groups_pi     young old r1 r2 pub_inst priv_inst ///
+>                                 high_pre_ppr low_pre_ppr ///
+>                                 high_nihd low_nihd ///
+>                                 big_msa small_msa
+ 44.             local groups_ic_fund
+ 45.             foreach a of local ic_fund_aliases {
+ 46.                 local groups_ic_fund `groups_ic_fund' hi_`a' lo_`a'
+ 47.             }
+ 48.             local groups_ic_expx
+ 49.             foreach a of local ic_expx_aliases {
+ 50.                 local groups_ic_expx `groups_ic_expx' hi_`a' lo_`a'
+ 51.             }
+ 52.         }
+ 53.         else if "`st'" == "med_pi" {
+ 54.             * PI-weighted inst-char medians. PI-level splits are the same
+.             * variables as under med so they render in the pi panel too.
+.             local groups_pi     young old r1 r2 pub_inst priv_inst ///
+>                                 high_pre_ppr low_pre_ppr ///
+>                                 high_nihd low_nihd ///
+>                                 big_msa small_msa
+ 55.             local groups_ic_fund
+ 56.             foreach a of local ic_fund_aliases {
+ 57.                 local groups_ic_fund `groups_ic_fund' hiw_`a' low_`a'
+ 58.             }
+ 59.             local groups_ic_expx
+ 60.             foreach a of local ic_expx_aliases {
+ 61.                 local groups_ic_expx `groups_ic_expx' hiw_`a' low_`a'
+ 62.             }
+ 63.         }
+ 64.         else if "`st'" == "quart" {
+ 65.             local groups_pi
+ 66.             foreach b of global PI_Q_BASES {
+ 67.                 local groups_pi `groups_pi' q4_`b' q1_`b'
+ 68.             }
+ 69.             local groups_ic_fund
+ 70.             foreach a of local ic_fund_aliases {
+ 71.                 local groups_ic_fund `groups_ic_fund' q4_`a' q1_`a'
+ 72.             }
+ 73.             local groups_ic_expx
+ 74.             foreach a of local ic_expx_aliases {
+ 75.                 local groups_ic_expx `groups_ic_expx' q4_`a' q1_`a'
+ 76.             }
+ 77.         }
+ 78.         else {
+ 79.             * quart_pi -- PI-weighted quartiles for inst chars, PI-continuous
+.             * quartiles for PI bases.
+.             local groups_pi
+ 80.             foreach b of global PI_Q_BASES {
+ 81.                 local groups_pi `groups_pi' q4_`b' q1_`b'
+ 82.             }
+ 83.             local groups_ic_fund
+ 84.             foreach a of local ic_fund_aliases {
+ 85.                 local groups_ic_fund `groups_ic_fund' q4w_`a' q1w_`a'
+ 86.             }
+ 87.             local groups_ic_expx
+ 88.             foreach a of local ic_expx_aliases {
+ 89.                 local groups_ic_expx `groups_ic_expx' q4w_`a' q1w_`a'
+ 90.             }
+ 91.         }
+ 92. 
+.         foreach spec_tag in mshrctrl {
+ 93.             local spec_folder = cond($HET_IC_FULL == 1, "coefplot_evavg_full", "coefplot_evavg")
+ 94.             cap mkdir "../output/figures/`samp'/`spec_folder'"
+ 95. 
+.         * Combined panel stacks pi + ic_fund + ic_expx so the paper can show
+.         * one coefplot per (yvar, spec, st) instead of three per-panel PDFs.
+.         local groups_all `groups_pi' `groups_ic_fund' `groups_ic_expx'
+ 96.         foreach panel in pi ic_fund ic_expx all {
+ 97.             local groups `groups_`panel''
+ 98.             local n_groups : word count `groups'
+ 99.             if `n_groups' == 0 continue
+100. 
+.             foreach yv of local ppml_het_yvars {
+101.                 preserve
+102.                 use "`resfile'", clear
+103.                 keep if yvar == "`yv'" & split_type == "`st'" & spec == "`spec_tag'"
+104.                 if _N == 0 {
+105.                     restore
+106.                     continue
+107.                 }
+108. 
+.                 * Groups come in high/low pairs; add a gap between pairs so
+.                 * each pair reads as one block.
+.                 local pair_gap 0.7
+109.                 local npairs = ceil(`n_groups'/2)
+110.                 gen double y = .
+111.                 local ylabs ""
+112.                 local i = 0
+113.                 foreach g of local groups {
+114.                     local ++i
+115.                     local pair = int((`i'-1)/2)
+116.                     local ypos = (`n_groups' - `i') + (`npairs' - 1 - `pair')*`pair_gap' + 1
+117.                     qui replace y = `ypos' if grp == "`g'"
+118.                     local lbl = "${LBL_`g'}"
+119.                     if "`lbl'" == "" local lbl "`g'"
+120.                     if length("`lbl'") > 40 local lbl = substr("`lbl'", 1, 37) + "..."
+121.                     local ylabs `"`ylabs' `ypos' "`lbl'""'
+122.                 }
+123.                 drop if mi(y) | mi(post_b)
+124.                 if _N == 0 {
+125.                     restore
+126.                     continue
+127.                 }
+128.                 gen ub = post_b + 1.96*post_se
+129.                 gen lb = post_b - 1.96*post_se
+130. 
+.                 qui sum lb
+131.                 local xmin = floor(r(min)/0.5)*0.5
+132.                 qui sum ub
+133.                 local xmax = ceil(r(max)/0.5)*0.5
+134. 
+.                 * Adaptive canvas: bigger for more rows. Matches old reduced_form format.
+.                 local ysize 6
+135.                 if `n_groups' > 20 local ysize 10
+136.                 if `n_groups' > 40 local ysize 14
+137.                 * Grow the canvas by the added inter-pair whitespace.
+.                 local ysize = round(`ysize' * (`n_groups' + (`npairs'-1)*`pair_gap')/`n_groups', 0.1)
+138.                 local labsize small
+139.                 if `n_groups' > 20 local labsize vsmall
+140. 
+.                 tw rcap ub lb y, horizontal lcolor(ebblue%70) msize(vsmall) || ///
+>                    scatter y post_b, mcolor(ebblue) msize(small) ///
+>                    , xline(0, lcolor(gs10) lpattern(solid)) ///
+>                      ylabel(`ylabs', angle(0) labsize(`labsize') noticks nogrid) ///
+>                      ytitle("") xtitle("Exposure x Post", size(small)) ///
+>                      xlabel(`xmin'(0.5)`xmax', labsize(small)) ///
+>                      legend(off) ///
+>                      ysize(`ysize') xsize(7) ///
+>                      yscale(range(0.9 .)) ///
+>                      plotregion(margin(l=zero r=zero b=zero t=vsmall))
+141.                 graph export ///
+>                     "../output/figures/`samp'/`spec_folder'/ppml_het_coefplot_`yv'_`st'_`panel'`suf'.pdf", ///
+>                     replace
+142.                 di as text "wrote ../output/figures/`samp'/`spec_folder'/ppml_het_coefplot_`yv'_`st'_`panel'`suf'.pdf"
+143.                 restore
+144.             }
+145.         }
+146. 
+.         * ----- Custom paired coefplot: inst chars on y-axis (High/Low rows),
+.         *       one blue + one orange marker per row. Splitting axis and
+.         *       prefix widths depend on `st':
+.         *         joint_ae         -- age (1-char y/o prefix)
+.         *         joint_ae_<axis>  -- PI split (2-char hp/lp or mc/fc prefix)
+.         if "`st'" == "joint_ae" | strpos("`st'", "joint_ae_") == 1 {
+147.             if "`st'" == "joint_ae" {
+148.                 local pfx_len   1
+149.                 local hi_pfx    y
+150.                 local lo_pfx    o
+151.                 local hi_leg    "Early-Career"
+152.                 local lo_leg    "Late-Career"
+153.                 local filename_stem joint_ae_paired
+154.             }
+155.             else {
+156.                 local axis : subinstr local st "joint_ae_" "", all
+157.                 local pfx_len   2
+158.                 local hi_pfx    "${PI_CHAR_HIPFX_`axis'}"
+159.                 local lo_pfx    "${PI_CHAR_LOPFX_`axis'}"
+160.                 local hi_leg    "${PI_CHAR_HILEG_`axis'}"
+161.                 local lo_leg    "${PI_CHAR_LOLEG_`axis'}"
+162.                 local filename_stem "joint_ae_`axis'_paired"
+163.             }
+164.             local hilo_pos = `pfx_len' + 2
+165.             local char_pos = `pfx_len' + 5
+166.             foreach yv of local ppml_het_yvars {
+167.                 preserve
+168.                 use "`resfile'", clear
+169.                 keep if yvar == "`yv'" & split_type == "`st'" & spec == "`spec_tag'"
+170.                 if _N == 0 {
+171.                     restore
+172.                     continue
+173.                 }
+174.                 gen str2  pfx_c  = substr(grp, 1, `pfx_len')
+175.                 gen str2  hilo_c = substr(grp, `hilo_pos', 2)
+176.                 gen str12 char_c = substr(grp, `char_pos', .)
+177.                 gen byte  is_hi_side = (pfx_c == "`hi_pfx'")
+178.                 gen char_idx = .
+179.                 local ii = 0
+180.                 foreach a of global IC_ALIASES {
+181.                     local ++ii
+182.                     qui replace char_idx = `ii' if char_c == "`a'"
+183.                 }
+184.                 qui drop if mi(char_idx)
+185.                 if _N == 0 {
+186.                     restore
+187.                     continue
+188.                 }
+189.                 qui sum char_idx
+190.                 local nchars = r(max)
+191.                 * Row layout: within-pair (blue+orange same hi/lo) 0.6;
+.                 * between hi-row and lo-row of same char = 0.8; between
+.                 * chars = 1.2. Base spacing 3.2 per char.
+.                 gen double y_group = (`nchars' + 1 - char_idx) * 3.2
+192.                 gen double y_pos   = y_group ///
+>                     + cond(hilo_c == "hi" & is_hi_side == 1,  1.0, ///
+>                       cond(hilo_c == "hi" & is_hi_side == 0,  0.4, ///
+>                       cond(hilo_c == "lo" & is_hi_side == 1, -0.4, -1.0)))
+193.                 gen ub = post_b + 1.96*post_se
+194.                 gen lb = post_b - 1.96*post_se
+195. 
+.                 local ylabs
+196.                 forvalues i = 1/`nchars' {
+197.                     qui levelsof char_c if char_idx == `i', local(cname) clean
+198.                     local clbl = "${LBL_ic_`cname'}"
+199.                     if "`clbl'" == "" local clbl "`cname'"
+200.                     local base = (`nchars' + 1 - `i') * 3.2
+201.                     local pos_hi = `base' + 1.0
+202.                     local pos_lo = `base' - 0.4
+203.                     local ylabs `"`ylabs' `pos_hi' "High `clbl'""'
+204.                     local ylabs `"`ylabs' `pos_lo' "Low `clbl'""'
+205.                 }
+206. 
+.                 qui sum lb
+207.                 local xmin = floor(r(min)/0.5)*0.5
+208.                 qui sum ub
+209.                 local xmax = ceil(r(max)/0.5)*0.5
+210. 
+.                 tw rcap ub lb y_pos if is_hi_side == 1, horizontal lcolor(ebblue%70) msize(vsmall)   || ///
+>                    scatter y_pos post_b if is_hi_side == 1, mcolor(ebblue) msize(small)              || ///
+>                    rcap ub lb y_pos if is_hi_side == 0, horizontal lcolor(dkorange%70) msize(vsmall) || ///
+>                    scatter y_pos post_b if is_hi_side == 0, mcolor(dkorange) msymbol(D) msize(small) ///
+>                    , xline(0, lcolor(gs10) lpattern(solid)) ///
+>                      ylabel(`ylabs', angle(0) labsize(small) noticks nogrid) ///
+>                      ytitle("") xtitle("Exposure x Post", size(small)) ///
+>                      xlabel(`xmin'(0.5)`xmax', labsize(small)) ///
+>                      legend(order(2 "`hi_leg'" 4 "`lo_leg'") pos(6) ring(1) rows(1) span size(small)) ///
+>                      ysize(`=max(8, `nchars'*1.6)') xsize(9) ///
+>                      yscale(range(2.1 .)) ///
+>                      plotregion(margin(l=zero r=zero b=zero t=vsmall))
+211.                 graph export ///
+>                     "../output/figures/`samp'/`spec_folder'/ppml_het_coefplot_`yv'_`filename_stem'`suf'.pdf", ///
+>                     replace
+212.                 di as text "wrote `filename_stem' coefplot for `yv' `spec_tag'"
+213.                 restore
+214.             }
+215.         }
+216. 
+.         * ----- Age x baseline-productivity 2x2 (no inst char).
+.         *       Two rows: High Baseline Productivity / Low Baseline Productivity.
+.         *       Blue = Early-Career, Orange = Late-Career.
+.         if "`st'" == "joint_agepr" {
+217.             foreach yv of local ppml_het_yvars {
+218.                 preserve
+219.                 use "`resfile'", clear
+220.                 keep if yvar == "`yv'" & split_type == "joint_agepr" & spec == "`spec_tag'"
+221.                 if _N == 0 {
+222.                     restore
+223.                     continue
+224.                 }
+225.                 gen byte is_young = (substr(grp, 1, 1) == "y")
+226.                 gen str2 pr_c    = substr(grp, 3, 2)
+227.                 gen double y_pos = cond(pr_c == "hp",  2, 1) ///
+>                                    + cond(is_young == 1,  0.3, -0.3)
+228.                 gen ub = post_b + 1.96*post_se
+229.                 gen lb = post_b - 1.96*post_se
+230. 
+.                 local ylabs `"2 "High Baseline Productivity" 1 "Low Baseline Productivity""'
+231. 
+.                 qui sum lb
+232.                 local xmin = floor(r(min)/0.5)*0.5
+233.                 qui sum ub
+234.                 local xmax = ceil(r(max)/0.5)*0.5
+235. 
+.                 tw rcap ub lb y_pos if is_young == 1, horizontal lcolor(ebblue%70) msize(vsmall)   || ///
+>                    scatter y_pos post_b if is_young == 1, mcolor(ebblue) msize(small)              || ///
+>                    rcap ub lb y_pos if is_young == 0, horizontal lcolor(dkorange%70) msize(vsmall) || ///
+>                    scatter y_pos post_b if is_young == 0, mcolor(dkorange) msymbol(D) msize(small) ///
+>                    , xline(0, lcolor(gs10) lpattern(solid)) ///
+>                      ylabel(`ylabs', angle(0) labsize(small) noticks nogrid) ///
+>                      ytitle("") xtitle("Exposure x Post", size(small)) ///
+>                      xlabel(`xmin'(0.5)`xmax', labsize(small)) ///
+>                      legend(order(2 "Early-Career" 4 "Late-Career") pos(6) ring(1) rows(1) span size(small)) ///
+>                      ysize(5) xsize(7) ///
+>                      yscale(range(0.62 .)) ///
+>                      plotregion(margin(l=zero r=zero b=zero t=vsmall))
+236.                 graph export ///
+>                     "../output/figures/`samp'/`spec_folder'/ppml_het_coefplot_`yv'_joint_agepr`suf'.pdf", ///
+>                     replace
+237.                 di as text "wrote joint_agepr coefplot for `yv' `spec_tag'"
+238.                 restore
+239.             }
+240.         }
+241. 
+.         * ----- Generic 4-cell joint coefplots (PI-split x PI-split): one row
+.         *       per cell, first-axis pairs blocked. Cells ordered hi-hi,
+.         *       hi-lo, lo-hi, lo-lo; lab1/lab2 = first axis, lab3/lab4 =
+.         *       second axis.
+.         local generic_jts joint_agenih joint_prnih joint_ageteam joint_tmnih joint_tmpr ///
+>                           joint_agenet joint_agelab joint_agecrwd joint_agemsa
+242.         if strpos(" `generic_jts' ", " `st' ") > 0 {
+243.             if "`st'" == "joint_agenih" {
+244.                 local cells y_hn y_ln o_hn o_ln
+245.                 local lab1 "Early-Career Scientists"
+246.                 local lab2 "Late-Career Scientists"
+247.                 local lab3 "More NIH Funding at Baseline"
+248.                 local lab4 "Less NIH Funding at Baseline"
+249.             }
+250.             if "`st'" == "joint_agenet" {
+251.                 local cells y_bn y_sn o_bn o_sn
+252.                 local lab1 "Early-Career Scientists"
+253.                 local lab2 "Late-Career Scientists"
+254.                 local lab3 "Larger Coauthor Network"
+255.                 local lab4 "Smaller Coauthor Network"
+256.             }
+257.             if "`st'" == "joint_agelab" {
+258.                 local cells y_nl y_el o_nl o_el
+259.                 local lab1 "Early-Career Scientists"
+260.                 local lab2 "Late-Career Scientists"
+261.                 local lab3 "Newer Labs"
+262.                 local lab4 "Established Labs"
+263.             }
+264.             if "`st'" == "joint_agecrwd" {
+265.                 local cells y_ci y_si o_ci o_si
+266.                 local lab1 "Early-Career Scientists"
+267.                 local lab2 "Late-Career Scientists"
+268.                 local lab3 "More Same-Field PIs at Inst."
+269.                 local lab4 "Fewer Same-Field PIs at Inst."
+270.             }
+271.             if "`st'" == "joint_agemsa" {
+272.                 local cells y_bmsa y_smsa o_bmsa o_smsa
+273.                 local lab1 "Early-Career Scientists"
+274.                 local lab2 "Late-Career Scientists"
+275.                 local lab3 "Larger MSAs"
+276.                 local lab4 "Smaller MSAs"
+277.             }
+278.             if "`st'" == "joint_prnih" {
+279.                 local cells hp_hn hp_ln lp_hn lp_ln
+280.                 local lab1 "More Productive at Baseline"
+281.                 local lab2 "Less Productive at Baseline"
+282.                 local lab3 "More NIH Funding at Baseline"
+283.                 local lab4 "Less NIH Funding at Baseline"
+284.             }
+285.             if "`st'" == "joint_ageteam" {
+286.                 local cells y_bt y_sm o_bt o_sm
+287.                 local lab1 "Early-Career Scientists"
+288.                 local lab2 "Late-Career Scientists"
+289.                 local lab3 "Larger Team Size"
+290.                 local lab4 "Smaller Team Size"
+291.             }
+292.             if "`st'" == "joint_tmnih" {
+293.                 local cells bt_hn bt_ln sm_hn sm_ln
+294.                 local lab1 "Larger Team Size"
+295.                 local lab2 "Smaller Team Size"
+296.                 local lab3 "More NIH Funding at Baseline"
+297.                 local lab4 "Less NIH Funding at Baseline"
+298.             }
+299.             if "`st'" == "joint_tmpr" {
+300.                 local cells bt_hp bt_lp sm_hp sm_lp
+301.                 local lab1 "Larger Team Size"
+302.                 local lab2 "Smaller Team Size"
+303.                 local lab3 "More Productive at Baseline"
+304.                 local lab4 "Less Productive at Baseline"
+305.             }
+306.             foreach yv of local ppml_het_yvars {
+307.                 preserve
+308.                 use "`resfile'", clear
+309.                 keep if yvar == "`yv'" & split_type == "`st'" & spec == "`spec_tag'"
+310.                 if _N == 0 {
+311.                     restore
+312.                     continue
+313.                 }
+314.                 gen double y_pos = .
+315.                 replace y_pos = 4.7 if grp == word("`cells'", 1)
+316.                 replace y_pos = 3.7 if grp == word("`cells'", 2)
+317.                 replace y_pos = 2   if grp == word("`cells'", 3)
+318.                 replace y_pos = 1   if grp == word("`cells'", 4)
+319.                 drop if mi(y_pos) | mi(post_b)
+320.                 if _N == 0 {
+321.                     restore
+322.                     continue
+323.                 }
+324.                 gen ub = post_b + 1.96*post_se
+325.                 gen lb = post_b - 1.96*post_se
+326. 
+.                 qui sum lb
+327.                 local xmin = floor(r(min)/0.5)*0.5
+328.                 qui sum ub
+329.                 local xmax = ceil(r(max)/0.5)*0.5
+330. 
+.                 tw rcap ub lb y_pos, horizontal lcolor(ebblue%70) msize(vsmall) || ///
+>                    scatter y_pos post_b, mcolor(ebblue) msize(small) ///
+>                    , xline(0, lcolor(gs10) lpattern(solid)) ///
+>                      ylabel(4.7 `""`lab1'" "`lab3'""' ///
+>                             3.7 `""`lab1'" "`lab4'""' ///
+>                             2   `""`lab2'" "`lab3'""' ///
+>                             1   `""`lab2'" "`lab4'""', ///
+>                             angle(0) labsize(small) noticks nogrid) ///
+>                      ytitle("") xtitle("Exposure x Post", size(small)) ///
+>                      xlabel(`xmin'(0.5)`xmax', labsize(small)) ///
+>                      legend(off) ///
+>                      ysize(5) xsize(7) ///
+>                      yscale(range(0.9 .)) ///
+>                      plotregion(margin(l=zero r=zero b=zero t=vsmall))
+331.                 graph export ///
+>                     "../output/figures/`samp'/`spec_folder'/ppml_het_coefplot_`yv'_`st'`suf'.pdf", ///
+>                     replace
+332.                 di as text "wrote `st' coefplot for `yv' `spec_tag'"
+333.                 restore
+334.             }
+335.         }
+336.         }  // close foreach spec_tag
+337.     }
+338. end
+
+. 
+. **
+. main
+(encoding automatically selected: ISO-8859-1)
+(4 vars, 266 obs)
+(4 observations deleted)
+ipeds_id: all characters numeric; replaced as long
+
+Duplicates in terms of all variables
+
+(0 observations are duplicates)
+file ../temp/ipeds_openalex_xw.dta saved
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                               259  
+    -----------------------------------------
+  (0 bytes saved)
+file ../temp/inst_chars_pre.dta saved
+(59,850 observations deleted)
+Iteration 1:   deviance = 8.1780e+04  eps = .         iters = 4    tol = 1.0e-04  min(eta) =  -1.51  P   
+Iteration 2:   deviance = 7.9771e+04  eps = 2.52e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.86      
+Iteration 3:   deviance = 7.9757e+04  eps = 1.70e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.94      
+Iteration 4:   deviance = 7.9757e+04  eps = 4.75e-08  iters = 2    tol = 1.0e-04  min(eta) =  -1.94      
+Iteration 5:   deviance = 7.9757e+04  eps = 4.53e-14  iters = 1    tol = 1.0e-05  min(eta) =  -1.94   S  
+Iteration 6:   deviance = 7.9757e+04  eps = 1.72e-16  iters = 2    tol = 1.0e-09  min(eta) =  -1.94   S O
+------------------------------------------------------------------------------------------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
+Converged in 6 iterations and 13 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =     75,300
+Absorbing 2 HDFE groups                           Residual df     =      7,529
+Statistics robust to heteroskedasticity           Wald chi2(6)    =     176.91
+Deviance             =  79757.36208               Prob > chi2     =     0.0000
+Log pseudolikelihood = -116230.4438               Pseudo R2       =     0.1901
+
+Number of clusters (athr_id)=      7,530
+                            (Std. err. adjusted for 7,530 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+        Z_it |  -.1077631   .2778987    -0.39   0.698    -.6524345    .4369083
+     Z_early |  -.5712849   .3479488    -1.64   0.101    -1.253252    .1106823
+    Z_lownih |   .5416015     .34798     1.56   0.120    -.1404267     1.22363
+    PT_early |    .179562   .0169052    10.62   0.000     .1464284    .2126957
+   PT_lownih |  -.1258209   .0169439    -7.43   0.000    -.1590304   -.0926115
+  Z_share_it |   .0167194   .0615376     0.27   0.786    -.1038921     .137331
+       _cons |   .8114303   .0099768    81.33   0.000     .7918762    .8309843
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      7530        7530           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+N = 75,300; 7,530 balanced groups of size 10
+N = 35,670; 3,567 balanced groups of size 10
+N = 37,650; 3,765 balanced groups of size 10
+horse_race_nih all_jrnls_r1_r2 ppr_cnt (NIH-matched sample):
+  Z x EarlyCareer     =   -0.5713  (se  0.3479)
+  Z x BelowMedianNIH  =    0.5416  (se  0.3480)
+  diff (early-lownih) =   -1.1129  (se  0.5306)   H0 equal: stat =   4.3991  p = 0.0360
+  base Z (late-career x above-median) =   -0.1078  (se  0.2779)
+  N =     75300  PIs = 7530 (early = 3567, below-median NIH = 3765)
+file ../output/tables/all_jrnls/phet_results_r1_r2.txt saved
+(39,700 observations deleted)
+Iteration 1:   deviance = 4.7934e+04  eps = .         iters = 3    tol = 1.0e-04  min(eta) =  -1.51  P   
+Iteration 2:   deviance = 4.6753e+04  eps = 2.52e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.85      
+Iteration 3:   deviance = 4.6745e+04  eps = 1.80e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.92      
+Iteration 4:   deviance = 4.6745e+04  eps = 7.84e-08  iters = 2    tol = 1.0e-04  min(eta) =  -1.92      
+Iteration 5:   deviance = 4.6745e+04  eps = 2.68e-13  iters = 1    tol = 1.0e-05  min(eta) =  -1.92   S  
+Iteration 6:   deviance = 4.6745e+04  eps = 0.00e+00  iters = 2    tol = 1.0e-09  min(eta) =  -1.92   S O
+------------------------------------------------------------------------------------------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
+Converged in 6 iterations and 12 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =     44,150
+Absorbing 2 HDFE groups                           Residual df     =      4,414
+Statistics robust to heteroskedasticity           Wald chi2(6)    =      68.67
+Deviance             =   46744.8809               Prob > chi2     =     0.0000
+Log pseudolikelihood =  -67530.7719               Pseudo R2       =     0.1854
+
+Number of clusters (athr_id)=      4,415
+                            (Std. err. adjusted for 4,415 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+        Z_it |   -.171767   .3426192    -0.50   0.616    -.8432884    .4997544
+     Z_early |  -.2496654   .4552833    -0.55   0.583    -1.142004    .6426735
+    Z_lownih |   .1388546   .4591981     0.30   0.762    -.7611571    1.038866
+    PT_early |   .1442519   .0222333     6.49   0.000     .1006753    .1878284
+   PT_lownih |  -.0925969   .0224031    -4.13   0.000    -.1365061   -.0486877
+  Z_share_it |   .0253401   .0803988     0.32   0.753    -.1322386    .1829188
+       _cons |   .7839924   .0133256    58.83   0.000     .7578747    .8101101
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      4415        4415           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+N = 44,150; 4,415 balanced groups of size 10
+N = 20,810; 2,081 balanced groups of size 10
+N = 22,070; 2,207 balanced groups of size 10
+horse_race_nih all_jrnls_r1_r2_public ppr_cnt (NIH-matched sample):
+  Z x EarlyCareer     =   -0.2497  (se  0.4553)
+  Z x BelowMedianNIH  =    0.1389  (se  0.4592)
+  diff (early-lownih) =   -0.3885  (se  0.7150)   H0 equal: stat =   0.2953  p = 0.5869
+  base Z (late-career x above-median) =   -0.1718  (se  0.3426)
+  N =     44150  PIs = 4415 (early = 2081, below-median NIH = 2207)
+file ../output/tables/all_jrnls/phet_results_r1_r2_public.txt saved
+
+. 
+end of do-file

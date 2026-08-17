@@ -1,92 +1,75 @@
 """
-Shift-share imputation. Impute the PI x market share MATRIX, then multiply
-imputed shares by observed market shocks. Shocks enter exactly (never
-smoothed); only the shares are imputed. Supports three denominator versions
-matching athr_exposure_{hc,all,treated_hc}.dta, and two smoothers (K-NN
-weights W, or per-market Ridge on TF-IDF).
+KNN shift-share imputation with optional row-sum-preserving EB denoising.
 
-Math:
-  s_ik    = (PI i's pre-period spend in market k) / (PI i's pre-period DENOM)
-  S       sparse FOIA x K_treated
-  S_hat   = smoothed universe x K_treated
-              K-NN:  W @ S
-              Ridge: fit Ridge(X_foia -> S[:,k]) per market k, predict on X_univ
-  z_hat   = S_hat @ g      universe x 1 shift-share exposure
-  S_sum   = rowsum(S_hat)  universe x 1 sum-of-shares control (mkt_spend_shr)
+Core object:
+    s_ik = PI i's pre-period share in treated market k
 
-Denominators per --version:
-  hc         : denom = sum of PI's spend on (Non-Lab==False & keep==1) categories
-                (matches build.do's tot_hc_spend so exposure_ss scales like the
-                observed athr_exposure_hc.dta.)
-  all        : denom = sum of PI's spend on Non-Lab==False categories
-                (all lab consumables — matches athr_exposure_all.dta.)
-  treated_hc : denom = sum of PI's spend on the 46 treated HC categories only
-                (matches athr_exposure_treated_hc.dta where mkt_spend_shr = 1
-                by construction on the anchor side.)
+EB denoises the composition of s_i across treated markets while preserving:
 
-Inputs:
-  ../../external/exposure_wts/athr_category_spend.dta       PI x category x year
-  --betas-path (default did_coefs_eb_price.dta)             per-market shocks g_k = b
-  # for --method knn:
-  ../../output/weight_matrix{tag}{k_sfx}.npz                universe x FOIA W
-  # for --method ridge:
-  ../../output/tfidf_foia{tag}.npz                          n_foia x V TF-IDF
-  ../../output/tfidf_universe{tag}.npz                      n_univ x V TF-IDF
-  ../../output/foia_ids_ordered{tag}.csv                    row order
-  ../../output/universe_ids{tag}.parquet                    row order
+    sum_k s_ik^EB = sum_k s_ik^raw
 
-Outputs (per --version, per --method):
-  ../../output/final_imputed_shift_share_{version}{tag}{method_sfx}{filter_sfx}{k_sfx}.csv
-       columns: athr_id, exposure_ss, sum_imputed_shares
-  ../../output/imputed_shares_matrix_{version}{tag}{method_sfx}{filter_sfx}{k_sfx}.npz
-       S_hat as CSR
-  ../../output/imputed_shares_markets_{version}{tag}{method_sfx}{filter_sfx}{k_sfx}.csv
-       per-market diagnostics: category, g, s_bar, rotemberg_wt, n_foia_pis
-       (+ alpha, in_r2 for --method ridge)
-  ../../output/shock_balance_{version}{tag}{method_sfx}{filter_sfx}{k_sfx}.csv
-       BHJ shock-balance regression coefficients.
+for every FOIA PI.
 
-method_sfx = ""       for knn (backward-compat with existing K-NN outputs)
-           = "_ridge" for ridge
-eb_sfx     = ""       --eb-alpha 0 (default, no shrinkage)
-           = "_eb{a}k"/"_ebmed" EB-shrink anchor share rows with prior
-                      pseudo-spend a before imputation; also saves
-                      foia_self_exposure{stem}.csv. --eb-prior cluster/peer
-                      shrink toward local (field-specific) baskets instead of
-                      the pool mean: "_ebc{a}k" / "_ebp{a}k".
-filter_sfx = "_cf[N]" --cluster-filter on the full label file, N =
-                      --min-foia-per-cluster when > 1
-           + "_ls"    --ls-filter (life-science author mask; suffix via --ls-sfx,
-                      e.g. "_ls100" for a K=100-based mask)
-           + "_msNNN" --min-max-sim
-k_sfx      = ""       --k 5 (default, untagged weight_matrix.npz)
-           = "_k3"    --k 3 (reads weight_matrix_k3.npz; knn only)
+After EB:
+    S_hat = W @ S
+    exposure_ss = S_hat @ g
+    sum_imputed_shares = rowsum(S_hat)
 
-The 2x2 of interest: bare (full universe), _cf (FOIA-anchored clusters),
-_ls (life-science authors), _cf_ls (both).
+There is no separate imputation of total treated-market share.
+
+EB priors
+---------
+peer:
+    Shrink toward the similarity-weighted basket of the top K most similar
+    OTHER FOIA PIs.
+
+cluster:
+    Shrink toward the equal-weighted basket of the OTHER FOIA PIs in the same
+    cluster.
+
+There is NO global prior.
+
+If a PI has no usable peer/cluster prior, its row is left unchanged.
+
+Recommended:
+    --eb-own-weight 0.90
+    --eb-prior peer
+    --eb-peer-k 5
+
+Filters / suffixes retained:
+    --cluster-filter + --min-foia-per-cluster
+        -> _cf, _cf2, _cf5
+
+    --ls-filter + --ls-sfx
+        -> _ls, _lsa, ...
+
+    --min-max-sim .25
+        -> _ms025
+
+    --k 3
+        -> _k3
 """
+
 import argparse
 import os
+
 import numpy as np
 import pandas as pd
 import scipy.sparse as sp
 from scipy.stats import norm
-from sklearn.linear_model import Ridge, RidgeCV
+
 
 OUT_DIR = "../../output"
 CATEGORY_SPEND_FILE = "../../external/exposure_wts/athr_category_spend.dta"
-# Per-version pre-computed share files from derived/exposure_msr/build.do.
-# We read `spend / tot_shr_spend` directly from these instead of recomputing
-# pi_total inline, so the shift-share denominator matches build.do exactly.
 CATEGORY_SHARE_FILE = "../../external/exposure_wts/athr_exposure_by_category_{version}.dta"
-OBSERVED_EXPOSURE_FILE = "../../external/exposure_wts/athr_exposure.dta"
+
 DEFAULT_BETAS_FILE = (
-    "/n/holylabs/LABS/pakes_lab/Lab/sci_eq/analysis/first_stage/output/"
-    "did_coefs_eb_price.dta"
+    "/n/holylabs/LABS/pakes_lab/Lab/sci_eq/analysis/"
+    "first_stage/output/did_coefs_eb_price.dta"
 )
-PRE_PERIOD_LAST_YEAR = 2013
+
 VERSIONS = ["hc", "all", "treated_hc"]
-DEFAULT_ALPHAS = np.logspace(-3, 4, 30)
+PRE_PERIOD_LAST_YEAR = 2013
 
 CATEGORY_RENAMES = {
     "acrylamide/bis solution": "acrylamide-bis solution",
@@ -94,134 +77,129 @@ CATEGORY_RENAMES = {
 }
 
 
-def load_shocks(betas_path):
-    df = pd.read_stata(betas_path)
-    if "category" not in df.columns or "b" not in df.columns:
-        raise SystemExit(
-            f"{betas_path} must have columns [category, b]: got {list(df.columns)}"
-        )
-    df["category"] = df["category"].replace(CATEGORY_RENAMES)
-    df = df.dropna(subset=["b"]).drop_duplicates(subset=["category"])
-    df = df.reset_index(drop=True)
-    return df["category"].tolist(), df["b"].to_numpy(dtype=np.float64)
+# =============================================================================
+# Loading
+# =============================================================================
+
+def load_shocks(path):
+    df = pd.read_stata(path)
+
+    if not {"category", "b"}.issubset(df.columns):
+        raise SystemExit(f"{path} needs [category, b]; got {list(df.columns)}")
+
+    df["category"] = df["category"].astype(str).replace(CATEGORY_RENAMES)
+    df = df.dropna(subset=["b"]).drop_duplicates("category").reset_index(drop=True)
+
+    return df["category"].tolist(), df["b"].to_numpy(float)
 
 
-def build_share_matrix(share_path, foia_ids, market_index, version):
-    """Build FOIA x K_treated share matrix S using the pre-computed denominator.
+def build_share_matrix(path, foia_ids, markets):
+    df = pd.read_stata(path)
 
-    Reads athr_exposure_by_category_{version}.dta (produced by build.do in
-    derived/exposure_msr) which already has (spend, tot_shr_spend) per
-    (PI, category), so we can take shr = spend / tot_shr_spend directly. This
-    guarantees the shift-share denominator exactly matches the one used to
-    construct athr_exposure_{version}.dta's scalar mkt_spend_shr — the K-NN
-    aggregation S_sum will then match the scalar mkt_spend_shr column
-    (up to floating point).
-    """
-    df = pd.read_stata(share_path)
     df["athr_id"] = df["athr_id"].astype(str)
     df["category"] = df["category"].astype(str).replace(CATEGORY_RENAMES)
+
     df = df.dropna(subset=["spend", "tot_shr_spend"])
-    df = df[(df["spend"] > 0) & (df["tot_shr_spend"] > 0)]
+    df = df[(df["spend"] > 0) & (df["tot_shr_spend"] > 0)].copy()
     df["share"] = df["spend"].astype(float) / df["tot_shr_spend"].astype(float)
 
-    # Denominator spend per anchor (constant within athr_id), captured before
-    # the treated-market restriction; 0 for anchors with no visible spend.
-    denom = df.drop_duplicates("athr_id").set_index("athr_id")["tot_shr_spend"]
-    T = denom.reindex(foia_ids).fillna(0.0).to_numpy(dtype=np.float64)
+    df = df[
+        df["category"].isin(markets)
+        & df["athr_id"].isin(set(foia_ids))
+    ].copy()
 
-    # Restrict to the 46 treated categories (columns of S).
-    df = df[df["category"].isin(market_index)]
-
-    foia_id_set = set(foia_ids)
-    df = df[df["athr_id"].isin(foia_id_set)]
-
-    foia_pos = {aid: i for i, aid in enumerate(foia_ids)}
-    market_pos = {c: i for i, c in enumerate(market_index)}
-    rows = df["athr_id"].map(foia_pos).to_numpy()
-    cols_idx = df["category"].map(market_pos).to_numpy()
-    data = df["share"].to_numpy(dtype=np.float64)
+    ipos = {aid: i for i, aid in enumerate(foia_ids)}
+    kpos = {cat: k for k, cat in enumerate(markets)}
 
     S = sp.csr_matrix(
-        (data, (rows, cols_idx)),
-        shape=(len(foia_ids), len(market_index)),
+        (
+            df["share"].to_numpy(float),
+            (
+                df["athr_id"].map(ipos).to_numpy(),
+                df["category"].map(kpos).to_numpy(),
+            ),
+        ),
+        shape=(len(foia_ids), len(markets)),
     )
 
-    coverage = pd.Series(
-        np.asarray((S != 0).sum(axis=0)).ravel(),
-        index=market_index,
-        name="n_foia_pis",
-    )
-    return S, coverage, T
+    coverage = np.asarray((S != 0).sum(axis=0)).ravel()
+    return S, coverage
 
 
-def compute_pi_characteristics(spend_path, foia_ids):
+# =============================================================================
+# PI characteristics / BHJ balance
+# =============================================================================
+
+def compute_pi_characteristics(path, foia_ids):
     df = pd.read_stata(
-        spend_path,
+        path,
         columns=["athr_id", "category", "year", "spend", "lab_spend"],
     )
-    df = df[df["year"] <= PRE_PERIOD_LAST_YEAR]
-    df = df.dropna(subset=["spend"])
+
+    df["athr_id"] = df["athr_id"].astype(str)
+    df = df[(df["year"] <= PRE_PERIOD_LAST_YEAR) & df["spend"].notna()].copy()
     df["lab_spend"] = df["lab_spend"].fillna(0)
     df = df[df["athr_id"].isin(set(foia_ids))]
 
     grp = df.groupby("athr_id")
-    pi = pd.DataFrame({
+
+    out = pd.DataFrame({
         "total_spend": grp["spend"].sum(),
         "lab_spend_total": grp["lab_spend"].sum(),
         "n_cats": grp["category"].nunique(),
-    }).reset_index()
-    pi["log_total_spend"] = np.log(pi["total_spend"].clip(lower=1))
-    pi["log_lab_spend"] = np.log(pi["lab_spend_total"].clip(lower=1))
-    pi["lab_share"] = pi["lab_spend_total"] / pi["total_spend"].clip(lower=1)
+    })
 
-    pi = pi.set_index("athr_id").reindex(foia_ids).reset_index()
-    return pi
+    out["log_total_spend"] = np.log(out["total_spend"].clip(lower=1))
+    out["log_lab_spend"] = np.log(out["lab_spend_total"].clip(lower=1))
+    out["lab_share"] = out["lab_spend_total"] / out["total_spend"].clip(lower=1)
+
+    return out.reindex(foia_ids).reset_index()
 
 
-def shock_balance(S, g, pi_chars, char_cols, market_index):
-    s_bar_col = np.asarray(S.sum(axis=0)).ravel()
-    if s_bar_col.sum() == 0:
-        print("  WARN: S has zero mass; skip shock balance.")
+def shock_balance(S, g, chars):
+    w = np.asarray(S.sum(axis=0)).ravel()
+
+    if w.sum() == 0:
+        print("  WARN: S has zero mass; skipping shock balance.")
         return None
 
-    print("\n--- Shock balance (Borusyak-Hull-Jaravel) ---")
-    print("  Regression: g_k = a + b * X_bar_k + e,  weights = Sum_i s_ik")
-    print("  H0: shocks are quasi-randomly assigned wrt pre-period X => b approx 0")
-    print()
-    print(f"  {'characteristic':<22s}  {'beta':>10s}  {'se':>10s}  {'t':>7s}  {'p':>6s}")
-
     rows = []
-    for col in char_cols:
-        X = pi_chars[col].to_numpy(dtype=np.float64)
-        mask = np.isfinite(X)
-        if mask.sum() == 0:
-            print(f"  {col:<22s}  (all NaN, skipped)")
+
+    print("\n--- Shock balance ---")
+    print(f"  {'characteristic':<22s} {'beta':>10s} {'se':>10s} {'t':>7s} {'p':>7s}")
+
+    for col in ["log_total_spend", "log_lab_spend", "n_cats", "lab_share"]:
+        X = chars[col].to_numpy(float)
+        finite = np.isfinite(X)
+
+        if finite.sum() == 0:
             continue
-        X = np.where(mask, X, X[mask].mean())
 
-        X_bar_num = np.asarray(S.T @ X).ravel()
-        X_bar = np.where(s_bar_col > 0, X_bar_num / np.maximum(s_bar_col, 1e-12), 0.0)
+        X = np.where(finite, X, X[finite].mean())
+        Xbar = np.asarray(S.T @ X).ravel() / np.maximum(w, 1e-12)
 
-        w = s_bar_col
-        wsum = w.sum()
-        Xb_mean = (w * X_bar).sum() / wsum
-        g_mean = (w * g).sum() / wsum
-        Xc = X_bar - Xb_mean
-        gc = g - g_mean
-        num = (w * Xc * gc).sum()
-        den = (w * Xc * Xc).sum()
+        xm = np.average(Xbar, weights=w)
+        gm = np.average(g, weights=w)
+
+        xc = Xbar - xm
+        gc = g - gm
+
+        den = np.sum(w * xc ** 2)
         if den <= 0:
-            print(f"  {col:<22s}  (no variation in X_bar, skipped)")
             continue
-        beta = num / den
-        resid = gc - beta * Xc
-        K_eff = int((w > 0).sum())
-        sigma2 = (w * resid ** 2).sum() / max(K_eff - 2, 1)
+
+        beta = np.sum(w * xc * gc) / den
+        resid = gc - beta * xc
+
+        K = int((w > 0).sum())
+        sigma2 = np.sum(w * resid ** 2) / max(K - 2, 1)
         se = np.sqrt(sigma2 / den)
+
         t = beta / se if se > 0 else np.nan
         p = 2 * (1 - norm.cdf(abs(t))) if np.isfinite(t) else np.nan
-        rows.append((col, beta, se, t, p, K_eff))
-        print(f"  {col:<22s}  {beta:+10.4f}  {se:10.4f}  {t:+7.2f}  {p:6.3f}")
+
+        rows.append((col, beta, se, t, p, K))
+        print(f"  {col:<22s} {beta:+10.4f} {se:10.4f} {t:+7.2f} {p:7.3f}")
 
     return pd.DataFrame(
         rows,
@@ -229,521 +207,949 @@ def shock_balance(S, g, pi_chars, char_cols, market_index):
     )
 
 
-def report_W_health(W):
-    row_sums = np.asarray(W.sum(axis=1)).ravel()
-    nz = row_sums > 0
-    print(f"  W rows with any weight: {nz.sum():,}/{W.shape[0]:,}")
-    if nz.sum() == 0:
-        return
-    rs = row_sums[nz]
-    print(
-        f"  W row-sum stats (nonzero rows): "
-        f"mean={rs.mean():.4f}  p5={np.percentile(rs,5):.4f}  "
-        f"p95={np.percentile(rs,95):.4f}"
-    )
-    if not np.allclose(rs, 1.0, atol=1e-3):
-        print(
-            "  WARN: W is not L1-normalized. S_hat entries will be similarity-"
-            "weighted SUMS, not averages."
+# =============================================================================
+# EB
+# =============================================================================
+
+def normalize_rows(S):
+    """
+    Normalize each positive row only as an internal device for denoising its
+    composition. Original row sums are returned and restored exactly.
+    """
+    X = S.toarray().astype(float)
+    row_sum = X.sum(axis=1)
+
+    P = np.zeros_like(X)
+    good = row_sum > 0
+    P[good] = X[good] / row_sum[good, None]
+
+    return P, row_sum
+
+
+def build_peer_prior(P, X_foia, foia_ids, peer_k, min_sim=0.0):
+    """
+    For each FOIA PI, use the top K most similar OTHER FOIA PIs.
+
+    Prior:
+        mu_i = sum_j sim_ij * P_j / sum_j sim_ij
+
+    No global fallback. If no usable peers exist, prior_available=False.
+    """
+    if peer_k < 1:
+        raise SystemExit("--eb-peer-k must be >= 1.")
+
+    A = (X_foia @ X_foia.T).tocsr()
+    A.setdiag(0)
+    A.eliminate_zeros()
+
+    n = len(foia_ids)
+    prior = np.zeros_like(P)
+    available = np.zeros(n, dtype=bool)
+    diag = []
+
+    row_has_mass = P.sum(axis=1) > 0
+
+    for i in range(n):
+        lo, hi = A.indptr[i], A.indptr[i + 1]
+        js = A.indices[lo:hi]
+        sims = A.data[lo:hi].astype(float)
+
+        keep = (sims > min_sim) & row_has_mass[js]
+        js = js[keep]
+        sims = sims[keep]
+
+        if len(js):
+            order = np.argsort(sims)[::-1][:peer_k]
+            js = js[order]
+            sims = sims[order]
+
+        if len(js) and sims.sum() > 0:
+            prior[i] = sims @ P[js] / sims.sum()
+            available[i] = True
+
+            eff_n = sims.sum() ** 2 / np.square(sims).sum()
+            mean_sim = sims.mean()
+            min_used_sim = sims.min()
+            max_used_sim = sims.max()
+        else:
+            eff_n = 0.0
+            mean_sim = np.nan
+            min_used_sim = np.nan
+            max_used_sim = np.nan
+
+        diag.append({
+            "athr_id": foia_ids[i],
+            "n_prior_peers": len(js),
+            "prior_eff_n": eff_n,
+            "mean_peer_sim": mean_sim,
+            "min_peer_sim": min_used_sim,
+            "max_peer_sim": max_used_sim,
+            "prior_available": available[i],
+        })
+
+    return prior, available, pd.DataFrame(diag)
+
+
+def build_cluster_prior(P, foia_ids, cluster_file):
+    """
+    Equal-weight leave-one-out cluster prior.
+
+    No global fallback. If PI i has no other FOIA PI with positive treated
+    shares in its cluster, prior_available=False and i will not be shrunk.
+    """
+    if not cluster_file or not os.path.exists(cluster_file):
+        raise SystemExit("--eb-prior cluster requires --eb-cluster-file.")
+
+    cl = pd.read_csv(cluster_file, dtype={"athr_id": str})
+
+    if not {"athr_id", "cluster_label"}.issubset(cl.columns):
+        raise SystemExit(
+            f"{cluster_file} needs [athr_id, cluster_label]; got {list(cl.columns)}"
         )
 
+    labels = (
+        cl.drop_duplicates("athr_id")
+        .set_index("athr_id")["cluster_label"]
+        .reindex(foia_ids)
+        .to_numpy()
+    )
 
-def eb_shrink_shares(S, T, alpha, prior=None):
-    """Dirichlet-style shrinkage of each anchor's share row toward a prior
-    basket:
-        s~_ik = (T_i * s_ik + alpha * prior_ik) / (T_i + alpha)
-    T_i is the anchor's denominator spend, so own-data weight T_i/(T_i+alpha)
-    grows with how much of the anchor's purchasing we actually observe.
-    prior is an n x K matrix of per-anchor prior baskets; None = the spend-
-    weighted pool mean for every anchor. Rows with T_i = 0 (no visible
-    denominator spend) are left all-zero rather than assigned the prior.
-    Returns (S_tilde csr, sbar, own_wt)."""
-    Sd = np.asarray(S.todense(), dtype=np.float64)
-    obs = T > 0
-    sbar = (T[obs] @ Sd[obs]) / T[obs].sum()
-    if prior is None:
-        prior = np.tile(sbar, (len(T), 1))
-    own_wt = np.zeros_like(T)
-    own_wt[obs] = T[obs] / (T[obs] + alpha)
-    St = Sd.copy()
-    St[obs] = own_wt[obs, None] * Sd[obs] + (1.0 - own_wt[obs, None]) * prior[obs]
-    return sp.csr_matrix(St), sbar, own_wt
+    n = len(foia_ids)
+    idx = np.arange(n)
 
+    prior = np.zeros_like(P)
+    available = np.zeros(n, dtype=bool)
+    row_has_mass = P.sum(axis=1) > 0
 
-def build_local_priors(S, T, args, foia_ids, tag, alpha):
-    """Per-anchor prior baskets for --eb-prior cluster/peer. Both are leave-
-    one-out and spend-weighted, so well-measured anchors define their
-    neighborhood's prior and no anchor is its own prior.
+    diag = []
 
-    cluster: LOO spend-weighted mean basket of same-cluster anchors, itself
-             blended toward the global mean with weight T_cluster/(T_cluster
-             + alpha) so single-anchor / thin clusters fall back gracefully.
-    peer   : LOO mean basket over all other anchors, weighted by
-             (TF-IDF cosine to the anchor) x (denominator spend)."""
-    Sd = np.asarray(S.todense(), dtype=np.float64)
-    n = len(T)
-    tw = T[:, None] * Sd
-    gbar = tw.sum(axis=0) / T.sum()
-    prior = np.zeros_like(Sd)
-    if args.eb_prior == "peer":
-        X = sp.load_npz(f"{OUT_DIR}/tfidf_foia{tag}.npz").tocsr().astype(np.float64)
-        if X.shape[0] != n:
-            raise SystemExit(f"tfidf_foia{tag}.npz rows {X.shape[0]} != n_foia {n}")
-        A = np.asarray((X @ X.T).todense())
-        np.fill_diagonal(A, 0.0)
-        num = A @ tw
-        den = A @ T
-        ok = den > 0
-        prior[ok] = num[ok] / den[ok, None]
-        prior[~ok] = gbar
-    else:
-        cf = args.eb_cluster_file or args.cluster_filter
-        if not cf or not os.path.exists(cf):
-            raise SystemExit("--eb-prior cluster needs --eb-cluster-file (or --cluster-filter)")
-        cl = pd.read_csv(cf, dtype={"athr_id": str})
-        labels = cl.set_index("athr_id")["cluster_label"].reindex(foia_ids).to_numpy()
-        idx = np.arange(n)
-        for i in range(n):
-            same = (labels == labels[i]) & (idx != i) if pd.notna(labels[i]) else np.zeros(n, bool)
-            Tc = T[same].sum()
-            cbar = (T[same] @ Sd[same]) / Tc if Tc > 0 else gbar
-            w = Tc / (Tc + alpha)
-            prior[i] = w * cbar + (1.0 - w) * gbar
-    return prior
+    for i in range(n):
+        same = (
+            pd.notna(labels[i])
+            & (labels == labels[i])
+            & (idx != i)
+            & row_has_mass
+        )
+
+        n_other = int(same.sum())
+
+        if n_other:
+            prior[i] = P[same].mean(axis=0)
+            available[i] = True
+
+        diag.append({
+            "athr_id": foia_ids[i],
+            "cluster_label": labels[i],
+            "n_prior_peers": n_other,
+            "prior_eff_n": float(n_other),
+            "prior_available": available[i],
+        })
+
+    return prior, available, pd.DataFrame(diag)
 
 
-def impute_knn(S, W):
-    """K-NN: S_hat = W @ S. Returns CSR."""
-    return (W @ S).tocsr()
+def eb_shrink_shares(S, prior, prior_available, own_weight):
+    """
+    Row-sum-preserving EB:
+
+        P_i^EB = lambda P_i + (1-lambda) prior_i
+        S_i^EB = rowsum(S_i) * P_i^EB
+
+    where lambda = --eb-own-weight.
+
+    If no prior is available for PI i, leave its row unchanged.
+    Zero rows always remain zero.
+    """
+    if not 0 < own_weight <= 1:
+        raise SystemExit("--eb-own-weight must be in (0,1].")
+
+    P, raw_sum = normalize_rows(S)
+    positive = raw_sum > 0
+
+    prior = np.asarray(prior, float).copy()
+
+    # Normalize priors defensively.
+    prior_sum = prior.sum(axis=1)
+    good_prior = prior_available & (prior_sum > 0)
+    prior[good_prior] /= prior_sum[good_prior, None]
+
+    shrink = positive & good_prior
+
+    P_eb = P.copy()
+    P_eb[shrink] = (
+        own_weight * P[shrink]
+        + (1 - own_weight) * prior[shrink]
+    )
+
+    S_eb = raw_sum[:, None] * P_eb
+    S_eb[~positive] = 0
+
+    # Hard invariant.
+    err = np.max(np.abs(S_eb.sum(axis=1) - raw_sum))
+
+    if err > 1e-10:
+        raise RuntimeError(f"EB changed row sums; max error={err:.3e}")
+
+    return sp.csr_matrix(S_eb), shrink
 
 
-def impute_ridge(S, X_foia, X_univ, alphas, clip_nonneg=True, verbose=True):
-    """Per-market ridge. For each column k of S:
-        RidgeCV on (X_foia, S[:,k]) -> alpha_k
-        Ridge fit -> beta_k, intercept_k
-        pred_k = X_univ @ beta_k + intercept_k
-    Returns (S_hat as CSR, per-market diagnostics as DataFrame)."""
-    K = S.shape[1]
-    n_univ = X_univ.shape[0]
-    S_hat = np.zeros((n_univ, K), dtype=np.float64)
-    diag_rows = []
-    S_dense = S.toarray() if sp.issparse(S) else np.asarray(S)
-    for k in range(K):
-        y = S_dense[:, k].astype(np.float64)
-        n_nz = int((y > 0).sum())
-        if y.std() == 0.0 or n_nz == 0:
-            S_hat[:, k] = float(y.mean())
-            diag_rows.append({"col": k, "alpha": np.nan, "in_r2": 0.0,
-                              "n_nonzero": n_nz})
-            if verbose:
-                print(f"    market {k+1}/{K}: zero variance, using mean={y.mean():.4g}",
-                      flush=True)
-            continue
-        cv = RidgeCV(alphas=alphas, fit_intercept=True, scoring=None, cv=None)
-        cv.fit(X_foia, y)
-        alpha = float(cv.alpha_)
-        model = Ridge(alpha=alpha, fit_intercept=True).fit(X_foia, y)
-        pred = X_univ.dot(model.coef_.astype(np.float64)) + float(model.intercept_)
-        if clip_nonneg:
-            np.maximum(pred, 0.0, out=pred)
-        S_hat[:, k] = pred
-        in_r2 = float(model.score(X_foia, y))
-        diag_rows.append({"col": k, "alpha": alpha, "in_r2": in_r2,
-                          "n_nonzero": n_nz})
-        if verbose and (k + 1) % 10 == 0:
-            print(f"    market {k+1}/{K}  alpha={alpha:.3g}  in_R2={in_r2:.3f}  "
-                  f"n_nz={n_nz}", flush=True)
-    return sp.csr_matrix(S_hat), pd.DataFrame(diag_rows)
+def eb_diagnostics(S_raw, S_eb, g):
+    z0 = np.asarray(S_raw @ g).ravel()
+    z1 = np.asarray(S_eb @ g).ravel()
+
+    good = np.asarray(S_raw.sum(axis=1)).ravel() > 0
+    z0, z1 = z0[good], z1[good]
+
+    if len(z0) < 2:
+        return {
+            "raw_sd": np.nan,
+            "eb_sd": np.nan,
+            "sd_retained": np.nan,
+            "slope": np.nan,
+            "corr": np.nan,
+        }
+
+    sd0 = z0.std()
+    sd1 = z1.std()
+
+    slope = (
+        np.cov(z0, z1, ddof=0)[0, 1] / np.var(z0)
+        if np.var(z0) > 0
+        else np.nan
+    )
+
+    corr = (
+        np.corrcoef(z0, z1)[0, 1]
+        if sd0 > 0 and sd1 > 0
+        else np.nan
+    )
+
+    return {
+        "raw_sd": sd0,
+        "eb_sd": sd1,
+        "sd_retained": sd1 / sd0 if sd0 > 0 else np.nan,
+        "slope": slope,
+        "corr": corr,
+    }
 
 
-def apply_filters(df_univ, S_hat, args, df_foia, diag_file):
-    """Apply --min-max-sim, --cluster-filter and --ls-filter.
-    Returns filtered (df_univ, S_hat)."""
+# =============================================================================
+# KNN diagnostics
+# =============================================================================
+
+def report_W_health(W):
+    rs = np.asarray(W.sum(axis=1)).ravel()
+    good = rs > 0
+
+    print(f"W rows with weight: {good.sum():,}/{len(rs):,}")
+
+    if good.any():
+        print(
+            f"W row sums: mean={rs[good].mean():.4f}, "
+            f"p5={np.percentile(rs[good], 5):.4f}, "
+            f"p95={np.percentile(rs[good], 95):.4f}"
+        )
+
+        if not np.allclose(rs[good], 1, atol=1e-3):
+            print("WARN: W rows are not L1-normalized.")
+
+
+def knn_loo_influence(W, S, g, foia_ids):
+    """
+    Leave-one-FOIA-anchor-out diagnostic only.
+    """
+    Wc = W.tocsc()
+
+    anchor_z = np.asarray(S @ g).ravel()
+    row_sum = np.asarray(W.sum(axis=1)).ravel()
+    numerator = np.asarray(W @ anchor_z).ravel()
+
+    baseline = np.zeros(len(row_sum))
+    good = row_sum > 0
+    baseline[good] = numerator[good] / row_sum[good]
+
+    rows = []
+
+    for i, aid in enumerate(foia_ids):
+        lo, hi = Wc.indptr[i], Wc.indptr[i + 1]
+        jj = Wc.indices[lo:hi]
+        wij = Wc.data[lo:hi]
+
+        denom = row_sum[jj] - wij
+        valid = denom > 1e-12
+
+        if valid.any():
+            loo = (
+                numerator[jj[valid]] - wij[valid] * anchor_z[i]
+            ) / denom[valid]
+
+            delta = loo - baseline[jj[valid]]
+
+            rmse = np.sqrt(np.mean(delta ** 2))
+            mean_abs = np.mean(np.abs(delta))
+            max_abs = np.max(np.abs(delta))
+        else:
+            rmse = mean_abs = max_abs = np.nan
+
+        rows.append({
+            "athr_id": aid,
+            "n_universe_affected": len(jj),
+            "weight_mass": wij.sum(),
+            "loo_rmse": rmse,
+            "loo_mean_abs": mean_abs,
+            "loo_max_abs": max_abs,
+        })
+
+    return pd.DataFrame(rows)
+
+
+# =============================================================================
+# Universe filters
+# =============================================================================
+
+def apply_filters(df_univ, S_hat, args, df_foia):
+    """
+    Post-imputation filters.
+
+    Suffixes:
+        _cf / _cf2 / _cf5
+        _ls / _lsa / ...
+        _msNNN
+    """
+
     if args.min_max_sim > 0:
+        diag_file = f"{OUT_DIR}/match_diagnostics.parquet"
+
         if not os.path.exists(diag_file):
             raise SystemExit(f"--min-max-sim needs {diag_file}")
+
         diag = pd.read_parquet(diag_file)[["athr_id", "max_sim"]]
-        n_before = len(df_univ)
+        diag["athr_id"] = diag["athr_id"].astype(str)
+
+        n0 = len(df_univ)
+
         df_univ = df_univ.merge(diag, on="athr_id", how="left")
-        keep_mask = df_univ["max_sim"] >= args.min_max_sim
-        keep_idx_mask = keep_mask.to_numpy()
-        df_univ = df_univ.loc[keep_mask].drop(columns=["max_sim"])
-        S_hat = S_hat[keep_idx_mask]
-        print(f"  max_sim filter (>= {args.min_max_sim}): "
-              f"kept {len(df_univ):,}/{n_before:,}")
+        keep = df_univ["max_sim"] >= args.min_max_sim
+
+        S_hat = S_hat[keep.to_numpy()]
+        df_univ = df_univ.loc[keep].drop(columns=["max_sim"]).copy()
+
+        print(
+            f"max_sim >= {args.min_max_sim}: "
+            f"{len(df_univ):,}/{n0:,}"
+        )
 
     if args.cluster_filter:
         if not os.path.exists(args.cluster_filter):
             raise SystemExit(f"--cluster-filter not found: {args.cluster_filter}")
-        cl = pd.read_csv(args.cluster_filter)
-        if "cluster_label" not in cl.columns or "athr_id" not in cl.columns:
+
+        cl = pd.read_csv(args.cluster_filter, dtype={"athr_id": str})
+
+        if not {"athr_id", "cluster_label"}.issubset(cl.columns):
             raise SystemExit(
-                f"--cluster-filter needs [athr_id, cluster_label]: got {list(cl.columns)}"
+                "--cluster-filter needs [athr_id, cluster_label]; "
+                f"got {list(cl.columns)}"
             )
+
         min_n = max(1, args.min_foia_per_cluster)
+
         foia_in_cl = df_foia.merge(cl, on="athr_id", how="inner")
-        foia_counts = foia_in_cl.groupby("cluster_label").size()
-        foia_clusters = set(foia_counts[foia_counts >= min_n].index)
-        n_before = len(df_univ)
-        df_univ = df_univ.merge(cl, on="athr_id", how="left")
-        keep_mask = (
-            df_univ["cluster_label"].notna()
-            & df_univ["cluster_label"].isin(foia_clusters)
+        counts = foia_in_cl.groupby("cluster_label").size()
+        keep_clusters = set(counts[counts >= min_n].index)
+
+        n0 = len(df_univ)
+
+        df_univ = df_univ.merge(
+            cl[["athr_id", "cluster_label"]],
+            on="athr_id",
+            how="left",
         )
-        keep_idx_mask = keep_mask.to_numpy()
-        df_univ = df_univ.loc[keep_mask].drop(columns=["cluster_label"])
-        S_hat = S_hat[keep_idx_mask]
-        print(f"  cluster filter ({args.cluster_filter}, min-foia-per-cluster={min_n}): "
-              f"kept {len(df_univ):,}/{n_before:,}")
+
+        keep = (
+            df_univ["cluster_label"].notna()
+            & df_univ["cluster_label"].isin(keep_clusters)
+        )
+
+        S_hat = S_hat[keep.to_numpy()]
+        df_univ = df_univ.loc[keep].drop(columns=["cluster_label"]).copy()
+
+        print(
+            f"cluster filter min FOIA={min_n}: "
+            f"{len(df_univ):,}/{n0:,}"
+        )
 
     if args.ls_filter:
         if not os.path.exists(args.ls_filter):
             raise SystemExit(f"--ls-filter not found: {args.ls_filter}")
+
         ls = pd.read_csv(args.ls_filter, dtype={"athr_id": str})
+
         if "athr_id" not in ls.columns:
-            raise SystemExit(
-                f"--ls-filter needs an athr_id column: got {list(ls.columns)}"
-            )
-        n_before = len(df_univ)
-        keep_mask = df_univ["athr_id"].isin(set(ls["athr_id"]))
-        keep_idx_mask = keep_mask.to_numpy()
-        df_univ = df_univ.loc[keep_mask]
-        S_hat = S_hat[keep_idx_mask]
-        print(f"  ls filter ({args.ls_filter}): "
-              f"kept {len(df_univ):,}/{n_before:,}")
+            raise SystemExit("--ls-filter needs an athr_id column.")
+
+        n0 = len(df_univ)
+
+        keep = df_univ["athr_id"].isin(set(ls["athr_id"]))
+
+        S_hat = S_hat[keep.to_numpy()]
+        df_univ = df_univ.loc[keep].copy()
+
+        print(f"LS filter: {len(df_univ):,}/{n0:,}")
 
     return df_univ, S_hat
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--tag", default="",
-                    help="Suffix matching --tag in 1_vectorize / 2_similarity_wts. "
-                         "Empty = baseline artifacts.")
-    ap.add_argument("--versions", nargs="+", default=VERSIONS, choices=VERSIONS,
-                    help="Which exposure-denominator versions to impute (loops).")
-    ap.add_argument("--method", choices=["knn", "ridge"], default="knn",
-                    help="Smoother for S -> S_hat. 'knn' uses the W matrix from "
-                         "2_similarity_wts.py (backward-compat with the previous "
-                         "4_ default). 'ridge' fits a Ridge per market on TF-IDF, "
-                         "using the same X_foia/X_univ artifacts as "
-                         "3_impute_exposure_ridge.py.")
-    ap.add_argument("--betas-path", default=DEFAULT_BETAS_FILE,
-                    help="Stata file with columns [category, b] giving per-market shocks.")
-    ap.add_argument("--alphas", nargs="+", type=float, default=None,
-                    help="Ridge alpha grid (only used if --method ridge). "
-                         "Default logspace(-3, 4, 30).")
-    ap.add_argument("--cluster-filter", default="",
-                    help="author_static_clusters_{K}.csv (full labels) from "
-                         "us_cluster_fields. After imputation, drop universe "
-                         "authors whose cluster has fewer FOIA PIs than "
-                         "--min-foia-per-cluster. Adds '_cf' to output names. "
-                         "Combine with --ls-filter for '_cf_ls'.")
-    ap.add_argument("--min-foia-per-cluster", type=int, default=1,
-                    help="Minimum FOIA count required for a cluster to be kept "
-                         "under --cluster-filter. 1 -> '_cf', 2 -> '_cf2', "
-                         "5 -> '_cf5'. Matches 3_impute_exposure.py.")
-    ap.add_argument("--ls-filter", default="",
-                    help="author_static_clusters_{K}_ls.csv from "
-                         "us_cluster_fields. After imputation, drop universe "
-                         "authors not on this life-science author list. Adds "
-                         "--ls-sfx to output names.")
-    ap.add_argument("--ls-sfx", default="_ls",
-                    help="Output suffix used when --ls-filter is set. Use e.g. "
-                         "'_ls100' for a mask built on the K=100 clustering so "
-                         "it coexists with the K=30 '_ls' outputs.")
-    ap.add_argument("--k", type=int, default=5,
-                    help="Which K-NN weight matrix to load (knn only): 5 = the "
-                         "untagged weight_matrix.npz (default), any other k "
-                         "reads weight_matrix_k{k}.npz (built by "
-                         "2_similarity_wts.py --k {k} --out-tag k{k}) and "
-                         "appends '_k{k}' to output names.")
-    ap.add_argument("--min-max-sim", type=float, default=0.0,
-                    help="Drop universe authors whose max cosine to any FOIA PI is "
-                         "below this threshold. Default 0.0 = keep all.")
-    ap.add_argument("--eb-alpha", default="0",
-                    help="Empirical-Bayes shrinkage of anchor share rows toward "
-                         "the spend-weighted pool-mean basket before imputation: "
-                         "s_ik <- (T_i*s_ik + a*sbar_k)/(T_i + a), where T_i is "
-                         "the anchor's denominator spend. Give a in dollars, or "
-                         "'median' = median T_i among observed anchors, computed "
-                         "per version. 0 = off. Appends '_eb{a}k'/'_ebmed' to "
-                         "output names and saves foia_self_exposure{stem}.csv.")
-    ap.add_argument("--eb-prior", choices=["global", "cluster", "peer"], default="global",
-                    help="Prior basket for --eb-alpha shrinkage. global: spend-"
-                         "weighted pool mean ('_eb'). cluster: leave-one-out "
-                         "spend-weighted mean of same-cluster anchors, blended "
-                         "toward the global mean by cluster spend ('_ebc'; needs "
-                         "--eb-cluster-file or --cluster-filter). peer: leave-one-"
-                         "out TF-IDF-similarity x spend weighted mean over all "
-                         "other anchors ('_ebp'). Local priors preserve cross-"
-                         "field basket differences; only within-neighborhood "
-                         "idiosyncrasy is shrunk.")
-    ap.add_argument("--eb-cluster-file", default="",
-                    help="athr_id,cluster_label csv defining --eb-prior cluster "
-                         "neighborhoods; defaults to --cluster-filter when set.")
-    args = ap.parse_args()
+# =============================================================================
+# Suffixes
+# =============================================================================
 
-    tag = args.tag
-    if tag and not tag.startswith("_"):
-        tag = "_" + tag
+def build_suffixes(args):
+    k_sfx = "" if args.k == 5 else f"_k{args.k}"
 
-    method_sfx = "" if args.method == "knn" else "_ridge"
     filter_sfx = ""
+
     if args.cluster_filter:
-        filter_sfx += "_cf" if args.min_foia_per_cluster <= 1 else f"_cf{args.min_foia_per_cluster}"
+        filter_sfx += (
+            "_cf"
+            if args.min_foia_per_cluster <= 1
+            else f"_cf{args.min_foia_per_cluster}"
+        )
+
     if args.ls_filter:
-        filter_sfx += args.ls_sfx if args.ls_sfx.startswith("_") else "_" + args.ls_sfx
+        filter_sfx += (
+            args.ls_sfx
+            if args.ls_sfx.startswith("_")
+            else "_" + args.ls_sfx
+        )
+
     if args.min_max_sim > 0:
         filter_sfx += f"_ms{int(round(args.min_max_sim * 100)):03d}"
-    k_sfx = "" if (args.k == 5 or args.method != "knn") else f"_k{args.k}"
-    eb_alpha = None
+
     eb_sfx = ""
-    if args.eb_alpha != "0":
-        prior_tag = {"global": "", "cluster": "c", "peer": "p"}[args.eb_prior]
-        if args.eb_alpha == "median":
-            eb_sfx = f"_eb{prior_tag}med"
-        else:
-            eb_alpha = float(args.eb_alpha)
-            if eb_alpha <= 0:
-                raise SystemExit(f"--eb-alpha must be positive or 'median': {args.eb_alpha}")
-            eb_sfx = f"_eb{prior_tag}{eb_alpha / 1000:g}k"
 
-    # ---- Load ids and shocks (shared across versions) ----
-    universe_ids_file = f"{OUT_DIR}/universe_ids{tag}.parquet"
-    foia_ids_file = f"{OUT_DIR}/foia_ids_ordered{tag}.csv"
-    diag_file = f"{OUT_DIR}/match_diagnostics{tag}.parquet"
-    for p in (universe_ids_file, foia_ids_file):
-        if not os.path.exists(p):
-            raise SystemExit(f"missing: {p}")
-    if not os.path.exists(CATEGORY_SPEND_FILE):
-        raise SystemExit(f"missing: {CATEGORY_SPEND_FILE}")
-    for v in args.versions:
-        p = CATEGORY_SHARE_FILE.format(version=v)
-        if not os.path.exists(p):
-            raise SystemExit(f"missing per-version share file: {p}")
-    if not os.path.exists(args.betas_path):
-        raise SystemExit(f"missing: {args.betas_path}")
+    if args.eb_own_weight < 1:
+        prior_tag = "p" if args.eb_prior == "peer" else "c"
+        own_pct = int(round(args.eb_own_weight * 100))
 
-    print("Loading universe + FOIA id orders ...")
-    df_univ_master = pd.read_parquet(universe_ids_file)
+        eb_sfx = f"_eb{prior_tag}{own_pct}"
+
+        if args.eb_prior == "peer":
+            eb_sfx += f"k{args.eb_peer_k}"
+
+    return eb_sfx, filter_sfx, k_sfx
+
+
+# =============================================================================
+# Main
+# =============================================================================
+
+def main():
+    ap = argparse.ArgumentParser()
+
+    # Core
+    ap.add_argument("--versions", nargs="+", choices=VERSIONS, default=VERSIONS)
+    ap.add_argument("--betas-path", default=DEFAULT_BETAS_FILE)
+
+    ap.add_argument(
+        "--k",
+        type=int,
+        default=5,
+        help=(
+            "KNN size used for universe imputation. "
+            "5 -> weight_matrix.npz; "
+            "3 -> weight_matrix_k3.npz and suffix _k3."
+        ),
+    )
+
+    # -------------------------------------------------------------------------
+    # EB
+    # -------------------------------------------------------------------------
+
+    ap.add_argument(
+        "--eb-own-weight",
+        type=float,
+        default=0.9,
+        help=(
+            "Weight each FOIA PI keeps on its own observed treated-market "
+            "composition. 1=EB off. Default .90; try .95, .85."
+        ),
+    )
+
+    ap.add_argument(
+        "--eb-prior",
+        choices=["peer", "cluster"],
+        default="peer",
+        help=(
+            "peer: top-K TF-IDF-similar FOIA PIs. "
+            "cluster: other FOIA PIs in same cluster. "
+            "No global prior."
+        ),
+    )
+
+    ap.add_argument(
+        "--eb-peer-k",
+        type=int,
+        default=5,
+        help="Number of nearest FOIA peers used for peer EB prior.",
+    )
+
+    ap.add_argument(
+        "--eb-min-peer-sim",
+        type=float,
+        default=0.0,
+        help=(
+            "Optional minimum TF-IDF similarity for peer prior. "
+            "Default 0 keeps the top K positive-similarity peers."
+        ),
+    )
+
+    ap.add_argument(
+        "--eb-cluster-file",
+        default="",
+        help=(
+            "athr_id,cluster_label CSV used only for "
+            "--eb-prior cluster."
+        ),
+    )
+
+    # -------------------------------------------------------------------------
+    # Existing post-imputation filters
+    # -------------------------------------------------------------------------
+
+    ap.add_argument(
+        "--cluster-filter",
+        default="",
+        help=(
+            "Post-imputation universe cluster filter. "
+            "This is separate from --eb-cluster-file."
+        ),
+    )
+
+    ap.add_argument(
+        "--min-foia-per-cluster",
+        type=int,
+        default=1,
+        help="1 -> _cf, 2 -> _cf2, 5 -> _cf5.",
+    )
+
+    ap.add_argument(
+        "--ls-filter",
+        default="",
+        help="Post-imputation life-science author mask.",
+    )
+
+    ap.add_argument(
+        "--ls-sfx",
+        default="_ls",
+        help="Filename suffix for LS mask, e.g. _ls or _lsa.",
+    )
+
+    ap.add_argument(
+        "--min-max-sim",
+        type=float,
+        default=0.0,
+        help="Drop universe authors below this max FOIA similarity.",
+    )
+
+    # Diagnostics
+    ap.add_argument(
+        "--loo-influence",
+        action="store_true",
+        help="Save leave-one-FOIA-anchor influence before and after EB.",
+    )
+
+    args = ap.parse_args()
+
+    if not 0 < args.eb_own_weight <= 1:
+        raise SystemExit("--eb-own-weight must be in (0,1].")
+
+    if args.eb_peer_k < 1:
+        raise SystemExit("--eb-peer-k must be >= 1.")
+
+    # -------------------------------------------------------------------------
+    # IDs / shocks
+    # -------------------------------------------------------------------------
+
+    universe_file = f"{OUT_DIR}/universe_ids.parquet"
+    foia_file = f"{OUT_DIR}/foia_ids_ordered.csv"
+
+    for path in [universe_file, foia_file]:
+        if not os.path.exists(path):
+            raise SystemExit(f"missing: {path}")
+
+    df_univ_master = pd.read_parquet(universe_file)
     df_univ_master["athr_id"] = df_univ_master["athr_id"].astype(str)
-    df_foia = pd.read_csv(foia_ids_file, dtype={"athr_id": str})
-    foia_ids = df_foia["athr_id"].astype(str).tolist()
 
-    print(f"Loading shocks from {args.betas_path} ...")
-    market_index, g = load_shocks(args.betas_path)
-    print(f"  markets with shocks: {len(market_index)}")
-    print(f"  g_k stats: mean={g.mean():.4f}  sd={g.std():.4f}  "
-          f"min={g.min():.4f}  max={g.max():.4f}")
+    df_foia = pd.read_csv(foia_file, dtype={"athr_id": str})
+    foia_ids = df_foia["athr_id"].tolist()
 
-    # ---- Load the smoother once (W for knn, TF-IDF for ridge) ----
-    W = None
-    X_foia = None
-    X_univ = None
-    if args.method == "knn":
-        weights_file = f"{OUT_DIR}/weight_matrix{tag}{k_sfx}.npz"
-        if not os.path.exists(weights_file):
-            raise SystemExit(f"missing: {weights_file}")
-        print(f"Loading W (tag={args.tag!r}, k={args.k}) ...")
-        W = sp.load_npz(weights_file)
-        print(f"  W shape: {W.shape}  nnz: {W.nnz:,}")
-        report_W_health(W)
-        if W.shape != (len(df_univ_master), len(foia_ids)):
-            raise SystemExit(
-                f"W shape {W.shape} != (n_univ={len(df_univ_master)}, n_foia={len(foia_ids)})"
-            )
-    else:
-        foia_matrix_file = f"{OUT_DIR}/tfidf_foia{tag}.npz"
-        univ_matrix_file = f"{OUT_DIR}/tfidf_universe{tag}.npz"
-        for p in (foia_matrix_file, univ_matrix_file):
-            if not os.path.exists(p):
-                raise SystemExit(f"missing: {p}")
-        print(f"Loading TF-IDF matrices (tag={args.tag!r}) ...")
-        X_foia = sp.load_npz(foia_matrix_file).tocsr().astype(np.float64)
-        X_univ = sp.load_npz(univ_matrix_file).tocsr()
-        print(f"  X_foia={X_foia.shape}  X_univ={X_univ.shape}  dtype={X_univ.dtype}")
-        if X_foia.shape[0] != len(foia_ids):
-            raise SystemExit(f"X_foia rows {X_foia.shape[0]} != n_foia {len(foia_ids)}")
-        if X_univ.shape[0] != len(df_univ_master):
-            raise SystemExit(f"X_univ rows {X_univ.shape[0]} != n_univ {len(df_univ_master)}")
+    markets, g = load_shocks(args.betas_path)
 
-    alphas = np.asarray(args.alphas) if args.alphas else DEFAULT_ALPHAS
+    print(f"Universe: {len(df_univ_master):,}")
+    print(f"FOIA anchors: {len(foia_ids):,}")
+    print(f"Treated markets: {len(markets)}")
 
-    # ---- PI characteristics (shared) ----
-    print("Computing FOIA pre-period characteristics ...")
-    pi_chars = compute_pi_characteristics(CATEGORY_SPEND_FILE, foia_ids)
+    # -------------------------------------------------------------------------
+    # KNN matrix
+    # -------------------------------------------------------------------------
 
-    # ---- Per-version loop ----
-    version_summary_rows = []
-    for version in args.versions:
-        print(f"\n{'='*78}")
-        print(f"version={version}   method={args.method}   tag={args.tag!r}")
-        print(f"{'='*78}")
+    k_sfx = "" if args.k == 5 else f"_k{args.k}"
+    weights_file = f"{OUT_DIR}/weight_matrix{k_sfx}.npz"
 
-        share_path = CATEGORY_SHARE_FILE.format(version=version)
-        print(f"Building FOIA share matrix S from {share_path} (version={version}) ...")
-        S, coverage, T = build_share_matrix(
-            share_path, foia_ids, market_index, version,
+    if not os.path.exists(weights_file):
+        raise SystemExit(f"missing: {weights_file}")
+
+    W = sp.load_npz(weights_file).tocsr()
+
+    if W.shape != (len(df_univ_master), len(foia_ids)):
+        raise SystemExit(
+            f"W shape {W.shape} != "
+            f"({len(df_univ_master)}, {len(foia_ids)})"
         )
-        print(f"  S shape: {S.shape}  nnz: {S.nnz:,}  "
-              f"density: {S.nnz / max(S.shape[0]*S.shape[1], 1):.4f}")
-        print(f"  FOIA PIs with >=1 treated-market share: "
-              f"{(np.asarray(S.sum(axis=1)).ravel() > 0).sum():,} / {S.shape[0]:,}")
-        cov = coverage.to_numpy()
-        print(f"  per-market coverage: min={cov.min()}  "
-              f"p5={int(np.percentile(cov,5))}  p50={int(np.percentile(cov,50))}  "
-              f"p95={int(np.percentile(cov,95))}  max={cov.max()}")
 
-        eb_df = None
-        if eb_sfx:
-            obs = T > 0
-            alpha_v = eb_alpha if eb_alpha is not None else float(np.median(T[obs]))
-            self_raw = np.asarray(S @ g).ravel()
-            prior = None
-            if args.eb_prior != "global":
-                prior = build_local_priors(S, T, args, foia_ids, tag, alpha_v)
-            S, sbar, own_wt = eb_shrink_shares(S, T, alpha_v, prior=prior)
-            self_eb = np.asarray(S @ g).ravel()
-            print(f"\n  --- EB shrinkage (alpha=${alpha_v:,.0f}, prior={args.eb_prior}) ---")
-            print(f"  rows shrunk: {obs.sum()}/{len(T)}  (T=0 rows left at zero)")
-            print(f"  self-exposure sd across anchors: raw={self_raw[obs].std():.4f}"
-                  f"  shrunk={self_eb[obs].std():.4f}"
-                  f"  (retained {self_eb[obs].std() / max(self_raw[obs].std(), 1e-12):.0%})")
-            q = np.percentile(own_wt[obs], [25, 50, 75])
-            print(f"  own-data weight T/(T+alpha): p25={q[0]:.2f}  "
-                  f"p50={q[1]:.2f}  p75={q[2]:.2f}")
-            movers = np.argsort(np.abs(self_eb - self_raw))[::-1][:5]
-            print("  largest self-exposure changes:")
-            for i in movers:
-                print(f"    {foia_ids[i]}: {self_raw[i]:+.4f} -> {self_eb[i]:+.4f}"
-                      f"  (T=${T[i]:,.0f}, own_wt={own_wt[i]:.2f})")
-            eb_df = pd.DataFrame({
-                "athr_id": foia_ids,
-                "T_denom_spend": T,
-                "own_wt": own_wt,
-                "self_exposure_raw": self_raw,
-                "self_exposure_eb": self_eb,
-                "sum_shares_eb": np.asarray(S.sum(axis=1)).ravel(),
-            })
+    report_W_health(W)
 
-        print(f"Imputing shares  (method={args.method})  ...")
-        if args.method == "knn":
-            S_hat = impute_knn(S, W)
-            ridge_diag = None
-        else:
-            S_hat, ridge_diag = impute_ridge(S, X_foia, X_univ, alphas)
+    # -------------------------------------------------------------------------
+    # FOIA TF-IDF only needed for peer EB
+    # -------------------------------------------------------------------------
 
-        print("Aggregating: z_hat = S_hat @ g,  S_sum = rowsum(S_hat) ...")
+    X_foia = None
+
+    if args.eb_own_weight < 1 and args.eb_prior == "peer":
+        tfidf_file = f"{OUT_DIR}/tfidf_foia.npz"
+
+        if not os.path.exists(tfidf_file):
+            raise SystemExit(f"peer EB needs {tfidf_file}")
+
+        X_foia = sp.load_npz(tfidf_file).tocsr().astype(float)
+
+        if X_foia.shape[0] != len(foia_ids):
+            raise SystemExit(
+                f"X_foia rows {X_foia.shape[0]} != n_foia {len(foia_ids)}"
+            )
+
+    chars = compute_pi_characteristics(
+        CATEGORY_SPEND_FILE,
+        foia_ids,
+    )
+
+    eb_sfx, filter_sfx, k_sfx = build_suffixes(args)
+    summaries = []
+
+    # =========================================================================
+    # Version loop
+    # =========================================================================
+
+    for version in args.versions:
+        print("\n" + "=" * 78)
+        print(f"version={version}")
+        print("=" * 78)
+
+        share_file = CATEGORY_SHARE_FILE.format(version=version)
+
+        if not os.path.exists(share_file):
+            raise SystemExit(f"missing: {share_file}")
+
+        S_raw, coverage = build_share_matrix(
+            share_file,
+            foia_ids,
+            markets,
+        )
+
+        raw_sum = np.asarray(S_raw.sum(axis=1)).ravel()
+        positive = raw_sum > 0
+
+        print(
+            f"FOIA PIs with treated shares: "
+            f"{positive.sum()}/{len(positive)}"
+        )
+
+        if positive.any():
+            print(
+                f"FOIA row sums: "
+                f"mean={raw_sum[positive].mean():.4f}, "
+                f"sd={raw_sum[positive].std():.4f}"
+            )
+
+        S = S_raw.copy()
+        prior_diag = None
+        shrink_mask = np.zeros(len(foia_ids), dtype=bool)
+
+        # ---------------------------------------------------------------------
+        # EB
+        # ---------------------------------------------------------------------
+
+        if args.eb_own_weight < 1:
+            P, _ = normalize_rows(S_raw)
+
+            if args.eb_prior == "peer":
+                prior, available, prior_diag = build_peer_prior(
+                    P,
+                    X_foia,
+                    foia_ids,
+                    peer_k=args.eb_peer_k,
+                    min_sim=args.eb_min_peer_sim,
+                )
+
+            else:
+                cluster_file = args.eb_cluster_file
+
+                if not cluster_file:
+                    # Convenience: use the same cluster file as the
+                    # post-imputation filter if supplied.
+                    cluster_file = args.cluster_filter
+
+                prior, available, prior_diag = build_cluster_prior(
+                    P,
+                    foia_ids,
+                    cluster_file,
+                )
+
+            S, shrink_mask = eb_shrink_shares(
+                S_raw,
+                prior,
+                available,
+                args.eb_own_weight,
+            )
+
+            d = eb_diagnostics(S_raw, S, g)
+
+            print("\n--- EB ---")
+            print(f"prior: {args.eb_prior}")
+            print(f"own weight: {args.eb_own_weight:.2f}")
+            print(
+                f"anchors actually shrunk: "
+                f"{shrink_mask.sum()}/{positive.sum()}"
+            )
+
+            if args.eb_prior == "peer":
+                print(f"peer K: {args.eb_peer_k}")
+
+            print(
+                f"FOIA exposure SD: "
+                f"{d['raw_sd']:.5f} -> {d['eb_sd']:.5f} "
+                f"({d['sd_retained']:.1%} retained)"
+            )
+
+            print(f"EB/raw slope: {d['slope']:.3f}")
+            print(f"EB/raw correlation: {d['corr']:.3f}")
+
+            eb_sum = np.asarray(S.sum(axis=1)).ravel()
+
+            print(
+                "max FOIA row-sum change: "
+                f"{np.max(np.abs(eb_sum - raw_sum)):.3e}"
+            )
+
+        # ---------------------------------------------------------------------
+        # LOO
+        # ---------------------------------------------------------------------
+
+        loo = None
+
+        if args.loo_influence:
+            loo_raw = knn_loo_influence(
+                W,
+                S_raw,
+                g,
+                foia_ids,
+            )
+
+            loo_eb = knn_loo_influence(
+                W,
+                S,
+                g,
+                foia_ids,
+            )
+
+            loo = loo_raw.merge(
+                loo_eb,
+                on="athr_id",
+                suffixes=("_raw", "_eb"),
+            )
+
+            print("\nTop 5 raw-influence FOIA anchors:")
+
+            for _, r in loo.nlargest(5, "loo_rmse_raw").iterrows():
+                print(
+                    f"  {r['athr_id']}: "
+                    f"{r['loo_rmse_raw']:.5f} -> "
+                    f"{r['loo_rmse_eb']:.5f}"
+                )
+
+        # ---------------------------------------------------------------------
+        # Universe imputation
+        # ---------------------------------------------------------------------
+
+        S_hat = (W @ S).tocsr()
+
         z_hat = np.asarray(S_hat @ g).ravel()
-        S_sum = np.asarray(S_hat.sum(axis=1)).ravel()
+        sum_imputed_shares = np.asarray(S_hat.sum(axis=1)).ravel()
 
         s_bar = np.asarray(S_hat.mean(axis=0)).ravel()
-        ss = (s_bar ** 2).sum()
-        eff_n_norm = (s_bar.sum() ** 2) / ss if ss > 0 else 0.0
-        print(f"  effective number of shocks (BHJ-style): {eff_n_norm:.2f}")
 
-        # Exposure comparison against observed anchor-level exposure
-        self_z = np.asarray(S @ g).ravel()
-        foia_mask = self_z != 0
-        print("\n  --- Exposure level comparison ---")
-        print(f"  Self-imputed FOIA exposure (S @ g):")
-        print(f"    n nonzero PIs: {foia_mask.sum()}/{len(self_z)}")
-        if foia_mask.any():
-            print(f"    mean={self_z[foia_mask].mean():+.5f}  "
-                  f"sd={self_z[foia_mask].std():.5f}  "
-                  f"med={np.median(self_z[foia_mask]):+.5f}")
-        print(f"  Universe imputed exposure (S_hat @ g):")
-        z_nz = z_hat != 0
-        print(f"    n nonzero authors: {z_nz.sum():,}/{len(z_hat):,}")
-        if z_nz.any():
-            print(f"    mean={z_hat[z_nz].mean():+.5f}  "
-                  f"sd={z_hat[z_nz].std():.5f}  "
-                  f"med={np.median(z_hat[z_nz]):+.5f}")
-
-        # Shock balance test (S only, so version-invariant results reflect topical
-        # confounds; still useful per-version for the record)
-        balance_df = shock_balance(
-            S, g, pi_chars,
-            char_cols=["log_total_spend", "log_lab_spend", "n_cats", "lab_share"],
-            market_index=market_index,
-        )
-
-        # Rotemberg weights
         rot_num = s_bar * g
         rot_den = rot_num.sum()
-        rot_wt = rot_num / rot_den if rot_den != 0 else np.zeros_like(rot_num)
-        top = np.argsort(np.abs(rot_wt))[::-1][:10]
-        print("  top-10 |Rotemberg weight| markets:")
-        for j in top:
-            print(f"    {market_index[j]:<40s}  alpha_k={rot_wt[j]:+.3f}  "
-                  f"s_bar={s_bar[j]:.4f}  g={g[j]:+.4f}")
 
-        # Apply optional filters (per-version — cluster filter usually chosen globally)
+        rot_wt = (
+            rot_num / rot_den
+            if rot_den != 0
+            else np.zeros_like(rot_num)
+        )
+
+        ss = np.square(s_bar).sum()
+        eff_n = s_bar.sum() ** 2 / ss if ss > 0 else 0.0
+
+        print(
+            f"\nUniverse exposure: "
+            f"mean={z_hat.mean():+.5f}, "
+            f"sd={z_hat.std():.5f}"
+        )
+
+        print(
+            f"Mean sum imputed shares: "
+            f"{sum_imputed_shares.mean():.5f}"
+        )
+
+        # ---------------------------------------------------------------------
+        # Universe filtering
+        # ---------------------------------------------------------------------
+
         df_univ = df_univ_master.copy()
         df_univ["exposure_ss"] = z_hat
-        df_univ["sum_imputed_shares"] = S_sum
-        df_univ, S_hat = apply_filters(df_univ, S_hat, args, df_foia, diag_file)
+        df_univ["sum_imputed_shares"] = sum_imputed_shares
 
-        # ---- Save outputs (version-specific filenames) ----
-        stem = f"_{version}{tag}{method_sfx}{eb_sfx}{filter_sfx}{k_sfx}"
+        df_univ, S_hat_filtered = apply_filters(
+            df_univ,
+            S_hat,
+            args,
+            df_foia,
+        )
+
+        # ---------------------------------------------------------------------
+        # Outputs
+        # ---------------------------------------------------------------------
+
+        stem = f"_{version}{eb_sfx}{filter_sfx}{k_sfx}"
+
         out_csv = f"{OUT_DIR}/final_imputed_shift_share{stem}.csv"
         out_npz = f"{OUT_DIR}/imputed_shares_matrix{stem}.npz"
         out_markets = f"{OUT_DIR}/imputed_shares_markets{stem}.csv"
 
-        df_univ[["athr_id", "exposure_ss", "sum_imputed_shares"]].to_csv(out_csv, index=False)
-        sp.save_npz(out_npz, S_hat)
+        df_univ[
+            ["athr_id", "exposure_ss", "sum_imputed_shares"]
+        ].to_csv(out_csv, index=False)
+
+        sp.save_npz(out_npz, S_hat_filtered)
 
         markets_df = pd.DataFrame({
-            "market_idx": np.arange(len(market_index)),
-            "category": market_index,
+            "market_idx": np.arange(len(markets)),
+            "category": markets,
             "g": g,
             "s_bar": s_bar,
             "rotemberg_wt": rot_wt,
-            "n_foia_pis": coverage.to_numpy(),
+            "n_foia_pis": coverage,
         })
-        if ridge_diag is not None:
-            markets_df = markets_df.merge(
-                ridge_diag.rename(columns={"col": "market_idx"}),
-                on="market_idx", how="left",
-            )
+
         markets_df.to_csv(out_markets, index=False)
 
-        if balance_df is not None:
-            out_balance = f"{OUT_DIR}/shock_balance{stem}.csv"
-            balance_df.to_csv(out_balance, index=False)
-            print(f"  Saved {out_balance}")
+        # ---------------------------------------------------------------------
+        # FOIA diagnostics
+        # ---------------------------------------------------------------------
 
-        if eb_df is not None:
-            out_self = f"{OUT_DIR}/foia_self_exposure{stem}.csv"
-            eb_df.to_csv(out_self, index=False)
-            print(f"  Saved {out_self}  (shrunk anchor-level self exposure)")
-
-        print(f"  Saved {out_csv}")
-        print(f"  Saved {out_npz}  (universe x K_treated imputed share matrix)")
-        print(f"  Saved {out_markets}")
-
-        version_summary_rows.append({
-            "version": version,
-            "method":  args.method,
-            "n_foia_with_shares":     int((np.asarray(S.sum(axis=1)).ravel() > 0).sum()),
-            "z_hat_mean_universe":    float(z_hat.mean()),
-            "z_hat_sd_universe":      float(z_hat.std()),
-            "S_sum_mean_universe":    float(S_sum.mean()),
-            "S_sum_sd_universe":      float(S_sum.std()),
-            "eff_n_shocks":           float(eff_n_norm),
+        foia_diag = pd.DataFrame({
+            "athr_id": foia_ids,
+            "sum_shares_raw": raw_sum,
+            "sum_shares_eb": np.asarray(S.sum(axis=1)).ravel(),
+            "exposure_raw": np.asarray(S_raw @ g).ravel(),
+            "exposure_eb": np.asarray(S @ g).ravel(),
+            "eb_shrunk": shrink_mask,
         })
 
+        if prior_diag is not None:
+            foia_diag = foia_diag.merge(
+                prior_diag,
+                on="athr_id",
+                how="left",
+            )
+
+        foia_diag.to_csv(
+            f"{OUT_DIR}/foia_eb_diagnostics{stem}.csv",
+            index=False,
+        )
+
+        if loo is not None:
+            loo.to_csv(
+                f"{OUT_DIR}/foia_loo_influence{stem}.csv",
+                index=False,
+            )
+
+        balance = shock_balance(S, g, chars)
+
+        if balance is not None:
+            balance.to_csv(
+                f"{OUT_DIR}/shock_balance{stem}.csv",
+                index=False,
+            )
+
+        # ---------------------------------------------------------------------
+        # Summary
+        # ---------------------------------------------------------------------
+
+        self_raw = np.asarray(S_raw @ g).ravel()
+        self_eb = np.asarray(S @ g).ravel()
+
+        summaries.append({
+            "version": version,
+            "eb_prior": args.eb_prior if args.eb_own_weight < 1 else "none",
+            "eb_own_weight": args.eb_own_weight,
+            "eb_peer_k": args.eb_peer_k if args.eb_prior == "peer" else np.nan,
+            "n_foia_with_shares": int(positive.sum()),
+            "n_foia_shrunk": int(shrink_mask.sum()),
+            "foia_raw_exposure_sd": (
+                self_raw[positive].std()
+                if positive.any()
+                else np.nan
+            ),
+            "foia_eb_exposure_sd": (
+                self_eb[positive].std()
+                if positive.any()
+                else np.nan
+            ),
+            "universe_exposure_sd": float(z_hat.std()),
+            "mean_sum_imputed_shares": float(sum_imputed_shares.mean()),
+            "eff_n_shocks": float(eff_n),
+            "n_universe_after_filters": len(df_univ),
+        })
+
+        print(f"\nSaved {out_csv}")
+        print(f"Saved {out_npz}")
+        print(f"Saved {out_markets}")
+
+    # =========================================================================
+    # Summary
+    # =========================================================================
+
+    summary = pd.DataFrame(summaries)
+
+    summary_out = (
+        f"{OUT_DIR}/shift_share_summary"
+        f"{eb_sfx}{filter_sfx}{k_sfx}.csv"
+    )
+
+    summary.to_csv(summary_out, index=False)
+
     print("\n" + "=" * 78)
-    print("Per-version shift-share imputation summary")
+    print("SUMMARY")
     print("=" * 78)
-    df_summary = pd.DataFrame(version_summary_rows)
-    with pd.option_context("display.width", 220,
-                           "display.max_columns", None,
-                           "display.float_format", "{:.4f}".format):
-        print(df_summary.to_string(index=False))
-    summary_out = f"{OUT_DIR}/shift_share_summary{tag}{method_sfx}{eb_sfx}{filter_sfx}{k_sfx}.csv"
-    df_summary.to_csv(summary_out, index=False)
+
+    with pd.option_context(
+        "display.width", 220,
+        "display.max_columns", None,
+        "display.float_format", "{:.4f}".format,
+    ):
+        print(summary.to_string(index=False))
+
     print(f"\nSaved {summary_out}")
     print("Done!")
 

@@ -10,14 +10,14 @@ version 17
 * EXPOSURE_FILTER  : "" | _cf | _cf2 | _cf5
 * EXPOSURE_FILE    : "" = final_imputed_shift_share_${EXPOSURE_VERSION}${EXPOSURE_FILTER}
 *                    else a literal filename under external/exposure/ (e.g. "ok")
-* FE_MODE          : author | inst_cluster | inst_cluster_fldyr
-*                    (inst_cluster modes absorb cluster_30: PIs unmatched to
-*                    the cluster file have cluster_30 missing and are silently
-*                    dropped by reghdfe/ppmlhdfe under those modes.)
+* FE_MODE          : author | athr_clyr | inst_cluster | inst_cluster_fldyr
+*                    (athr_clyr and inst_cluster modes absorb cluster_30: PIs
+*                    unmatched to the cluster file have cluster_30 missing and
+*                    are silently dropped by reghdfe/ppmlhdfe under those modes.)
 * QUICK_TOPJRNL    : 1 = top_jrnls sample, ppr_cnt only, single pass (pub=0, unweighted)
 global EXPOSURE_VERSION "hc"
-global EXPOSURE_FILTER  "_cf_k3"
-global FE_MODE "author"
+global EXPOSURE_FILTER  "_cf_ms016_k3"
+global FE_MODE "athr_clyr"
 global WEIGHT_MSIM 1
 global QUICK_TOPJRNL 0
 
@@ -269,13 +269,13 @@ program restrict_samp
     keep if num_place==1
     gegen athr = group(athr_id)
     preserve
-    contract athr num_place athr_id exposure inst_id inst msa_comb msa_c_world min_year min_year_any type public mkt_spend_shr cluster_30 max_sim foia_athr
+    contract athr num_place athr_id exposure inst_id inst msa_comb msa_c_world min_year min_year_any max_year type public mkt_spend_shr cluster_30 max_sim foia_athr
     drop _freq
     save ../temp/athr_xw, replace
     restore
     xtset athr year
     tsfill, full
-    drop athr_id exposure inst_id inst msa_comb msa_c_world min_year min_year_any type public mkt_spend_shr cluster_30 max_sim foia_athr
+    drop athr_id exposure inst_id inst msa_comb msa_c_world min_year min_year_any max_year type public mkt_spend_shr cluster_30 max_sim foia_athr
     merge m:1 athr using ../temp/athr_xw, assert(3) keep(3) nogen
     // Drop position vars from master before athr_any merge — Stata silently keeps master, and the last-only versions are degenerate
     foreach v in n_first_ppr n_middle_ppr n_last_ppr n_solo_ppr ///
@@ -369,6 +369,9 @@ program event_study
     syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0) no_clin(int 0)]
     local fes athr_id year
     local vce_cl athr_id
+    if "$FE_MODE" == "athr_clyr" {
+        local fes athr_id i.cluster_30#i.year
+    }
     if "$FE_MODE" == "inst_cluster" {
         local fes inst_id cluster_30 year
         local vce_cl inst_id
@@ -737,6 +740,9 @@ program pooled_did
     syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0) no_clin(int 0)]
     local fes athr_id year
     local vce_cl athr_id
+    if "$FE_MODE" == "athr_clyr" {
+        local fes athr_id i.cluster_30#i.year
+    }
     if "$FE_MODE" == "inst_cluster" {
         local fes inst_id cluster_30 year
         local vce_cl inst_id
@@ -930,6 +936,9 @@ program ppml_specs
     syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0) no_clin(int 0)]
     local fes athr_id year
     local vce_cl athr_id
+    if "$FE_MODE" == "athr_clyr" {
+        local fes athr_id i.cluster_30#i.year
+    }
     if "$FE_MODE" == "inst_cluster" {
         local fes inst_id cluster_30 year
         local vce_cl inst_id
@@ -1224,6 +1233,98 @@ program ppml_specs
             }
         restore
         }
+
+        // FOIA PIs only (observed, non-imputed exposure); ppr_cnt only, matching the es_ foia gate
+        if "`yvar'" == "ppr_cnt" {
+        preserve
+            keep if foia_athr == 1
+            local f_b    = .
+            local f_se   = .
+            local f_N    = .
+            local f_r2   = .
+            local f_pmn  = .
+            local fs_bx  = .
+            local fs_sex = .
+            local fs_bs  = .
+            local fs_ses = .
+            local fs_N   = .
+            local fs_r2  = .
+            local fs_pmn = .
+            cap noi ppmlhdfe `yvar' Z_it `wt', absorb(`fes') vce(cluster `vce_cl')
+            if _rc == 0 {
+                local f_b   = _b[Z_it]
+                local f_se  = _se[Z_it]
+                local f_N   = e(N)
+                local f_r2  = e(r2_p)
+                qui sum `yvar' if year < 2014 & e(sample)
+                local f_pmn = r(mean)
+            }
+            else di as error "ppml_pdid `yvar' foia-only base failed"
+            foreach v in _mu_fs _dvarfs {
+                cap drop `v'
+            }
+            cap noi ppmlhdfe `yvar' Z_it Z_share_it `wt', absorb(`fes') vce(cluster `vce_cl') d(_dvarfs)
+            if _rc == 0 {
+                local fs_bx  = _b[Z_it]
+                local fs_sex = _se[Z_it]
+                local fs_bs  = _b[Z_share_it]
+                local fs_ses = _se[Z_share_it]
+                local fs_N   = e(N)
+                local fs_r2  = e(r2_p)
+                qui sum `yvar' if year < 2014 & e(sample)
+                local fs_pmn = r(mean)
+                cap noi predict double _mu_fs, mu
+                if _rc di as error "ppml_pdid `yvar' foia-only: predict mu failed -- binscatter SKIPPED."
+            }
+            else di as error "ppml_pdid `yvar' foia-only +share failed"
+            cap mat drop foia_ppml_`yvar'
+            mat foia_ppml_`yvar' = J(7,2,.)
+            mat foia_ppml_`yvar'[1,1] = `f_b'
+            mat foia_ppml_`yvar'[2,1] = `f_se'
+            mat foia_ppml_`yvar'[5,1] = `f_pmn'
+            mat foia_ppml_`yvar'[6,1] = `f_N'
+            mat foia_ppml_`yvar'[7,1] = `f_r2'
+            mat foia_ppml_`yvar'[1,2] = `fs_bx'
+            mat foia_ppml_`yvar'[2,2] = `fs_sex'
+            mat foia_ppml_`yvar'[3,2] = `fs_bs'
+            mat foia_ppml_`yvar'[4,2] = `fs_ses'
+            mat foia_ppml_`yvar'[5,2] = `fs_pmn'
+            mat foia_ppml_`yvar'[6,2] = `fs_N'
+            mat foia_ppml_`yvar'[7,2] = `fs_r2'
+            mat rownames foia_ppml_`yvar' = b_exposure se_exposure b_share se_share pre_mean N r2_p
+            mat colnames foia_ppml_`yvar' = base with_share
+
+            qui gunique athr_id
+            di as text "ppml_specs `samp'`suf' `yvar' (FOIA PIs only, " r(unique) " PIs): pdid b=" ///
+                %7.4f `fs_bx' "  pre_mean=" %7.4f `fs_pmn'
+
+            cap confirm variable _mu_fs
+            if _rc == 0 {
+                keep if !mi(_mu_fs) & _mu_fs > 0
+                gen double _z_work = ln(_mu_fs) + (`yvar' - _mu_fs)/_mu_fs
+                gen double _fwlw = _mu_fs
+                if "$WEIGHT_MSIM" == "1" replace _fwlw = _mu_fs * max_sim
+                cap noi qui reghdfe _z_work Z_share_it [pw=_fwlw], absorb(`fes') residuals(_y_r)
+                if _rc == 0 cap noi qui reghdfe Z_it Z_share_it [pw=_fwlw], absorb(`fes') residuals(_Z_r)
+                if _rc {
+                    di as error "ppml FWL foia-only `yvar' failed; skipping plot."
+                }
+                else {
+                    local pbf_str  : dis %7.3f foia_ppml_`yvar'[1,2]
+                    local psef_str : dis %7.3f foia_ppml_`yvar'[2,2]
+                    binscatter _y_r _Z_r [aw=_fwlw], n(30) ///
+                        xtitle("Exposure x Post") ///
+                        ytitle("{&Delta} Log Expected `poisson_name'") ///
+                        xlab(#6, format(%5.3f)) ///
+                        msymbol(O) mcolors(gs6) lcolors(dkorange) ///
+                        title("FOIA PIs only (observed exposure)", size(small)) ///
+                        note("{&beta} = `pbf_str' (SE: `psef_str')", size(small) pos(7) ring(1) justification(left)) ///
+                        plotregion(margin(sides))
+                    graph export ../output/figures/`samp'/ppml_pdid_`yvar'`suf'_mshrctrl_foia`wsuf'.pdf, replace
+                }
+            }
+        restore
+        }
     }
 end
 
@@ -1232,6 +1333,9 @@ program placebo_treatment
     syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0) no_clin(int 0)]
     local fes athr_id year
     local vce_cl athr_id
+    if "$FE_MODE" == "athr_clyr" {
+        local fes athr_id i.cluster_30#i.year
+    }
     if "$FE_MODE" == "inst_cluster" {
         local fes inst_id cluster_30 year
         local vce_cl inst_id
@@ -1402,6 +1506,9 @@ program trim_top
     syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0) no_clin(int 0)]
     local fes athr_id year
     local vce_cl athr_id
+    if "$FE_MODE" == "athr_clyr" {
+        local fes athr_id i.cluster_30#i.year
+    }
     if "$FE_MODE" == "inst_cluster" {
         local fes inst_id cluster_30 year
         local vce_cl inst_id
@@ -1700,6 +1807,9 @@ program robustness
     syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0) no_clin(int 0)]
     local fes athr_id year
     local vce_cl athr_id
+    if "$FE_MODE" == "athr_clyr" {
+        local fes athr_id i.cluster_30#i.year
+    }
     if "$FE_MODE" == "inst_cluster" {
         local fes inst_id cluster_30 year
         local vce_cl inst_id
@@ -1746,7 +1856,7 @@ program robustness
 
         foreach spec in ageCtrl noattrit {
             if "`spec'" == "ageCtrl"  local title "Age x year controls"
-            if "`spec'" == "noattrit" local title "PIs with last real pub year >= 2018"
+            if "`spec'" == "noattrit" local title "PIs with last real pub year >= 2019"
 
             use ../output/prepped_samples/es_`samp'`suf', clear
             cap drop rel int_lead* int_lag* mshr_lead* mshr_lag*
@@ -1769,10 +1879,10 @@ program robustness
                 replace `var' = 0 if mi(`var')
             }
             if "`spec'" == "noattrit" {
-                bys athr_id: egen latest_pub = max(cond(ppr_cnt > 0, year, .))
-                * [F11-adjacent] guard: missing latest_pub must NOT pass a >= test
-                keep if latest_pub >= 2018 & !mi(latest_pub)
-                drop latest_pub
+                * max_year is the last last-author pub year over the full raw
+                * panel (through 2025), the same object restrict_samp gates on
+                * -- not the last in-window pub year
+                keep if max_year >= 2019
             }
             qui sum rel
             local abs_lag  = abs(r(max))
@@ -1892,7 +2002,7 @@ program output_tables
     if "$QUICK_TOPJRNL" == "1" local outcomes ppr_cnt ln_ppr_cnt
     // main() clears matrices between wmodes, so cap confirm silently skips missing ones
     // [F13] trim0 added (full-sample baseline written by trim_top)
-    foreach prog in pdid ppml_pdid nih_ppml placebo2011 placebo2012 trim0 trim1 trim5 trim10 trim25 {
+    foreach prog in pdid ppml_pdid nih_ppml foia_ppml placebo2011 placebo2012 trim0 trim1 trim5 trim10 trim25 {
         foreach yvar of local outcomes {
             cap confirm matrix `prog'_`yvar'
             if !_rc {

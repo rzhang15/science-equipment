@@ -58,7 +58,7 @@ EXPOSURE_DIR = "../../external/exposure_wts"
 COAUTHOR_CSV = f"{OUT_DIR}/coauthor_text_stemmed.csv"
 COAUTHORS_DTA = "../../external/coauthors/coauthors.dta"
 EDGES = "/n/home02/cxu75/sci_eq/derived/openalex/cluster_fields/output/bert/author_paper_edges.parquet"
-CLUSTER_DIR = "../../us_cluster_fields/output"
+CLUSTER_DIR = "../../external/us_appended_text"
 
 
 # --------------------------------------------------------------------------

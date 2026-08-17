@@ -1,0 +1,135 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 120,000; see help set_maxvar.
+
+. do chk2.do 
+
+. local cs /n/home02/cxu75/sci_eq/analysis/foia_case_study
+
+. use `cs'/external/samp/merged_foias_with_pis, clear
+
+. keep if inlist(uni, "utdallas", "umich")
+(165,761 observations deleted)
+
+. drop if mi(athr_id)
+(41,584 observations deleted)
+
+. gen year = year(date(date, "YMD"))
+
+. drop if year > 2013
+(225,108 observations deleted)
+
+. merge m:1 category using `cs'/external/categories/categories_tfidf, keep(1 3)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                        20,191
+        from master                    20,191  (_merge==1)
+        from using                          0  (_merge==2)
+
+    Matched                            81,079  (_merge==3)
+    -----------------------------------------
+
+. rename _merge nonlab
+
+. replace nonlab = 0 if nonlab == 3
+(81,079 real changes made)
+
+. replace keep = 2 if keep == .
+(20,191 real changes made)
+
+. gen hq = keep == 1 | (bad_control == 1 & support >= 25 & precision >= 0.8 & r
+> ecall >= 0.8)
+
+. gen lab_spend = spend if nonlab == 0
+(20,191 missing values generated)
+
+. gen hq_labspend = lab_spend if hq == 1
+(40,294 missing values generated)
+
+. collapse (sum) lab_spend hq_labspend, by(athr_id year)
+
+. di _n "=== PI-YEAR level (pooled) ==="
+
+=== PI-YEAR level (pooled) ===
+
+. sum lab_spend hq_labspend if lab_spend > 50, sep(0)
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+   lab_spend |        539    18704.95    20908.47      73.03   141182.9
+ hq_labspend |        539    10852.32    12015.77          0   69851.51
+
+. sum hq_labspend if hq_labspend > 50
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+ hq_labspend |        520    11248.75    12049.78       68.5   69851.51
+
+. bys athr_id: gen n_yrs = _N
+
+. collapse (mean) lab_spend hq_labspend (first) n_yrs, by(athr_id)
+
+. di _n "=== PI level (avg across observed years) ==="
+
+=== PI level (avg across observed years) ===
+
+. sum lab_spend hq_labspend if lab_spend > 50, sep(0)
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+   lab_spend |        186    16354.29    17646.02      73.03   107132.4
+ hq_labspend |        186     9370.44     10096.7          0   58605.73
+
+. sum hq_labspend if hq_labspend > 50
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+ hq_labspend |        183    9524.054    10107.06      73.03   58605.73
+
+. di _n "=== years observed vs spend ==="
+
+=== years observed vs spend ===
+
+. corr n_yrs lab_spend
+(obs=199)
+
+             |    n_yrs lab_sp~d
+-------------+------------------
+       n_yrs |   1.0000
+   lab_spend |   0.3130   1.0000
+
+
+. tab n_yrs
+
+    (first) |
+      n_yrs |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          1 |         33       16.58       16.58
+          2 |         38       19.10       35.68
+          3 |         42       21.11       56.78
+          4 |         86       43.22      100.00
+------------+-----------------------------------
+      Total |        199      100.00
+
+. 
+end of do-file
