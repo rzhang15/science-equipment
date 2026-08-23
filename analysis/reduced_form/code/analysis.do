@@ -15,11 +15,29 @@ version 17
 *                    unmatched to the cluster file have cluster_30 missing and
 *                    are silently dropped by reghdfe/ppmlhdfe under those modes.)
 * QUICK_TOPJRNL    : 1 = top_jrnls sample, ppr_cnt only, single pass (pub=0, unweighted)
+* HISIM_PCT        : 0 = off; N = keep top N% of imputed PIs by max_sim
+*                    (all_jrnls, r1_r2, public=0 only; outputs under all_jrnls_hisimN)
+* FIG_MODES        : pres = event studies with stats legend (slides);
+*                    paper = legend-free copies under figures/<samp>/paper/
+* DROP_SOLO        : 1 = solo-authored papers are excluded everywhere they can
+*                    be, from the paper counts (ppr_cnt, ppr_cnt_any,
+*                    n_last_ppr) and from both age measures (min_year,
+*                    min_year_any), which then flows into the pre-period trims
+*                    and every downstream sample. cite_affl_wt, affl_wt and
+*                    avg_team_size_*/avg_num_coathrs/avg_position are panel
+*                    aggregates with no solo component to subtract and still
+*                    include solo papers --
+*                    de-soloing those needs a paper-level rebuild in
+*                    derived/openalex/make_athr_yr_panel. Writes to the same
+*                    filenames as the baseline: flip back and rerun to restore.
 global EXPOSURE_VERSION "hc"
-global EXPOSURE_FILTER  "_cf_ms016_k3"
-global FE_MODE "athr_clyr"
-global WEIGHT_MSIM 1
+global EXPOSURE_FILTER  "_cf_k3"
+global FE_MODE "author"
+global WEIGHT_MSIM 0
 global QUICK_TOPJRNL 0
+global HISIM_PCT 0 
+global FIG_MODES "pres paper"
+global DROP_SOLO 0
 
 program main
     gather_external_data
@@ -38,6 +56,25 @@ program main
         trim_top,          samp(top_jrnls) r1r2(1) public(0)
         robustness,        samp(top_jrnls) r1r2(1) public(0)
         output_tables,     samp(top_jrnls) r1r2(1) public(0)
+        exit
+    }
+    if "$HISIM_PCT" != "0" {
+        local hs all_jrnls_hisim$HISIM_PCT
+        cap mkdir "../output/figures/all_jrnls"
+        cap mkdir "../output/figures/`hs'"
+        restrict_samp, samp(all_jrnls) r1r2(1) public(0) hisim($HISIM_PCT)
+        foreach wmode in 0 1 {
+            global WEIGHT_MSIM `wmode'
+            di as text _newline "=========================================="
+            di as text "  RUNNING sample=`hs' WEIGHT_MSIM=`wmode' PUBLIC=0"
+            di as text "=========================================="
+            mat drop _all
+            event_study,   samp(`hs') r1r2(1) public(0)
+            pooled_did,    samp(`hs') r1r2(1) public(0)
+            ppml_specs,    samp(`hs') r1r2(1) public(0)
+            output_tables, samp(`hs') r1r2(1) public(0)
+        }
+        global WEIGHT_MSIM 0
         exit
     }
     foreach pub in 0 1 {
@@ -156,7 +193,7 @@ program gather_external_data
 end
 
 program restrict_samp
-    syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0) no_clin(int 0)]
+    syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0) no_clin(int 0) hisim(int 0)]
     local suf ""
     if (`r1r2' == 1 & `public' == 0 & `r1_only' == 0) local suf "_r1_r2"
     if (`r1r2' == 1 & `public' == 1 & `r1_only' == 0) local suf "_r1_r2_public"
@@ -175,7 +212,7 @@ program restrict_samp
     preserve
         cap use athr_id year ppr_cnt cite_affl_wt affl_wt ///
                 avg_position avg_position_rat ///
-                n_first_ppr n_middle_ppr n_last_ppr ///
+                n_first_ppr n_middle_ppr n_last_ppr n_solo_ppr ///
                 avg_team_size_last avg_team_size_notlast ///
                 using ../external/samp/athr_panel_full_year_`samp'`input_suf', clear
         local _pos_rc = _rc
@@ -189,7 +226,12 @@ program restrict_samp
         save ../temp/athr_any_`samp'`input_suf', replace
 
         // Use all-position min_year for age_2014 — last-only would count a PI as spuriously young
-        bys athr_id: egen min_year_any = min(year)
+        if $DROP_SOLO == 1 {
+            gen _any_ns_yr = year if (ppr_cnt_any - n_solo_ppr) > 0 & !mi(ppr_cnt_any) & !mi(n_solo_ppr)
+            bys athr_id: egen min_year_any = min(_any_ns_yr)
+            drop _any_ns_yr
+        }
+        else bys athr_id: egen min_year_any = min(year)
         keep athr_id min_year_any
         duplicates drop
         save ../temp/athr_min_year_any_`samp'`input_suf', replace
@@ -202,6 +244,30 @@ program restrict_samp
     }
     bys athr_id: egen max_year = max(year)
     bys athr_id: egen min_year = min(year)
+    * min_year counts solo-author papers as last-authored. n_solo_ppr is unusable
+    * here -- num_athrs is 1 by construction in the last-author panel, so it
+    * equals ppr_cnt on every row. avg_team_size (mean coauthors per paper) is
+    * genuine: >0 means the year had a last-author paper with a coauthor.
+    cap confirm variable avg_team_size
+    if !_rc {
+        gen _nonsolo_yr = year if avg_team_size > 0.001 & !mi(avg_team_size)
+        bys athr_id: egen min_year_nonsolo = min(_nonsolo_yr)
+        bys athr_id: egen _max_year_nonsolo = max(_nonsolo_yr)
+        if $DROP_SOLO == 1 {
+            replace min_year = min_year_nonsolo
+            replace max_year = _max_year_nonsolo
+        }
+        drop _nonsolo_yr _max_year_nonsolo
+        preserve
+            bys athr_id: keep if _n == 1
+            qui count if mi(min_year_nonsolo)
+            local n_allsolo = r(N)
+            qui count
+            di as text "restrict_samp `samp'`suf': min_year_nonsolo built; `n_allsolo' of " r(N) ///
+                " PIs have no non-solo last-author paper (min_year_nonsolo missing)."
+        restore
+    }
+    else di as error "restrict_samp `samp'`suf': avg_team_size not in panel -- min_year_nonsolo SKIPPED (rerun make_athr_yr_panel/code/build.do)."
     keep if min_year <= 2013
     keep if max_year >= 2015
     keep if inrange(year, 2010, 2019)
@@ -242,11 +308,11 @@ program restrict_samp
         sum imputed_mkt_spend_shr, d
         local imshr_mean : di %4.3f r(mean)
         local imshr_sd   : di %4.3f r(sd)
-        tw kdensity exposure_all, lcolor(ebblue)   || kdensity imputed, lcolor(dkorange)   xtitle("Exposure Measure") ytitle("Density") ///
+        tw kdensity exposure_all, lcolor(ebblue)   || kdensity imputed, lcolor(dkorange)   xtitle("Exposure Measure") ytitle("Density") ysc(titlegap(-6) outergap(0)) ///
             xlab(#15) ///
             legend(on label(1 "FOIA PI Observed Exposure (mean = `mean', sd = `sd')") label(2 "Imputed Exposure (mean = `imputed_mean', sd = `imputed_sd')") pos(7) ring(1) size(small))
         graph export ../output/figures/`samp'/exposure_dist`suf'.pdf, replace
-        tw kdensity mkt_spend_shr_all, lcolor(ebblue)  || kdensity imputed_mkt_spend_shr, lcolor(dkorange)   xtitle("Market Spend Share") ytitle("Density") ///
+        tw kdensity mkt_spend_shr_all, lcolor(ebblue)  || kdensity imputed_mkt_spend_shr, lcolor(dkorange)   xtitle("Market Spend Share") ytitle("Density") ysc(titlegap(-6) outergap(0)) ///
             xlab(#15) ///
             legend(on label(1 "FOIA PI Observed (mean = `mshr_mean', sd = `mshr_sd')") label(2 "Imputed (mean = `imshr_mean', sd = `imshr_sd')") pos(7) ring(1) size(small))
         graph export ../output/figures/`samp'/mkt_spend_shr_dist`suf'.pdf, replace
@@ -269,13 +335,13 @@ program restrict_samp
     keep if num_place==1
     gegen athr = group(athr_id)
     preserve
-    contract athr num_place athr_id exposure inst_id inst msa_comb msa_c_world min_year min_year_any max_year type public mkt_spend_shr cluster_30 max_sim foia_athr
+    contract athr num_place athr_id exposure inst_id inst msa_comb msa_c_world min_year min_year_nonsolo min_year_any max_year type public mkt_spend_shr cluster_30 max_sim foia_athr
     drop _freq
     save ../temp/athr_xw, replace
     restore
     xtset athr year
     tsfill, full
-    drop athr_id exposure inst_id inst msa_comb msa_c_world min_year min_year_any max_year type public mkt_spend_shr cluster_30 max_sim foia_athr
+    drop athr_id exposure inst_id inst msa_comb msa_c_world min_year min_year_nonsolo min_year_any max_year type public mkt_spend_shr cluster_30 max_sim foia_athr
     merge m:1 athr using ../temp/athr_xw, assert(3) keep(3) nogen
     // Drop position vars from master before athr_any merge — Stata silently keeps master, and the last-only versions are degenerate
     foreach v in n_first_ppr n_middle_ppr n_last_ppr n_solo_ppr ///
@@ -287,9 +353,37 @@ program restrict_samp
     foreach var in ppr_cnt cite_affl_wt affl_wt ppr_cnt_any cite_affl_wt_any affl_wt_any {
         replace `var' = 0 if mi(`var')
     }
-    foreach var in n_first_ppr n_middle_ppr n_last_ppr {
+    foreach var in n_first_ppr n_middle_ppr n_last_ppr n_solo_ppr {
         cap confirm variable `var'
         if !_rc replace `var' = 0 if mi(`var')
+    }
+    * Last-author papers with at least one coauthor. n_last_ppr/n_solo_ppr come
+    * from the all-position panel, where num_athrs is genuine (the last-author
+    * panel's copies are degenerate); n_last_ppr there is the same count as
+    * ppr_cnt here, so the two must agree row by row.
+    cap confirm variable n_solo_ppr
+    if !_rc {
+        qui count if ppr_cnt != n_last_ppr
+        if r(N) > 0 di as error "restrict_samp `samp'`suf': ppr_cnt != n_last_ppr on " r(N) ///
+            " rows -- ppr_cnt_nonsolo may not be a clean subset of ppr_cnt. VERIFY."
+        gen ppr_cnt_nonsolo = n_last_ppr - n_solo_ppr
+        qui sum ppr_cnt_nonsolo
+        local ns_tot = r(sum)
+        qui sum ppr_cnt
+        local solo_shr = 100*(1 - `ns_tot'/r(sum))
+        di as text "restrict_samp `samp'`suf': ppr_cnt_nonsolo built; solo papers are " ///
+            %5.2f `solo_shr' "% of last-author papers."
+        if $DROP_SOLO == 1 {
+            replace ppr_cnt     = ppr_cnt_nonsolo
+            replace n_last_ppr  = ppr_cnt_nonsolo
+            replace ppr_cnt_any = ppr_cnt_any - n_solo_ppr
+            di as text "restrict_samp `samp'`suf': DROP_SOLO=1 -- ppr_cnt, ppr_cnt_any, n_last_ppr" ///
+                " and both age measures exclude solo papers. cite_affl_wt, affl_wt and" ///
+                " avg_team_size_* still include them (no solo component in the panel)."
+        }
+    }
+    else if $DROP_SOLO == 1 {
+        di as error "restrict_samp `samp'`suf': DROP_SOLO=1 but n_solo_ppr is not in the panel -- NOTHING was dropped."
     }
     gen pre_ppr_cnt = ppr_cnt if year < 2014
     bys athr_id: egen pre_ppr_cnt_sum = sum(pre_ppr_cnt)
@@ -362,7 +456,23 @@ program restrict_samp
     assert !mi(mkt_spend_shr)
     cap mkdir ../output/prepped_samples
     compress
-    save ../output/prepped_samples/es_`samp'`suf', replace
+    if `hisim' > 0 {
+        * cutoff from imputed (non-FOIA) PIs; FOIA anchors sit at max_sim=1 and always survive
+        bys athr_id: gen byte _hs_one = _n == 1
+        qui _pctile max_sim if _hs_one == 1 & foia_athr != 1, p(`=100 - `hisim'')
+        local hs_cut = r(r1)
+        qui gunique athr_id
+        local hs_n0 = r(unique)
+        keep if max_sim >= `hs_cut'
+        drop _hs_one
+        qui gunique athr_id
+        di as text "restrict_samp `samp'`suf' hisim=`hisim': max_sim cut=" %6.4f `hs_cut' ///
+            "  PIs kept " r(unique) " / `hs_n0'"
+        save ../output/prepped_samples/es_`samp'_hisim`hisim'`suf', replace
+    }
+    else {
+        save ../output/prepped_samples/es_`samp'`suf', replace
+    }
 end
 
 program event_study
@@ -543,14 +653,23 @@ program event_study
         replace rel = -1 if rel == `abs_lag' + 1
         gen year = rel + 2014
         hashsort rel
-        tw rcap ub lb year if year != 2013 , lcolor(ebblue%70) msize(vsmall) || ///
-          scatter b year, mcolor(ebblue) || ///
-          scatteri `ymax' 2013.75 `ymax' 2014.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
-          xlab(2010(1)2019) xtitle("Year") ///
-          ytitle("`var_name'") ylab(`ymin'(`gap')`ymax') ///
-          yline(0, lcolor(gs10) lpattern(solid)) ///
-          legend(on order(- "Num. PIs: `num_athrs'" "Num. Institutions: `num_insts'" "Pre-Period Avg : `pre_mean'") pos(7) ring(1) rows(2) bmargin(zero) size(small)) plotregion(margin(sides))
-        graph export ../output/figures/`samp'/es_`yvar'`suf'_mshrctrl`wsuf'.pdf, replace
+        local stats_leg `"legend(on order(- "Num. PIs: `num_athrs'" "Num. Institutions: `num_insts'" "Pre-Period Avg : `pre_mean'") pos(7) ring(1) rows(2) bmargin(zero) size(small))"'
+        local fdir ../output/figures/`samp'
+        foreach fmode of global FIG_MODES {
+            if "`fmode'" == "paper" {
+                local stats_leg legend(off)
+                local fdir ../output/figures/`samp'/paper
+                cap mkdir "`fdir'"
+            }
+            tw rcap ub lb year if year != 2013 , lcolor(ebblue%70) msize(vsmall) || ///
+              scatter b year, mcolor(ebblue) || ///
+              scatteri `ymax' 2013.75 `ymax' 2014.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
+              xlab(2010(1)2019) xtitle("Year") ///
+              ytitle("`var_name'") ysc(titlegap(-6) outergap(0)) ylab(`ymin'(`gap')`ymax') ///
+              yline(0, lcolor(gs10) lpattern(solid)) ///
+              `stats_leg' plotregion(margin(sides))
+            graph export `fdir'/es_`yvar'`suf'_mshrctrl`wsuf'.pdf, replace
+        }
         save ../temp/es_`yvar'`suf'_mshrctrl`wsuf', replace
         restore
         }
@@ -587,12 +706,18 @@ program event_study
             keep es1 es2
             drop if mi(es1)
             rename (es1 es2) (b se)
+            local pgap 0.1
+            local tgap -6
+            if inlist("`yvar'", "n_grants", "nih_total_cost") {
+                local pgap 0.4
+                local tgap 0
+            }
             gen ub = b + 1.96*se
             sum ub, d
-            local ymax = round(r(max), 0.1)
+            local ymax = round(r(max), `pgap')
             gen lb = b - 1.96*se
             sum lb, d
-            local ymin = round(r(min), 0.1)
+            local ymin = round(r(min), `pgap')
             if `ymin' > 0 local ymin = 0
             gen rel = -`abs_lead' if _n == 1
             replace rel = rel[_n-1]+1 if _n > 1
@@ -600,14 +725,23 @@ program event_study
             replace rel = -1 if rel == `abs_lag' + 1
             gen year = rel + 2014
             hashsort rel
-            tw rcap ub lb year if year != 2013, lcolor(ebblue%70) msize(vsmall) || ///
-              scatter b year, mcolor(ebblue) || ///
-              scatteri `ymax' 2013.75 `ymax' 2014.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
-              xlab(2010(1)2019) xtitle("Year") ///
-              ytitle("`ppml_ytit'") ylab(`ymin'(0.1)`ymax') ///
-              yline(0, lcolor(gs10) lpattern(solid)) ///
-              legend(on order(- "Num. PIs: `num_athrs'" "Num. Institutions: `num_insts'" "Pre-Period Avg : `pre_mean'") pos(7) ring(1) rows(2) bmargin(zero) size(small)) plotregion(margin(sides))
-            graph export ../output/figures/`samp'/es_`yvar'`suf'_ppml_mshrctrl`wsuf'.pdf, replace
+            local stats_leg `"legend(on order(- "Num. PIs: `num_athrs'" "Num. Institutions: `num_insts'" "Pre-Period Avg : `pre_mean'") pos(7) ring(1) rows(2) bmargin(zero) size(small))"'
+            local fdir ../output/figures/`samp'
+            foreach fmode of global FIG_MODES {
+                if "`fmode'" == "paper" {
+                    local stats_leg legend(off)
+                    local fdir ../output/figures/`samp'/paper
+                    cap mkdir "`fdir'"
+                }
+                tw rcap ub lb year if year != 2013, lcolor(ebblue%70) msize(vsmall) || ///
+                  scatter b year, mcolor(ebblue) || ///
+                  scatteri `ymax' 2013.75 `ymax' 2014.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
+                  xlab(2010(1)2019) xtitle("Year") ///
+                  ytitle("`ppml_ytit'") ysc(titlegap(`tgap') outergap(0)) ylab(`ymin'(`pgap')`ymax') ///
+                  yline(0, lcolor(gs10) lpattern(solid)) ///
+                  `stats_leg' plotregion(margin(sides))
+                graph export `fdir'/es_`yvar'`suf'_ppml_mshrctrl`wsuf'.pdf, replace
+            }
             save ../temp/es_`yvar'`suf'_ppml_mshrctrl`wsuf', replace
             restore
             }
@@ -660,15 +794,26 @@ program event_study
             replace rel = -1 if rel == `abs_lag' + 1
             gen year = rel + 2014
             hashsort rel
-            tw rcap ub lb year if year != 2013, lcolor(dkorange%70) msize(vsmall) || ///
-              scatter b year, mcolor(dkorange) || ///
-              scatteri `ymax' 2013.75 `ymax' 2014.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
-              xlab(2010(1)2019) xtitle("Year") ///
-              ytitle("`ppml_ytit'") ylab(#6) ///
-              yline(0, lcolor(gs10) lpattern(solid)) ///
-              title("FOIA PIs only (observed exposure)", size(small)) ///
-              legend(on order(- "Num. PIs: `num_athrs'" "Num. Institutions: `num_insts'" "Pre-Period Avg : `pre_mean'") pos(7) ring(1) rows(2) bmargin(zero) size(small)) plotregion(margin(sides))
-            graph export ../output/figures/`samp'/es_`yvar'`suf'_ppml_mshrctrl_foia`wsuf'.pdf, replace
+            local stats_leg `"legend(on order(- "Num. PIs: `num_athrs'" "Num. Institutions: `num_insts'" "Pre-Period Avg : `pre_mean'") pos(7) ring(1) rows(2) bmargin(zero) size(small))"'
+            local es_title title("FOIA PIs only (observed exposure)", size(small))
+            local fdir ../output/figures/`samp'
+            foreach fmode of global FIG_MODES {
+                if "`fmode'" == "paper" {
+                    local stats_leg legend(off)
+                    local es_title
+                    local fdir ../output/figures/`samp'/paper
+                    cap mkdir "`fdir'"
+                }
+                tw rcap ub lb year if year != 2013, lcolor(dkorange%70) msize(vsmall) || ///
+                  scatter b year, mcolor(dkorange) || ///
+                  scatteri `ymax' 2013.75 `ymax' 2014.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
+                  xlab(2010(1)2019) xtitle("Year") ///
+                  ytitle("`ppml_ytit'") ysc(titlegap(-6) outergap(0)) ylab(#6) ///
+                  yline(0, lcolor(gs10) lpattern(solid)) ///
+                  `es_title' ///
+                  `stats_leg' plotregion(margin(sides))
+                graph export `fdir'/es_`yvar'`suf'_ppml_mshrctrl_foia`wsuf'.pdf, replace
+            }
             save ../temp/es_`yvar'`suf'_ppml_mshrctrl_foia`wsuf', replace
             restore
             }
@@ -720,15 +865,26 @@ program event_study
             replace rel = -1 if rel == `abs_lag' + 1
             gen year = rel + 2014
             hashsort rel
-            tw rcap ub lb year if year != 2013, lcolor(lavender%70) msize(vsmall) || ///
-              scatter b year, mcolor(lavender) || ///
-              scatteri `ymax' 2013.75 `ymax' 2014.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
-              xlab(2010(1)2019) xtitle("Year") ///
-              ytitle("`ppml_ytit'") ylab(#6) ///
-              yline(0, lcolor(gs10) lpattern(solid)) ///
-              title("NIH-matched PIs only", size(small)) ///
-              legend(on order(- "Num. PIs: `num_athrs'" "Num. Institutions: `num_insts'" "Pre-Period Avg : `pre_mean'") pos(7) ring(1) rows(2) bmargin(zero) size(small)) plotregion(margin(sides))
-            graph export ../output/figures/`samp'/es_`yvar'`suf'_ppml_mshrctrl_nih`wsuf'.pdf, replace
+            local stats_leg `"legend(on order(- "Num. PIs: `num_athrs'" "Num. Institutions: `num_insts'" "Pre-Period Avg : `pre_mean'") pos(7) ring(1) rows(2) bmargin(zero) size(small))"'
+            local es_title title("NIH-matched PIs only", size(small))
+            local fdir ../output/figures/`samp'
+            foreach fmode of global FIG_MODES {
+                if "`fmode'" == "paper" {
+                    local stats_leg legend(off)
+                    local es_title
+                    local fdir ../output/figures/`samp'/paper
+                    cap mkdir "`fdir'"
+                }
+                tw rcap ub lb year if year != 2013, lcolor(lavender%70) msize(vsmall) || ///
+                  scatter b year, mcolor(lavender) || ///
+                  scatteri `ymax' 2013.75 `ymax' 2014.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
+                  xlab(2010(1)2019) xtitle("Year") ///
+                  ytitle("`ppml_ytit'") ysc(titlegap(-6) outergap(0)) ylab(#6) ///
+                  yline(0, lcolor(gs10) lpattern(solid)) ///
+                  `es_title' ///
+                  `stats_leg' plotregion(margin(sides))
+                graph export `fdir'/es_`yvar'`suf'_ppml_mshrctrl_nih`wsuf'.pdf, replace
+            }
             save ../temp/es_`yvar'`suf'_ppml_mshrctrl_nih`wsuf', replace
             restore
             }
@@ -902,7 +1058,7 @@ program pooled_did
                 local pds_b_str  : dis %7.3f `s_bx'
                 local pds_se_str : dis %7.3f `s_sex'
                 binscatter _y_r _Z_r `wt_bin', n(30) ///
-                    xtitle("Exposure x Post") ytitle("`var_name'") ///
+                    xtitle("Exposure x Post") ytitle("`var_name'") ysc(titlegap(-6) outergap(0)) ///
                     xlab(-0.06(0.015)0.06, format(%5.3f)) ///
                     msymbol(O) mcolors(gs6) lcolors(ebblue) ///
                     note("{&beta} = `pds_b_str' (SE: `pds_se_str')") ///
@@ -1100,7 +1256,7 @@ program ppml_specs
                     local pse_str : dis %7.3f ppml_pdid_`yvar'[2,1]
                     binscatter _y_r _Z_r [aw=_fwlw], n(30) ///
                         xtitle("Exposure x Post") ///
-                        ytitle("{&Delta} Log Expected `poisson_name'") ///
+                        ytitle("{&Delta} Log Expected `poisson_name'") ysc(titlegap(0) outergap(0)) ///
                         xlab(-0.06(0.015)0.06, format(%5.3f)) ///
                         msymbol(O) mcolors(gs6) lcolors(ebblue) ///
                         note("{&beta} = `pb_str' (SE: `pse_str')", size(small) pos(7) ring(1) justification(left)) ///
@@ -1128,7 +1284,7 @@ program ppml_specs
                     local pses_str : dis %7.3f ppml_pdid_`yvar'[2,2]
                     binscatter _y_r _Z_r [aw=_fwlw], n(30) ///
                         xtitle("Exposure x Post") ///
-                        ytitle("{&Delta} Log Expected `poisson_name'") ///
+                        ytitle("{&Delta} Log Expected `poisson_name'") ysc(titlegap(0) outergap(0)) ///
                         xlab(-0.06(0.015)0.06, format(%5.3f)) ///
                         msymbol(O) mcolors(gs6) lcolors(ebblue) ///
                         note("{&beta} = `pbs_str' (SE: `pses_str')", size(small) pos(7) ring(1) justification(left)) ///
@@ -1222,7 +1378,7 @@ program ppml_specs
                     local psen_str : dis %7.3f nih_ppml_`yvar'[2,2]
                     binscatter _y_r _Z_r [aw=_fwlw], n(30) ///
                         xtitle("Exposure x Post") ///
-                        ytitle("{&Delta} Log Expected `poisson_name'") ///
+                        ytitle("{&Delta} Log Expected `poisson_name'") ysc(titlegap(0) outergap(0)) ///
                         xlab(-0.06(0.015)0.06, format(%5.3f)) ///
                         msymbol(O) mcolors(gs6) lcolors(ebblue) ///
                         title("NIH-matched PIs only", size(small)) ///
@@ -1314,7 +1470,7 @@ program ppml_specs
                     local psef_str : dis %7.3f foia_ppml_`yvar'[2,2]
                     binscatter _y_r _Z_r [aw=_fwlw], n(30) ///
                         xtitle("Exposure x Post") ///
-                        ytitle("{&Delta} Log Expected `poisson_name'") ///
+                        ytitle("{&Delta} Log Expected `poisson_name'") ysc(titlegap(0) outergap(0)) ///
                         xlab(#6, format(%5.3f)) ///
                         msymbol(O) mcolors(gs6) lcolors(dkorange) ///
                         title("FOIA PIs only (observed exposure)", size(small)) ///
@@ -1487,7 +1643,7 @@ program placebo_treatment
             tw rcap ub lb year if year != `ref_yr', lcolor(dkorange%70) msize(vsmall) || ///
               scatter b year, mcolor(dkorange) ///
               , xlab(2010(1)2019) xtitle("Year (placebo treatment at `placebo_yr')") ///
-                ytitle("`ppml_ytit'") ///
+                ytitle("`ppml_ytit'") ysc(titlegap(-6) outergap(0)) ///
                 ylab(`ymin'(0.1)`ymax') yline(0, lcolor(gs10) lpattern(solid)) ///
                 xline(2014, lpattern(dash) lcolor(gs10)) ///
                 title("Placebo ES: treatment shifted to `placebo_yr' (real: 2014)", size(small)) ///
@@ -1631,7 +1787,7 @@ program trim_top
            scatter b trim, mcolor(ebblue) msize(medium) ///
            , xlab(0 "Full sample" 1 "Drop top 1%" 5 "5%" 10 "10%" 25 "25%", labsize(small)) ///
              xtitle("Top-pre-pub PIs dropped") ///
-             ytitle("pdid {&beta}: `var_name'") ///
+             ytitle("pdid {&beta}: `var_name'") ysc(titlegap(-6) outergap(0)) ///
              yline(0, lcolor(gs10) lpattern(solid)) ///
              title("Trim-top sensitivity: `var_name'", size(small)) ///
              legend(off) plotregion(margin(sides))
@@ -1660,7 +1816,7 @@ program trim_top
            scatter b trim, mcolor(dkorange) msize(medium) ///
            , xlab(0 "Full sample" 1 "Drop top 1%" 5 "5%" 10 "10%" 25 "25%", labsize(small)) ///
              xtitle("Top-pre-pub PIs dropped") ///
-             ytitle("`ppml_ytit'") ///
+             ytitle("`ppml_ytit'") ysc(titlegap(-6) outergap(0)) ///
              yline(0, lcolor(gs10) lpattern(solid)) ///
              title("Trim-top sensitivity (ppml): `var_name'", size(small)) ///
              legend(off) plotregion(margin(sides))
@@ -1965,7 +2121,7 @@ program robustness
             cap graph drop _all
             cap noi tw rcap ub lb year if year != 2013, lcolor(ebblue%70) msize(vsmall) || ///
               scatter b year, mcolor(ebblue) ///
-              , xlab(2010(1)2019) xtitle("Year") ytitle("`ytit'") ///
+              , xlab(2010(1)2019) xtitle("Year") ytitle("`ytit'") ysc(titlegap(-6) outergap(0)) ///
                 `ylabopt' yline(0, lcolor(gs10) lpattern(solid)) ///
                 title("Main ES: `title' (N PIs = `n_pi')", size(small)) ///
                 legend(off) plotregion(margin(sides))

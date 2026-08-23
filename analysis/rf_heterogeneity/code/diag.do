@@ -68,14 +68,14 @@ local n_r2 = r(N)
 
 graph bar (mean) young, ///
     over(r1, relabel(1 `"R2 (N=`n_r2')"' 2 `"R1 (N=`n_r1')"')) ///
-    ytitle("Share Early-Career") bar(1, color(ebblue)) ///
+    ytitle("Share Early-Career") ysc(titlegap(-6) outergap(0)) bar(1, color(ebblue)) ///
     blabel(bar, format(%4.3f) size(medium)) ///
     plotregion(margin(sides))
 graph export ../output/figures/all_jrnls/diag_share_young_by_r1`samp_suf'.pdf, replace
 
 tw histogram age_2014 if r1 == 1, freq lcolor(ebblue) fcolor(ebblue%30) width(2) || ///
    histogram age_2014 if r1 == 0, freq lcolor(dkorange) fcolor(dkorange%30) width(2) ///
-   , xtitle("Age in 2014") ytitle("Frequency") ///
+   , xtitle("Age in 2014") ytitle("Frequency") ysc(titlegap(-6) outergap(0)) ///
      legend(order(1 "R1 (N=`n_r1')" 2 "R2 (N=`n_r2')") pos(2) ring(0) rows(2) size(small)) ///
      plotregion(margin(sides))
 graph export ../output/figures/all_jrnls/diag_age_hist_by_r1`samp_suf'.pdf, replace
@@ -123,7 +123,7 @@ forvalues i = 1/2 {
        (line _kd_y _kx, lcolor(ebblue) lwidth(medthick)) ///
        (line _kd_o _kx, lcolor(dkorange) lwidth(medthick)) ///
        , xtitle("ln(1 + Pre-Period `xlbl')") ///
-         ytitle("Density") ///
+         ytitle("Density") ysc(titlegap(-6) outergap(0)) ///
          legend(order(3 "Early-Career (N=`n_y'): mean=`mu_y'" ///
                       4 "Late-Career (N=`n_o'): mean=`mu_o'") ///
                 pos(2) ring(0) rows(2) size(small)) ///
@@ -216,7 +216,7 @@ foreach spec of local pi_split_specs {
     local sh_yl : dis %4.2f r(mean)
     tw kdensity age_2014 if `dvar' == 1, lcolor(ebblue) lwidth(medthick) || ///
        kdensity age_2014 if `dvar' == 0, lcolor(dkorange) lwidth(medthick) ///
-       , xtitle("Age in 2014") ytitle("Density") ///
+       , xtitle("Age in 2014") ytitle("Density") ysc(titlegap(-6) outergap(0)) ///
          subtitle("`dlbl' split (share early-career: Hi=`sh_yh', Lo=`sh_yl')", size(small)) ///
          legend(order(1 "High `dlbl' (N=`n_hi', mean=`mu_hi')" ///
                       2 "Low `dlbl' (N=`n_lo', mean=`mu_lo')") ///
@@ -253,7 +253,7 @@ foreach wt of local wt_list {
         local mu_lo : dis %5.1f r(mean)
         tw kdensity age_2014 if `hi'_`a' == 1, lcolor(ebblue) lwidth(medthick) || ///
            kdensity age_2014 if `hi'_`a' == 0, lcolor(dkorange) lwidth(medthick) ///
-           , xtitle("Age in 2014") ytitle("Density") ///
+           , xtitle("Age in 2014") ytitle("Density") ysc(titlegap(-6) outergap(0)) ///
              subtitle("Cutoff: `wt_lbl' of ic_`a'", size(small)) ///
              legend(order(1 "Hi `a' (N=`n_hi', mean=`mu_hi')" ///
                           2 "Lo `a' (N=`n_lo', mean=`mu_lo')") ///
@@ -292,7 +292,7 @@ foreach wt of local wt_list {
         local sh_hpl : dis %4.2f r(mean)
         tw kdensity ln_pre_ppr_tot if `hi'_`a' == 1, lcolor(ebblue) lwidth(medthick) || ///
            kdensity ln_pre_ppr_tot if `hi'_`a' == 0, lcolor(dkorange) lwidth(medthick) ///
-           , xtitle("ln(1 + Pre-Period Paper Count, 2009-2013)") ytitle("Density") ///
+           , xtitle("ln(1 + Pre-Period Paper Count, 2009-2013)") ytitle("Density") ysc(titlegap(-6) outergap(0)) ///
              subtitle("Cutoff: `wt_lbl' of ic_`a' (share HP: Hi=`sh_hph', Lo=`sh_hpl')", size(small)) ///
              legend(order(1 "Hi `a' (N=`n_hi', mean=`mu_hi')" ///
                           2 "Lo `a' (N=`n_lo', mean=`mu_lo')") ///
@@ -334,7 +334,7 @@ if !_rc {
            kdensity exposure if _cell == 2, lcolor(ebblue%50) lwidth(medthick) lpattern(dash) || ///
            kdensity exposure if _cell == 3, lcolor(dkorange) lwidth(medthick) || ///
            kdensity exposure if _cell == 4, lcolor(dkorange%50) lwidth(medthick) lpattern(dash) ///
-           , xtitle("Exposure") ytitle("Density") ///
+           , xtitle("Exposure") ytitle("Density") ysc(titlegap(-6) outergap(0)) ///
              subtitle("Cell composition on hiw_`a' x high_pre_ppr", size(small)) ///
              legend(order(1 "HP x Hi `a' (N=`n_1', mean=`mu_1')" ///
                           2 "HP x Lo `a' (N=`n_2', mean=`mu_2')" ///
@@ -380,7 +380,7 @@ if !_rc {
 
     tw kdensity ln_ppr if hiw_tfnd == 1, lcolor(ebblue) lwidth(medthick) || ///
        kdensity ln_ppr if hiw_tfnd == 0, lcolor(dkorange) lwidth(medthick) ///
-       , xtitle("ln(1 + Avg Papers per Year at Institution)") ytitle("Density") ///
+       , xtitle("ln(1 + Avg Papers per Year at Institution)") ytitle("Density") ysc(titlegap(-6) outergap(0)) ///
          legend(order(1 "Hi Total R&D (N=`n_hi', mean=`mu_hi'/yr)" ///
                       2 "Lo Total R&D (N=`n_lo', mean=`mu_lo'/yr)") ///
                 pos(6) ring(1) rows(1) span size(small)) ///

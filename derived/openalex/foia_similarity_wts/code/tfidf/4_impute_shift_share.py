@@ -84,13 +84,13 @@ CATEGORY_RENAMES = {
 def load_shocks(path):
     df = pd.read_stata(path)
 
-    if not {"category", "b"}.issubset(df.columns):
-        raise SystemExit(f"{path} needs [category, b]; got {list(df.columns)}")
+    if not {"category", "b_eb"}.issubset(df.columns):
+        raise SystemExit(f"{path} needs [category, b_eb]; got {list(df.columns)}")
 
     df["category"] = df["category"].astype(str).replace(CATEGORY_RENAMES)
-    df = df.dropna(subset=["b"]).drop_duplicates("category").reset_index(drop=True)
+    df = df.dropna(subset=["b_eb"]).drop_duplicates("category").reset_index(drop=True)
 
-    return df["category"].tolist(), df["b"].to_numpy(float)
+    return df["category"].tolist(), df["b_eb"].to_numpy(float)
 
 
 def build_share_matrix(path, foia_ids, markets):

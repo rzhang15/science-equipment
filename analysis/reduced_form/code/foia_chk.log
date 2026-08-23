@@ -1,0 +1,285 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 120,000; see help set_maxvar.
+
+. do foia_chk.do 
+
+. use /n/holylabs/pakes_lab/Lab/sci_eq/analysis/reduced_form/temp/foia_decline_
+> panel, clear
+
+. di "=== baseline ==="
+=== baseline ===
+
+. ppmlhdfe ppr_cnt Z_it Z_share_it, absorb(athr_id year) vce(cluster athr_id)
+Iteration 1:   deviance = 7.8226e+02  eps = .         iters = 4    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.53  P   
+Iteration 2:   deviance = 7.6858e+02  eps = 1.78e-02  iters = 3    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.98      
+Iteration 3:   deviance = 7.6851e+02  eps = 8.98e-05  iters = 3    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -2.06      
+Iteration 4:   deviance = 7.6851e+02  eps = 1.48e-08  iters = 3    tol = 1.0e-0
+> 5                                                                            
+>    min(eta) =  -2.06      
+Iteration 5:   deviance = 7.6851e+02  eps = 3.09e-15  iters = 2    tol = 1.0e-0
+> 6                                                                            
+>    min(eta) =  -2.06   S  
+Iteration 6:   deviance = 7.6851e+02  eps = 0.00e+00  iters = 2    tol = 1.0e-0
+> 9                                                                            
+>    min(eta) =  -2.06   S O
+-------------------------------------------------------------------------------
+> -----------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon 
+> below tolerance)
+Converged in 6 iterations and 17 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =        820
+Absorbing 2 HDFE groups                           Residual df     =         81
+Statistics robust to heteroskedasticity           Wald chi2(2)    =      10.18
+Deviance             =  768.5116419               Prob > chi2     =     0.0062
+Log pseudolikelihood = -1164.785549               Pseudo R2       =     0.1175
+
+Number of clusters (athr_id)=         82
+                               (Std. err. adjusted for 82 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+        Z_it |   4.127681   1.674232     2.47   0.014     .8462462    7.409116
+  Z_share_it |    -1.4219   .5817949    -2.44   0.015    -2.562197   -.2816026
+       _cons |   .6682574   .0682881     9.79   0.000     .5344151    .8020997
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |        82          82           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. di "=== drop min-exposure PI (Zuiderweg, -0.191) ==="
+=== drop min-exposure PI (Zuiderweg, -0.191) ===
+
+. preserve
+
+. drop if exposure < -.15
+(10 observations deleted)
+
+. ppmlhdfe ppr_cnt Z_it Z_share_it, absorb(athr_id year) vce(cluster athr_id)
+Iteration 1:   deviance = 7.7470e+02  eps = .         iters = 4    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -0.96  P   
+Iteration 2:   deviance = 7.6197e+02  eps = 1.67e-02  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.14      
+Iteration 3:   deviance = 7.6192e+02  eps = 6.04e-05  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.16      
+Iteration 4:   deviance = 7.6192e+02  eps = 1.51e-09  iters = 2    tol = 1.0e-0
+> 5                                                                            
+>    min(eta) =  -1.16      
+Iteration 5:   deviance = 7.6192e+02  eps = 0.00e+00  iters = 2    tol = 1.0e-0
+> 6                                                                            
+>    min(eta) =  -1.16   S  
+Iteration 6:   deviance = 7.6192e+02  eps = 2.08e-16  iters = 1    tol = 1.0e-0
+> 9                                                                            
+>    min(eta) =  -1.16   S O
+-------------------------------------------------------------------------------
+> -----------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon 
+> below tolerance)
+Converged in 6 iterations and 13 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =        810
+Absorbing 2 HDFE groups                           Residual df     =         80
+Statistics robust to heteroskedasticity           Wald chi2(2)    =       6.43
+Deviance             =  761.9197372               Prob > chi2     =     0.0402
+Log pseudolikelihood = -1156.875891               Pseudo R2       =     0.1140
+
+Number of clusters (athr_id)=         81
+                               (Std. err. adjusted for 81 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+        Z_it |   3.909104   1.996358     1.96   0.050    -.0036848    7.821893
+  Z_share_it |  -1.382295   .6294271    -2.20   0.028    -2.615949   -.1486405
+       _cons |    .668351   .0701518     9.53   0.000     .5308559     .805846
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |        81          81           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. restore
+
+. di "=== winsorize exposure at 5/95 ==="
+=== winsorize exposure at 5/95 ===
+
+. preserve
+
+. egen tagw = tag(athr_id)
+
+. qui _pctile exposure if tagw==1, p(5 95)
+
+. local lo = r(r1)
+
+. local hi = r(r2)
+
+. gen expw = min(max(exposure,`lo'),`hi')
+
+. gen Zw = expw*post
+
+. ppmlhdfe ppr_cnt Zw Z_share_it, absorb(athr_id year) vce(cluster athr_id)
+Iteration 1:   deviance = 7.8171e+02  eps = .         iters = 4    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.35  P   
+Iteration 2:   deviance = 7.6840e+02  eps = 1.73e-02  iters = 3    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.61      
+Iteration 3:   deviance = 7.6835e+02  eps = 6.80e-05  iters = 3    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.64      
+Iteration 4:   deviance = 7.6835e+02  eps = 2.32e-09  iters = 3    tol = 1.0e-0
+> 5                                                                            
+>    min(eta) =  -1.64      
+Iteration 5:   deviance = 7.6835e+02  eps = 0.00e+00  iters = 2    tol = 1.0e-0
+> 6                                                                            
+>    min(eta) =  -1.64   S  
+Iteration 6:   deviance = 7.6835e+02  eps = 0.00e+00  iters = 1    tol = 1.0e-0
+> 9                                                                            
+>    min(eta) =  -1.64   S O
+-------------------------------------------------------------------------------
+> -----------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon 
+> below tolerance)
+Converged in 6 iterations and 16 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =        820
+Absorbing 2 HDFE groups                           Residual df     =         81
+Statistics robust to heteroskedasticity           Wald chi2(2)    =      10.87
+Deviance             =  768.3521498               Prob > chi2     =     0.0044
+Log pseudolikelihood = -1164.705802               Pseudo R2       =     0.1176
+
+Number of clusters (athr_id)=         82
+                               (Std. err. adjusted for 82 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+          Zw |   5.603318   2.155371     2.60   0.009     1.378868    9.827768
+  Z_share_it |  -1.533866   .5897045    -2.60   0.009    -2.689666   -.3780666
+       _cons |   .6666628   .0683367     9.76   0.000     .5327254    .8006002
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |        82          82           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. restore
+
+. di "=== no share control ==="
+=== no share control ===
+
+. ppmlhdfe ppr_cnt Z_it, absorb(athr_id year) vce(cluster athr_id)
+Iteration 1:   deviance = 7.9347e+02  eps = .         iters = 3    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.18  P   
+Iteration 2:   deviance = 7.7980e+02  eps = 1.75e-02  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.38      
+Iteration 3:   deviance = 7.7975e+02  eps = 7.18e-05  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.40      
+Iteration 4:   deviance = 7.7975e+02  eps = 2.54e-09  iters = 2    tol = 1.0e-0
+> 5                                                                            
+>    min(eta) =  -1.40      
+Iteration 5:   deviance = 7.7975e+02  eps = 2.03e-16  iters = 2    tol = 1.0e-0
+> 6                                                                            
+>    min(eta) =  -1.40   S  
+Iteration 6:   deviance = 7.7975e+02  eps = 0.00e+00  iters = 1    tol = 1.0e-0
+> 9                                                                            
+>    min(eta) =  -1.40   S O
+-------------------------------------------------------------------------------
+> -----------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon 
+> below tolerance)
+Converged in 6 iterations and 12 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =        820
+Absorbing 2 HDFE groups                           Residual df     =         81
+Statistics robust to heteroskedasticity           Wald chi2(1)    =       2.00
+Deviance             =  779.7457112               Prob > chi2     =     0.1573
+Log pseudolikelihood = -1170.402583               Pseudo R2       =     0.1133
+
+Number of clusters (athr_id)=         82
+                               (Std. err. adjusted for 82 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+        Z_it |    2.47821   1.752416     1.41   0.157     -.956462    5.912882
+       _cons |    .513563   .0200256    25.65   0.000     .4743136    .5528125
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |        82          82           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. di "=== institution composition ==="
+=== institution composition ===
+
+. egen tag = tag(athr_id)
+
+. tab inst if tag==1, sort
+
+                                   inst |      Freq.     Percent        Cum.
+----------------------------------------+-----------------------------------
+       University of Michigan–Ann Arbor |         65       79.27       79.27
+      The University of Texas at Austin |          7        8.54       87.80
+               East Carolina University |          5        6.10       93.90
+                  Texas Tech University |          4        4.88       98.78
+      The University of Texas at Dallas |          1        1.22      100.00
+----------------------------------------+-----------------------------------
+                                  Total |         82      100.00
+
+. 
+end of do-file

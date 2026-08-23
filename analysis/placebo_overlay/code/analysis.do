@@ -78,10 +78,6 @@ program overlay_hist
     if r(p) < 0.001 local ks_p "< 0.001"
     else local ks_p : di "= " %5.3f r(p)
 
-    ttest b, by(sample) unequal
-    if r(p) < 0.001 local t_p "< 0.001"
-    else local t_p : di "= " %5.3f r(p)
-
     // Fisher randomization-style p-value: test stat = mean of real betas.
     // Build the null distribution of iteration means from the placebo runs
     // (one mean per iter, so within-iter correlation is baked in), then
@@ -91,9 +87,11 @@ program overlay_hist
         collapse (mean) iter_mean = b, by(iter)
         local n_iter = _N
         count if iter_mean >= `mean_r_raw'
-        local p_one : di %5.3f r(N) / `n_iter'
+        if r(N) == 0 local p_one : di "< " %5.3f 1 / `n_iter'
+        else local p_one : di "= " %5.3f r(N) / `n_iter'
         count if abs(iter_mean) >= abs(`mean_r_raw')
-        local p_two : di %5.3f r(N) / `n_iter'
+        if r(N) == 0 local p_two : di "< " %5.3f 1 / `n_iter'
+        else local p_two : di "= " %5.3f r(N) / `n_iter'
         sum iter_mean
         local mean_imean : di %6.3f r(mean)
         local sd_imean   : di %6.3f r(sd)
@@ -125,10 +123,10 @@ program overlay_hist
            ytitle("Density") ///
            xlab(-0.6(0.1)0.6) ///
            xline(0, lcolor(gs6) lpattern(dash)) ///
-           xline(`mean_r_raw', lcolor(edkblue) lpattern(solid) lwidth(medthin)) ///
+           xline(`mean_r_raw', lcolor(ebblue) lpattern(solid) lwidth(medthin)) ///
            legend(on order(3 "Actual Treatment Effects (N=`N_r', mean=`mean_r', sd=`sd_r')" ///
-                           4 "Placebo Treatment Effects (N=`N_p', mean=`mean_p', sd=`sd_p')" ///
-                           - "t-test p `t_p'; K-S p `ks_p'") ///
+                           4 "Placebo Treatment Effects (N=`N_p', mean=`mean_p', sd=`sd_p')") ///
+                           /// - "Randomization Inference p `p_two'; Kolmogorov-Smirnov p `ks_p'") ///
                   pos(7) ring(1) region(fcolor(none)) size(small))
         graph export ../output/figures/did_coefs_overlay_kdens_eb`suf'.pdf, replace
     restore
@@ -146,7 +144,7 @@ program overlay_hist
            xline(0, lcolor(gs6) lpattern(dash)) ///
            legend(off) ///
            title("Placebo iteration means (N=`n_iter'); purple = observed mean (`mean_r')", size(small)) ///
-           note("One-sided RI p = `p_one'; two-sided RI p = `p_two'; KS D = `ks_d', p `ks_p'", size(vsmall))
+           note("One-sided RI p `p_one'; two-sided RI p `p_two'; KS D = `ks_d', p `ks_p'", size(vsmall))
         graph export ../output/figures/placebo_iter_means_ri_eb`suf'.pdf, replace
     restore
 

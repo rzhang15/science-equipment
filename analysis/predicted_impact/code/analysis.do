@@ -66,6 +66,8 @@ cap mkdir ../temp
 * ============================================================
 global EXPOSURE_VERSION "hc"
 global EXPOSURE_FILTER  "_cf"
+* pres = event studies with stats legend (slides); paper = legend-free copies under figures/<samp>/paper/
+global FIG_MODES "pres paper"
 
 global TIER_OUTCOMES n_pred_high n_pred_low                              ///
                      n_pred_high_topdecile n_pred_low_topdecile          ///
@@ -448,14 +450,23 @@ program plot_one
     else                 local legend_extra `"order(- "Pre-Period Avg : `pre_mean'")"'
 
     cap graph drop _all
-    tw rcap ub lb year if year != 2013 , lcolor(ebblue%70) msize(vsmall) || ///
-      scatter b year, mcolor(ebblue) || ///
-      scatteri `ymax' 2013.75 `ymax' 2014.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
-      xlab(2010(1)2019) xtitle("Year") ///
-      ytitle("`ytit'") ylab(`ymin'(`gap')`ymax') ///
-      yline(0, lcolor(gs10) lpattern(solid)) ///
-      legend(on `legend_extra' pos(7) ring(1) rows(2) bmargin(zero) size(small)) plotregion(margin(sides))
-    graph export ../output/figures/`samp'/es_`yvar'`suf'.pdf, replace
+    local stats_leg `"legend(on `legend_extra' pos(7) ring(1) rows(2) bmargin(zero) size(small))"'
+    local fdir ../output/figures/`samp'
+    foreach fmode of global FIG_MODES {
+        if "`fmode'" == "paper" {
+            local stats_leg legend(off)
+            local fdir ../output/figures/`samp'/paper
+            cap mkdir "`fdir'"
+        }
+        tw rcap ub lb year if year != 2013 , lcolor(ebblue%70) msize(vsmall) || ///
+          scatter b year, mcolor(ebblue) || ///
+          scatteri `ymax' 2013.75 `ymax' 2014.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
+          xlab(2010(1)2019) xtitle("Year") ///
+          ytitle("`ytit'") ylab(`ymin'(`gap')`ymax') ///
+          yline(0, lcolor(gs10) lpattern(solid)) ///
+          `stats_leg' plotregion(margin(sides))
+        graph export `fdir'/es_`yvar'`suf'.pdf, replace
+    }
 end
 
 /* ---------------------------------------------------------------------------

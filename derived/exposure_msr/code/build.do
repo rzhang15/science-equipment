@@ -103,7 +103,7 @@ program build_exposure_version
     bys athr_id: egen tot_shr_spend = total(spend)
     gen mkt_spend_shr = spend / tot_shr_spend
 
-    gen exposure = b*mkt_spend_shr
+    gen exposure = b_eb*mkt_spend_shr
     gen treated_spend = spend if treated == 1
     replace mkt_spend_shr = . if has_beta == 0
     preserve

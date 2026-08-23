@@ -5,6 +5,7 @@ program drop _all
 set scheme modern
 preliminaries
 version 17
+global exhibit_mode paper // paper | presentation
 
 program main
    *raw_plots
@@ -23,7 +24,6 @@ program raw_plots
     gen tot_spend = raw_spend
     replace treated = 2 if keep == 0 & treated == 1
     replace treated = 3 if keep == 0 & treated == 0
-    *collapse (mean) avg_raw_price  item_price avg_log_price r_raw_qty r_raw_spend r_raw_price raw_qty log_raw_qty avg_raw_qty raw_spend log_raw_spend avg_raw_spend (sum) tot_spend tot_qty [aw = spend_2013], by(year treated)
     collapse (mean) avg_raw_price = raw_price item_price avg_log_price raw_qty log_raw_qty avg_raw_qty = raw_qty raw_spend log_raw_spend avg_raw_spend = raw_spend (sum) tot_spend tot_qty [aw = spend_2013], by(year treated)
     gen tot_price = tot_spend/tot_qty
     gen log_tot_price = ln(tot_price)
@@ -657,10 +657,10 @@ program event_study
         local ctrl_mean = round(r(mean) + 0.001, 0.001)
         if "`yvar'" == "price" {
             di "hi"
-            manual_event_study, lag(5) lead(-4) yvar(avg_log_`yvar') ymin(-0.2) ymax(0.6) ygap(0.1) trt_mean(`trt_mean') ctrl_mean(`ctrl_mean')  name(`yname') fes(`fes') wt_var(spend_2013) cluster_var(mkt) file_suf("naive")
+            manual_event_study, lag(5) lead(-4) yvar(avg_log_`yvar') ymin(-0.4) ymax(0.7) ygap(0.1) trt_mean(`trt_mean') ctrl_mean(`ctrl_mean')  name(`yname') fes(`fes') wt_var(spend_2013) cluster_var(mkt) file_suf("naive")
         }
         if "`yvar'" != "price" {
-            manual_event_study, lag(5) lead(-4) yvar(log_raw_`yvar') ymin(-0.2) ymax(0.6) ygap(0.1) trt_mean(`trt_mean') ctrl_mean(`ctrl_mean')  name(`yname') fes(`fes') wt_var(spend_2013) cluster_var(mkt) file_suf("naive")
+            manual_event_study, lag(5) lead(-4) yvar(log_raw_`yvar') ymin(-0.4) ymax(0.7) ygap(0.1) trt_mean(`trt_mean') ctrl_mean(`ctrl_mean')  name(`yname') fes(`fes') wt_var(spend_2013) cluster_var(mkt) file_suf("naive")
         }
         restore
     }
@@ -1149,6 +1149,11 @@ program manual_event_study
     sum year , d
     local year_min = r(min)
     local year_max = r(max)
+    local legend_lvl legend(on order(- "Treatment Level Avg. in t = -1: `trt_mean'" "Control Level Avg. in t = -1: `ctrl_mean'") pos(7) rows(2) bmargin(zero) size(small))
+    local legend_split legend(on order(3 "Treatment" 4 "Control") ring(0) pos(7) size(small) region(fcolor(none)))
+    if "$exhibit_mode" == "paper" {
+        local legend_lvl legend(off)
+    }
    /* if "`title'" == "" {
         tw rcap ub lb rel if rel != -1 & inrange(rel, `lead', `lag') , lcolor(ebblue%70) msize(vsmall) || ///
         scatter b rel if inrange(rel, `lead', `lag') , mcolor(ebblue) || ///
@@ -1163,8 +1168,8 @@ program manual_event_study
         scatter b year if inrange(rel, `lead', `lag') , mcolor(ebblue) || ///
         scatteri `ymax' 2013.75 `ymax' 2014.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
         xlab(`year_min'(1)`year_max') xtitle("Year") ///
-        ytitle("`name'") ylab(`ymin'(`ygap')`ymax') yline(0, lcolor(gs10) lpattern(solid)) ///
-        legend(on order(- "Treatment Level Avg. in t = -1: `trt_mean'" "Control Level Avg. in t = -1: `ctrl_mean'") pos(7) rows(2) bmargin(zero) size(small)) ///
+        ytitle("`name'") ysc(titlegap(-6) outergap(0)) ylab(`ymin'(`ygap')`ymax') yline(0, lcolor(gs10) lpattern(solid)) ///
+        `legend_lvl' ///
         title(`title', size(small)) plotregion(margin(sides))
         graph export "../output/figures/es/`suf'es_`yvar'_`file_suf'.pdf", replace
 
@@ -1174,8 +1179,8 @@ program manual_event_study
         scatter year_fes rel_year_fes if inrange(rel, `lead', `lag') , mcolor(dkorange) msymbol(diamond) || ///
         scatteri `ymax' 2013.75 `ymax' 2014.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
         xlab(`year_min'(1)`year_max') xtitle("Year") ///
-        ytitle("`name'") ylab(`ymin'(`ygap')`ymax') yline(0, lcolor(gs10) lpattern(solid)) ///
-        legend(on order(1 "Treatment Level Avg. in t = -1: `trt_mean'" 2 "Control Level Avg. in t = -1: `ctrl_mean'") pos(7) rows(2) bmargin(zero) size(small)) ///
+        ytitle("`name'") ysc(titlegap(-6) outergap(0)) ylab(`ymin'(`ygap')`ymax') yline(0, lcolor(gs10) lpattern(solid)) ///
+        `legend_split' ///
         title(`title', size(small)) plotregion(margin(sides))
         graph export "../output/figures/es/split_`suf'es_`yvar'_`file_suf'.pdf", replace
     restore

@@ -2,3 +2,5 @@
 ./college/ | /n/netscratch/pakes_lab/Lab/sci_eq/college
 ./inst_chars/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/inst_chars/output
 ./nih/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/nih/match_pi_athr/output
+./samp/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/make_athr_yr_panel/output
+./world/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/make_athr_yr_panel/temp

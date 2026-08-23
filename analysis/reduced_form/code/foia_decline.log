@@ -1,0 +1,398 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 120,000; see help set_maxvar.
+
+. do foia_decline.do 
+
+. set more off
+
+. clear all
+
+. capture log close
+
+. program drop _all
+
+. set scheme modern
+
+. preliminaries
+
+. version 17
+
+. 
+. * Publication decline for the FOIA PIs that survive into es_all_jrnls_r1_r2.
+. *
+. * ATTRITION_CUT drops PIs whose LAST last-author paper ever is before that year.
+. * max_year runs past the 2010-2019 estimation window (out to 2025), so the gate
+. * uses post-window information and does not select on the in-window outcome.
+. * 0 = keep everyone.
+. * FOIA PIs carry observed (non-imputed) exposure, so this is invariant to the
+. * EXPOSURE_FILTER the prepped sample was built under. The full-sample beta
+. * reported alongside is NOT: it needs a real (non-placebo) prepped sample.
+. 
+. global ATTRITION_CUT 2020
+
+. 
+. program main
+  1.     build_panels
+  2.     attrition_sensitivity
+  3.     estimate_betas
+  4.     author_level_decline
+  5.     decline_scatter
+  6. end
+
+. 
+. program build_panels
+  1.     use ../output/prepped_samples/es_all_jrnls_r1_r2, clear
+  2.     gen post = year >= 2014
+  3.     gen Z_it       = exposure      * post
+  4.     gen Z_share_it = mkt_spend_shr * post
+  5.     save ../temp/foia_decline_full_all, replace
+  6.     apply_attrition
+  7.     save ../temp/foia_decline_full, replace
+  8. 
+.     use ../temp/foia_decline_full_all, clear
+  9.     keep if foia_athr == 1
+ 10.     save ../temp/foia_decline_panel_all, replace
+ 11.     apply_attrition
+ 12.     save ../temp/foia_decline_panel, replace
+ 13. end
+
+. 
+. program apply_attrition
+  1.     if $ATTRITION_CUT <= 0 exit
+  2.     qui gunique athr_id
+  3.     local n0 = r(unique)
+  4.     drop if max_year < $ATTRITION_CUT
+  5.     qui gunique athr_id
+  6.     di as text "attrition gate (max_year >= $ATTRITION_CUT): kept " r(unique) " of `n0' PIs"
+  7. end
+
+. 
+. program attrition_sensitivity
+  1.     foreach c in 0 2020 2021 2022 {
+  2.         use ../temp/foia_decline_panel_all, clear
+  3.         if `c' > 0 drop if max_year < `c'
+  4.         qui gunique athr_id
+  5.         local n = r(unique)
+  6.         cap noi qui ppmlhdfe ppr_cnt Z_it Z_share_it, absorb(athr_id year) vce(cluster athr_id)
+  7.         if _rc {
+  8.             di as error "attrition_sensitivity cut=`c' failed"
+  9.             continue
+ 10.         }
+ 11.         di as text "cut=`c'  N PIs=" %4.0f `n' "  b=" %8.4f _b[Z_it] ///
+>             "  se=" %7.4f _se[Z_it] "  t=" %6.2f _b[Z_it]/_se[Z_it]
+ 12.     }
+ 13. end
+
+. 
+. program estimate_betas
+  1.     mat foia_decline = J(6,2,.)
+  2. 
+.     use ../temp/foia_decline_panel, clear
+  3.     ppmlhdfe ppr_cnt Z_it Z_share_it, absorb(athr_id year) vce(cluster athr_id)
+  4.     scalar b_foia = _b[Z_it]
+  5.     mat foia_decline[1,1] = _b[Z_it]
+  6.     mat foia_decline[2,1] = _se[Z_it]
+  7.     mat foia_decline[3,1] = _b[Z_share_it]
+  8.     mat foia_decline[4,1] = _se[Z_share_it]
+  9.     qui sum ppr_cnt if year < 2014 & e(sample)
+ 10.     mat foia_decline[5,1] = r(mean)
+ 11.     qui gunique athr_id
+ 12.     mat foia_decline[6,1] = r(unique)
+ 13. 
+.     use ../temp/foia_decline_full, clear
+ 14.     ppmlhdfe ppr_cnt Z_it Z_share_it, absorb(athr_id year) vce(cluster athr_id)
+ 15.     scalar b_full = _b[Z_it]
+ 16.     mat foia_decline[1,2] = _b[Z_it]
+ 17.     mat foia_decline[2,2] = _se[Z_it]
+ 18.     mat foia_decline[3,2] = _b[Z_share_it]
+ 19.     mat foia_decline[4,2] = _se[Z_share_it]
+ 20.     qui sum ppr_cnt if year < 2014 & e(sample)
+ 21.     mat foia_decline[5,2] = r(mean)
+ 22.     qui gunique athr_id
+ 23.     mat foia_decline[6,2] = r(unique)
+ 24. 
+.     mat rownames foia_decline = b_exposure se_exposure b_share se_share pre_mean n_pis
+ 25.     mat colnames foia_decline = foia_only full_samp
+ 26.     cap mkdir ../output/tables
+ 27.     qui matrix_to_txt, saving("../output/tables/foia_decline_betas.txt") ///
+>         matrix(foia_decline) title(<tab:foia_decline_betas>) format(%20.6f) replace
+ 28. 
+.     di as text _newline "beta(FOIA-only) = " %7.4f b_foia "   beta(full samp) = " %7.4f b_full
+ 29. end
+
+. 
+. program author_level_decline
+  1.     use ../temp/foia_decline_panel, clear
+  2.     gen _pre  = ppr_cnt if year <  2014
+  3.     gen _post = ppr_cnt if year >= 2014
+  4.     bys athr_id: egen pre_mean  = mean(_pre)
+  5.     bys athr_id: egen post_mean = mean(_post)
+  6. 
+.     qui sum _pre
+  7.     local agg_pre = r(mean)
+  8.     qui sum _post
+  9.     local agg_post = r(mean)
+ 10.     local agg_ratio = `agg_post' / `agg_pre'
+ 11.     di as text "FOIA sample pooled pre mean = " %5.3f `agg_pre' ///
+>         "  post mean = " %5.3f `agg_post' "  ratio = " %5.3f `agg_ratio'
+ 12. 
+.     gen double realized_ratio = post_mean / pre_mean if pre_mean > 0
+ 13.     gen double realized_pct     = 100 * (realized_ratio - 1)
+ 14.     gen double realized_pct_adj = 100 * (realized_ratio / `agg_ratio' - 1)
+ 15.     gen double pred_chg = b_foia * exposure
+ 16.     gen double pred_pct = 100 * (exp(b_foia * exposure) - 1)
+ 17. 
+.     gsort athr_id -athr_name
+ 18.     by athr_id: replace athr_name = athr_name[1]
+ 19.     by athr_id: keep if _n == 1
+ 20.     gisid athr_id
+ 21. 
+.     gen byte declined_raw = realized_pct < 0     if !mi(realized_pct)
+ 22.     gen byte declined_adj = realized_pct_adj < 0 if !mi(realized_pct_adj)
+ 23.     gen byte pred_decline = pred_pct < 0         if !mi(pred_pct)
+ 24. 
+.     keep athr_name inst athr_id age_2014 cluster_30 exposure mkt_spend_shr ///
+>          pre_mean post_mean realized_pct realized_pct_adj ///
+>          pred_chg pred_pct declined_raw declined_adj pred_decline
+ 25.     order athr_name inst athr_id age_2014 cluster_30 exposure mkt_spend_shr ///
+>           pre_mean post_mean realized_pct realized_pct_adj pred_pct ///
+>           declined_raw declined_adj pred_decline
+ 26. 
+.     gsort -exposure
+ 27.     save ../temp/foia_ppr_decline, replace
+ 28.     export delimited using ../output/foia_ppr_decline.csv, replace
+ 29. 
+.     count
+ 30.     di as text _newline "=== FOIA PIs: " r(N)
+ 31.     count if pred_decline == 1
+ 32.     di as text "predicted decline (b x exposure < 0): " r(N)
+ 33.     count if declined_raw == 1
+ 34.     di as text "realized raw decline (post < pre): " r(N)
+ 35.     count if declined_adj == 1
+ 36.     di as text "realized decline vs FOIA-sample trend: " r(N)
+ 37.     tab pred_decline declined_adj, row
+ 38. 
+.     qui corr pred_pct realized_pct_adj
+ 39.     di as text "corr(predicted, realized-adjusted) = " %6.3f r(rho)
+ 40. 
+.     di as text _newline "=== 15 largest predicted declines ==="
+ 41.     gsort pred_pct
+ 42.     list athr_name inst exposure pred_pct realized_pct realized_pct_adj in 1/15, ///
+>         noobs abbrev(22) sep(0)
+ 43. 
+.     di as text _newline "=== 15 largest realized declines (trend-adjusted) ==="
+ 44.     gsort realized_pct_adj
+ 45.     list athr_name inst exposure pred_pct realized_pct realized_pct_adj in 1/15, ///
+>         noobs abbrev(22) sep(0)
+ 46. end
+
+. 
+. program decline_scatter
+  1.     cap mkdir ../output/figures/all_jrnls
+  2.     use ../temp/foia_ppr_decline, clear
+  3.     local bstr : di %6.3f b_foia
+  4.     twoway (scatter realized_pct_adj exposure, mcolor(ebblue%60) msymbol(O)) ///
+>            (function 100*(exp(b_foia*x)-1), range(exposure) lcolor(dkorange) lwidth(medthick)), ///
+>         xtitle("Observed exposure") ///
+>         ytitle("Realized {&Delta} papers vs FOIA trend (%)") ///
+>         legend(order(1 "FOIA PI" 2 "PPML fit") pos(6) rows(1)) ///
+>         note("{&beta} = `bstr' (FOIA-only PPML, author + year FE)", size(small) pos(7) ring(1) justification(left))
+  5.     graph export ../output/figures/all_jrnls/foia_decline_scatter.pdf, replace
+  6. end
+
+. 
+. main
+(file ../temp/foia_decline_full_all.dta not found)
+file ../temp/foia_decline_full_all.dta saved
+(26,680 observations deleted)
+attrition gate (max_year >= 2020): kept 10847 of 13515 PIs
+file ../temp/foia_decline_full.dta saved
+(134,330 observations deleted)
+(file ../temp/foia_decline_panel_all.dta not found)
+file ../temp/foia_decline_panel_all.dta saved
+(140 observations deleted)
+attrition gate (max_year >= 2020): kept 68 of 82 PIs
+file ../temp/foia_decline_panel.dta saved
+cut=0  N PIs=  82  b=  4.1277  se= 1.6742  t=  2.47
+(140 observations deleted)
+cut=2020  N PIs=  68  b=  2.6135  se= 1.9600  t=  1.33
+(170 observations deleted)
+cut=2021  N PIs=  65  b=  2.5228  se= 1.9699  t=  1.28
+(200 observations deleted)
+cut=2022  N PIs=  62  b=  3.3282  se= 2.1479  t=  1.55
+Iteration 1:   deviance = 6.3047e+02  eps = .         iters = 3    tol = 1.0e-04  min(eta) =  -0.76  P   
+Iteration 2:   deviance = 6.2081e+02  eps = 1.56e-02  iters = 2    tol = 1.0e-04  min(eta) =  -0.89      
+Iteration 3:   deviance = 6.2078e+02  eps = 5.20e-05  iters = 2    tol = 1.0e-04  min(eta) =  -0.90      
+Iteration 4:   deviance = 6.2078e+02  eps = 1.21e-09  iters = 2    tol = 1.0e-05  min(eta) =  -0.90      
+Iteration 5:   deviance = 6.2078e+02  eps = 0.00e+00  iters = 2    tol = 1.0e-06  min(eta) =  -0.90   S  
+Iteration 6:   deviance = 6.2078e+02  eps = 0.00e+00  iters = 1    tol = 1.0e-09  min(eta) =  -0.90   S O
+------------------------------------------------------------------------------------------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
+Converged in 6 iterations and 12 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =        680
+Absorbing 2 HDFE groups                           Residual df     =         67
+Statistics robust to heteroskedasticity           Wald chi2(2)    =       8.70
+Deviance             =  620.7782704               Prob > chi2     =     0.0129
+Log pseudolikelihood = -976.6177301               Pseudo R2       =     0.1095
+
+Number of clusters (athr_id)=         68
+                               (Std. err. adjusted for 68 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+        Z_it |   2.613504   1.960048     1.33   0.182    -1.228119    6.455127
+  Z_share_it |  -.9586703   .3865007    -2.48   0.013    -1.716198   -.2011427
+       _cons |   .6565357   .0564178    11.64   0.000     .5459589    .7671125
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |        68          68           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+Iteration 1:   deviance = 1.1967e+05  eps = .         iters = 4    tol = 1.0e-04  min(eta) =  -1.42  P   
+Iteration 2:   deviance = 1.1655e+05  eps = 2.67e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.76      
+Iteration 3:   deviance = 1.1652e+05  eps = 2.30e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.83      
+Iteration 4:   deviance = 1.1652e+05  eps = 2.09e-07  iters = 2    tol = 1.0e-04  min(eta) =  -1.84      
+Iteration 5:   deviance = 1.1652e+05  eps = 7.20e-12  iters = 1    tol = 1.0e-05  min(eta) =  -1.84   S  
+Iteration 6:   deviance = 1.1652e+05  eps = 0.00e+00  iters = 2    tol = 1.0e-08  min(eta) =  -1.84   S O
+------------------------------------------------------------------------------------------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
+Converged in 6 iterations and 13 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =    108,470
+Absorbing 2 HDFE groups                           Residual df     =     10,846
+Statistics robust to heteroskedasticity           Wald chi2(2)    =       4.31
+Deviance             =  116524.5596               Prob > chi2     =     0.1157
+Log pseudolikelihood = -168223.0555               Pseudo R2       =     0.1903
+
+Number of clusters (athr_id)=     10,847
+                           (Std. err. adjusted for 10,847 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+        Z_it |  -.3647414   .1785671    -2.04   0.041    -.7147265   -.0147562
+  Z_share_it |  -.0077203   .0544147    -0.14   0.887    -.1143711    .0989306
+       _cons |   .8368925   .0079877   104.77   0.000     .8212369    .8525481
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |     10847       10847           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+beta(FOIA-only) =  2.6135   beta(full samp) = -0.3647
+(408 missing values generated)
+(272 missing values generated)
+FOIA sample pooled pre mean = 1.739  post mean = 1.471  ratio = 0.846
+(143 real changes made)
+(612 observations deleted)
+file ../temp/foia_ppr_decline.dta saved
+file ../output/foia_ppr_decline.csv saved
+  68
+
+=== FOIA PIs: 68
+  11
+predicted decline (b x exposure < 0): 11
+  45
+realized raw decline (post < pre): 45
+  39
+realized decline vs FOIA-sample trend: 39
+
++----------------+
+| Key            |
+|----------------|
+|   frequency    |
+| row percentage |
++----------------+
+
+pred_decli |     declined_adj
+        ne |         0          1 |     Total
+-----------+----------------------+----------
+         0 |        25         32 |        57 
+           |     43.86      56.14 |    100.00 
+-----------+----------------------+----------
+         1 |         4          7 |        11 
+           |     36.36      63.64 |    100.00 
+-----------+----------------------+----------
+     Total |        29         39 |        68 
+           |     42.65      57.35 |    100.00 
+corr(predicted, realized-adjusted) =  0.059
+
+=== 15 largest predicted declines ===
+
+  +---------------------------------------------------------------------------------------------------------------------+
+  |            athr_name   inst                                 exposure     pred_pct   realized_pct   realized_pct_adj |
+  |---------------------------------------------------------------------------------------------------------------------|
+  |       Eran Pichersky   University of Michigan–Ann Arbor    -.0525786   -12.839098     -33.333331         -21.166664 |
+  |   Andrzej Wierzbicki   University of Michigan–Ann Arbor    -.0340524   -8.5150922     -33.333331         -21.166664 |
+  |           Sibum Sung   The University of Texas at Austin   -.0268993   -6.7887107     -52.380954         -43.690478 |
+  |         Kyle Summers   East Carolina University            -.0056419   -1.4637056     -33.333331         -21.166664 |
+  |     Michael Q. Zhang   The University of Texas at Dallas   -.0044735   -1.1623306            -40             -29.05 |
+  |  Christiane E. Wobus   University of Michigan–Ann Arbor    -.0027001   -.70317563      11.111111          31.388889 |
+  |   Johann K. Eberhart   The University of Texas at Austin     -.00192   -.50053902              0              18.25 |
+  |  Christopher D. Rock   Texas Tech University                -.001818   -.47399932     -46.666665         -36.933331 |
+  |  James Douglas Engel   University of Michigan–Ann Arbor    -.0012035   -.31405319            100              136.5 |
+  | Christin CarterâSu   University of Michigan–Ann Arbor    -.0011697    -.3052263     -66.666667         -60.583333 |
+  |      Sally A. Camper   University of Michigan–Ann Arbor    -.0007949   -.20754307       46.66667          73.433337 |
+  |     Henry I. Mosberg   University of Michigan–Ann Arbor     .0006102    .15961416     -23.809522         -9.9047592 |
+  |     Robert J. Denver   University of Michigan–Ann Arbor     .0006601    .17265634             50             77.375 |
+  |         Cunming Duan   University of Michigan–Ann Arbor     .0007089    .18545054     -57.142857         -49.321429 |
+  |      Leslie S. Satin   University of Michigan–Ann Arbor     .0008361    .21876175     -88.888889         -86.861111 |
+  +---------------------------------------------------------------------------------------------------------------------+
+
+=== 15 largest realized declines (trend-adjusted) ===
+
+  +---------------------------------------------------------------------------------------------------------------------+
+  |            athr_name   inst                                 exposure     pred_pct   realized_pct   realized_pct_adj |
+  |---------------------------------------------------------------------------------------------------------------------|
+  |      Leslie S. Satin   University of Michigan–Ann Arbor     .0008361    .21876175     -88.888889         -86.861111 |
+  |               Qun Lu   East Carolina University             .1555192    50.147817     -77.777777         -73.722221 |
+  | Michael J. Imperiale   University of Michigan–Ann Arbor     .0153431    4.0914095            -75           -70.4375 |
+  |      Joel A. Swanson   University of Michigan–Ann Arbor     .0082102    2.1689125     -66.666667         -60.583333 |
+  | Christin CarterâSu   University of Michigan–Ann Arbor    -.0011697    -.3052263     -66.666667         -60.583333 |
+  |      Tom K. Kerppola   University of Michigan–Ann Arbor     .1045945    31.437076     -62.962964         -56.203705 |
+  |    Daniel E. Michele   University of Michigan–Ann Arbor     .0447953    12.420116            -60              -52.7 |
+  |         Yoichi Osawa   University of Michigan–Ann Arbor     .0532491    14.931585            -60              -52.7 |
+  |      John R. Traynor   University of Michigan–Ann Arbor     .0130326    3.4647508     -57.575759         -49.833335 |
+  |         Cunming Duan   University of Michigan–Ann Arbor     .0007089    .18545054     -57.142857         -49.321429 |
+  |       Philip D. King   University of Michigan–Ann Arbor     .0217683    5.8540938     -55.555554         -47.444443 |
+  |   CheongâHee Chang   University of Michigan–Ann Arbor     .0414922    11.453812     -55.555554         -47.444443 |
+  |           Sibum Sung   The University of Texas at Austin   -.0268993   -6.7887107     -52.380954         -43.690478 |
+  |      K. Sue OâShea   University of Michigan–Ann Arbor     .0021327    .55893756            -50            -40.875 |
+  | Catherine A. Collins   University of Michigan–Ann Arbor     .0054989     1.447528     -46.666665         -36.933331 |
+  +---------------------------------------------------------------------------------------------------------------------+
+file ../output/figures/all_jrnls/foia_decline_scatter.pdf saved as PDF format
+
+. 
+end of do-file

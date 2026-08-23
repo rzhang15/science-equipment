@@ -919,7 +919,7 @@ program boe
     local q1_hq : di %6.2f r(p25)
     local q3_hq : di %6.2f r(p75)
     local median_hq : di %6.2f r(p50)
-   tw hist hq_labspend if hq_labspend >50,  color(edkblue) frac width(5000) xlab(0(7500)150000, angle(45)) ///
+   tw hist hq_labspend if hq_labspend >50 & hq_labspend <= 75000,  color(edkblue) frac width(5000) xlab(0(7500)75000, angle(45)) ///
        xtitle("High-Confidence Consumables Expenditure ($)") ytitle("Fraction of PI-Years") legend(on order(- "N = `N_hq'" "Mean = `mean_hq'" "SD = `sd_hq'" "Min = `min_hq'" "Q1 = `q1_hq'" "Median = `median_hq'" "Q3 = `q3_hq'" "Max = `max_hq'") pos(1) ring(0) region(fcolor(none)) size(small))
    graph export ../output/figures/hq_labspend.pdf, replace
     collapse (mean) tot_spend nonlab_spend lab_spend hq_labspend lq_labspend perc_lab_spend perc_nonlab_spend, by(athr_id)

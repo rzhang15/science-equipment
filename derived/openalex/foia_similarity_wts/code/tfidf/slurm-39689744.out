@@ -1,0 +1,240 @@
+Universe: 1,860,867
+FOIA anchors: 208
+Treated markets: 46
+W rows with weight: 1,783,003/1,860,867
+W row sums: mean=1.0000, p5=1.0000, p95=1.0000
+
+==============================================================================
+version=hc
+==============================================================================
+FOIA PIs with treated shares: 208/208
+FOIA row sums: mean=0.2693, sd=0.1989
+
+Universe exposure: mean=+0.02399, sd=0.03342
+Mean sum imputed shares: 0.25261
+cluster filter min FOIA=1: 1,613,853/1,860,867
+
+--- Shock balance ---
+  characteristic               beta         se       t       p
+  log_total_spend           +0.0935     0.0336   +2.78   0.005
+  log_lab_spend             +0.0868     0.0305   +2.84   0.004
+  n_cats                    +0.0029     0.0011   +2.61   0.009
+  lab_share                 +0.0571     0.3301   +0.17   0.863
+
+Saved ../../output/final_imputed_shift_share_hc_cf_k3.csv
+Saved ../../output/imputed_shares_matrix_hc_cf_k3.npz
+Saved ../../output/imputed_shares_markets_hc_cf_k3.csv
+
+==============================================================================
+version=all
+==============================================================================
+FOIA PIs with treated shares: 208/208
+FOIA row sums: mean=0.1105, sd=0.1162
+
+Universe exposure: mean=+0.01207, sd=0.01963
+Mean sum imputed shares: 0.10978
+cluster filter min FOIA=1: 1,613,853/1,860,867
+
+--- Shock balance ---
+  characteristic               beta         se       t       p
+  log_total_spend           +0.0433     0.0259   +1.67   0.095
+  log_lab_spend             +0.0434     0.0251   +1.73   0.084
+  n_cats                    +0.0017     0.0011   +1.59   0.113
+  lab_share                 -0.2425     0.3998   -0.61   0.544
+
+Saved ../../output/final_imputed_shift_share_all_cf_k3.csv
+Saved ../../output/imputed_shares_matrix_all_cf_k3.npz
+Saved ../../output/imputed_shares_markets_all_cf_k3.csv
+
+==============================================================================
+version=treated_hc
+==============================================================================
+FOIA PIs with treated shares: 208/208
+FOIA row sums: mean=1.0000, sd=0.0000
+
+Universe exposure: mean=+0.09228, sd=0.08381
+Mean sum imputed shares: 0.95816
+cluster filter min FOIA=1: 1,613,853/1,860,867
+
+--- Shock balance ---
+  characteristic               beta         se       t       p
+  log_total_spend           +0.1659     0.0482   +3.44   0.001
+  log_lab_spend             +0.1586     0.0448   +3.54   0.000
+  n_cats                    +0.0043     0.0014   +3.07   0.002
+  lab_share                 +0.1648     0.5095   +0.32   0.746
+
+Saved ../../output/final_imputed_shift_share_treated_hc_cf_k3.csv
+Saved ../../output/imputed_shares_matrix_treated_hc_cf_k3.npz
+Saved ../../output/imputed_shares_markets_treated_hc_cf_k3.csv
+
+==============================================================================
+SUMMARY
+==============================================================================
+   version eb_prior  eb_own_weight  eb_peer_k  n_foia_with_shares  n_foia_shrunk  foia_raw_exposure_sd  foia_eb_exposure_sd  universe_exposure_sd  mean_sum_imputed_shares  eff_n_shocks  n_universe_after_filters
+        hc     none         1.0000          5                 208              0                0.0496               0.0496                0.0334                   0.2526       19.0640                   1613853
+       all     none         1.0000          5                 208              0                0.0277               0.0277                0.0196                   0.1098       18.0821                   1613853
+treated_hc     none         1.0000          5                 208              0                0.1148               0.1148                0.0838                   0.9582       19.3124                   1613853
+
+Saved ../../output/shift_share_summary_cf_k3.csv
+Done!
+Universe: 1,860,867
+FOIA anchors: 208
+Treated markets: 46
+W rows with weight: 1,783,003/1,860,867
+W row sums: mean=1.0000, p5=1.0000, p95=1.0000
+
+==============================================================================
+version=hc
+==============================================================================
+FOIA PIs with treated shares: 208/208
+FOIA row sums: mean=0.2693, sd=0.1989
+
+Universe exposure: mean=+0.02399, sd=0.03342
+Mean sum imputed shares: 0.25261
+max_sim >= 0.164: 280,319/1,860,867
+cluster filter min FOIA=1: 263,998/280,319
+
+--- Shock balance ---
+  characteristic               beta         se       t       p
+  log_total_spend           +0.0935     0.0336   +2.78   0.005
+  log_lab_spend             +0.0868     0.0305   +2.84   0.004
+  n_cats                    +0.0029     0.0011   +2.61   0.009
+  lab_share                 +0.0571     0.3301   +0.17   0.863
+
+Saved ../../output/final_imputed_shift_share_hc_cf_ms016_k3.csv
+Saved ../../output/imputed_shares_matrix_hc_cf_ms016_k3.npz
+Saved ../../output/imputed_shares_markets_hc_cf_ms016_k3.csv
+
+==============================================================================
+version=all
+==============================================================================
+FOIA PIs with treated shares: 208/208
+FOIA row sums: mean=0.1105, sd=0.1162
+
+Universe exposure: mean=+0.01207, sd=0.01963
+Mean sum imputed shares: 0.10978
+max_sim >= 0.164: 280,319/1,860,867
+cluster filter min FOIA=1: 263,998/280,319
+
+--- Shock balance ---
+  characteristic               beta         se       t       p
+  log_total_spend           +0.0433     0.0259   +1.67   0.095
+  log_lab_spend             +0.0434     0.0251   +1.73   0.084
+  n_cats                    +0.0017     0.0011   +1.59   0.113
+  lab_share                 -0.2425     0.3998   -0.61   0.544
+
+Saved ../../output/final_imputed_shift_share_all_cf_ms016_k3.csv
+Saved ../../output/imputed_shares_matrix_all_cf_ms016_k3.npz
+Saved ../../output/imputed_shares_markets_all_cf_ms016_k3.csv
+
+==============================================================================
+version=treated_hc
+==============================================================================
+FOIA PIs with treated shares: 208/208
+FOIA row sums: mean=1.0000, sd=0.0000
+
+Universe exposure: mean=+0.09228, sd=0.08381
+Mean sum imputed shares: 0.95816
+max_sim >= 0.164: 280,319/1,860,867
+cluster filter min FOIA=1: 263,998/280,319
+
+--- Shock balance ---
+  characteristic               beta         se       t       p
+  log_total_spend           +0.1659     0.0482   +3.44   0.001
+  log_lab_spend             +0.1586     0.0448   +3.54   0.000
+  n_cats                    +0.0043     0.0014   +3.07   0.002
+  lab_share                 +0.1648     0.5095   +0.32   0.746
+
+Saved ../../output/final_imputed_shift_share_treated_hc_cf_ms016_k3.csv
+Saved ../../output/imputed_shares_matrix_treated_hc_cf_ms016_k3.npz
+Saved ../../output/imputed_shares_markets_treated_hc_cf_ms016_k3.csv
+
+==============================================================================
+SUMMARY
+==============================================================================
+   version eb_prior  eb_own_weight  eb_peer_k  n_foia_with_shares  n_foia_shrunk  foia_raw_exposure_sd  foia_eb_exposure_sd  universe_exposure_sd  mean_sum_imputed_shares  eff_n_shocks  n_universe_after_filters
+        hc     none         1.0000          5                 208              0                0.0496               0.0496                0.0334                   0.2526       19.0640                    263998
+       all     none         1.0000          5                 208              0                0.0277               0.0277                0.0196                   0.1098       18.0821                    263998
+treated_hc     none         1.0000          5                 208              0                0.1148               0.1148                0.0838                   0.9582       19.3124                    263998
+
+Saved ../../output/shift_share_summary_cf_ms016_k3.csv
+Done!
+Universe: 1,860,867
+FOIA anchors: 208
+Treated markets: 46
+W rows with weight: 1,783,003/1,860,867
+W row sums: mean=1.0000, p5=1.0000, p95=1.0000
+
+==============================================================================
+version=hc
+==============================================================================
+FOIA PIs with treated shares: 208/208
+FOIA row sums: mean=0.2693, sd=0.1989
+
+Universe exposure: mean=+0.02399, sd=0.03342
+Mean sum imputed shares: 0.25261
+LS filter: 1,420,921/1,860,867
+
+--- Shock balance ---
+  characteristic               beta         se       t       p
+  log_total_spend           +0.0935     0.0336   +2.78   0.005
+  log_lab_spend             +0.0868     0.0305   +2.84   0.004
+  n_cats                    +0.0029     0.0011   +2.61   0.009
+  lab_share                 +0.0571     0.3301   +0.17   0.863
+
+Saved ../../output/final_imputed_shift_share_hc_lsa_k3.csv
+Saved ../../output/imputed_shares_matrix_hc_lsa_k3.npz
+Saved ../../output/imputed_shares_markets_hc_lsa_k3.csv
+
+==============================================================================
+version=all
+==============================================================================
+FOIA PIs with treated shares: 208/208
+FOIA row sums: mean=0.1105, sd=0.1162
+
+Universe exposure: mean=+0.01207, sd=0.01963
+Mean sum imputed shares: 0.10978
+LS filter: 1,420,921/1,860,867
+
+--- Shock balance ---
+  characteristic               beta         se       t       p
+  log_total_spend           +0.0433     0.0259   +1.67   0.095
+  log_lab_spend             +0.0434     0.0251   +1.73   0.084
+  n_cats                    +0.0017     0.0011   +1.59   0.113
+  lab_share                 -0.2425     0.3998   -0.61   0.544
+
+Saved ../../output/final_imputed_shift_share_all_lsa_k3.csv
+Saved ../../output/imputed_shares_matrix_all_lsa_k3.npz
+Saved ../../output/imputed_shares_markets_all_lsa_k3.csv
+
+==============================================================================
+version=treated_hc
+==============================================================================
+FOIA PIs with treated shares: 208/208
+FOIA row sums: mean=1.0000, sd=0.0000
+
+Universe exposure: mean=+0.09228, sd=0.08381
+Mean sum imputed shares: 0.95816
+LS filter: 1,420,921/1,860,867
+
+--- Shock balance ---
+  characteristic               beta         se       t       p
+  log_total_spend           +0.1659     0.0482   +3.44   0.001
+  log_lab_spend             +0.1586     0.0448   +3.54   0.000
+  n_cats                    +0.0043     0.0014   +3.07   0.002
+  lab_share                 +0.1648     0.5095   +0.32   0.746
+
+Saved ../../output/final_imputed_shift_share_treated_hc_lsa_k3.csv
+Saved ../../output/imputed_shares_matrix_treated_hc_lsa_k3.npz
+Saved ../../output/imputed_shares_markets_treated_hc_lsa_k3.csv
+
+==============================================================================
+SUMMARY
+==============================================================================
+   version eb_prior  eb_own_weight  eb_peer_k  n_foia_with_shares  n_foia_shrunk  foia_raw_exposure_sd  foia_eb_exposure_sd  universe_exposure_sd  mean_sum_imputed_shares  eff_n_shocks  n_universe_after_filters
+        hc     none         1.0000          5                 208              0                0.0496               0.0496                0.0334                   0.2526       19.0640                   1420921
+       all     none         1.0000          5                 208              0                0.0277               0.0277                0.0196                   0.1098       18.0821                   1420921
+treated_hc     none         1.0000          5                 208              0                0.1148               0.1148                0.0838                   0.9582       19.3124                   1420921
+
+Saved ../../output/shift_share_summary_lsa_k3.csv
+Done!

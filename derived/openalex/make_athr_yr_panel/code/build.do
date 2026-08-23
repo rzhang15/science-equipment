@@ -359,6 +359,10 @@ program merge_ipeds
     if `first' == 1 local suf = "_first" 
 
     use ../output/athr_panel_full_`time'`suf'_`samp',clear 
+    * Institution-agnostic career date, computed before the IPEDS merge drops
+    * every year spent outside a US R1/R2 (national labs, hospitals, industry,
+    * non-US). In the _last panel this is the first last-author year ever.
+    bys athr_id: egen min_year_ever = min(year)
     merge m:1 inst_id using ../temp/ipeds_inst_id, assert(1 2 3) keep(3) nogen 
     gen public = control == 1
     save ../output/athr_panel_full_`time'`suf'_`samp'_r1_r2, replace
