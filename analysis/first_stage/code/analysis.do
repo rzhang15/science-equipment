@@ -5,7 +5,7 @@ program drop _all
 set scheme modern
 preliminaries
 version 17
-global exhibit_mode paper // paper | presentation
+global exhibit_mode both // paper | presentation | both
 
 program main
    *raw_plots
@@ -1131,6 +1131,8 @@ program manual_event_study
     predict control_trend, xb
     sum control_trend if rel == -1, d
     local base =  r(mean)
+    gen year_fes_raw = year_fes
+    gen trt_coef_raw = trt_coef
     replace year_fes = year_fes - control_trend + `base'
     replace trt_coef = trt_coef - control_trend + `base'
     gen year_fes_ub = year_fes + 1.96*year_fes_se
@@ -1149,11 +1151,9 @@ program manual_event_study
     sum year , d
     local year_min = r(min)
     local year_max = r(max)
-    local legend_lvl legend(on order(- "Treatment Level Avg. in t = -1: `trt_mean'" "Control Level Avg. in t = -1: `ctrl_mean'") pos(7) rows(2) bmargin(zero) size(small))
     local legend_split legend(on order(3 "Treatment" 4 "Control") ring(0) pos(7) size(small) region(fcolor(none)))
-    if "$exhibit_mode" == "paper" {
-        local legend_lvl legend(off)
-    }
+    local modes $exhibit_mode
+    if "$exhibit_mode" == "both" local modes presentation paper
    /* if "`title'" == "" {
         tw rcap ub lb rel if rel != -1 & inrange(rel, `lead', `lag') , lcolor(ebblue%70) msize(vsmall) || ///
         scatter b rel if inrange(rel, `lead', `lag') , mcolor(ebblue) || ///
@@ -1164,6 +1164,13 @@ program manual_event_study
         plotregion(margin(sides))
         graph export "../output/figures/es/`suf'es_`yvar'_`file_suf'.pdf", replace
     }*/
+    foreach mode in `modes' {
+        local figdir ../output/figures
+        local legend_lvl legend(on order(- "Treatment Level Avg. in t = -1: `trt_mean'" "Control Level Avg. in t = -1: `ctrl_mean'") pos(7) rows(2) bmargin(zero) size(small))
+        if "`mode'" == "paper" {
+            local figdir ../output/figures/paper
+            local legend_lvl legend(off)
+        }
         tw rcap ub lb year if rel != -1 & inrange(rel, `lead', `lag') , lcolor(ebblue%70) msize(vsmall) || ///
         scatter b year if inrange(rel, `lead', `lag') , mcolor(ebblue) || ///
         scatteri `ymax' 2013.75 `ymax' 2014.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
@@ -1171,7 +1178,8 @@ program manual_event_study
         ytitle("`name'") ysc(titlegap(-6) outergap(0)) ylab(`ymin'(`ygap')`ymax') yline(0, lcolor(gs10) lpattern(solid)) ///
         `legend_lvl' ///
         title(`title', size(small)) plotregion(margin(sides))
-        graph export "../output/figures/es/`suf'es_`yvar'_`file_suf'.pdf", replace
+        graph export "`figdir'/es/`suf'es_`yvar'_`file_suf'.pdf", replace
+    }
 
         tw rcap trt_coef_ub trt_coef_lb year if rel != -1 & inrange(rel, `lead', `lag') , lcolor(ebblue%70) msize(vsmall) || ///
         rcap year_fes_ub year_fes_lb rel_year_fes if rel != -1 & inrange(rel, `lead', `lag') , lcolor(dkorange%70) lpattern(dash) msize(vsmall) || ///
@@ -1183,6 +1191,29 @@ program manual_event_study
         `legend_split' ///
         title(`title', size(small)) plotregion(margin(sides))
         graph export "../output/figures/es/split_`suf'es_`yvar'_`file_suf'.pdf", replace
+
+        gen trt_coef_raw_ub = trt_coef_raw + 1.96*trt_coef_se
+        gen trt_coef_raw_lb = trt_coef_raw - 1.96*trt_coef_se
+        gen year_fes_raw_ub = year_fes_raw + 1.96*year_fes_se
+        gen year_fes_raw_lb = year_fes_raw - 1.96*year_fes_se
+        sum trt_coef_raw_ub if inrange(rel, `lead', `lag'), d
+        local rymax = r(max)
+        sum year_fes_raw_ub if inrange(rel, `lead', `lag'), d
+        local rymax = round(max(`rymax', r(max)) + `ygap', `ygap')
+        sum trt_coef_raw_lb if inrange(rel, `lead', `lag'), d
+        local rymin = r(min)
+        sum year_fes_raw_lb if inrange(rel, `lead', `lag'), d
+        local rymin = round(min(`rymin', r(min)) - `ygap', `ygap')
+        tw rcap trt_coef_raw_ub trt_coef_raw_lb year if rel != -1 & inrange(rel, `lead', `lag') , lcolor(ebblue%70) msize(vsmall) || ///
+        rcap year_fes_raw_ub year_fes_raw_lb rel_year_fes if rel != -1 & inrange(rel, `lead', `lag') , lcolor(dkorange%70) lpattern(dash) msize(vsmall) || ///
+        scatter trt_coef_raw year if inrange(rel, `lead', `lag') , mcolor(ebblue) || ///
+        scatter year_fes_raw rel_year_fes if inrange(rel, `lead', `lag') , mcolor(dkorange) msymbol(diamond) || ///
+        scatteri `rymax' 2013.75 `rymax' 2014.25 , bcolor(gs12%30) recast(area) base(`rymin') ///
+        xlab(`year_min'(1)`year_max') xtitle("Year") ///
+        ytitle("`name'") ysc(titlegap(-6) outergap(0)) ylab(`rymin'(`ygap')`rymax') yline(0, lcolor(gs10) lpattern(solid)) ///
+        `legend_split' ///
+        title(`title', size(small)) plotregion(margin(sides))
+        graph export "../output/figures/es/split_nodetrend_`suf'es_`yvar'_`file_suf'.pdf", replace
     restore
 end
 **

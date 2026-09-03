@@ -19,25 +19,19 @@ version 17
 *                    (all_jrnls, r1_r2, public=0 only; outputs under all_jrnls_hisimN)
 * FIG_MODES        : pres = event studies with stats legend (slides);
 *                    paper = legend-free copies under figures/<samp>/paper/
-* DROP_SOLO        : 1 = solo-authored papers are excluded everywhere they can
-*                    be, from the paper counts (ppr_cnt, ppr_cnt_any,
-*                    n_last_ppr) and from both age measures (min_year,
-*                    min_year_any), which then flows into the pre-period trims
-*                    and every downstream sample. cite_affl_wt, affl_wt and
-*                    avg_team_size_*/avg_num_coathrs/avg_position are panel
-*                    aggregates with no solo component to subtract and still
-*                    include solo papers --
-*                    de-soloing those needs a paper-level rebuild in
-*                    derived/openalex/make_athr_yr_panel. Writes to the same
-*                    filenames as the baseline: flip back and rerun to restore.
+* NO_SOLO          : 1 = read the athr_panel_full_year[_last]_no_solo_* panels
+*                    (paper-level solo drop in make_athr_yr_panel, nosolo(1)),
+*                    so every outcome and age measure is solo-free. Writes to
+*                    the same filenames as the baseline: flip back and rerun
+*                    to restore.
 global EXPOSURE_VERSION "hc"
 global EXPOSURE_FILTER  "_cf_k3"
 global FE_MODE "author"
 global WEIGHT_MSIM 0
 global QUICK_TOPJRNL 0
-global HISIM_PCT 0 
-global FIG_MODES "pres paper"
-global DROP_SOLO 0
+global HISIM_PCT 0
+global FIG_MODES "paper"
+global NO_SOLO 0
 
 program main
     gather_external_data
@@ -208,36 +202,34 @@ program restrict_samp
     if (`r1_only' == 1 & `public' == 0) local input_suf "_r1_r2"
     if (`r1_only' == 1 & `public' == 1) local input_suf "_r1_r2_public"
     if (`no_clin' == 1) local input_suf "_no_clin`input_suf'"
+    // build.do puts the no_solo tag before samp: athr_panel_full_year[_last]_no_solo_<samp>
+    local ns ""
+    if ($NO_SOLO == 1) local ns "_no_solo"
 
     preserve
         cap use athr_id year ppr_cnt cite_affl_wt affl_wt ///
                 avg_position avg_position_rat ///
                 n_first_ppr n_middle_ppr n_last_ppr n_solo_ppr ///
                 avg_team_size_last avg_team_size_notlast ///
-                using ../external/samp/athr_panel_full_year_`samp'`input_suf', clear
+                using ../external/samp/athr_panel_full_year`ns'_`samp'`input_suf', clear
         local _pos_rc = _rc
         if `_pos_rc' {
             di as text "restrict_samp `samp'`suf': position vars not in panel yet — falling back to base _any outcomes. Rerun make_athr_yr_panel/code/build.do to enable them."
             use athr_id year ppr_cnt cite_affl_wt affl_wt ///
-                using ../external/samp/athr_panel_full_year_`samp'`input_suf', clear
+                using ../external/samp/athr_panel_full_year`ns'_`samp'`input_suf', clear
         }
         global POSITION_OUTCOMES_AVAIL = cond(`_pos_rc' == 0, 1, 0)
         rename (ppr_cnt cite_affl_wt affl_wt) (ppr_cnt_any cite_affl_wt_any affl_wt_any)
-        save ../temp/athr_any_`samp'`input_suf', replace
+        save ../temp/athr_any_`samp'`ns'`input_suf', replace
 
         // Use all-position min_year for age_2014 — last-only would count a PI as spuriously young
-        if $DROP_SOLO == 1 {
-            gen _any_ns_yr = year if (ppr_cnt_any - n_solo_ppr) > 0 & !mi(ppr_cnt_any) & !mi(n_solo_ppr)
-            bys athr_id: egen min_year_any = min(_any_ns_yr)
-            drop _any_ns_yr
-        }
-        else bys athr_id: egen min_year_any = min(year)
+        bys athr_id: egen min_year_any = min(year)
         keep athr_id min_year_any
         duplicates drop
-        save ../temp/athr_min_year_any_`samp'`input_suf', replace
+        save ../temp/athr_min_year_any_`samp'`ns'`input_suf', replace
     restore
 
-    use ../external/samp/athr_panel_full_year_last_`samp'`input_suf',clear
+    use ../external/samp/athr_panel_full_year_last`ns'_`samp'`input_suf',clear
     if `r1_only' == 1 {
         keep if type == "r1"
         di as text "restrict_samp `samp'`suf' (r1_only=1): kept N=" _N " R1-only rows"
@@ -252,12 +244,7 @@ program restrict_samp
     if !_rc {
         gen _nonsolo_yr = year if avg_team_size > 0.001 & !mi(avg_team_size)
         bys athr_id: egen min_year_nonsolo = min(_nonsolo_yr)
-        bys athr_id: egen _max_year_nonsolo = max(_nonsolo_yr)
-        if $DROP_SOLO == 1 {
-            replace min_year = min_year_nonsolo
-            replace max_year = _max_year_nonsolo
-        }
-        drop _nonsolo_yr _max_year_nonsolo
+        drop _nonsolo_yr
         preserve
             bys athr_id: keep if _n == 1
             qui count if mi(min_year_nonsolo)
@@ -280,7 +267,7 @@ program restrict_samp
     merge m:1 athr_id using ../temp/observed_exposure, keep(1 3) nogen
     keep if !mi(imputed) | !mi(exposure)
     merge m:1 athr_id using ../temp/athr_cluster30, keep(1 3) nogen
-    merge m:1 athr_id using ../temp/athr_min_year_any_`samp'`input_suf', keep(1 3) nogen
+    merge m:1 athr_id using ../temp/athr_min_year_any_`samp'`ns'`input_suf', keep(1 3) nogen
     replace min_year_any = min_year if mi(min_year_any)
     gen foia_athr = 1 if !mi(exposure)
     // Real FOIA PIs anchor themselves (max_sim=1); unmatched (rare) get 0 so they drop from pw regs
@@ -328,10 +315,7 @@ program restrict_samp
     bys athr_id: gen tot_yrs = _N
     bys athr_id inst_id: gen plc_cntr = _n == 1
     bys athr_id : egen num_place = total(plc_cntr)
-    * [F5] spelled out (was `num_yrs', which relied on abbreviation)
     drop if num_yrs_pre <=2 
-   * drop if num_yrs_post < 2
-*    drop if tot_yrs <= 4
     keep if num_place==1
     gegen athr = group(athr_id)
     preserve
@@ -349,7 +333,7 @@ program restrict_samp
                  avg_team_size_last avg_team_size_notlast {
         cap drop `v'
     }
-    merge 1:1 athr_id year using ../temp/athr_any_`samp'`input_suf', keep(1 3) nogen
+    merge 1:1 athr_id year using ../temp/athr_any_`samp'`ns'`input_suf', keep(1 3) nogen
     foreach var in ppr_cnt cite_affl_wt affl_wt ppr_cnt_any cite_affl_wt_any affl_wt_any {
         replace `var' = 0 if mi(`var')
     }
@@ -373,17 +357,6 @@ program restrict_samp
         local solo_shr = 100*(1 - `ns_tot'/r(sum))
         di as text "restrict_samp `samp'`suf': ppr_cnt_nonsolo built; solo papers are " ///
             %5.2f `solo_shr' "% of last-author papers."
-        if $DROP_SOLO == 1 {
-            replace ppr_cnt     = ppr_cnt_nonsolo
-            replace n_last_ppr  = ppr_cnt_nonsolo
-            replace ppr_cnt_any = ppr_cnt_any - n_solo_ppr
-            di as text "restrict_samp `samp'`suf': DROP_SOLO=1 -- ppr_cnt, ppr_cnt_any, n_last_ppr" ///
-                " and both age measures exclude solo papers. cite_affl_wt, affl_wt and" ///
-                " avg_team_size_* still include them (no solo component in the panel)."
-        }
-    }
-    else if $DROP_SOLO == 1 {
-        di as error "restrict_samp `samp'`suf': DROP_SOLO=1 but n_solo_ppr is not in the panel -- NOTHING was dropped."
     }
     gen pre_ppr_cnt = ppr_cnt if year < 2014
     bys athr_id: egen pre_ppr_cnt_sum = sum(pre_ppr_cnt)
@@ -508,7 +481,6 @@ program event_study
     qui sum rel, d
     local abs_lag  = abs(r(max))
     local abs_lead = abs(r(min))
-    * [F12] Only the observed window is generated; unused time dummies removed.
     forval i = 1/`abs_lead' {
         gen int_lead`i'  = exposure      if rel == -`i'
         gen mshr_lead`i' = mkt_spend_shr if rel == -`i'
@@ -713,12 +685,10 @@ program event_study
                 local tgap 0
             }
             gen ub = b + 1.96*se
-            sum ub, d
-            local ymax = round(r(max), `pgap')
             gen lb = b - 1.96*se
-            sum lb, d
-            local ymin = round(r(min), `pgap')
-            if `ymin' > 0 local ymin = 0
+            local ymax = 1.5
+            local ymin = -3
+            local pgap 0.3
             gen rel = -`abs_lead' if _n == 1
             replace rel = rel[_n-1]+1 if _n > 1
             replace rel = rel + 1 if rel >= -1
@@ -1245,9 +1215,6 @@ program ppml_specs
                 if "$WEIGHT_MSIM" == "1" replace _fwlw = _mu_b * max_sim
                 cap noi qui reghdfe _z_work [pw=_fwlw], absorb(`fes') residuals(_y_r)
                 if _rc == 0 cap noi qui reghdfe Z_it [pw=_fwlw], absorb(`fes') residuals(_Z_r)
-                * [F10]+flow: failure skips only THIS plot, not the rest of
-                * the yvar iteration (was `continue', which also skipped the
-                * mshrctrl binscatter below)
                 if _rc {
                     di as error "ppml FWL `yvar' failed; skipping plot."
                 }
@@ -1657,7 +1624,6 @@ end
 
 program trim_top
     // Composition check: drop top {1,5,10,25}% of PIs by pre_ppr_cnt_sum, re-estimate.
-    // [F3] trim=0 (full sample) is estimated here too, with the SAME
     // with-share spec, so the sensitivity figures have a comparable baseline.
     syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0) no_clin(int 0)]
     local fes athr_id year
@@ -2065,10 +2031,6 @@ program robustness
             foreach est of local ests {
             local esuf ""
             if "`est'" == "ppmlhdfe" local esuf "_ppml"
-
-            * [F4] int_lead1 is OMITTED as the reference (was included with
-            * post-hoc re-centering, which made every plotted SE wrong for
-            * the b_j - b_lead1 contrast).
             cap noi `est' `yvar' `int_leads' `int_lags' `mshr_leads' `mshr_lags' `addctrl', ///
                     absorb(`fes') vce(cluster `vce_cl')
             local rc = _rc
@@ -2157,7 +2119,6 @@ program output_tables
                    `position_outcomes'
     if "$QUICK_TOPJRNL" == "1" local outcomes ppr_cnt ln_ppr_cnt
     // main() clears matrices between wmodes, so cap confirm silently skips missing ones
-    // [F13] trim0 added (full-sample baseline written by trim_top)
     foreach prog in pdid ppml_pdid nih_ppml foia_ppml placebo2011 placebo2012 trim0 trim1 trim5 trim10 trim25 {
         foreach yvar of local outcomes {
             cap confirm matrix `prog'_`yvar'
@@ -2191,8 +2152,6 @@ program write_rf_main_tex
     local se_base= ppml_pdid_ppr_cnt[2,1]
     local n_base = ppml_pdid_ppr_cnt[6,1]
 
-    * [F9] guard BOTH columns — a missing estimate would otherwise print "."
-    * with *** stars (missing compares as +infinity in cond()).
     if mi(`b_base') | mi(`se_base') | mi(`b_ms') | mi(`se_ms') {
         di as text "write_rf_main_tex: base or with-share PPML missing for ppr_cnt; skipping."
         exit 0

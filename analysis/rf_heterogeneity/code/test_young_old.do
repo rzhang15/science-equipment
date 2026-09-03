@@ -18,7 +18,7 @@ log using test_young_old.log, replace
 local fes athr_id year
 local vce_cl athr_id
 
-foreach suf in _r1_r2 _r1_r2_public {
+foreach suf in _r1_r2 {
     cap confirm file "../temp/es_all_jrnls`suf'.dta"
     if _rc {
         di as error "../temp/es_all_jrnls`suf'.dta missing -- run analysis.do first."
@@ -34,6 +34,14 @@ foreach suf in _r1_r2 _r1_r2_public {
     gcollapse (min) min_year_nonsolo = _nonsolo_yr, by(athr_id)
     save ../temp/min_year_nonsolo`suf', replace
 
+    * Career clock excluding solo papers: first year with a non-solo paper in
+    * any author position.
+    use athr_id year ppr_cnt n_solo_ppr using ///
+        ../external/samp/athr_panel_full_year_all_jrnls`suf', clear
+    gen _ns_any_yr = year if ppr_cnt - n_solo_ppr > 0.001
+    gcollapse (min) min_year_any_ns = _ns_any_yr, by(athr_id)
+    save ../temp/min_year_any_ns`suf', replace
+
     * Last-author papers excluding solo ones. n_solo_ppr is genuine in the
     * all-position panel (num_athrs is real there), where n_last_ppr is the
     * same count as ppr_cnt in the analysis panel.
@@ -47,6 +55,7 @@ foreach suf in _r1_r2 _r1_r2_public {
         min_year min_year_any young old young_nih old_nih ///
         using ../temp/es_all_jrnls`suf', clear
     merge m:1 athr_id using ../temp/min_year_nonsolo`suf', keep(1 3) nogen
+    merge m:1 athr_id using ../temp/min_year_any_ns`suf', keep(1 3) nogen
     merge 1:1 athr_id year using ../temp/nonsolo_ppr`suf', keep(1 3) nogen
     foreach v in n_last_ppr ppr_cnt_nonsolo {
         replace `v' = 0 if mi(`v')
@@ -70,7 +79,7 @@ foreach suf in _r1_r2 _r1_r2_public {
     qui count if athr_indicator == 1
     di as result _n "== all_jrnls`suf': min_year_nonsolo median = `nsmed'; `n_allsolo' of " ///
         r(N) " PIs have no non-solo last-author paper =="
-    tabstat min_year min_year_nonsolo min_year_any if athr_indicator == 1, ///
+    tabstat min_year min_year_nonsolo min_year_any min_year_any_ns if athr_indicator == 1, ///
         stats(n mean p10 p25 p50 p75 p90) col(stat) format(%9.1f)
     gen byte young_ns = min_year_nonsolo >  `nsmed' if !mi(min_year_nonsolo)
     gen byte old_ns   = min_year_nonsolo <= `nsmed' if !mi(min_year_nonsolo)
@@ -85,82 +94,45 @@ foreach suf in _r1_r2 _r1_r2_public {
     qui count if athr_indicator == 1 & young != young_any & !mi(young) & !mi(young_any)
     di as text "  PIs that switch side under the first-pub-ever definition: " r(N)
 
-    * True first-publication year from the full world corpus, so PIs whose early
-    * career predates this corpus are not counted as young. Built by
-    * derived/openalex/make_athr_yr_panel/code/diag_first_pub_world.do (hand-run;
-    * lives in that project's temp/, so it disappears on the next make there).
-    cap confirm file "../external/world/diag_first_any_world.dta"
-    if !_rc {
-        merge m:1 athr_id using ../external/world/diag_first_any_world, keep(1 3) nogen
-        gen career_age_w = 2014 - first_any_world
-        qui sum first_any_world if athr_indicator == 1, d
-        local wmed = r(p50)
-        gen byte young_w = first_any_world >  `wmed' if !mi(first_any_world)
-        gen byte old_w   = first_any_world <= `wmed' if !mi(first_any_world)
-        gen trunc_yrs = min_year_any - first_any_world
-        qui count if athr_indicator == 1 & trunc_yrs > 0 & !mi(trunc_yrs)
-        di as text "  PIs with truncated career start (trunc_yrs > 0): " r(N)
-        qui count if athr_indicator == 1 & young_any != young_w & !mi(young_any) & !mi(young_w)
-        di as text "  PIs that switch side once career truncation is fixed: " r(N)
-    }
-    else di as error "  ../external/world/diag_first_any_world.dta missing -- young_w/old_w SKIPPED. Rerun diag_first_pub_world.do."
-
-    * Same correction on the lab-start side: first_last_world is the first
-    * last-author paper anywhere, so it recovers PIs whose early independent
-    * work sits outside this corpus.
-    cap confirm file "../external/world/diag_first_last_world.dta"
-    if !_rc {
-        merge m:1 athr_id using ../external/world/diag_first_last_world, keep(1 3) nogen
-        gen lab_age_w = 2014 - first_last_world
-        qui sum first_last_world if athr_indicator == 1, d
-        local wlmed = r(p50)
-        gen byte young_wl = first_last_world >  `wlmed' if !mi(first_last_world)
-        gen byte old_wl   = first_last_world <= `wlmed' if !mi(first_last_world)
-        gen trunc_lab = min_year - first_last_world
-        qui count if athr_indicator == 1 & trunc_lab > 0 & !mi(trunc_lab)
-        di as text "  PIs whose lab start is recorded too late (trunc_lab > 0): " r(N)
-        qui count if athr_indicator == 1 & young != young_wl & !mi(young) & !mi(young_wl)
-        di as text "  PIs that switch side once lab truncation is fixed: " r(N)
-    }
-    else di as error "  ../external/world/diag_first_last_world.dta missing -- young_wl/old_wl SKIPPED."
-
-    * Lab-age split on PIs whose panel dates both match the world corpus exactly:
-    * no institution-move artifact, no coverage gap, no merged author id. The
-    * subsample where min_year is a credible lab-start date.
-    cap confirm variable first_last_world
-    if !_rc {
-        gen byte clean_dates = (min_year == first_last_world) & (min_year_any == first_any_world) ///
-            if !mi(first_last_world) & !mi(first_any_world)
-        qui count if athr_indicator == 1 & clean_dates == 1
-        di as text "  PIs with both dates verified against the world corpus: " r(N)
-        qui sum min_year if athr_indicator == 1 & clean_dates == 1, d
-        local cmed = r(p50)
-        gen byte young_c = min_year >  `cmed' if !mi(min_year) & clean_dates == 1
-        gen byte old_c   = min_year <= `cmed' if !mi(min_year) & clean_dates == 1
-    }
+    qui sum min_year_any_ns if athr_indicator == 1, d
+    local anynsmed = r(p50)
+    di as text "  min_year_any_ns (first non-solo pub, any position) median = `anynsmed'"
+    gen byte young_anyns = min_year_any_ns >  `anynsmed' if !mi(min_year_any_ns)
+    gen byte old_anyns   = min_year_any_ns <= `anynsmed' if !mi(min_year_any_ns)
+    qui count if athr_indicator == 1 & young_any != young_anyns & !mi(young_any) & !mi(young_anyns)
+    di as text "  PIs that switch side once solo papers are dropped from the career clock: " r(N)
 
     gen lab_age     = 2014 - min_year
     gen lab_age_ns  = 2014 - min_year_nonsolo
     gen career_age  = 2014 - min_year_any
 
-    * Apprenticeship gap. gap <= 0 means the PI's first indexed paper was already
-    * last-authored, so min_year cannot be measuring independence for them.
+    * Lab-age split dropping PIs whose first indexed paper was already
+    * last-authored (gap <= 0), for whom min_year cannot measure independence.
     gen gap = min_year - min_year_any
     qui count if athr_indicator == 1 & gap <= 0
     local n_nogap = r(N)
     qui count if athr_indicator == 1
-    di as text "  PIs with gap <= 0 (lab age undefined in practice): `n_nogap' of " r(N)
+    di as text "  PIs with gap <= 0 (first paper is last-authored): `n_nogap' of " r(N)
     qui sum min_year if athr_indicator == 1 & gap >= 1, d
     local gapmed = r(p50)
     gen byte young_g = min_year >  `gapmed' if !mi(min_year) & gap >= 1 & !mi(gap)
     gen byte old_g   = min_year <= `gapmed' if !mi(min_year) & gap >= 1 & !mi(gap)
+
+    * Young on both the lab-age and career-age clocks vs old on both; PIs the
+    * two clocks disagree on are missing and drop out of the fit.
+    gen byte young_both = young == 1 & young_any == 1 ///
+        if young == young_any & !mi(young) & !mi(young_any)
+    gen byte old_both   = young == 0 & young_any == 0 ///
+        if young == young_any & !mi(young) & !mi(young_any)
 
     gen post       = year >= 2014
     gen Z_it       = exposure      * post
     gen Z_share_it = mkt_spend_shr * post
 
     * ---- (1)/(3a) median splits
-    local pairs `" "young old" "young_ns old_ns" "young_any old_any" "young_w old_w" "young_wl old_wl" "young_c old_c" "young_g old_g" "young_nih old_nih" "'
+    cap matrix drop SPLITS
+    local split_rows
+    local pairs `" "young old" "young_ns old_ns" "young_g old_g" "young_any old_any" "young_anyns old_anyns" "young_both old_both" "young_nih old_nih" "'
     foreach pair of local pairs {
         local g1 : word 1 of `pair'
         local g2 : word 2 of `pair'
@@ -171,7 +143,7 @@ foreach suf in _r1_r2 _r1_r2_public {
             di as text "  `g1'/`g2' not built -- skipping pair."
             continue
         }
-        foreach yvar in ppr_cnt ppr_cnt_nonsolo cite_affl_wt {
+        foreach yvar in ppr_cnt {
             cap drop Z_`g1' Z_`g2' S_`g1' S_`g2' PT_`g1'
             gen Z_`g1' = Z_it       * `g1'
             gen Z_`g2' = Z_it       * `g2'
@@ -207,17 +179,21 @@ foreach suf in _r1_r2 _r1_r2_public {
             di as text "  diff, joint VCE:  b=" %8.4f `b_diff' " se=" %7.4f `se_diff' ///
                 " t=" %6.3f `t_diff' " p=" %6.4f `p_diff' " (one-sided " %6.4f `p_one' ")"
             di as text "  diff, indep. SEs: se=" %7.4f `se_ind' " p=" %6.4f `p_ind'
+
+            matrix SPLITS = nullmat(SPLITS) \ ///
+                (`b1', `se1', `b2', `se2', `b_diff', `se_diff', `p_diff', `p_one', `Nfit')
+            local split_rows `split_rows' `g1'
         }
     }
 
     * ---- (2)/(3b) continuous age gradient: one coefficient, all PIs
-    foreach agevar in lab_age lab_age_ns career_age career_age_w lab_age_w {
+    foreach agevar in lab_age lab_age_ns career_age {
         cap confirm variable `agevar'
         if _rc {
             di as text "  `agevar' not built -- skipping gradient."
             continue
         }
-        foreach yvar in ppr_cnt ppr_cnt_nonsolo cite_affl_wt {
+        foreach yvar in ppr_cnt {
             cap drop age_c Z_age S_age PT_age
             qui sum `agevar' if athr_indicator == 1, d
             local age_mean = r(mean)
@@ -262,7 +238,7 @@ foreach suf in _r1_r2 _r1_r2_public {
         qui count if athr_indicator == 1 & `c' == 1
         di as text "  cell `c': " r(N) " PIs"
     }
-    foreach yvar in ppr_cnt cite_affl_wt {
+    foreach yvar in ppr_cnt {
         foreach c in yc_yl oc_ol oc_yl yc_ol {
             cap drop Z_`c' S_`c' PT_`c'
             gen Z_`c'  = Z_it       * `c'
@@ -300,7 +276,7 @@ foreach suf in _r1_r2 _r1_r2_public {
     }
 
     * ---- (4) horse race: both age measures in one fit
-    foreach yvar in ppr_cnt ppr_cnt_nonsolo cite_affl_wt {
+    foreach yvar in ppr_cnt {
         cap drop lab_c car_c Z_lab Z_car S_lab S_car PT_lab PT_car
         qui sum lab_age if athr_indicator == 1, d
         local lab_mean = r(mean)
@@ -348,6 +324,13 @@ foreach suf in _r1_r2 _r1_r2_public {
         di as text "  career age holding gap fixed: b=" %8.4f `b_cg' " (se=" %7.4f `se_cg' ") p=" %6.4f `p_cg'
         local b_gap = -`b_lab'
         di as text "  apprenticeship gap (per decade): b=" %8.4f `b_gap' " (se=" %7.4f `se_lab' ") p=" %6.4f `p_lab'
+    }
+
+    if "`split_rows'" != "" {
+        matrix colnames SPLITS = b_young se_young b_old se_old b_diff se_diff p_diff p_1sided N
+        matrix rownames SPLITS = `split_rows'
+        di as result _n "== all_jrnls`suf' ppr_cnt: young - old summary across age splits =="
+        matlist SPLITS, format(%9.4f) lines(oneline)
     }
 }
 

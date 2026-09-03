@@ -3,9 +3,27 @@ acetonitrile,1,US shock: Hurricane Ike (2008) hit Texas Gulf ACN production; glo
 avidin products,1,horizontal overlap pre-merger: Pierce biotin-avidin franchise + Molecular Probes streptavidin-fluor conjugates
 bacterial selection antibiotics - rifampicin,1,
 bottle top filters,1,US M&A in window: Pall Corp -> Danaher (closed Aug 2015) reshuffled US lab filtration market
+bovine serum albumin,1,
 capillary blood collection tubes,1,
+capped mrna synthesis kits,1,
 catalase,1,
 cell culture antibiotics - blasticidin,1,
+cell culture dissociation reagents,1,
+cell culture nutritional supplements - amino acids,1,
+cell culture nutritional supplements - b27,1,
+cell culture nutritional supplements - casamino acids,1,
+cell culture nutritional supplements - glucose,1,
+cell culture nutritional supplements - insulin,1,
+cell culture nutritional supplements - its-g,1,
+cell culture nutritional supplements - l-glutamine,1,
+cell culture nutritional supplements - lif,1,
+cell culture nutritional supplements - other,1,
+cell culture nutritional supplements - peptone,1,
+cell culture nutritional supplements - sodium pyruvate,1,
+cell culture nutritional supplements - sugars,1,
+cell culture nutritional supplements - tryptone,1,
+cell culture nutritional supplements - vitamins,1,
+cell culture nutritional supplements - yeast,1,
 cell lysis detergents - np-40 (igepal ca-630),1,
 centrifugal ultrafiltration devices,1,US M&A in window: Pall Corp -> Danaher (closed Aug 2015) reshuffled US lab filtration market
 centrifugation media,1,
@@ -14,6 +32,7 @@ collagenase,1,
 crystallizing dishes,1,
 cylindrical carboys,1,
 dextrose,1,
+direct pcr lysis reagents,1,
 dna-salmon sperm,1,
 drug - anticoagulant,1,
 egta solution,1,
@@ -21,15 +40,25 @@ ethanol,1,US commodity shock: 2012 Midwest drought + RFS volatility 2012-2014 mo
 flash chromatography columns - silica gel,1,
 formaldehydes and paraformaldehydes,1,"US regulatory shock: EPA IRIS 2010, NTP 12th RoC 2011 listed as known human carcinogen, OSHA tightening"
 formic acid,1,
+gel blotting papers,1,
 gene expression inducers,1,
+growth medium supplement,1,
 human serum,1,
 hypodermic needles,1,US M&A in window: Becton Dickinson + CareFusion closed Mar 2015; BD dominates US needle/syringe
+in vitro transcription kit,1,
+laemmli sample buffer,1,
 ldh cytotoxicity assay,1,
+lds sample buffer,1,
+mes-sds buffer,1,
+mops-sds buffer,1,
+native page running buffers,1,
+native-page sample buffer,1,
 nitrile gloves,1,US-relevant shock: 2017-2018 NBR feedstock shortage drove 20-40% lab glove price increases
 nitrogen,1,
 phosphoprotein electrophoresis reagents,1,classification uncertainty - not shock-based; specialty SDS-PAGE reagent overlapping with Tier 2 protein workflow
 pipes buffers,1,
 primary antibodies,1,antibody reproducibility crisis 2014-16; Sigma-Aldrich/MilliporeSigma merger Nov 2015 affected major antibody supplier
+reducing agents - bme,1,
 secondary antibodies,1,antibody reproducibility crisis 2014-16; Sigma-Aldrich/MilliporeSigma merger Nov 2015 affected major antibody supplier
 slide mounting medium,1,
 sodium hydride,1,
@@ -39,3 +68,10 @@ synthetic dual-labeled probe,1,US-driven secular price collapse: Twist Bioscienc
 synthetic shrna,1,
 syringe filters,1,US M&A in window: Pall Corp -> Danaher (closed Aug 2015) reshuffled US lab filtration market
 syringes,1,US M&A in window: Becton Dickinson + CareFusion closed Mar 2015; BD dominates US needle/syringe
+tbe buffer,1,
+tris-aceate-sds running buffer,1,
+tris-acetate-edta (tae) buffer,1,
+tris-glycine buffer,1,
+tris-glycine-sds (tgs) buffer,1,
+tris-tricine-sds buffer,1,
+western blot transfer buffers,1,

@@ -11,13 +11,18 @@ global EXPOSURE_VERSION "hc"
 global EXPOSURE_FILTER  "_cf_k3"
 global FE_MODE "author"
 * pres = event studies with stats legend (slides); paper = legend-free copies under <figdir>/paper/
-global FIG_MODES "pres paper"
+global FIG_MODES "paper"
 global HET_RUN_OLS 0
 global DEBUG_YVAR "ppr_cnt"
 global HET_INCLUDE_INSTWTD 0
 global HET_RUN_QUARTILES 0
 global HET_IC_FULL 0
 global HET_AGE_NBINS 10
+* Lab clock for every lab-age split (young/old, lab_age_2014, lab bins/quartiles):
+* "athr_age" = min(first last-author article in the raw OpenAlex pull, corpus
+* min_year_nonsolo) -- earliest solo-free last-authorship observed in either
+* source; "panel" = corpus min_year.
+global LAB_CLOCK "panel"
 * `do analysis.do horserace` runs only horse_race_nih on the existing
 * ../temp/es_* panels (no rebuild of splits / event studies).
 global HET_HORSERACE_ONLY 0
@@ -36,6 +41,7 @@ program main
     }
     horse_race_nih, samp(`s') r1r2(1) public(0)
     output_het_tables, samp(`s') r1r2(1) public(0)
+    output_split_diff_tables, samp(`s') r1r2(1) public(0)
 
     if $HET_HORSERACE_ONLY == 0 {
         add_het_splits, samp(all_jrnls) r1r2(1) public(1)
@@ -45,6 +51,7 @@ program main
     }
     horse_race_nih, samp(all_jrnls) r1r2(1) public(1)
     output_het_tables, samp(all_jrnls) r1r2(1) public(1)
+    output_split_diff_tables, samp(all_jrnls) r1r2(1) public(1)
 end
 
 program gather_inst_chars
@@ -119,15 +126,15 @@ if $HET_IC_FULL == 1 {
 global PI_Q_BASES pre_ppr nihg nihd
 
 program define_group_labels
-    global LBL_young        "Early-Career Scientists"
-    global LBL_old          "Late-Career Scientists"
-    global LBL_young_ns     "Early-Career Scientists (Excl. Solo)"
-    global LBL_old_ns       "Late-Career Scientists (Excl. Solo)"
-    global LBL_young_any    "Early-Career Scientists (First Pub Ever)"
-    global LBL_old_any      "Late-Career Scientists (First Pub Ever)"
-    global LBL_lab_lt10     "Early-Career Scientists (<10 Yrs)"
-    global LBL_lab_10_20    "Mid-Career Scientists (10-20 Yrs)"
-    global LBL_lab_20p      "Late-Career Scientists (20+ Yrs)"
+    global LBL_young        "Early-Career PIs"
+    global LBL_old          "Late-Career PIs"
+    global LBL_young_ns     "Early-Career PIs (Excl. Solo)"
+    global LBL_old_ns       "Late-Career PIs (Excl. Solo)"
+    global LBL_young_any    "Early-Career PIs (First Pub Ever)"
+    global LBL_old_any      "Late-Career PIs (First Pub Ever)"
+    global LBL_lab_lt10     "Early-Career PIs (<10 Yrs)"
+    global LBL_lab_10_20    "Mid-Career PIs (10-20 Yrs)"
+    global LBL_lab_20p      "Late-Career PIs (20+ Yrs)"
     global LBL_q1_labage    "Q1 Lab Age (Newest Labs)"
     global LBL_q2_labage    "Q2 Lab Age"
     global LBL_q3_labage    "Q3 Lab Age"
@@ -140,8 +147,8 @@ program define_group_labels
     global LBL_low_nihg     "Fewer NIH Grants at Baseline"
     global LBL_high_nihd    "More NIH Funding at Baseline"
     global LBL_low_nihd     "Less NIH Funding at Baseline"
-    global LBL_young_nih    "Early-Career Scientists (NIH-Matched PIs)"
-    global LBL_old_nih      "Late-Career Scientists (NIH-Matched PIs)"
+    global LBL_young_nih    "Early-Career PIs (NIH-Matched)"
+    global LBL_old_nih      "Late-Career PIs (NIH-Matched)"
     global LBL_yhigh_nihd   "Early-Career, More NIH (Young Median)"
     global LBL_ylow_nihd    "Early-Career, Less NIH (Young Median)"
     global LBL_yq4_nihd     "Early-Career, Q4 NIH (Young Quartiles)"
@@ -220,6 +227,8 @@ program define_group_labels
     foreach b of global PI_Q_BASES {
         global PI_PAIRS_Q `"${PI_PAIRS_Q} "q4_`b' q1_`b'" "'
     }
+    * PI-level pairs shown on the main het coefplot and in the split-diff table.
+    global COEFPLOT_PI_PAIRS `" "young old" "r1 r2" "high_pre_ppr low_pre_ppr" "high_nihd low_nihd" "big_msa small_msa" "'
 end
 
 program add_het_splits
@@ -234,6 +243,24 @@ program add_het_splits
 
     cap drop athr_indicator
     bys athr_id : gen athr_indicator = _n == 1
+
+    * Neither source alone is complete: the raw pull misses works OpenAlex has
+    * reassigned to other author ids since the corpus snapshot, and the corpus
+    * is journal- and US-R1/R2-truncated. Earliest observation in either wins.
+    if "$LAB_CLOCK" == "athr_age" {
+        merge m:1 athr_id using ../external/athr_age/athr_age, ///
+            keep(1 3) keepusing(first_last) nogen
+        cap confirm variable min_year_nonsolo
+        if !_rc replace min_year = min(first_last, min_year_nonsolo)
+        else {
+            di as error "add_het_splits `samp'`suf': min_year_nonsolo not in panel -- lab clock = first_last only"
+            replace min_year = first_last
+        }
+        qui count if athr_indicator == 1 & mi(min_year)
+        di as text "add_het_splits `samp'`suf': lab clock = min(athr_age first_last, min_year_nonsolo); " ///
+            r(N) " PIs with neither drop from lab-age splits"
+        drop first_last
+    }
 
     qui sum pre_ppr_cnt_sum if athr_indicator == 1, d
     local ppr_cut = r(p50)
@@ -804,15 +831,11 @@ program event_study_het
                     keep es1 es2
                     drop if mi(es1)
                     rename (es1 es2) (b se)
-                    local pgap 0.1
-                    if inlist("`grp'", "young", "old") local pgap 0.2
+                    local pgap 0.3
                     gen ub = b + 1.96*se
-                    sum ub, d
-                    local ymax = round(r(max), `pgap')
                     gen lb = b - 1.96*se
-                    sum lb, d
-                    local ymin = round(r(min), `pgap')
-                    if `ymin' > 0 local ymin = 0
+                    local ymax = 1.5
+                    local ymin = -3
                     gen rel = -`abs_lead' if _n == 1
                     replace rel = rel[_n-1]+1 if _n > 1
                     replace rel = rel + 1 if rel >= -1
@@ -1848,6 +1871,69 @@ program output_het_tables
     }
 end
 
+program output_split_diff_tables
+    * Group-difference test for every split on the main het coefplot: b, se for
+    * each group and lincom g1 - g2 off the joint pooled-DiD PPML VCE (the
+    * med_pi_diff rows event_study_het posts).
+    syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0)]
+    local suf ""
+    if (`r1r2' == 1 & `public' == 0 & `r1_only' == 0) local suf "_r1_r2"
+    if (`r1r2' == 1 & `public' == 1 & `r1_only' == 0) local suf "_r1_r2_public"
+    if (`r1_only' == 1 & `public' == 0) local suf "_r1"
+    if (`r1_only' == 1 & `public' == 1) local suf "_r1_public"
+    cap confirm file "../temp/phet_results_`samp'`suf'.dta"
+    if _rc {
+        di as error "output_split_diff_tables `samp'`suf': phet_results not found -- skipping."
+        exit 0
+    }
+    cap mkdir ../output/tables
+    cap mkdir ../output/tables/`samp'
+
+    local pairs `"${COEFPLOT_PI_PAIRS}"'
+    foreach a of global IC_ALIASES {
+        local pairs `"`pairs' "hiw_`a' low_`a'" "'
+    }
+
+    foreach yvar in ppr_cnt cite_affl_wt {
+        preserve
+        use "../temp/phet_results_`samp'`suf'.dta", clear
+        keep if yvar == "`yvar'" & spec == "mshrctrl" & inlist(split_type, "med_pi", "med_pi_diff")
+        cap mat drop sdiff
+        local rows
+        foreach pair of local pairs {
+            local g1 : word 1 of `pair'
+            local g2 : word 2 of `pair'
+            qui count if grp == "`g1'_diff" & split_type == "med_pi_diff"
+            if r(N) == 0 continue
+            foreach g in `g1' `g2' {
+                qui sum post_b  if grp == "`g'" & split_type == "med_pi"
+                local b_`g'  = r(mean)
+                qui sum post_se if grp == "`g'" & split_type == "med_pi"
+                local se_`g' = r(mean)
+            }
+            qui sum post_b  if grp == "`g1'_diff" & split_type == "med_pi_diff"
+            local b_diff = r(mean)
+            qui sum post_se if grp == "`g1'_diff" & split_type == "med_pi_diff"
+            local se_diff = r(mean)
+            qui sum pre_b   if grp == "`g1'_diff" & split_type == "med_pi_diff"
+            local p_diff = r(mean)
+            qui sum N       if grp == "`g1'_diff" & split_type == "med_pi_diff"
+            local Nfit = r(mean)
+            mat sdiff = nullmat(sdiff) \ ///
+                (`b_`g1'', `se_`g1'', `b_`g2'', `se_`g2'', `b_diff', `se_diff', `p_diff', `Nfit')
+            local rows `rows' `g1'
+        }
+        restore
+        if "`rows'" == "" continue
+        mat colnames sdiff = b_g1 se_g1 b_g2 se_g2 b_diff se_diff p_diff N
+        mat rownames sdiff = `rows'
+        di as result _n "== split_diff `samp'`suf' `yvar': g1 - g2 off the joint VCE (rows = g1 of each coefplot pair) =="
+        matlist sdiff, format(%9.4f) lines(oneline)
+        qui matrix_to_txt, saving("../output/tables/`samp'/split_diff_`yvar'`suf'.txt") ///
+            matrix(sdiff) title(<tab:split_diff_`yvar'`suf'>) format(%20.4f) replace
+    }
+end
+
 program ppml_het_coefplot
     * Three panels per yvar (pi / ic_fund / ic_expx).
     * If yvar() is supplied, plot only that outcome; otherwise loop all.
@@ -1898,11 +1984,10 @@ program ppml_het_coefplot
             local groups_ic_expx
         }
         else if "`st'" == "med" {
-            local groups_pi     young old young_ns old_ns young_any old_any ///
-                                r1 r2 ///
-                                high_pre_ppr low_pre_ppr ///
-                                high_nihd low_nihd ///
-                                big_msa small_msa
+            local groups_pi
+            foreach pair of global COEFPLOT_PI_PAIRS {
+                local groups_pi `groups_pi' `pair'
+            }
             local groups_ic_fund
             foreach a of local ic_fund_aliases {
                 local groups_ic_fund `groups_ic_fund' hi_`a' lo_`a'
@@ -1915,11 +2000,10 @@ program ppml_het_coefplot
         else if "`st'" == "med_pi" {
             * PI-weighted inst-char medians. PI-level splits are the same
             * variables as under med so they render in the pi panel too.
-            local groups_pi     young old young_ns old_ns young_any old_any ///
-                                r1 r2 ///
-                                high_pre_ppr low_pre_ppr ///
-                                high_nihd low_nihd ///
-                                big_msa small_msa
+            local groups_pi
+            foreach pair of global COEFPLOT_PI_PAIRS {
+                local groups_pi `groups_pi' `pair'
+            }
             local groups_ic_fund
             foreach a of local ic_fund_aliases {
                 local groups_ic_fund `groups_ic_fund' hiw_`a' low_`a'

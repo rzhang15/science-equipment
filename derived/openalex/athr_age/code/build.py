@@ -1,92 +1,75 @@
 """Career and lab start dates for every author in the scraped works.
 
 Reads the raw OpenAlex works pull (~146GB, 20k csv files): every paper each
-author ever published, with no journal, institution or country filter, and
-with OpenAlex's own first/middle/last author designation.
+author ever published, with no journal, institution or country filter. OpenAlex
+codes solo papers as position "first", never "last", so first_last is the first
+multi-author last-authorship. Research articles only (pub_type "article").
 
   first_pub    first publication year, any position
   first_last   first year as last author
-  n_ppr        papers observed
-  n_last_ppr   last-author papers observed
 
-Run: python build.py [n_workers]
+Run: python build.py
 """
-import sys
 import glob
 import os
-import pandas as pd
-from multiprocessing import Pool
+import sys
+import polars as pl
 
-WORKS  = "../external/works"
-OUT    = "../output/athr_age.dta"
-COLS   = ["pub_date", "athr_id", "athr_pos"]
+WORKS = "../external/works"
+OUT = "../output/athr_age.dta"
 YR_MIN, YR_MAX = 1930, 2025
-REDUCE_EVERY = 250
+KEEP_TYPES = ["article"]
+CHUNK = 500
 
 
-def scan(path):
-    try:
-        d = pd.read_csv(path, usecols=COLS, low_memory=False,
-                        dtype={"athr_id": "string", "athr_pos": "string",
-                               "pub_date": "string"})
-    except Exception as e:
-        print(f"  SKIP {os.path.basename(path)}: {e}", flush=True)
-        return None
-    d = d.dropna(subset=["athr_id", "pub_date"])
-    d = d[d.athr_id.ne("A9999999999")]
-    d["yr"] = pd.to_numeric(d.pub_date.str.slice(0, 4), errors="coerce")
-    d = d[d.yr.between(YR_MIN, YR_MAX)]
-    if d.empty:
-        return None
-    last = d[d.athr_pos.eq("last")]
-    g = d.groupby("athr_id")
-    out = pd.DataFrame({"first_pub": g.yr.min(), "n_ppr": g.yr.size()})
-    if not last.empty:
-        gl = last.groupby("athr_id")
-        out["first_last"] = gl.yr.min()
-        out["n_last_ppr"] = gl.yr.size()
-    else:
-        out["first_last"] = pd.NA
-        out["n_last_ppr"] = 0
-    return out
-
-
-def reduce(parts):
-    d = pd.concat(parts)
-    return d.groupby(level=0).agg(first_pub=("first_pub", "min"),
-                                  first_last=("first_last", "min"),
-                                  n_ppr=("n_ppr", "sum"),
-                                  n_last_ppr=("n_last_ppr", "sum"))
+def scan(files):
+    return (
+        pl.scan_csv(files, infer_schema=False)
+        .select("pub_date", "athr_id", "athr_pos", "pub_type", "paratext")
+        .filter(
+            pl.col("athr_id").is_not_null(),
+            pl.col("athr_id") != "A9999999999",
+            pl.col("pub_type").is_in(KEEP_TYPES),
+            pl.col("paratext") != "TRUE",
+        )
+        .with_columns(yr=pl.col("pub_date").str.slice(0, 4).cast(pl.Int32, strict=False))
+        .filter(pl.col("yr").is_between(YR_MIN, YR_MAX))
+        .group_by("athr_id")
+        .agg(
+            first_pub=pl.col("yr").min(),
+            first_last=pl.col("yr").filter(pl.col("athr_pos") == "last").min(),
+        )
+        .collect(engine="streaming")
+    )
 
 
 if __name__ == "__main__":
-    n = int(sys.argv[1]) if len(sys.argv) > 1 else 8
     files = sorted(glob.glob(os.path.join(WORKS, "openalex_authors*.csv")))
     if not files:
         sys.exit(f"no csv files under {WORKS} -- run make.py to build external/")
-    print(f"{len(files)} files, {n} workers", flush=True)
+    print(f"{len(files)} files", flush=True)
 
-    acc, buf = None, []
-    with Pool(n) as p:
-        for i, r in enumerate(p.imap_unordered(scan, files, chunksize=8), 1):
-            if r is not None:
-                buf.append(r)
-            if len(buf) >= REDUCE_EVERY:
-                acc = reduce(buf if acc is None else [acc] + buf)
-                buf = []
-            if i % 1000 == 0:
-                nauth = 0 if acc is None else len(acc)
-                print(f"  {i}/{len(files)} files, {nauth:,} authors", flush=True)
-    if buf:
-        acc = reduce(buf if acc is None else [acc] + buf)
+    parts = []
+    for i in range(0, len(files), CHUNK):
+        chunk = files[i:i + CHUNK]
+        try:
+            parts.append(scan(chunk))
+        except Exception:
+            for f in chunk:
+                try:
+                    parts.append(scan([f]))
+                except Exception as e:
+                    print(f"  SKIP {os.path.basename(f)}: {e}", flush=True)
+        print(f"  {min(i + CHUNK, len(files))}/{len(files)} files", flush=True)
 
-    acc = acc.reset_index().rename(columns={"index": "athr_id"})
-    for c in ["first_pub", "first_last", "n_ppr", "n_last_ppr"]:
-        acc[c] = pd.to_numeric(acc[c], errors="coerce").astype("float64")
-    acc["athr_id"] = acc.athr_id.astype(str)
-    print(f"\n{len(acc):,} authors")
-    print(acc[["first_pub", "first_last", "n_ppr", "n_last_ppr"]]
-          .describe(percentiles=[.1, .5, .9]).round(1).to_string())
-    print("with a last-author paper:", int(acc.first_last.notna().sum()))
-    acc.to_stata(OUT, write_index=False)
+    acc = (
+        pl.concat(parts)
+        .group_by("athr_id")
+        .agg(first_pub=pl.col("first_pub").min(), first_last=pl.col("first_last").min())
+        .sort("athr_id")
+    )
+    n_last = acc["first_last"].is_not_null().sum()
+    print(f"\n{acc.height:,} authors; {n_last:,} with a last-author paper")
+    print(acc.select("first_pub", "first_last").describe())
+    acc.to_pandas().to_stata(OUT, write_index=False)
     print("wrote", OUT, flush=True)

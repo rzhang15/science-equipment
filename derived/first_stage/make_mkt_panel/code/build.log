@@ -1,0 +1,428 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 120,000; see help set_maxvar.
+
+. do "/n/holylabs/pakes_lab/Lab/sci_eq/derived/first_stage/make_mkt_panel/code/
+> build.do" 
+
+. set more off
+
+. clear all
+
+. capture log close
+
+. program drop _all
+
+. set scheme modern
+
+. preliminaries
+
+. version 17
+
+. 
+. program main
+  1.     foreach t in tfidf {
+  2.         clean_raw, embed(`t')
+  3.         qui make_panels, embed(`t')
+  4.     }
+  5. end
+
+. 
+. program clean_raw
+  1.     syntax, embed(string)
+  2.     use ../external/price_samp/first_stage_data_`embed', clear
+  3.     gen purchase_date = date(date, "DMY")
+  4.     replace purchase_date = date(date, "YMD") if mi(purchase_date)
+  5.     gen year = year(purchase_date)
+  6.     keep if inrange(year, 2010,2019)
+  7.     drop if strpos(agencyname, "medical") > 0
+  8.     qui count
+  9.     local total_obs = r(N)
+ 10.     qui sum spend, d
+ 11.     local total_spend : di %16.0f r(sum)
+ 12.     di "[All purchases EVER] N:  `total_obs' Total Spend:  `total_spend'"
+ 13. 
+.     qui {
+ 14.         merge m:1 suppliername using ../external/sup/lifescience_supplier_map, assert(1 2 3) keep(3) nogen
+ 15.         rename (suppliername new_suppliername) (old_suppliername suppliername)
+ 16.         drop if mi(suppliername)
+ 17.         drop if suppliername == "na"
+ 18.         bys suppliername: gen num_sup_obs = _N
+ 19.         drop if num_sup_obs == 1
+ 20.         replace suppliername = "thermo fisher scientific" if suppliername == "possible missions" & strpos(agencyname, "texas") > 0
+ 21.         bys suppliername: gegen tot_sup_spend = total(spend)
+ 22.         drop if tot_sup_spend  < 0 
+ 23.     }
+ 24.     qui count
+ 25.     local total_obs = r(N)
+ 26.     qui sum spend, d
+ 27.     local total_spend : di %16.0f r(sum)
+ 28.     di "[Supplier Cut]  N: `total_obs' Total Spend: `total_spend'"
+ 29. 
+.     qui {
+ 30. *        replace category = "cryovials" if strpos(clean_desc, "cryo") >0 & strpos(clean_desc, "vial") >0 
+. *        replace category = "us fbs" if strpos(clean_desc, "fetal")>0& strpos(clean_desc, "bovine")>0 & strpos(clean_desc, "serum")>0
+. *        replace category = "us fbs" if strpos(clean_desc, "calf")>0& strpos(clean_desc, "bovine")>0 & strpos(clean_desc, "serum")>0
+. *        replace category = "elisa kits" if strpos(clean_desc, "duoset") >0 
+.         // drop nonsense negatives
+.         drop if price <= 0 | qty < 1 | spend <= 0
+ 31.         // filter to consumables
+.         drop if category == "Non-Lab"
+ 32.         drop if category == "unclassified"
+ 33.         drop if strpos(category, "electronics")> 0
+ 34.         replace spend = price * qty  if qty != 1
+ 35.         replace qty = spend / price if qty == 1
+ 36.         drop if similarity_score == 0
+ 37.     }
+ 38.     qui count
+ 39.     local total_obs = r(N)
+ 40.     qui sum spend, d
+ 41.     local total_spend : di %16.0f r(sum)
+ 42.     di "[ML Consumables & Negative Orders] N: `total_obs' Total Spend: `total_spend'"
+ 43. 
+.     qui {
+ 44.         drop if spend > 100000 | price > 100000 | qty > 100000
+ 45.         foreach v in "graduate " "table" "library" "reader" "po " "replace" ///
+>             "thesis" "pay" "delivery" "sequencing" "analysis" "transport" "lease" "order" " ins" "date" ///
+>             "delivered" "deliver" "wire" "fitting" "lamp" "nasco" "sport" ///
+>             "screw" "wall" "file" "mesh" "chamber" "analyzer" "oven" ///
+>             "fume hood" "biosafety cabinet" "wo#" "construction" "flooring" ///
+>             "lab gases" "glucarpidase" "voraxaze" "supplement issue" ///
+>             "ajph" "phssr" "capillarys" "analyses" "datalogger" ///
+>             "professionalism" ".org" "lcmsms" "pre-owned" "enterprise" ///
+>             "dialysis" "tower" "kelvin" "lithography" "seal" ///
+>             "array" "adverstise" "generator" "thermo cycler" {
+ 46.             drop if strpos(clean_desc, "`v'") > 0
+ 47.         }
+ 48.         drop if (strpos(clean_desc, "plate") > 0 | strpos(clean_desc, "card")) & category == "synthetic dna oligonucleotide"
+ 49.         // drop borderline terms only when model confidence is low
+.         foreach v in "service" "repair" "maintenance" "consulting" "training" ///
+>             "rental" "subscription" "license" "software" "warranty" "support contract" ///
+>             "calibration" "installation" "shipping" "freight" "quote" "estimate" ///
+>             "contract" "agreement" "professional" "labor" "hourly" {
+ 50.             drop if strpos(clean_desc, "`v'") > 0 & prediction_source == "Expert Model" & similarity_score < 0.20
+ 51.         } 
+ 52.         foreach v in "animal - " "fees - " "electronics - " "instrument" "office supplies" "lab furniture" "waste disposal" "equipment" "furniture" "software" ///
+>           "toolkit" "clamp" "tool" "tubing" "random" "unclear" "wire" "towel" "irrelevant chemicals" "oring" "caps" "gas" "first-aid" "first aid" "desk" "chair" "brushes" "trash" "cleaner" ///
+>           "cotton ball" "bundle of products" "tape" "miscellaneous" "clips" "flint" "accessories" "stands" "batteries" "ear protection" "apron" "pots" "pants" "stoppers" "closures" "rings" ///
+>           "mortar" "pestle" "support" "trays" "applicators and swabs" "bundle" "sequencing" "tem - " "nonlab" {
+ 53.             drop if strpos(category, "`v'") > 0
+ 54.         }
+ 55. 
+.         // === CATEGORY-SPECIFIC ANTI-KEYWORD DROPS ===
+.         // TF-IDF classifier mis-routes items that share substring tokens with the
+.         // category name but are obviously different products. These drops were
+.         // validated by checking that the within-category sd of yoy log-price
+.         // changes drops materially (>10%) without dropping real items.
+. 
+.         // carbon dioxide: bone marrow stem cells, surgical bone grafts, anatomical
+.         // skulls, ostase (bone-specific alk phos), decalcification stains
+.         foreach v in "bone " "marrow" "skull" "stem cell" "graft tiss" "ostase" "decalcified" "mesenchymal" "mscs" {
+ 56.             drop if category == "carbon dioxide" & strpos(clean_desc, "`v'") > 0
+ 57.         }
+ 58.         // direct pcr lysis reagents: construction primer, paint primer, surgical needles
+.         foreach v in "plaster" "primer c-" "gallon pail" "catheter" "butterfly needle" "infusion" "5# pail" {
+ 59.             drop if category == "direct pcr lysis reagents" & strpos(clean_desc, "`v'") > 0
+ 60.         }
+ 61.         // chromatography paper: paper plates (food service), bench protector paper, bundled stripette orders
+.         foreach v in "paper plate" "ppr plt" "bench prot" "laycoat" {
+ 62.             drop if category == "chromatography paper" & strpos(clean_desc, "`v'") > 0
+ 63.         }
+ 64.         // rifampicin: rifaximin is a different (related) antibiotic
+.         drop if category == "bacterial selection antibiotics - rifampicin" & strpos(clean_desc, "rifaximin") > 0
+ 65.         // storage jars: jarid (antibody caught on "jar"), drierite (desiccant), pigments (paint), antibodies
+.         foreach v in "jarid" "drierite" "pigment" "anitbody" "antibody" {
+ 66.             drop if category == "storage jars" & strpos(clean_desc, "`v'") > 0
+ 67.         }
+ 68.         // rectangular carboys: bundled non-carboy orders (gas cylinder accessories, cleaning bundles)
+.         foreach v in "gas cylinder support" "sparkleen" "stylus" "pen light" {
+ 69.             drop if category == "rectangular carboys" & strpos(clean_desc, "`v'") > 0
+ 70.         }
+ 71.         // zeocin: phleomycin (precursor antibiotic, sold separately), gentamicin, expression plasmids
+.         foreach v in "phleomycin" "expression plasmid" "gentamicin" "resistance gene" {
+ 72.             drop if category == "cell culture antibiotics - zeocin" & strpos(clean_desc, "`v'") > 0
+ 73.         }
+ 74.     }
+ 75.     qui count
+ 76.     local total_obs = r(N)
+ 77.     qui sum spend, d
+ 78.     local total_spend : di %16.0f r(sum)
+ 79.     di "[Remove Possible Non-consumables] N: `total_obs' Total Spend: `total_spend'"
+ 80.     qui {
+ 81.         merge m:1 category using ../external/categories/categories_`embed', assert(1 2 3)  keep(1 3) nogen
+ 82.         drop if similarity_score <= 0.10 & prediction_source == "Expert Model" 
+ 83.         replace category = subinstr(category, "/","-",.)
+ 84.         gen raw_price = price
+ 85.         gen raw_qty = qty
+ 86.         gen raw_spend = spend 
+ 87.         replace price = log(price)
+ 88.         replace qty = log(qty)
+ 89.         replace spend = log(spend)
+ 90.         bys category year : gegen spend99= pctile(raw_spend), p(99)
+ 91.         bys category year : gegen spend1 = pctile(raw_spend), p(1)
+ 92.         bys category year : gegen qty99= pctile(raw_qty), p(99)
+ 93.         bys category year : gegen qty1 = pctile(raw_qty), p(1)
+ 94.         bys category year : gegen price99= pctile(raw_price), p(99)
+ 95.         bys category year : gegen price1 = pctile(raw_price), p(1)
+ 96.         drop if raw_spend < spend1
+ 97.         drop if raw_spend > spend99
+ 98.         drop if raw_price > price99
+ 99.         drop if raw_price < price1
+100.         drop if raw_qty < qty1
+101.         drop if raw_qty > qty99
+102.         drop spend1 spend99 price1 price99 qty1 qty99
+103.         bys category  : gegen spend99= pctile(raw_spend), p(99)
+104.         bys category  : gegen spend1 = pctile(raw_spend), p(1)
+105.         bys category  : gegen qty99= pctile(raw_qty), p(99)
+106.         bys category  : gegen qty1 = pctile(raw_qty), p(1)
+107.         bys category  : gegen price99= pctile(raw_price), p(99)
+108.         bys category  : gegen price1 = pctile(raw_price), p(1)
+109.         drop if raw_spend < spend1
+110.         drop if raw_spend > spend99
+111.         drop if raw_qty < qty1
+112.         drop if raw_qty > qty99
+113.         drop if raw_price < price1
+114.         drop if raw_price > price99
+115.         drop spend1 spend99 price1 price99 qty1 qty99
+116.     }
+117.     qui count
+118.     local total_obs = r(N)
+119.     qui sum raw_spend, d
+120.     local total_spend : di %16.0f r(sum)
+121.     di "[Windsorize] N: `total_obs' Total Spend: `total_spend'"
+122. 
+.     qui {
+123.         preserve
+124.         gcollapse (mean) recall precision support keep , by(category)
+125.         tw kdensity recall || kdensity precision , xlab(, labsize(small)) ylab(, labsize(small)) xtitle("Score (0-1)", size(small)) ytitle("Density", size(small)) xline(0.8, lcolor(gs5) lpattern(dash)) ///
+>             legend(on order(1 "Recall" 2 "Precision") pos(11) ring(0))
+126.         graph export ../output/figures/recall_precision_density_`embed'.pdf, replace
+127.         binscatter2 recall support, xlab(, labsize(small)) ylab(, labsize(small)) ///
+>             xtitle("Support", size(small)) ytitle("Recall", size(small))
+128.         graph export ../output/figures/recall_support_`embed'.pdf, replace
+129.         binscatter2 precision support, xlab(, labsize(small)) ylab(, labsize(small)) ///
+>             xtitle("Precision", size(small)) ytitle("Recall", size(small))
+130.         graph export ../output/figures/precision_support_`embed'.pdf, replace
+131.         restore
+132.     }
+133.     drop if support <= 5  
+134.     qui count
+135.     local total_obs = r(N)
+136.     qui sum raw_spend, d
+137.     local total_spend : di %16.0f r(sum)
+138.     di "[bad ml categories] N: `total_obs' Total Spend: `total_spend'"
+139.     qui {
+140.         gen obs_cnt = 1
+141.         bys suppliername year: gen supplier_yr = _n == 1
+142.         bys suppliername: gegen tot_supplier_obs = total(obs_cnt) 
+143.         bys suppliername: gen sup_id = _n == 1
+144.         drop if tot_supplier_obs == 1
+145.         drop supplier_yr tot_supplier_obs sup_id
+146.         gegen uni_id = group(agencyname)
+147.         gegen supplier_id = group(suppliername)
+148.         bys supplier_id category year: gegen total_sup_spend = total(raw_spend)
+149.         gegen mkt = group(category)
+150.         bys category year: gen yr_cnt = _n == 1
+151.         bys category year: gegen cat_spend = total(raw_spend) 
+152.         bys category year: gegen tot_obs = total(obs_cnt)
+153.         gen obs_2013 = tot_obs if year == 2013
+154.         gen spend_2013 = cat_spend if year == 2013
+155.         bys category year uni_id: gegen uni_cat_spend = total(raw_spend) 
+156.         bys category year uni_id: gegen uni_tot_obs = total(obs_cnt)
+157.         gen uni_obs_2013 = uni_tot_obs if year == 2013
+158.         gen uni_spend_2013 = uni_cat_spend if year == 2013
+159.         hashsort category spend_2013
+160.         bys category : replace spend_2013 = spend_2013[_n-1] if mi(spend_2013)
+161.         hashsort category obs_2013
+162.         bys category : replace obs_2013 = obs_2013[_n-1] if mi(obs_2013)
+163.         hashsort category uni_id uni_spend_2013
+164.         bys category uni_id: replace uni_spend_2013 = uni_spend_2013[_n-1] if mi(uni_spend_2013)
+165.         hashsort category uni_id obs_2013
+166.         bys category uni_id : replace uni_obs_2013 = uni_obs_2013[_n-1] if mi(uni_obs_2013)
+167.         gegen uni_mkt = group(uni_id mkt)
+168.         bys uni_mkt : egen min_year = min(year)
+169.         bys uni_mkt : egen max_year = max(year)
+170.         keep if min_year < 2014 & max_year > 2014
+171.         drop min_year
+172.         bys uni_id year: gen cnt = _n == 1
+173.         bys uni_id : egen num_years = total(cnt)
+174.         bys uni_id : egen min_year = min(year)
+175.         keep if num_years == 10 | (num_years == 9 & min_year == 2011)
+176.        bys category uni_id: gen uni_cat_cnt = _n == 1
+177.         bys category: egen num_uni = total(uni_cat_cnt)
+178.         drop if num_uni <= 5 
+179.         drop num_uni uni_cat_cnt
+180.         drop num_years min_year cnt 
+181.         drop yr_cnt
+182.         bys category year: gen yr_cnt = _n == 1
+183.         bys category : egen num_years = total(yr_cnt)
+184.         drop if num_years != 10
+185.     }
+186. 
+.     qui count
+187.     local total_obs = r(N)
+188.     qui sum raw_spend, d
+189.     local total_spend : di %16.0f r(sum)
+190.     di "[Balance Cat-years] N: `total_obs' Total Spend: `total_spend'"
+191.     qui sum raw_spend 
+192.     local tot_spend = r(sum)
+193.     qui sum raw_spend if keep == 1 | (bad_control == 1 & support >= 25 & precision >=0.8 & recall >=0.8)
+194.     di "Total spend in matched categories: " r(sum) " out of " `tot_spend' " (" string(r(sum)/`tot_spend'*100) "%)"
+195.     qui count
+196.     local tot_obs = r(N)
+197.     qui count if keep  == 1 | (bad_control == 1 & support >= 25 & precision >=0.8 & recall >=0.8)
+198.     di "Total observations in matched categories: " r(N) " out of " `tot_obs' " (" string(r(N)/`tot_obs'*100) "%)"
+199.     bys category year: egen min_raw_price = min(raw_price)
+200.     bys category year: egen max_raw_price = max(raw_price)
+201.     bys category year: egen sd_raw_price = sd(raw_price)
+202.     gen range_raw_price = max_raw_price - min_raw_price
+203.     gunique category
+204.     gunique category if treated == 1
+205.     save ../output/full_item_level_`embed', replace
+206. end
+
+. 
+. program make_panels
+  1.     syntax, embed(string)
+  2.     use ../output/full_item_level_`embed', clear
+  3.     collapse (mean) min_raw_price max_raw_price sd_raw_price range_raw_price obs_2013 uni_spend_2013 uni_obs_2013 recall precision support treated tier1 tier2 tier3 keep item_price = raw_price avg_log_price = price avg_log_spend = spend avg_log_qty =
+>  qty (sum) raw_spend raw_qty obs_cnt (firstnm) mkt agencyname, by(category year uni_id)
+  4.     gen raw_price = raw_spend/raw_qty
+  5.     gen log_raw_price = ln(raw_price)
+  6.     gen log_raw_qty = ln(raw_qty)
+  7.     gen log_raw_spend = ln(raw_spend)
+  8.     save ../output/full_uni_category_yr_`embed', replace
+  9. 
+.     use ../output/full_item_level_`embed', clear
+ 10.     collapse (max) treated (mean) min_raw_price max_raw_price sd_raw_price range_raw_price precision recall support tier1 tier2 tier3 keep spend_2013 obs_2013 uni_spend_2013 uni_obs_2013 item_price = raw_price avg_log_price = price avg_log_spend = sp
+> end avg_log_qty = qty (firstnm) mkt (sum) raw_spend raw_qty obs_cnt , by(category year)
+ 11.     gen raw_price = raw_spend/raw_qty
+ 12.     gen log_raw_spend = ln(raw_spend)
+ 13.     gen log_raw_qty = ln(raw_qty)
+ 14.     gen log_raw_price = ln(raw_price)
+ 15.     save "../output/full_category_yr_`embed'", replace 
+ 16. 
+.     use ../output/full_item_level_`embed', clear
+ 17.     keep if keep == 1  
+ 18.     drop uni_mkt 
+ 19.     cap drop max_year
+ 20.     gegen uni_mkt = group(uni_id mkt)
+ 21.     bys uni_mkt : egen min_year = min(year)
+ 22.     bys uni_mkt : egen max_year = max(year)
+ 23.     keep if min_year < 2014 & max_year > 2014
+ 24.     save ../output/item_level_`embed', replace
+ 25.    
+.     preserve
+ 26.     collapse (max) treated (sum) obs_cnt *raw_spend (firstnm) suppliername mkt , by(supplier_id category year)
+ 27.     save ../output/supplier_category_yr_`embed', replace
+ 28.     gen pre_period = year < 2014
+ 29.     keep if inrange(year, 2011,2013) | inrange(year, 2015, 2017)
+ 30.     collapse (sum) raw_spend obs_cnt (firstnm) suppliername treated , by(supplier_id category pre_period)
+ 31.     bys category pre_period: gegen total_spend = total(raw_spend)
+ 32.     gen mkt_shr = raw_spend/total_spend * 100
+ 33.     gen life_tech = mkt_shr if suppliername == "life technologies"
+ 34.     gen thermo = mkt_shr if suppliername == "thermo fisher scientific"
+ 35.     bys category pre_period (life_tech): replace life_tech = life_tech[_n-1] if mi(life_tech)
+ 36.     bys category pre_period (thermo): replace thermo = thermo[_n-1] if mi(thermo)
+ 37.     gen simulated_hhi = 2 * life_tech * thermo if pre_period == 1
+ 38.     bys category (simulated_hhi): replace simulated_hhi = simulated_hhi[_n-1] if mi(simulated_hhi) & pre_period == 0
+ 39.     replace suppliername = "thermo fisher scientific" if suppliername == "life technologies" & pre_period == 0 
+ 40.     drop mkt_shr
+ 41.     gen mkt_shr = raw_spend/total_spend * 100
+ 42.     replace mkt_shr = mkt_shr * mkt_shr
+ 43.     gcollapse (sum) obs_cnt hhi = mkt_shr (firstnm) simulated_hhi treated mkt, by(category pre_period)
+ 44.     hashsort category -pre_period
+ 45.     by category : gen delta_hhi = hhi - hhi[_n-1] if pre_period == 0
+ 46.     bys category: gegen tot_cnt = total(obs_cnt)
+ 47.     bys category (delta_hhi): replace delta_hhi = delta_hhi[_n-1] if mi(delta_hhi)
+ 48.     gcontract category simulated_hhi delta_hhi treated tot_cnt
+ 49.     drop _freq
+ 50.     gisid category
+ 51.     save ../output/category_hhi_`embed', replace
+ 52.     restore
+ 53. 
+. 
+.     preserve
+ 54.     collapse (max) treated (sum) raw_spend raw_qty obs_cnt (mean) min_raw_price max_raw_price sd_raw_price range_raw_price spend_2013 obs_2013 precision recall support tier1 tier2 tier3 item_price = raw_price avg_log_price = price avg_log_spend = spe
+> nd avg_log_qty = qty (firstnm) agencyname mkt , by(uni_id category year)
+ 55.     gen raw_price = raw_spend/raw_qty
+ 56.     gen log_raw_spend = ln(raw_spend)
+ 57.     gen log_raw_qty = ln(raw_qty)
+ 58.     gen log_raw_price = ln(raw_price)
+ 59.     save ../output/uni_category_yr_`embed', replace
+ 60.     restore
+ 61. 
+.     collapse (max) treated (mean) min_raw_price max_raw_price sd_raw_price range_raw_price precision recall support tier1 tier2 tier3 spend_2013 obs_2013 uni_spend_2013 uni_obs_2013 item_price = raw_price avg_log_price = price avg_log_spend = spend avg_
+> log_qty = qty (firstnm) mkt (sum) raw_spend raw_qty obs_cnt , by(category year)
+ 62.     gen raw_price = raw_spend/raw_qty
+ 63.     gen log_raw_spend = ln(raw_spend)
+ 64.     gen log_raw_qty = ln(raw_qty)
+ 65.     gen log_raw_price = ln(raw_price)
+ 66.     save "../output/category_yr_`embed'", replace 
+ 67. 
+.     preserve
+ 68.     keep if treated == 1
+ 69.     hashsort category year
+ 70.     tw line avg_log_price year , by(category)
+ 71.     by category: gen chg = avg_log_price - avg_log_price[_n-1] 
+ 72.     gen max_chg = chg
+ 73.     gcollapse (mean) chg (max) max_chg, by(category)
+ 74.     tw scatter chg max_chg, mlabel(category) xlab(, labsize(small)) ylab(, labsize(small)) ///
+>         xtitle("Average Yearly Change in Log Price (2011-2017)", size(small)) ///
+>         ytitle("Max Yearly Change in Log Price (2011-2017)", size(small)) ///
+>         legend(off)
+ 75.     graph export ../output/figures/treated_trends.pdf, replace
+ 76.     restore
+ 77.     
+.     preserve
+ 78.     keep if treated == 0
+ 79.     hashsort category year
+ 80.     by category: gen chg = avg_log_price - avg_log_price[_n-1] 
+ 81.     gen max_chg = chg
+ 82.     gcollapse (mean) chg (max) max_chg, by(category)
+ 83.     tw scatter chg max_chg, mlabel(category) xlab(, labsize(small)) ylab(, labsize(small)) ///
+>         xtitle("Average Yearly Change in Log Price (2011-2017)", size(small)) ///
+>         ytitle("Max Yearly Change in Log Price (2011-2017)", size(small)) ///
+>         legend(off)
+ 84.     graph export ../output/figures/ctrl_trends.pdf, replace
+ 85.     restore
+ 86. end
+
+. 
+. **
+. main
+(417,049 missing values generated)
+(417,049 real changes made)
+(26,956 observations deleted)
+(399,923 observations deleted)
+[All purchases EVER] N:  2439756 Total Spend:        3431808657
+[Supplier Cut]  N: 1929224 Total Spend:       2294099731
+[ML Consumables & Negative Orders] N: 1492935 Total Spend:        421728732
+[Remove Possible Non-consumables] N: 1422023 Total Spend:        362245017
+[Windsorize] N: 1322434 Total Spend:        242135377
+(39,923 observations deleted)
+[bad ml categories] N: 1282511 Total Spend:        226324034
+[Balance Cat-years] N: 1217746 Total Spend:        208145305
+Total spend in matched categories: 1.140e+08 out of 2.081e+08 (54.75409%)
+Total observations in matched categories: 851119 out of 1217746 (69.89298%)
+(21 missing values generated)
+N = 1,217,746; 574 unbalanced groups of sizes 36 to 124,318

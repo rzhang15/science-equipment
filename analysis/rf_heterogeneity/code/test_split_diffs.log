@@ -1,0 +1,533 @@
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  /n/holylabs/pakes_lab/Lab/sci_eq/analysis/rf_heterogeneity/code/test_split_diffs.log
+  log type:  text
+ opened on:  25 Aug 2026, 18:14:11
+
+. 
+. * Group-difference test for every split on the main het coefplot, off the
+. * joint pooled-DiD PPML that event_study_het fits (split_type med_pi).
+. * Reads the panel analysis.do already wrote to ../temp/, so no rebuild.
+. 
+. local fes athr_id year
+
+. local vce_cl athr_id
+
+. local pairs `" "young old" "r1 r2" "high_pre_ppr low_pre_ppr" "high_nihd low_nihd" "big_msa small_msa" "hiw_tfnd low_tfnd" "hiw_lsf low_lsf" "hiw_endow low_endow" "'
+
+. 
+. foreach suf in _r1_r2 {
+  2.     cap confirm file "../temp/es_all_jrnls`suf'.dta"
+  3.     if _rc {
+  4.         di as error "../temp/es_all_jrnls`suf'.dta missing -- run analysis.do first."
+  5.         continue
+  6.     }
+  7.     local dummies
+  8.     foreach pair of local pairs {
+  9.         local dummies `dummies' `pair'
+ 10.     }
+ 11.     use athr_id year ppr_cnt exposure mkt_spend_shr `dummies' ///
+>         using ../temp/es_all_jrnls`suf', clear
+ 12. 
+.     gen post       = year >= 2014
+ 13.     gen Z_it       = exposure      * post
+ 14.     gen Z_share_it = mkt_spend_shr * post
+ 15. 
+.     cap matrix drop SPLITS
+ 16.     local split_rows
+ 17.     foreach pair of local pairs {
+ 18.         local g1 : word 1 of `pair'
+ 19.         local g2 : word 2 of `pair'
+ 20.         cap drop Z_`g1' Z_`g2' S_`g1' S_`g2' PT_`g1'
+ 21.         gen Z_`g1'  = Z_it       * `g1'
+ 22.         gen Z_`g2'  = Z_it       * `g2'
+ 23.         gen S_`g1'  = Z_share_it * `g1'
+ 24.         gen S_`g2'  = Z_share_it * `g2'
+ 25.         gen PT_`g1' = post * `g1'
+ 26. 
+.         cap noi ppmlhdfe ppr_cnt Z_`g1' Z_`g2' S_`g1' S_`g2' PT_`g1', ///
+>             absorb(`fes') vce(cluster `vce_cl')
+ 27.         if _rc {
+ 28.             di as error "test_split_diffs`suf' `g1'/`g2': ppml failed (rc=" _rc "); skipping."
+ 29.             continue
+ 30.         }
+ 31.         local b1   = _b[Z_`g1']
+ 32.         local se1  = _se[Z_`g1']
+ 33.         local b2   = _b[Z_`g2']
+ 34.         local se2  = _se[Z_`g2']
+ 35.         local Nfit = e(N)
+ 36.         lincom Z_`g1' - Z_`g2'
+ 37.         local b_diff  = r(estimate)
+ 38.         local se_diff = r(se)
+ 39.         local p_diff  = r(p)
+ 40. 
+.         di as result _n "== all_jrnls`suf' ppr_cnt `g1' vs `g2' (N=`Nfit') =="
+ 41.         di as text "  `g1': b=" %8.4f `b1' " (se=" %7.4f `se1' ")"
+ 42.         di as text "  `g2': b=" %8.4f `b2' " (se=" %7.4f `se2' ")"
+ 43.         di as text "  diff, joint VCE:  b=" %8.4f `b_diff' " se=" %7.4f `se_diff' " p=" %6.4f `p_diff'
+ 44. 
+.         matrix SPLITS = nullmat(SPLITS) \ ///
+>             (`b1', `se1', `b2', `se2', `b_diff', `se_diff', `p_diff', `Nfit')
+ 45.         local split_rows `split_rows' `g1'
+ 46.     }
+ 47. 
+.     if "`split_rows'" != "" {
+ 48.         matrix colnames SPLITS = b_g1 se_g1 b_g2 se_g2 b_diff se_diff p_diff N
+ 49.         matrix rownames SPLITS = `split_rows'
+ 50.         di as result _n "== all_jrnls`suf' ppr_cnt: g1 - g2 summary across coefplot splits (rows = g1) =="
+ 51.         matlist SPLITS, format(%9.4f) lines(oneline)
+ 52.     }
+ 53. }
+Iteration 1:   deviance = 1.3559e+05  eps = .         iters = 3    tol = 1.0e-04  min(eta) =  -1.27  P   
+Iteration 2:   deviance = 1.3227e+05  eps = 2.51e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.48      
+Iteration 3:   deviance = 1.3225e+05  eps = 1.86e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.50      
+Iteration 4:   deviance = 1.3225e+05  eps = 1.37e-07  iters = 2    tol = 1.0e-04  min(eta) =  -1.50      
+Iteration 5:   deviance = 1.3225e+05  eps = 4.04e-12  iters = 1    tol = 1.0e-05  min(eta) =  -1.50   S  
+Iteration 6:   deviance = 1.3225e+05  eps = 0.00e+00  iters = 2    tol = 1.0e-08  min(eta) =  -1.50   S O
+------------------------------------------------------------------------------------------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
+Converged in 6 iterations and 12 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =    122,760
+Absorbing 2 HDFE groups                           Residual df     =     12,275
+Statistics robust to heteroskedasticity           Wald chi2(5)    =     137.01
+Deviance             =  132248.8619               Prob > chi2     =     0.0000
+Log pseudolikelihood = -190317.9848               Pseudo R2       =     0.1815
+
+Number of clusters (athr_id)=     12,276
+                           (Std. err. adjusted for 12,276 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+     Z_young |  -.6569355   .2284252    -2.88   0.004    -1.104641   -.2092303
+       Z_old |   -.114247    .243542    -0.47   0.639    -.5915806    .3630866
+     S_young |   .0140468   .0762448     0.18   0.854    -.1353902    .1634837
+       S_old |  -.0647076    .067219    -0.96   0.336    -.1964545    .0670393
+    PT_young |   .1220246   .0298831     4.08   0.000     .0634548    .1805944
+       _cons |    .787002   .0100749    78.12   0.000     .7672556    .8067484
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |     12276       12276           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+ ( 1)  Z_young - Z_old = 0
+
+------------------------------------------------------------------------------
+     ppr_cnt | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |  -.5426885   .3339024    -1.63   0.104    -1.197125    .1117481
+------------------------------------------------------------------------------
+
+== all_jrnls_r1_r2 ppr_cnt young vs old (N=122760) ==
+  young: b= -0.6569 (se= 0.2284)
+  old: b= -0.1142 (se= 0.2435)
+  diff, joint VCE:  b= -0.5427 se= 0.3339 p=0.1041
+Iteration 1:   deviance = 1.3583e+05  eps = .         iters = 4    tol = 1.0e-04  min(eta) =  -1.26  P   
+Iteration 2:   deviance = 1.3250e+05  eps = 2.51e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.49      
+Iteration 3:   deviance = 1.3247e+05  eps = 1.91e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.52      
+Iteration 4:   deviance = 1.3247e+05  eps = 1.58e-07  iters = 2    tol = 1.0e-04  min(eta) =  -1.52      
+Iteration 5:   deviance = 1.3247e+05  eps = 5.75e-12  iters = 1    tol = 1.0e-05  min(eta) =  -1.52   S  
+Iteration 6:   deviance = 1.3247e+05  eps = 0.00e+00  iters = 2    tol = 1.0e-08  min(eta) =  -1.52   S O
+------------------------------------------------------------------------------------------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
+Converged in 6 iterations and 13 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =    122,760
+Absorbing 2 HDFE groups                           Residual df     =     12,275
+Statistics robust to heteroskedasticity           Wald chi2(5)    =      14.35
+Deviance             =  132470.8076               Prob > chi2     =     0.0135
+Log pseudolikelihood = -190428.9577               Pseudo R2       =     0.1810
+
+Number of clusters (athr_id)=     12,276
+                           (Std. err. adjusted for 12,276 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+        Z_r1 |  -.3065831   .1727597    -1.77   0.076    -.6451858    .0320197
+        Z_r2 |  -.8712701   .6585992    -1.32   0.186    -2.162101    .4195607
+        S_r1 |  -.0024415   .0526158    -0.05   0.963    -.1055666    .1006835
+        S_r2 |    .017897   .2011735     0.09   0.929    -.3763957    .4121898
+       PT_r1 |   .0640204    .062656     1.02   0.307     -.058783    .1868238
+       _cons |   .7808208   .0316056    24.71   0.000      .718875    .8427665
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |     12276       12276           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+ ( 1)  Z_r1 - Z_r2 = 0
+
+------------------------------------------------------------------------------
+     ppr_cnt | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |    .564687   .6808809     0.83   0.407    -.7698151    1.899189
+------------------------------------------------------------------------------
+
+== all_jrnls_r1_r2 ppr_cnt r1 vs r2 (N=122760) ==
+  r1: b= -0.3066 (se= 0.1728)
+  r2: b= -0.8713 (se= 0.6586)
+  diff, joint VCE:  b=  0.5647 se= 0.6809 p=0.4069
+Iteration 1:   deviance = 1.3546e+05  eps = .         iters = 3    tol = 1.0e-04  min(eta) =  -1.16  P   
+Iteration 2:   deviance = 1.3200e+05  eps = 2.62e-02  iters = 3    tol = 1.0e-04  min(eta) =  -1.37      
+Iteration 3:   deviance = 1.3198e+05  eps = 2.07e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.39      
+Iteration 4:   deviance = 1.3198e+05  eps = 1.35e-07  iters = 2    tol = 1.0e-04  min(eta) =  -1.39      
+Iteration 5:   deviance = 1.3198e+05  eps = 2.63e-12  iters = 2    tol = 1.0e-05  min(eta) =  -1.39   S  
+Iteration 6:   deviance = 1.3198e+05  eps = 0.00e+00  iters = 2    tol = 1.0e-08  min(eta) =  -1.39   S O
+------------------------------------------------------------------------------------------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
+Converged in 6 iterations and 14 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =    122,760
+Absorbing 2 HDFE groups                           Residual df     =     12,275
+Statistics robust to heteroskedasticity           Wald chi2(5)    =     358.48
+Deviance             =  131975.7626               Prob > chi2     =     0.0000
+Log pseudolikelihood = -190181.4352               Pseudo R2       =     0.1821
+
+Number of clusters (athr_id)=     12,276
+                              (Std. err. adjusted for 12,276 clusters in athr_id)
+---------------------------------------------------------------------------------
+                |               Robust
+        ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+----------------+----------------------------------------------------------------
+ Z_high_pre_ppr |  -.3710611   .1981187    -1.87   0.061    -.7593667    .0172444
+  Z_low_pre_ppr |   .1030587   .2826089     0.36   0.715    -.4508445    .6569619
+ S_high_pre_ppr |   .0552309   .0609558     0.91   0.365    -.0642404    .1747021
+  S_low_pre_ppr |   -.016068   .0860045    -0.19   0.852    -.1846338    .1524978
+PT_high_pre_ppr |  -.2227029   .0305197    -7.30   0.000    -.2825204   -.1628854
+          _cons |    .891445   .0126076    70.71   0.000     .8667347    .9161554
+---------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |     12276       12276           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+ ( 1)  Z_high_pre_ppr - Z_low_pre_ppr = 0
+
+------------------------------------------------------------------------------
+     ppr_cnt | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |  -.4741198   .3451359    -1.37   0.170    -1.150574    .2023341
+------------------------------------------------------------------------------
+
+== all_jrnls_r1_r2 ppr_cnt high_pre_ppr vs low_pre_ppr (N=122760) ==
+  high_pre_ppr: b= -0.3711 (se= 0.1981)
+  low_pre_ppr: b=  0.1031 (se= 0.2826)
+  diff, joint VCE:  b= -0.4741 se= 0.3451 p=0.1695
+(52,110 missing values generated)
+(52,110 missing values generated)
+(52,110 missing values generated)
+(52,110 missing values generated)
+(52,110 missing values generated)
+Iteration 1:   deviance = 7.6252e+04  eps = .         iters = 3    tol = 1.0e-04  min(eta) =  -1.21  P   
+Iteration 2:   deviance = 7.4536e+04  eps = 2.30e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.44      
+Iteration 3:   deviance = 7.4526e+04  eps = 1.34e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.47      
+Iteration 4:   deviance = 7.4526e+04  eps = 2.62e-08  iters = 2    tol = 1.0e-04  min(eta) =  -1.47      
+Iteration 5:   deviance = 7.4526e+04  eps = 1.61e-14  iters = 1    tol = 1.0e-05  min(eta) =  -1.47   S  
+Iteration 6:   deviance = 7.4526e+04  eps = 1.85e-16  iters = 2    tol = 1.0e-09  min(eta) =  -1.47   S O
+------------------------------------------------------------------------------------------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
+Converged in 6 iterations and 12 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =     70,650
+Absorbing 2 HDFE groups                           Residual df     =      7,064
+Statistics robust to heteroskedasticity           Wald chi2(5)    =      20.14
+Deviance             =  74526.34109               Prob > chi2     =     0.0012
+Log pseudolikelihood = -111307.5093               Pseudo R2       =     0.1785
+
+Number of clusters (athr_id)=      7,065
+                            (Std. err. adjusted for 7,065 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+ Z_high_nihd |   -.370103   .2774153    -1.33   0.182    -.9138269    .1736209
+  Z_low_nihd |    .166854   .2910367     0.57   0.566    -.4035674    .7372755
+ S_high_nihd |  -.0467677   .0820007    -0.57   0.568    -.2074862    .1139508
+  S_low_nihd |    .045347   .0925324     0.49   0.624    -.1360133    .2267072
+PT_high_nihd |   .0951351   .0358956     2.65   0.008     .0247811    .1654892
+       _cons |   .8239495   .0142042    58.01   0.000     .7961098    .8517892
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      7065        7065           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+ ( 1)  Z_high_nihd - Z_low_nihd = 0
+
+------------------------------------------------------------------------------
+     ppr_cnt | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   -.536957   .4020716    -1.34   0.182    -1.325003    .2510889
+------------------------------------------------------------------------------
+
+== all_jrnls_r1_r2 ppr_cnt high_nihd vs low_nihd (N=70650) ==
+  high_nihd: b= -0.3701 (se= 0.2774)
+  low_nihd: b=  0.1669 (se= 0.2910)
+  diff, joint VCE:  b= -0.5370 se= 0.4021 p=0.1817
+(25,280 missing values generated)
+(25,280 missing values generated)
+(25,280 missing values generated)
+(25,280 missing values generated)
+(25,280 missing values generated)
+Iteration 1:   deviance = 1.0510e+05  eps = .         iters = 3    tol = 1.0e-04  min(eta) =  -1.26  P   
+Iteration 2:   deviance = 1.0258e+05  eps = 2.46e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.50      
+Iteration 3:   deviance = 1.0256e+05  eps = 1.64e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.53      
+Iteration 4:   deviance = 1.0256e+05  eps = 5.57e-08  iters = 2    tol = 1.0e-04  min(eta) =  -1.53      
+Iteration 5:   deviance = 1.0256e+05  eps = 7.61e-14  iters = 1    tol = 1.0e-05  min(eta) =  -1.53   S  
+Iteration 6:   deviance = 1.0256e+05  eps = 0.00e+00  iters = 2    tol = 1.0e-09  min(eta) =  -1.53   S O
+------------------------------------------------------------------------------------------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
+Converged in 6 iterations and 12 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =     97,480
+Absorbing 2 HDFE groups                           Residual df     =      9,747
+Statistics robust to heteroskedasticity           Wald chi2(5)    =      13.51
+Deviance             =  102559.8178               Prob > chi2     =     0.0191
+Log pseudolikelihood = -155125.7602               Pseudo R2       =     0.1845
+
+Number of clusters (athr_id)=      9,748
+                            (Std. err. adjusted for 9,748 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+   Z_big_msa |  -.4826431   .2484349    -1.94   0.052    -.9695666    .0042804
+ Z_small_msa |  -.3757312   .2586338    -1.45   0.146    -.8826442    .1311818
+   S_big_msa |  -.1857883   .0772588    -2.40   0.016    -.3372127   -.0343639
+ S_small_msa |   .0852974    .076923     1.11   0.267     -.065469    .2360638
+  PT_big_msa |   .0773727    .032131     2.41   0.016      .014397    .1403483
+       _cons |   .8767759   .0120663    72.66   0.000     .8531265    .9004254
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      9748        9748           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+ ( 1)  Z_big_msa - Z_small_msa = 0
+
+------------------------------------------------------------------------------
+     ppr_cnt | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   -.106912   .3586243    -0.30   0.766    -.8098026    .5959787
+------------------------------------------------------------------------------
+
+== all_jrnls_r1_r2 ppr_cnt big_msa vs small_msa (N=97480) ==
+  big_msa: b= -0.4826 (se= 0.2484)
+  small_msa: b= -0.3757 (se= 0.2586)
+  diff, joint VCE:  b= -0.1069 se= 0.3586 p=0.7656
+(23,060 missing values generated)
+(23,060 missing values generated)
+(23,060 missing values generated)
+(23,060 missing values generated)
+(23,060 missing values generated)
+Iteration 1:   deviance = 1.1057e+05  eps = .         iters = 3    tol = 1.0e-04  min(eta) =  -1.25  P   
+Iteration 2:   deviance = 1.0784e+05  eps = 2.54e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.46      
+Iteration 3:   deviance = 1.0782e+05  eps = 1.94e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.48      
+Iteration 4:   deviance = 1.0782e+05  eps = 1.82e-07  iters = 2    tol = 1.0e-04  min(eta) =  -1.49      
+Iteration 5:   deviance = 1.0782e+05  eps = 7.67e-12  iters = 1    tol = 1.0e-05  min(eta) =  -1.49   S  
+Iteration 6:   deviance = 1.0782e+05  eps = 0.00e+00  iters = 2    tol = 1.0e-08  min(eta) =  -1.49   S O
+------------------------------------------------------------------------------------------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
+Converged in 6 iterations and 12 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =     99,700
+Absorbing 2 HDFE groups                           Residual df     =      9,969
+Statistics robust to heteroskedasticity           Wald chi2(5)    =      19.30
+Deviance             =  107819.5175               Prob > chi2     =     0.0017
+Log pseudolikelihood = -155283.0336               Pseudo R2       =     0.1835
+
+Number of clusters (athr_id)=      9,970
+                            (Std. err. adjusted for 9,970 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+  Z_hiw_tfnd |  -.4435716    .251607    -1.76   0.078    -.9367121     .049569
+  Z_low_tfnd |   -.146765   .2767093    -0.53   0.596    -.6891053    .3955753
+  S_hiw_tfnd |  -.0769122   .0792126    -0.97   0.332     -.232166    .0783417
+  S_low_tfnd |    .049729   .0807317     0.62   0.538    -.1085022    .2079603
+ PT_hiw_tfnd |   .0897418   .0332368     2.70   0.007     .0245989    .1548847
+       _cons |   .8026281   .0122707    65.41   0.000     .7785781    .8266781
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      9970        9970           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+ ( 1)  Z_hiw_tfnd - Z_low_tfnd = 0
+
+------------------------------------------------------------------------------
+     ppr_cnt | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |  -.2968065   .3739975    -0.79   0.427    -1.029828    .4362151
+------------------------------------------------------------------------------
+
+== all_jrnls_r1_r2 ppr_cnt hiw_tfnd vs low_tfnd (N=99700) ==
+  hiw_tfnd: b= -0.4436 (se= 0.2516)
+  low_tfnd: b= -0.1468 (se= 0.2767)
+  diff, joint VCE:  b= -0.2968 se= 0.3740 p=0.4274
+(23,120 missing values generated)
+(23,120 missing values generated)
+(23,120 missing values generated)
+(23,120 missing values generated)
+(23,120 missing values generated)
+Iteration 1:   deviance = 1.1054e+05  eps = .         iters = 3    tol = 1.0e-04  min(eta) =  -1.25  P   
+Iteration 2:   deviance = 1.0781e+05  eps = 2.54e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.46      
+Iteration 3:   deviance = 1.0778e+05  eps = 1.95e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.49      
+Iteration 4:   deviance = 1.0778e+05  eps = 1.81e-07  iters = 2    tol = 1.0e-04  min(eta) =  -1.49      
+Iteration 5:   deviance = 1.0778e+05  eps = 7.47e-12  iters = 2    tol = 1.0e-05  min(eta) =  -1.49   S O
+------------------------------------------------------------------------------------------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
+Converged in 5 iterations and 11 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =     99,640
+Absorbing 2 HDFE groups                           Residual df     =      9,963
+Statistics robust to heteroskedasticity           Wald chi2(5)    =      13.16
+Deviance             =  107784.4614               Prob > chi2     =     0.0219
+Log pseudolikelihood = -155215.8638               Pseudo R2       =     0.1835
+
+Number of clusters (athr_id)=      9,964
+                            (Std. err. adjusted for 9,964 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+   Z_hiw_lsf |  -.3897261   .2649841    -1.47   0.141    -.9090855    .1296333
+   Z_low_lsf |  -.1921077   .2616968    -0.73   0.463     -.705024    .3208087
+   S_hiw_lsf |    -.01939   .0788786    -0.25   0.806    -.1739893    .1352093
+   S_low_lsf |   .0025829   .0806006     0.03   0.974    -.1553915    .1605572
+  PT_hiw_lsf |   .0514244   .0332393     1.55   0.122    -.0137234    .1165722
+       _cons |   .8124877    .012433    65.35   0.000     .7881195    .8368558
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      9964        9964           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+ ( 1)  Z_hiw_lsf - Z_low_lsf = 0
+
+------------------------------------------------------------------------------
+     ppr_cnt | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |  -.1976184   .3724269    -0.53   0.596    -.9275618    .5323249
+------------------------------------------------------------------------------
+
+== all_jrnls_r1_r2 ppr_cnt hiw_lsf vs low_lsf (N=99640) ==
+  hiw_lsf: b= -0.3897 (se= 0.2650)
+  low_lsf: b= -0.1921 (se= 0.2617)
+  diff, joint VCE:  b= -0.1976 se= 0.3724 p=0.5957
+(1,780 missing values generated)
+(1,780 missing values generated)
+(1,780 missing values generated)
+(1,780 missing values generated)
+(1,780 missing values generated)
+Iteration 1:   deviance = 1.3383e+05  eps = .         iters = 3    tol = 1.0e-04  min(eta) =  -1.25  P   
+Iteration 2:   deviance = 1.3054e+05  eps = 2.52e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.45      
+Iteration 3:   deviance = 1.3051e+05  eps = 1.91e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.47      
+Iteration 4:   deviance = 1.3051e+05  eps = 1.55e-07  iters = 2    tol = 1.0e-04  min(eta) =  -1.47      
+Iteration 5:   deviance = 1.3051e+05  eps = 5.18e-12  iters = 1    tol = 1.0e-05  min(eta) =  -1.47   S  
+Iteration 6:   deviance = 1.3051e+05  eps = 2.10e-16  iters = 2    tol = 1.0e-08  min(eta) =  -1.47   S O
+------------------------------------------------------------------------------------------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
+Converged in 6 iterations and 12 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =    120,980
+Absorbing 2 HDFE groups                           Residual df     =     12,097
+Statistics robust to heteroskedasticity           Wald chi2(5)    =      21.75
+Deviance             =  130514.3752               Prob > chi2     =     0.0006
+Log pseudolikelihood = -187727.2343               Pseudo R2       =     0.1813
+
+Number of clusters (athr_id)=     12,098
+                           (Std. err. adjusted for 12,098 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+ Z_hiw_endow |  -.4465931   .2213699    -2.02   0.044    -.8804702    -.012716
+ Z_low_endow |  -.1799953   .2546095    -0.71   0.480    -.6790207    .3190301
+ S_hiw_endow |  -.0443209   .0689177    -0.64   0.520    -.1793972    .0907554
+ S_low_endow |   .0642975   .0767762     0.84   0.402    -.0861812    .2147761
+PT_hiw_endow |   .0822749   .0304013     2.71   0.007     .0226895    .1418603
+       _cons |   .7892444   .0118473    66.62   0.000     .7660242    .8124646
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |     12098       12098           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+ ( 1)  Z_hiw_endow - Z_low_endow = 0
+
+------------------------------------------------------------------------------
+     ppr_cnt | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |  -.2665977   .3373879    -0.79   0.429     -.927866    .3946705
+------------------------------------------------------------------------------
+
+== all_jrnls_r1_r2 ppr_cnt hiw_endow vs low_endow (N=120980) ==
+  hiw_endow: b= -0.4466 (se= 0.2214)
+  low_endow: b= -0.1800 (se= 0.2546)
+  diff, joint VCE:  b= -0.2666 se= 0.3374 p=0.4294
+
+== all_jrnls_r1_r2 ppr_cnt: g1 - g2 summary across coefplot splits (rows = g1) ==
+
+             |      b_g1      se_g1       b_g2      se_g2     b_diff    se_diff     p_diff          N 
+-------------+----------------------------------------------------------------------------------------
+       young |   -0.6569     0.2284    -0.1142     0.2435    -0.5427     0.3339     0.1041   1.23e+05 
+          r1 |   -0.3066     0.1728    -0.8713     0.6586     0.5647     0.6809     0.4069   1.23e+05 
+high_pre_ppr |   -0.3711     0.1981     0.1031     0.2826    -0.4741     0.3451     0.1695   1.23e+05 
+   high_nihd |   -0.3701     0.2774     0.1669     0.2910    -0.5370     0.4021     0.1817   7.07e+04 
+     big_msa |   -0.4826     0.2484    -0.3757     0.2586    -0.1069     0.3586     0.7656   9.75e+04 
+    hiw_tfnd |   -0.4436     0.2516    -0.1468     0.2767    -0.2968     0.3740     0.4274   9.97e+04 
+     hiw_lsf |   -0.3897     0.2650    -0.1921     0.2617    -0.1976     0.3724     0.5957   9.96e+04 
+   hiw_endow |   -0.4466     0.2214    -0.1800     0.2546    -0.2666     0.3374     0.4294   1.21e+05 
+
+. 
+. log close
+      name:  <unnamed>
+       log:  /n/holylabs/pakes_lab/Lab/sci_eq/analysis/rf_heterogeneity/code/test_split_diffs.log
+  log type:  text
+ closed on:  25 Aug 2026, 18:14:28
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

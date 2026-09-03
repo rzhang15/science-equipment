@@ -1,5 +1,5 @@
 --------------------------------------------------------------------------------
-Makelog started: 2026-06-01 23:01:02
+Makelog started: 2026-09-03 14:57:54
 Working directory: /n/holylabs/pakes_lab/Lab/sci_eq/derived/first_stage/select_categories/code
 --------------------------------------------------------------------------------
 External links successfully created!
@@ -70,38 +70,6 @@ Notes:
 . *             for non-FBS sera).
 . *   - Tier 3: bundling/extension robustness (NOT directly antitrust-document-
 . *             named; co-purchased with Tier 1/Tier 2 products).
-. *-------------------------------------------------------------------------------
-. * CHANGELOG vs. previous build.do (strict audit):
-. *   Tier 1 -> Tier 2:
-. *     - bovine adult/calf serum, nz bovine calf serum, horse serum (footnote 44)
-. *     - PBS / DPBS / HBSS (process liquids: EU para 27 separate market;
-. *       not in serious-doubts finding)
-. *     - gene-specific rnai reagents (ambiguous between siRNA/shRNA/miRNA)
-. *   Tier 2 -> control:
-. *     - pre-designed/custom-designed qpcr assays (oligonucleotides, not kits)
-. *     - qpcr beads (not in EU kit market list)
-. *     - nucleic acid quantitation (not in any EU market)
-. *     - phosphoprotein electrophoresis reagents (specialty)
-. *     - fluorophore - general / NA stain, NA gel stains, streptavidin conjugates,
-. *       quantum dots (EU para 318 "reactive dyes" only)
-. *     - modified/radiolabeled nucleotides (EU para 126 ancillary reagents)
-. *     - creatine kinase (label flags non-NA enzyme)
-. *     - all enzyme reaction buffers (EU para 126 buffers excluded)
-. *     - protein quantitation assay kits (not in EU markets)
-. *     - pcr barcoding expansion (sequencing library prep)
-. *   Tier 2 -> Tier 3:
-. *     - capped mrna synthesis / IVT / direct pcr lysis (specialty derivatives)
-. *   Tier 3 -> control:
-. *     - all non-reactive-dye fluorophores (calcium/cell tracer/lysosome/etc.)
-. *     - viability stains (live-cell imaging)
-. *     - reaction buffers, ligation reaction buffer (EU para 126)
-. *     - WB accessories: blockers, enhancers, pen, rollers, stripping buffers
-. *       (post-transfer; weak bundling link)
-. *   New additions:
-. *     - earle's balanced salt solution (ebss) buffer -> Tier 2 (process liquid)
-. *     - rna ladder, protein ladders, radiolabeled protein MW ladder -> Tier 2
-. *     - site-directed mutagenesis kits, transposon mutagenesis kits,
-. *       random mutagenesis systems -> Tier 2 (cloning, EU para 12(vi))
 . *===============================================================================
 . 
 . gen tier1 = 0
@@ -357,51 +325,51 @@ Notes:
 . *     General fluorophores, NA stains, indicator dyes are NOT reactive dyes.
 . replace tier2 = 1 if category == "fluorophore - bioconjugate dyes"
 189. 
+. * --- End-user magnetic beads (NOT in EU OEM divestiture) ---
+. replace tier2 = 1 if category == "affinity resins - activated coupling matrices (magnetic)"
+190. replace tier2 = 1 if category == "affinity resins - anti-ig secondary (magnetic)"
+191. replace tier2 = 1 if category == "affinity resins - biotin/avidin (magnetic)"
+192. replace tier2 = 1 if category == "affinity resins - epitope tags (flag/ha/myc/v5) (magnetic)"
+193. replace tier2 = 1 if category == "affinity resins - glycoprotein (lectin-immobilized) (magnetic)"
+194. replace tier2 = 1 if category == "affinity resins - gst-tag (magnetic)"
+195. replace tier2 = 1 if category == "affinity resins - his-tag (imac) (magnetic)"
+196. replace tier2 = 1 if category == "affinity resins - mbp-tag (magnetic)"
+197. replace tier2 = 1 if category == "affinity resins - other (magnetic)"
+198. replace tier2 = 1 if category == "affinity resins - protein a (magnetic)"
+199. replace tier2 = 1 if category == "affinity resins - protein a/g (magnetic)"
+200. replace tier2 = 1 if category == "affinity resins - protein g (magnetic)"
+201. replace tier2 = 1 if category == "affinity resins - strep-tag (magnetic)"
+202. replace tier2 = 1 if category == "affinity resins - streptavidin/avidin (magnetic)"
+203. replace tier2 = 1 if category == "immunomagnetic cell separation beads"
+204. replace tier2 = 1 if category == "immunomagnetic cell separation columns"
+205. replace tier2 = 1 if category == "magnetic beads - other"
+206. replace tier2 = 1 if category == "magnetic cell separation kits"
+207. replace tier2 = 1 if category == "magnetic ip kit"
+208. 
 . count if tier2 == 1
-190. 
+209. 
 . *-------------------------------------------------------------------------------
 . * TIER 3: BUNDLING / EXTENSION ROBUSTNESS
 . *-------------------------------------------------------------------------------
 . 
 . * --- Cell culture supplements (bundled with HyClone media) ---
 . replace tier3 = 1 if category == "cell culture nutritional supplements - amino acids"
-191. replace tier3 = 1 if category == "cell culture nutritional supplements - b27"
-192. replace tier3 = 1 if category == "cell culture nutritional supplements - casamino acids"
-193. replace tier3 = 1 if category == "cell culture nutritional supplements - glucose"
-194. replace tier3 = 1 if category == "cell culture nutritional supplements - insulin"
-195. replace tier3 = 1 if category == "cell culture nutritional supplements - its-g"
-196. replace tier3 = 1 if category == "cell culture nutritional supplements - l-glutamine"
-197. replace tier3 = 1 if category == "cell culture nutritional supplements - lif"
-198. replace tier3 = 1 if category == "cell culture nutritional supplements - other"
-199. replace tier3 = 1 if category == "cell culture nutritional supplements - peptone"
-200. replace tier3 = 1 if category == "cell culture nutritional supplements - sodium pyruvate"
-201. replace tier3 = 1 if category == "cell culture nutritional supplements - sugars"
-202. replace tier3 = 1 if category == "cell culture nutritional supplements - tryptone"
-203. replace tier3 = 1 if category == "cell culture nutritional supplements - vitamins"
-204. replace tier3 = 1 if category == "cell culture nutritional supplements - yeast"
-205. replace tier3 = 1 if category == "cell culture dissociation reagents"
-206. replace tier3 = 1 if category == "growth medium supplement"
-207. 
-. * --- End-user magnetic beads (NOT in EU OEM divestiture; bundling robustness) ---
-. replace tier3 = 1 if category == "affinity resins - activated coupling matrices (magnetic)"
-208. replace tier3 = 1 if category == "affinity resins - anti-ig secondary (magnetic)"
-209. replace tier3 = 1 if category == "affinity resins - biotin/avidin (magnetic)"
-210. replace tier3 = 1 if category == "affinity resins - epitope tags (flag/ha/myc/v5) (magnetic)"
-211. replace tier3 = 1 if category == "affinity resins - glycoprotein (lectin-immobilized) (magnetic)"
-212. replace tier3 = 1 if category == "affinity resins - gst-tag (magnetic)"
-213. replace tier3 = 1 if category == "affinity resins - his-tag (imac) (magnetic)"
-214. replace tier3 = 1 if category == "affinity resins - mbp-tag (magnetic)"
-215. replace tier3 = 1 if category == "affinity resins - other (magnetic)"
-216. replace tier3 = 1 if category == "affinity resins - protein a (magnetic)"
-217. replace tier3 = 1 if category == "affinity resins - protein a/g (magnetic)"
-218. replace tier3 = 1 if category == "affinity resins - protein g (magnetic)"
-219. replace tier3 = 1 if category == "affinity resins - strep-tag (magnetic)"
-220. replace tier3 = 1 if category == "affinity resins - streptavidin/avidin (magnetic)"
-221. replace tier3 = 1 if category == "immunomagnetic cell separation beads"
-222. replace tier3 = 1 if category == "immunomagnetic cell separation columns"
-223. replace tier3 = 1 if category == "magnetic beads - other"
-224. replace tier3 = 1 if category == "magnetic cell separation kits"
-225. replace tier3 = 1 if category == "magnetic ip kit"
+210. replace tier3 = 1 if category == "cell culture nutritional supplements - b27"
+211. replace tier3 = 1 if category == "cell culture nutritional supplements - casamino acids"
+212. replace tier3 = 1 if category == "cell culture nutritional supplements - glucose"
+213. replace tier3 = 1 if category == "cell culture nutritional supplements - insulin"
+214. replace tier3 = 1 if category == "cell culture nutritional supplements - its-g"
+215. replace tier3 = 1 if category == "cell culture nutritional supplements - l-glutamine"
+216. replace tier3 = 1 if category == "cell culture nutritional supplements - lif"
+217. replace tier3 = 1 if category == "cell culture nutritional supplements - other"
+218. replace tier3 = 1 if category == "cell culture nutritional supplements - peptone"
+219. replace tier3 = 1 if category == "cell culture nutritional supplements - sodium pyruvate"
+220. replace tier3 = 1 if category == "cell culture nutritional supplements - sugars"
+221. replace tier3 = 1 if category == "cell culture nutritional supplements - tryptone"
+222. replace tier3 = 1 if category == "cell culture nutritional supplements - vitamins"
+223. replace tier3 = 1 if category == "cell culture nutritional supplements - yeast"
+224. replace tier3 = 1 if category == "cell culture dissociation reagents"
+225. replace tier3 = 1 if category == "growth medium supplement"
 226. 
 . * --- Electrophoresis sample/running buffers (bundled with Tier 2 SDS-PAGE) ---
 . replace tier3 = 1 if category == "laemmli sample buffer"
@@ -454,8 +422,8 @@ Notes:
 261. 
 . gen bad_control = 0
 262. gen bad_control_reason = ""
-263. 
-. * Rule: bad_control = US-based exogenous shock to price/spending during
+263. replace bad_control = 1 if tier3 == 1
+264. * Rule: bad_control = US-based exogenous shock to price/spending during
 . * 2010-2018, OR a product where Thermo and Life Tech had genuine
 . * horizontal overlap pre-merger (so bundling/portfolio effects bias the
 . * control), OR classification ambiguity. Bundling alone (without horizontal
@@ -465,22 +433,22 @@ Notes:
 . *     -> MilliporeSigma merger Nov 2015 absorbed one of the largest antibody
 . *     portfolios in the industry ---
 . replace bad_control = 1 if inlist(category, "primary antibodies", "secondary antibodies")
-264. replace bad_control_reason = "antibody reproducibility crisis 2014-16; Sigma-Aldrich/MilliporeSigma merger Nov 2015 affected major antibody supplier" ///
+265. replace bad_control_reason = "antibody reproducibility crisis 2014-16; Sigma-Aldrich/MilliporeSigma merger Nov 2015 affected major antibody supplier" ///
 >     if inlist(category, "primary antibodies", "secondary antibodies")
-265. 
+266. 
 . * --- Avidin products: Thermo (Pierce NeutrAvidin) AND Life (Molecular Probes
 . *     streptavidin conjugates) both had strong franchises -> horizontal
 . *     overlap from the merger ---
 . replace bad_control = 1 if category == "avidin products"
-266. replace bad_control_reason = "horizontal overlap pre-merger: Pierce biotin-avidin franchise + Molecular Probes streptavidin-fluor conjugates" ///
+267. replace bad_control_reason = "horizontal overlap pre-merger: Pierce biotin-avidin franchise + Molecular Probes streptavidin-fluor conjugates" ///
 >     if category == "avidin products"
-267. 
+268. 
 . * --- Phosphoprotein electrophoresis reagents: ambiguous classification
 . *     (Tier 2 -> control in changelog); flag rather than contaminate either group ---
 . replace bad_control = 1 if category == "phosphoprotein electrophoresis reagents"
-268. replace bad_control_reason = "classification uncertainty - not shock-based; specialty SDS-PAGE reagent overlapping with Tier 2 protein workflow" ///
+269. replace bad_control_reason = "classification uncertainty - not shock-based; specialty SDS-PAGE reagent overlapping with Tier 2 protein workflow" ///
 >     if category == "phosphoprotein electrophoresis reagents"
-269. 
+270. 
 . *-------------------------------------------------------------------------------
 . * US-based exogenous shocks during 2010-2018 window
 . *-------------------------------------------------------------------------------
@@ -489,74 +457,74 @@ Notes:
 . *     one of few US producers; global ACN shortage with lingering US price
 . *     effects through 2010-2011 ---
 . replace bad_control = 1 if category == "acetonitrile"
-270. replace bad_control_reason = "US shock: Hurricane Ike (2008) hit Texas Gulf ACN production; global shortage with lingering US price effects 2010-2011" ///
+271. replace bad_control_reason = "US shock: Hurricane Ike (2008) hit Texas Gulf ACN production; global shortage with lingering US price effects 2010-2011" ///
 >     if category == "acetonitrile"
-271. 
+272. 
 . * --- Nitrile gloves: 2017-2018 NBR (nitrile butadiene rubber) feedstock
 . *     shortage drove ~20-40% US lab glove price hikes; Malaysian production
 . *     consolidation ---
 . replace bad_control = 1 if category == "nitrile gloves"
-272. replace bad_control_reason = "US-relevant shock: 2017-2018 NBR feedstock shortage drove 20-40% lab glove price increases" ///
+273. replace bad_control_reason = "US-relevant shock: 2017-2018 NBR feedstock shortage drove 20-40% lab glove price increases" ///
 >     if category == "nitrile gloves"
-273. 
+274. 
 . * --- Synthetic DNA oligonucleotides + dual-labeled probes: US-driven secular
 . *     price collapse from Twist Bioscience entry (founded 2013, SF) and IDT
 . *     (Coralville IA) scale-up; per-base costs fell ~10x in window ---
 . replace bad_control = 1 if inlist(category, "synthetic dna oligonucleotide - desalted", "synthetic dual-labeled probe")
-274. replace bad_control_reason = "US-driven secular price collapse: Twist Bioscience entry 2013 + IDT scale-up dropped per-base costs ~10x in window" ///
+275. replace bad_control_reason = "US-driven secular price collapse: Twist Bioscience entry 2013 + IDT scale-up dropped per-base costs ~10x in window" ///
 >     if inlist(category, "synthetic dna oligonucleotide - desalted", "synthetic dual-labeled probe")
-275. 
+276. 
 . * --- Filtration (bottle top, syringe, centrifugal ultrafiltration): Pall Corp
 . *     (Port Washington NY) -> Danaher (closed Aug 2015), US M&A overlapping
 . *     the TF/Life window ---
 . replace bad_control = 1 if inlist(category, "bottle top filters", "syringe filters", "centrifugal ultrafiltration devices")
-276. replace bad_control_reason = "US M&A in window: Pall Corp -> Danaher (closed Aug 2015) reshuffled US lab filtration market" ///
+277. replace bad_control_reason = "US M&A in window: Pall Corp -> Danaher (closed Aug 2015) reshuffled US lab filtration market" ///
 >     if inlist(category, "bottle top filters", "syringe filters", "centrifugal ultrafiltration devices")
-277. 
+278. 
 . * --- Needles and syringes: Becton Dickinson (Franklin Lakes NJ) + CareFusion
 . *     (San Diego CA) closed Mar 2015; BD dominates US needle/syringe ---
 . replace bad_control = 1 if inlist(category, "hypodermic needles", "syringes")
-278. replace bad_control_reason = "US M&A in window: Becton Dickinson + CareFusion closed Mar 2015; BD dominates US needle/syringe" ///
+279. replace bad_control_reason = "US M&A in window: Becton Dickinson + CareFusion closed Mar 2015; BD dominates US needle/syringe" ///
 >     if inlist(category, "hypodermic needles", "syringes")
-279. 
+280. 
 . * --- Formaldehyde / paraformaldehyde: US-specific regulatory tightening -
 . *     EPA IRIS draft assessment 2010, NTP 12th Report on Carcinogens (Jun 2011)
 . *     listed as known human carcinogen, OSHA exposure tightening ---
 . replace bad_control = 1 if category == "formaldehydes and paraformaldehydes"
-280. replace bad_control_reason = "US regulatory shock: EPA IRIS 2010, NTP 12th RoC 2011 listed as known human carcinogen, OSHA tightening" ///
+281. replace bad_control_reason = "US regulatory shock: EPA IRIS 2010, NTP 12th RoC 2011 listed as known human carcinogen, OSHA tightening" ///
 >     if category == "formaldehydes and paraformaldehydes"
-281. 
+282. 
 . * --- Ethanol: US corn ethanol commodity exposure - 2012 Midwest drought,
 . *     RFS waiver fights 2012-2014, EPA RFS proposal Nov 2013 ---
 . replace bad_control = 1 if category == "ethanol"
-282. replace bad_control_reason = "US commodity shock: 2012 Midwest drought + RFS volatility 2012-2014 moved corn-ethanol prices" ///
+283. replace bad_control_reason = "US commodity shock: 2012 Midwest drought + RFS volatility 2012-2014 moved corn-ethanol prices" ///
 >     if category == "ethanol"
-283. 
+284. 
 . count if bad_control == 1
-284. tab bad_control
-285. 
+285. tab bad_control
+286. 
 . label var bad_control        "Drop from controls: action/shock/bundling in 2010-2018 window"
-286. label var bad_control_reason "Reason category was flagged as bad control"
-287. gen keep = (support >= 25 & precision >= 0.8 & recall >= 0.8) //| (inrange(support, 10, 25) & precision >= 0.9 & recall >=0.90)
-288. replace bad_control = 1 if category == "pipes buffers"  
-289. replace bad_control = 1 if category == "synthetic shrna"  
-290. replace bad_control =1 if inlist(category, "slide mounting medium", "collagenase", "catalase", "dextrose", "egta solution", "pipes buffers", "bacterial selection antibiotics - rifampicin")
-291. replace bad_control =1 if inlist(category, "drug - anticoagulant", "sodium hydride", "crystallizing dishes", "citric acid", "formic acid", "gene expression inducers", "dna-salmon sperm")
-292. replace bad_control =1 if inlist(category, "sucrose", "cell lysis - tween detergents", "flash chromatography columns - silica gel", "cylindrical carboys", "cell culture antibiotics - blasticidin")
-293. replace bad_control =1 if inlist(category, "nitrogen", "centrifugation media", "ldh cytotoxicity assay", "cell lysis detergents - np-40 (igepal ca-630)", "cell lysis detergents" , "human serum", "colorimetric substrates - TMB", "capillary blood colle
+287. label var bad_control_reason "Reason category was flagged as bad control"
+288. gen keep = (support >= 25 & precision >= 0.8 & recall >= 0.8) //| (inrange(support, 10, 25) & precision >= 0.9 & recall >=0.90)
+289. replace bad_control = 1 if category == "pipes buffers"  
+290. replace bad_control = 1 if category == "synthetic shrna"  
+291. replace bad_control =1 if inlist(category, "slide mounting medium", "collagenase", "catalase", "dextrose", "egta solution", "pipes buffers", "bacterial selection antibiotics - rifampicin")
+292. replace bad_control =1 if inlist(category, "drug - anticoagulant", "sodium hydride", "crystallizing dishes", "citric acid", "formic acid", "gene expression inducers", "dna-salmon sperm")
+293. replace bad_control =1 if inlist(category, "sucrose", "cell lysis - tween detergents", "flash chromatography columns - silica gel", "cylindrical carboys", "cell culture antibiotics - blasticidin")
+294. replace bad_control =1 if inlist(category, "nitrogen", "centrifugation media", "ldh cytotoxicity assay", "cell lysis detergents - np-40 (igepal ca-630)", "cell lysis detergents" , "human serum", "colorimetric substrates - TMB", "capillary blood colle
 > ction tubes")
-294. replace keep = 0 if bad_control == 1  // drop bad controls from analysis sample
-295. 
+295. replace keep = 0 if bad_control == 1  // drop bad controls from analysis sample
+296. 
 . * --- Export bad_control documentation CSV ---
 . preserve
-296.     keep if bad_control == 1
-297.     keep category bad_control bad_control_reason
-298.     sort category
-299.     export delimited using ../output/bad_control_documentation.csv, replace
-300. restore
-301. 
+297.     keep if bad_control == 1
+298.     keep category bad_control bad_control_reason
+299.     sort category
+300.     export delimited using ../output/bad_control_documentation.csv, replace
+301. restore
+302. 
 . save ../output/categories_`embed', replace
-302. end
+303. end
 
 . main
 (encoding automatically selected: ISO-8859-1)
@@ -743,24 +711,6 @@ Notes:
 (1 real change made)
 (1 real change made)
 (1 real change made)
-  154
-(1 real change made)
-(1 real change made)
-(1 real change made)
-(1 real change made)
-(1 real change made)
-(1 real change made)
-(1 real change made)
-(1 real change made)
-(1 real change made)
-(1 real change made)
-(1 real change made)
-(1 real change made)
-(1 real change made)
-(1 real change made)
-(1 real change made)
-(1 real change made)
-(1 real change made)
 (1 real change made)
 (1 real change made)
 (0 real changes made)
@@ -780,6 +730,7 @@ Notes:
 (1 real change made)
 (1 real change made)
 (1 real change made)
+  172
 (1 real change made)
 (1 real change made)
 (1 real change made)
@@ -799,7 +750,24 @@ Notes:
 (1 real change made)
 (1 real change made)
 (1 real change made)
-  54
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+  36
 
     Tier 1: |
 serious-dou |
@@ -822,8 +790,8 @@ overlap, no |
   paras 11, |
  12, fn 44) |      Freq.     Percent        Cum.
 ------------+-----------------------------------
-          0 |        951       86.06       86.06
-          1 |        154       13.94      100.00
+          0 |        933       84.43       84.43
+          1 |        172       15.57      100.00
 ------------+-----------------------------------
       Total |      1,105      100.00
 
@@ -832,8 +800,8 @@ overlap, no |
   extension |
  robustness |      Freq.     Percent        Cum.
 ------------+-----------------------------------
-          0 |      1,051       95.11       95.11
-          1 |         54        4.89      100.00
+          0 |      1,069       96.74       96.74
+          1 |         36        3.26      100.00
 ------------+-----------------------------------
       Total |      1,105      100.00
 
@@ -850,8 +818,8 @@ overlap, no |
   (Tier 1 + |
     Tier 2) |      Freq.     Percent        Cum.
 ------------+-----------------------------------
-          0 |        928       83.98       83.98
-          1 |        177       16.02      100.00
+          0 |        910       82.35       82.35
+          1 |        195       17.65      100.00
 ------------+-----------------------------------
       Total |      1,105      100.00
 
@@ -865,6 +833,7 @@ overlap, no |
 ------------+-----------------------------------
       Total |      1,105      100.00
 (1,105 missing values generated)
+(36 real changes made)
 (2 real changes made)
 variable bad_control_reason was str1 now str118
 (2 real changes made)
@@ -887,12 +856,12 @@ variable bad_control_reason was str118 now str119
 (1 real change made)
 (1 real change made)
 (1 real change made)
-  15
+  51
 
 bad_control |      Freq.     Percent        Cum.
 ------------+-----------------------------------
-          0 |      1,090       98.64       98.64
-          1 |         15        1.36      100.00
+          0 |      1,054       95.38       95.38
+          1 |         51        4.62      100.00
 ------------+-----------------------------------
       Total |      1,105      100.00
 (1 real change made)
@@ -901,8 +870,8 @@ bad_control |      Freq.     Percent        Cum.
 (7 real changes made)
 (4 real changes made)
 (6 real changes made)
-(38 real changes made)
-(1,065 observations deleted)
+(47 real changes made)
+(1,029 observations deleted)
 (file ../output/bad_control_documentation.csv not found)
 file ../output/bad_control_documentation.csv saved
 (file ../output/categories_tfidf.dta not found)
@@ -912,6 +881,6 @@ file ../output/categories_tfidf.dta saved
 end of do-file
 
 --------------------------------------------------------------------------------
-Makelog ended: 2026-06-01 23:01:03
+Makelog ended: 2026-09-03 14:57:56
 Working directory: /n/holylabs/pakes_lab/Lab/sci_eq/derived/first_stage/select_categories/code
 --------------------------------------------------------------------------------

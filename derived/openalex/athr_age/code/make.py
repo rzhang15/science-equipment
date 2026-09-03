@@ -17,6 +17,6 @@ start_makelog(paths)
 # MAKE LINKS
 link_externals(paths, ['links.txt'])
 # BUILD.PY
-subprocess.call('python build.py 8 > ../output/build.log 2>&1', shell=True)
+subprocess.call('python build.py > ../output/build.log 2>&1', shell=True)
 end_makelog(paths)
 input('\n Press <Enter> to exit.')

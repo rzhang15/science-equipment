@@ -16,13 +16,25 @@ gen nih_cost_k = nih_total_cost / 1000
 * years since the PI's first last-author publication, as of 2014
 gen yrs_lab_2014 = 2014 - min_year
 
+* Panel B variables are PI-level and time-invariant: summarize them on one
+* observation per PI so the N column matches the moments' denominator
+local pi_vars yrs_lab_2014 exposure mkt_spend_shr
+foreach v of local pi_vars {
+    qui gegen _chk = sd(`v'), by(athr_id)
+    qui count if _chk > 0 & !mi(_chk)
+    if r(N) > 0 di as error "`v' varies within athr_id for " r(N) " PI-years"
+    drop _chk
+}
+bys athr_id: gen byte pi_obs = _n == 1
+
 local vars ppr_cnt ppr_cnt_any cite_affl_wt avg_num_coathrs n_grants ///
-           nih_cost_k yrs_lab_2014 exposure mkt_spend_shr
+           nih_cost_k `pi_vars'
 mat sumstats = J(9,8,.)
 local r = 0
 foreach v of local vars {
     local ++r
-    qui sum `v', d
+    if `r' <= 6 qui sum `v', d
+    else        qui sum `v' if pi_obs, d
     mat sumstats[`r',1] = r(mean)
     mat sumstats[`r',2] = r(sd)
     mat sumstats[`r',3] = r(min)
@@ -107,9 +119,9 @@ file write `fh' "\quad Active NIH grants `cells5' & \GrantObs \\" _n
 file write `fh' "\quad NIH funding (" _char(92) _char(36) " thousands)`cells6' & \GrantObs \\" _n
 file write `fh' "\addlinespace" _n
 file write `fh' "\multicolumn{9}{l}{\textit{Panel B: PI characteristics}} \\" _n
-file write `fh' "\quad Years as PI in 2014 `cells7' & \RFObs \\" _n
-file write `fh' "\quad Exposure measure `cells8' & \RFObs \\" _n
-file write `fh' "\quad Treated-market share \$S_i\$`cells9' & \RFObs \\" _n
+file write `fh' "\quad Years as PI in 2014 `cells7' & \NPIs \\" _n
+file write `fh' "\quad Exposure measure `cells8' & \NPIs \\" _n
+file write `fh' "\quad Treated-market share \$S_i\$`cells9' & \NPIs \\" _n
 file write `fh' "\bottomrule" _n
 file write `fh' "\end{tabular}" _n
 file write `fh' "\floatfoot{\textit{Notes:} The sample is the all-journal PI-year panel of R1 and R2 university PIs, 2010--2019, covering \NPIs\ PIs and \RFObs\ PI-years." _n
@@ -117,7 +129,7 @@ file write `fh' "Panel A reports PI-year outcomes, whose mean-median gaps reflec
 file write `fh' "Publications (last-author) is the outcome in our main analysis, and publications (any position) counts a PI's papers in any authorship position." _n
 file write `fh' "Coauthors per paper is an average over a PI's papers in a year and is observed for \CoauthObs\ PI-years, since a per-paper average requires at least one publication." _n
 file write `fh' "Active NIH grants and annual NIH funding are observed for the \NNIHMatched\ PIs matched to NIH records, \GrantObs\ PI-years." _n
-file write `fh' "Panel B reports PI characteristics. Years as PI is the number of years since a PI's first last-author publication, measured in 2014." _n
+file write `fh' "Panel B reports PI characteristics, with one observation per PI (\NPIs\ PIs). Years as PI is the number of years since a PI's first last-author publication, measured in 2014." _n
 file write `fh' "The exposure measure and treated-market share \$S_i\$ are the shift-share cost increase and the pre-merger treated-market spending share defined in Section~\ref{sec:exposure}, observed for FOIA PIs and imputed for the rest.}" _n
 file write `fh' "\end{table}" _n
 file close `fh'

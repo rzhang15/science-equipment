@@ -173,7 +173,8 @@ program nih_by_age
     keep if athr_indicator == 1
     if "`samp'" == "foia" keep if foia_athr == 1
     gen byte nih_matched = !mi(nih_pi_name)
-    keep athr_id min_year age_2014 nih_matched
+    gen lab_age_2014 = 2014 - min_year
+    keep athr_id min_year lab_age_2014 nih_matched
     save ../temp/nih_age_pis_`samp'`suf', replace
 
     use ../temp/nih_pre_amt, clear
@@ -245,12 +246,12 @@ program nih_by_age
         w(0.5) wlab("0.5 grants") unit(PIs) fmt(%9.2f) ///
         out(../output/figures/kd_nih_active_by_age_`samp'`suf'.pdf)
 
-    bs_stats, y(nih_amt_yr) x(age_2014) ///
-        xtitle(Age in 2014 (yrs since first pub + 30)) ///
+    bs_stats, y(nih_amt_yr) x(lab_age_2014) ///
+        xtitle(Lab age in 2014 (yrs since first last-author pub)) ///
         ytitle(Avg annual NIH funding, 2010-2013 ($)) ///
         out(../output/figures/bs_nih_amt_by_age_`samp'`suf'.pdf)
-    bs_stats, y(nih_active_yr) x(age_2014) ///
-        xtitle(Age in 2014 (yrs since first pub + 30)) ///
+    bs_stats, y(nih_active_yr) x(lab_age_2014) ///
+        xtitle(Lab age in 2014 (yrs since first last-author pub)) ///
         ytitle(Avg # active NIH grants per year, 2010-2013) ///
         out(../output/figures/bs_nih_active_by_age_`samp'`suf'.pdf)
 end
@@ -284,7 +285,7 @@ program nih_by_age_piyr
     drop _tag
     di as text "nih_by_age_piyr `samp'`suf': median min_year = `med_yr'; PIs young/old = `npi_y'/`npi_o'"
 
-    keep athr_id year min_year age_2014 young nih_amt nih_active nih_new_grants
+    keep athr_id year min_year lab_age_2014 young nih_amt nih_active nih_new_grants
     save ../output/nih_by_age_piyrs_`samp'`suf', replace
 
     cap mat drop nih_age_piyr
@@ -333,9 +334,10 @@ end
 * ---------------------------------------------------------------------------
 program gather_pubs
     syntax [, suf(string)]
-    use athr_id year min_year age_2014 athr_indicator foia_athr nih_pi_name ppr_cnt_any ///
+    use athr_id year min_year athr_indicator foia_athr nih_pi_name ppr_cnt_any ///
         pre_ppr_cnt_sum pre_ppr_cnt_avg ///
         using ../external/pi_samp/pi_desc_all_jrnls_r1_r2`suf', clear
+    gen lab_age_2014 = 2014 - min_year
     gen pre_any = ppr_cnt_any if year < 2014
     bys athr_id: egen pre_ppr_any_sum = total(pre_any)
     bys athr_id: egen pre_ppr_any_avg = mean(pre_any)
@@ -343,7 +345,7 @@ program gather_pubs
     replace foia_athr = 0 if mi(foia_athr)
     gen byte nih_matched = !mi(nih_pi_name)
     rename (pre_ppr_cnt_sum pre_ppr_cnt_avg) (pre_ppr_sum pre_ppr_avg)
-    keep athr_id min_year age_2014 foia_athr nih_matched ///
+    keep athr_id min_year lab_age_2014 foia_athr nih_matched ///
          pre_ppr_sum pre_ppr_avg pre_ppr_any_sum pre_ppr_any_avg
     save ../temp/pubs_pre_pis`suf', replace
 end
@@ -405,8 +407,8 @@ program pubs_by_age
         if "`v'" == "pre_ppr_avg"      local ytitle "Avg pubs per year, 2010-2013 (last author)"
         if "`v'" == "pre_ppr_any_sum"  local ytitle "Total pubs 2010-2013 (any position)"
         if "`v'" == "pre_ppr_any_avg"  local ytitle "Avg pubs per year, 2010-2013 (any position)"
-        bs_stats, y(`v') x(age_2014) ///
-            xtitle(Age in 2014 (yrs since first pub + 30)) ///
+        bs_stats, y(`v') x(lab_age_2014) ///
+            xtitle(Lab age in 2014 (yrs since first last-author pub)) ///
             ytitle(`ytitle') ///
             out(../output/figures/bs_`v'_by_age_`samp'`suf'.pdf)
     }
@@ -584,8 +586,8 @@ program prod_per_dollar
         if "`v'" == "spend_per_ppr"         local ytitle "FOIA $ per pub"
         if "`v'" == "ppr_per_100k_comb"     local ytitle "Pubs per yr per $100k NIH + FOIA"
         if "`v'" == "comb_per_ppr"          local ytitle "NIH + FOIA $ per pub"
-        bs_stats, y(`v') x(age_2014) ///
-            xtitle(Age in 2014 (yrs since first pub + 30)) ///
+        bs_stats, y(`v') x(lab_age_2014) ///
+            xtitle(Lab age in 2014 (yrs since first last-author pub)) ///
             ytitle(`ytitle') ///
             out(../output/figures/bs_`v'_by_age_`samp'`suf'.pdf)
     }
@@ -623,7 +625,8 @@ program spend_by_age
 
     use ../external/pi_samp/pi_desc_all_jrnls_r1_r2`suf', clear
     keep if athr_indicator == 1 & foia_athr == 1
-    keep athr_id min_year age_2014
+    gen lab_age_2014 = 2014 - min_year
+    keep athr_id min_year lab_age_2014
     save ../temp/foia_pi_age`suf', replace
 
     use ../external/samp/merged_foias_with_pis, clear
@@ -661,7 +664,7 @@ program spend_by_age
 
     * PI-level dataset behind the table/plots (incl. young/old flag)
     preserve
-        keep athr_id min_year age_2014 young tot_spend lab_spend nonlab_spend ///
+        keep athr_id min_year lab_age_2014 young tot_spend lab_spend nonlab_spend ///
              hq_labspend perc_lab_spend n_yrs
         save ../output/spend_by_age_pis`suf', replace
     restore
@@ -758,8 +761,8 @@ program spend_by_age
         if "`v'" == "tot_spend"    local ytitle "Avg annual total spend ($)"
         if "`v'" == "ln_lab_spend" local ytitle "Log avg annual lab spend"
         if "`v'" == "ln_tot_spend" local ytitle "Log avg annual total spend"
-        bs_stats, y(`v') x(age_2014) ///
-            xtitle(Age in 2014 (yrs since first pub + 30)) ///
+        bs_stats, y(`v') x(lab_age_2014) ///
+            xtitle(Lab age in 2014 (yrs since first last-author pub)) ///
             ytitle(`ytitle') ///
             out(../output/figures/bs_`v'_by_age`suf'.pdf)
     }
@@ -787,7 +790,7 @@ program spend_by_age_piyr
     di as text "spend_by_age_piyr`suf': median min_year = `med_yr'; PIs young/old = `npi_y'/`npi_o'"
 
     preserve
-        keep athr_id year min_year age_2014 young tot_spend lab_spend nonlab_spend ///
+        keep athr_id year min_year lab_age_2014 young tot_spend lab_spend nonlab_spend ///
              hq_labspend perc_lab_spend
         save ../output/spend_by_age_piyrs`suf', replace
     restore

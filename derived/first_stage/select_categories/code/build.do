@@ -31,38 +31,6 @@ program select_good_categories
 *             for non-FBS sera).
 *   - Tier 3: bundling/extension robustness (NOT directly antitrust-document-
 *             named; co-purchased with Tier 1/Tier 2 products).
-*-------------------------------------------------------------------------------
-* CHANGELOG vs. previous build.do (strict audit):
-*   Tier 1 -> Tier 2:
-*     - bovine adult/calf serum, nz bovine calf serum, horse serum (footnote 44)
-*     - PBS / DPBS / HBSS (process liquids: EU para 27 separate market;
-*       not in serious-doubts finding)
-*     - gene-specific rnai reagents (ambiguous between siRNA/shRNA/miRNA)
-*   Tier 2 -> control:
-*     - pre-designed/custom-designed qpcr assays (oligonucleotides, not kits)
-*     - qpcr beads (not in EU kit market list)
-*     - nucleic acid quantitation (not in any EU market)
-*     - phosphoprotein electrophoresis reagents (specialty)
-*     - fluorophore - general / NA stain, NA gel stains, streptavidin conjugates,
-*       quantum dots (EU para 318 "reactive dyes" only)
-*     - modified/radiolabeled nucleotides (EU para 126 ancillary reagents)
-*     - creatine kinase (label flags non-NA enzyme)
-*     - all enzyme reaction buffers (EU para 126 buffers excluded)
-*     - protein quantitation assay kits (not in EU markets)
-*     - pcr barcoding expansion (sequencing library prep)
-*   Tier 2 -> Tier 3:
-*     - capped mrna synthesis / IVT / direct pcr lysis (specialty derivatives)
-*   Tier 3 -> control:
-*     - all non-reactive-dye fluorophores (calcium/cell tracer/lysosome/etc.)
-*     - viability stains (live-cell imaging)
-*     - reaction buffers, ligation reaction buffer (EU para 126)
-*     - WB accessories: blockers, enhancers, pen, rollers, stripping buffers
-*       (post-transfer; weak bundling link)
-*   New additions:
-*     - earle's balanced salt solution (ebss) buffer -> Tier 2 (process liquid)
-*     - rna ladder, protein ladders, radiolabeled protein MW ladder -> Tier 2
-*     - site-directed mutagenesis kits, transposon mutagenesis kits,
-*       random mutagenesis systems -> Tier 2 (cloning, EU para 12(vi))
 *===============================================================================
 
 gen tier1 = 0

@@ -7,22 +7,26 @@ pause on
 set seed 8975
 
 program main
-    foreach s in all_jrnls_no_clin { //} all_jrnls_no_clin top_jrnls top_jrnls_no_clin { 
+    foreach s in all_jrnls { //} all_jrnls_no_clin top_jrnls top_jrnls_no_clin { 
         local t year
-        make_panel, time(`t') last(1) samp(`s') us(1)
+       /* make_panel, time(`t') last(1) samp(`s') us(1)
         merge_ipeds, time(`t') last(1) samp(`s') us(1)
         make_panel, time(`t') samp(`s') us(1)
-        merge_ipeds, time(`t') samp(`s') us(1)
+        merge_ipeds, time(`t') samp(`s') us(1)*/
+        make_panel, time(`t') last(1) samp(`s') us(1) nosolo(1)
+        merge_ipeds, time(`t') last(1) samp(`s') us(1) nosolo(1)
+        make_panel, time(`t') samp(`s') us(1) nosolo(1)
+        merge_ipeds, time(`t') samp(`s') us(1) nosolo(1)
     }
 end
 
 program make_panel
-    syntax, time(string) samp(str) [, firstlast(int 0) last(int 0) first(int 0) us(int 0) second(int 0)]
+    syntax, time(string) samp(str) [, firstlast(int 0) last(int 0) first(int 0) us(int 0) second(int 0) nosolo(int 0)]
     // route openalex-level loads to the clinical-filtered folder when samp
     // ends in _no_clin; sub_athrs paths stay the same
     local src "openalex"
     if regexm("`samp'", "_no_clin$") local src "openalex_no_clin"
-    import delimited ../external/clusters/author_static_clusters_30_ls.csv, clear
+    import delimited ../external/clusters/author_static_clusters_30.csv, clear
     save ../temp/clusters, replace
 
     // Build coauthor structures from the full-authors sample so team-size
@@ -53,6 +57,7 @@ program make_panel
         use id pmid which_athr which_affl pub_date year jrnl cite_count athr_id athr_name country_code msa_comb msa_c_world inst inst_id msacode using ../external/sub_athrs/first/cleaned_`samp', clear
         local suf = "_first" 
     }
+    if `nosolo' == 1 local suf "`suf'_no_solo"
     if `us' == 0 local suf "`suf'_global"
     gen cns = inlist(jrnl, "Cell", "Nature", "Science") 
     gen ppr_cnt = 1
@@ -60,6 +65,9 @@ program make_panel
     merge m:1 athr_id using ../temp/clusters, assert(1 2 3) keep(3) nogen
     merge m:1 id using ../external/patents/patent_ppr_cnt, assert(1 2 3) keep(1 3) nogen keepusing(patent_count front_only body_only)
     merge m:1 pmid using ../temp/paper_team_size_`samp', assert(2 3) keep(3) nogen
+    // paper_team_size comes from the full-authors sample, so this drops solo
+    // papers correctly even in position subsamples where num_athrs == 1 by construction
+    if `nosolo' == 1 drop if paper_team_size == 1
     rename cluster_label field
 
     bys pmid athr_id (which_athr which_affl): gen author_id = _n == 1
@@ -343,7 +351,7 @@ program make_panel
 end
 
 program merge_ipeds
-    syntax, time(string) samp(str) [, last(int 0) first(int 0) firstlast(int 0) second(int 0) us(int 0)]
+    syntax, time(string) samp(str) [, last(int 0) first(int 0) firstlast(int 0) second(int 0) us(int 0) nosolo(int 0)]
     local suf = "" 
     import delimited ../external/ipeds/ipeds_openalex.csv, clear 
     contract ipeds_id inst_id type
@@ -353,17 +361,14 @@ program merge_ipeds
     contract inst_id type control
     drop _freq
     save ../temp/ipeds_inst_id, replace
-    if `last' == 1 local suf = "_last" 
-    if `firstlast' == 1 local suf = "_firstlast" 
-    if `second' == 1 local suf = "_second" 
-    if `first' == 1 local suf = "_first" 
+    if `last' == 1 local suf = "_last"
+    if `firstlast' == 1 local suf = "_firstlast"
+    if `second' == 1 local suf = "_second"
+    if `first' == 1 local suf = "_first"
+    if `nosolo' == 1 local suf "`suf'_no_solo"
 
-    use ../output/athr_panel_full_`time'`suf'_`samp',clear 
-    * Institution-agnostic career date, computed before the IPEDS merge drops
-    * every year spent outside a US R1/R2 (national labs, hospitals, industry,
-    * non-US). In the _last panel this is the first last-author year ever.
-    bys athr_id: egen min_year_ever = min(year)
-    merge m:1 inst_id using ../temp/ipeds_inst_id, assert(1 2 3) keep(3) nogen 
+    use ../output/athr_panel_full_`time'`suf'_`samp',clear
+    merge m:1 inst_id using ../temp/ipeds_inst_id, assert(1 2 3) keep(3) nogen
     gen public = control == 1
     save ../output/athr_panel_full_`time'`suf'_`samp'_r1_r2, replace
     keep if public == 1
