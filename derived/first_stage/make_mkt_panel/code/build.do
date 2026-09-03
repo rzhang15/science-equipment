@@ -8,13 +8,15 @@ version 17
 
 program main
     foreach t in tfidf {
-        clean_raw, embed(`t')
-        qui make_panels, embed(`t')
+        foreach s in "" "_all3" {
+            clean_raw, embed(`t') suffix(`s')
+            qui make_panels, embed(`t') suffix(`s')
+        }
     }
 end
 
 program clean_raw
-    syntax, embed(string)
+    syntax, embed(string) [suffix(string)]
     use ../external/price_samp/first_stage_data_`embed', clear
     gen purchase_date = date(date, "DMY")
     replace purchase_date = date(date, "YMD") if mi(purchase_date)
@@ -134,7 +136,7 @@ program clean_raw
     local total_spend : di %16.0f r(sum)
     di "[Remove Possible Non-consumables] N: `total_obs' Total Spend: `total_spend'"
     qui {
-        merge m:1 category using ../external/categories/categories_`embed', assert(1 2 3)  keep(1 3) nogen
+        merge m:1 category using ../external/categories/categories_`embed'`suffix', assert(1 2 3)  keep(1 3) nogen
         drop if similarity_score <= 0.10 & prediction_source == "Expert Model" 
         replace category = subinstr(category, "/","-",.)
         gen raw_price = price
@@ -181,13 +183,13 @@ program clean_raw
         gcollapse (mean) recall precision support keep , by(category)
         tw kdensity recall || kdensity precision , xlab(, labsize(small)) ylab(, labsize(small)) xtitle("Score (0-1)", size(small)) ytitle("Density", size(small)) xline(0.8, lcolor(gs5) lpattern(dash)) ///
             legend(on order(1 "Recall" 2 "Precision") pos(11) ring(0))
-        graph export ../output/figures/recall_precision_density_`embed'.pdf, replace
+        graph export ../output/figures/recall_precision_density_`embed'`suffix'.pdf, replace
         binscatter2 recall support, xlab(, labsize(small)) ylab(, labsize(small)) ///
             xtitle("Support", size(small)) ytitle("Recall", size(small))
-        graph export ../output/figures/recall_support_`embed'.pdf, replace
+        graph export ../output/figures/recall_support_`embed'`suffix'.pdf, replace
         binscatter2 precision support, xlab(, labsize(small)) ylab(, labsize(small)) ///
             xtitle("Precision", size(small)) ytitle("Recall", size(small))
-        graph export ../output/figures/precision_support_`embed'.pdf, replace
+        graph export ../output/figures/precision_support_`embed'`suffix'.pdf, replace
         restore
     }
     drop if support <= 5  
@@ -263,28 +265,28 @@ program clean_raw
     gen range_raw_price = max_raw_price - min_raw_price
     gunique category
     gunique category if treated == 1
-    save ../output/full_item_level_`embed', replace
+    save ../output/full_item_level_`embed'`suffix', replace
 end
 
 program make_panels
-    syntax, embed(string)
-    use ../output/full_item_level_`embed', clear
+    syntax, embed(string) [suffix(string)]
+    use ../output/full_item_level_`embed'`suffix', clear
     collapse (mean) min_raw_price max_raw_price sd_raw_price range_raw_price obs_2013 uni_spend_2013 uni_obs_2013 recall precision support treated tier1 tier2 tier3 keep item_price = raw_price avg_log_price = price avg_log_spend = spend avg_log_qty = qty (sum) raw_spend raw_qty obs_cnt (firstnm) mkt agencyname, by(category year uni_id)
     gen raw_price = raw_spend/raw_qty
     gen log_raw_price = ln(raw_price)
     gen log_raw_qty = ln(raw_qty)
     gen log_raw_spend = ln(raw_spend)
-    save ../output/full_uni_category_yr_`embed', replace
+    save ../output/full_uni_category_yr_`embed'`suffix', replace
 
-    use ../output/full_item_level_`embed', clear
+    use ../output/full_item_level_`embed'`suffix', clear
     collapse (max) treated (mean) min_raw_price max_raw_price sd_raw_price range_raw_price precision recall support tier1 tier2 tier3 keep spend_2013 obs_2013 uni_spend_2013 uni_obs_2013 item_price = raw_price avg_log_price = price avg_log_spend = spend avg_log_qty = qty (firstnm) mkt (sum) raw_spend raw_qty obs_cnt , by(category year)
     gen raw_price = raw_spend/raw_qty
     gen log_raw_spend = ln(raw_spend)
     gen log_raw_qty = ln(raw_qty)
     gen log_raw_price = ln(raw_price)
-    save "../output/full_category_yr_`embed'", replace 
+    save "../output/full_category_yr_`embed'`suffix'", replace 
 
-    use ../output/full_item_level_`embed', clear
+    use ../output/full_item_level_`embed'`suffix', clear
     keep if keep == 1  
     drop uni_mkt 
     cap drop max_year
@@ -292,11 +294,11 @@ program make_panels
     bys uni_mkt : egen min_year = min(year)
     bys uni_mkt : egen max_year = max(year)
     keep if min_year < 2014 & max_year > 2014
-    save ../output/item_level_`embed', replace
+    save ../output/item_level_`embed'`suffix', replace
    
     preserve
     collapse (max) treated (sum) obs_cnt *raw_spend (firstnm) suppliername mkt , by(supplier_id category year)
-    save ../output/supplier_category_yr_`embed', replace
+    save ../output/supplier_category_yr_`embed'`suffix', replace
     gen pre_period = year < 2014
     keep if inrange(year, 2011,2013) | inrange(year, 2015, 2017)
     collapse (sum) raw_spend obs_cnt (firstnm) suppliername treated , by(supplier_id category pre_period)
@@ -320,7 +322,7 @@ program make_panels
     gcontract category simulated_hhi delta_hhi treated tot_cnt
     drop _freq
     gisid category
-    save ../output/category_hhi_`embed', replace
+    save ../output/category_hhi_`embed'`suffix', replace
     restore
 
 
@@ -330,7 +332,7 @@ program make_panels
     gen log_raw_spend = ln(raw_spend)
     gen log_raw_qty = ln(raw_qty)
     gen log_raw_price = ln(raw_price)
-    save ../output/uni_category_yr_`embed', replace
+    save ../output/uni_category_yr_`embed'`suffix', replace
     restore
 
     collapse (max) treated (mean) min_raw_price max_raw_price sd_raw_price range_raw_price precision recall support tier1 tier2 tier3 spend_2013 obs_2013 uni_spend_2013 uni_obs_2013 item_price = raw_price avg_log_price = price avg_log_spend = spend avg_log_qty = qty (firstnm) mkt (sum) raw_spend raw_qty obs_cnt , by(category year)
@@ -338,7 +340,7 @@ program make_panels
     gen log_raw_spend = ln(raw_spend)
     gen log_raw_qty = ln(raw_qty)
     gen log_raw_price = ln(raw_price)
-    save "../output/category_yr_`embed'", replace 
+    save "../output/category_yr_`embed'`suffix'", replace 
 
     preserve
     keep if treated == 1
@@ -351,7 +353,7 @@ program make_panels
         xtitle("Average Yearly Change in Log Price (2011-2017)", size(small)) ///
         ytitle("Max Yearly Change in Log Price (2011-2017)", size(small)) ///
         legend(off)
-    graph export ../output/figures/treated_trends.pdf, replace
+    graph export ../output/figures/treated_trends`suffix'.pdf, replace
     restore
     
     preserve
@@ -364,7 +366,7 @@ program make_panels
         xtitle("Average Yearly Change in Log Price (2011-2017)", size(small)) ///
         ytitle("Max Yearly Change in Log Price (2011-2017)", size(small)) ///
         legend(off)
-    graph export ../output/figures/ctrl_trends.pdf, replace
+    graph export ../output/figures/ctrl_trends`suffix'.pdf, replace
     restore
 end
 

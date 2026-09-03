@@ -30,7 +30,7 @@ global FE_MODE "author"
 global WEIGHT_MSIM 0
 global QUICK_TOPJRNL 0
 global HISIM_PCT 0
-global FIG_MODES "paper"
+global FIG_MODES "pres"
 global NO_SOLO 0
 
 program main

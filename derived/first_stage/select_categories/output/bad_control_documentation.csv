@@ -1,77 +1,114 @@
-category,bad_control,bad_control_reason
-acetonitrile,1,US shock: Hurricane Ike (2008) hit Texas Gulf ACN production; global shortage with lingering US price effects 2010-2011
-avidin products,1,horizontal overlap pre-merger: Pierce biotin-avidin franchise + Molecular Probes streptavidin-fluor conjugates
-bacterial selection antibiotics - rifampicin,1,
-bottle top filters,1,US M&A in window: Pall Corp -> Danaher (closed Aug 2015) reshuffled US lab filtration market
-bovine serum albumin,1,
-capillary blood collection tubes,1,
-capped mrna synthesis kits,1,
-catalase,1,
-cell culture antibiotics - blasticidin,1,
-cell culture dissociation reagents,1,
-cell culture nutritional supplements - amino acids,1,
-cell culture nutritional supplements - b27,1,
-cell culture nutritional supplements - casamino acids,1,
-cell culture nutritional supplements - glucose,1,
-cell culture nutritional supplements - insulin,1,
-cell culture nutritional supplements - its-g,1,
-cell culture nutritional supplements - l-glutamine,1,
-cell culture nutritional supplements - lif,1,
-cell culture nutritional supplements - other,1,
-cell culture nutritional supplements - peptone,1,
-cell culture nutritional supplements - sodium pyruvate,1,
-cell culture nutritional supplements - sugars,1,
-cell culture nutritional supplements - tryptone,1,
-cell culture nutritional supplements - vitamins,1,
-cell culture nutritional supplements - yeast,1,
-cell lysis detergents - np-40 (igepal ca-630),1,
-centrifugal ultrafiltration devices,1,US M&A in window: Pall Corp -> Danaher (closed Aug 2015) reshuffled US lab filtration market
-centrifugation media,1,
-citric acid,1,
-collagenase,1,
-crystallizing dishes,1,
-cylindrical carboys,1,
-dextrose,1,
-direct pcr lysis reagents,1,
-dna-salmon sperm,1,
-drug - anticoagulant,1,
-egta solution,1,
-ethanol,1,US commodity shock: 2012 Midwest drought + RFS volatility 2012-2014 moved corn-ethanol prices
-flash chromatography columns - silica gel,1,
-formaldehydes and paraformaldehydes,1,"US regulatory shock: EPA IRIS 2010, NTP 12th RoC 2011 listed as known human carcinogen, OSHA tightening"
-formic acid,1,
-gel blotting papers,1,
-gene expression inducers,1,
-growth medium supplement,1,
-human serum,1,
-hypodermic needles,1,US M&A in window: Becton Dickinson + CareFusion closed Mar 2015; BD dominates US needle/syringe
-in vitro transcription kit,1,
-laemmli sample buffer,1,
-ldh cytotoxicity assay,1,
-lds sample buffer,1,
-mes-sds buffer,1,
-mops-sds buffer,1,
-native page running buffers,1,
-native-page sample buffer,1,
-nitrile gloves,1,US-relevant shock: 2017-2018 NBR feedstock shortage drove 20-40% lab glove price increases
-nitrogen,1,
-phosphoprotein electrophoresis reagents,1,classification uncertainty - not shock-based; specialty SDS-PAGE reagent overlapping with Tier 2 protein workflow
-pipes buffers,1,
-primary antibodies,1,antibody reproducibility crisis 2014-16; Sigma-Aldrich/MilliporeSigma merger Nov 2015 affected major antibody supplier
-reducing agents - bme,1,
-secondary antibodies,1,antibody reproducibility crisis 2014-16; Sigma-Aldrich/MilliporeSigma merger Nov 2015 affected major antibody supplier
-slide mounting medium,1,
-sodium hydride,1,
-sucrose,1,
-synthetic dna oligonucleotide - desalted,1,US-driven secular price collapse: Twist Bioscience entry 2013 + IDT scale-up dropped per-base costs ~10x in window
-synthetic dual-labeled probe,1,US-driven secular price collapse: Twist Bioscience entry 2013 + IDT scale-up dropped per-base costs ~10x in window
-synthetic shrna,1,
-syringe filters,1,US M&A in window: Pall Corp -> Danaher (closed Aug 2015) reshuffled US lab filtration market
-syringes,1,US M&A in window: Becton Dickinson + CareFusion closed Mar 2015; BD dominates US needle/syringe
-tbe buffer,1,
-tris-aceate-sds running buffer,1,
-tris-acetate-edta (tae) buffer,1,
-tris-glycine buffer,1,
-tris-glycine-sds (tgs) buffer,1,
-tris-tricine-sds buffer,1,
-western blot transfer buffers,1,
+category,bad_control_reason,excluded_type
+acetonitrile,US shock: Hurricane Ike (2008) hit Texas Gulf ACN production; global shortage with lingering US price effects 2010-2011,excluded control
+acrylamide/bis solution,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+avidin products,horizontal overlap pre-merger: Pierce biotin-avidin franchise + Molecular Probes streptavidin-fluor conjugates,excluded control
+bacterial selection antibiotics - rifampicin,US shock: rifampin on FDA drug-shortage list 2013-14 and 2017,excluded control
+bacterial transformation reagents,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+bottle top filters,US M&A in window: Pall Corp -> Danaher (closed Aug 2015) reshuffled US lab filtration market,excluded control
+bovine serum albumin,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+capillary blood collection tubes,US M&A in window: BD (Microtainer) dominates; BD-CareFusion closed Mar 2015 (same reason as needles/syringes),excluded control
+capped mrna synthesis kits,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+catalase,judgment call: bovine-liver-derived biologic sharing bovine supply chain with FBS/BSA,excluded control
+cell culture antibiotics - blasticidin,Invitrogen-dominant selection antibiotic tied to Tier 3 expression plasmid/vector systems; portfolio pricing exposure,excluded control
+cell culture dissociation reagents,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+cell culture nutritional supplements - amino acids,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+cell culture nutritional supplements - b27,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+cell culture nutritional supplements - casamino acids,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+cell culture nutritional supplements - glucose,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+cell culture nutritional supplements - insulin,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+cell culture nutritional supplements - its-g,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+cell culture nutritional supplements - l-glutamine,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+cell culture nutritional supplements - lif,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+cell culture nutritional supplements - other,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+cell culture nutritional supplements - peptone,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+cell culture nutritional supplements - sodium pyruvate,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+cell culture nutritional supplements - sugars,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+cell culture nutritional supplements - tryptone,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+cell culture nutritional supplements - vitamins,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+cell culture nutritional supplements - yeast,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+cell lysis detergents - np-40 (igepal ca-630),horizontal overlap pre-merger: Pierce surfactants/lysis buffers (Thermo) + Invitrogen lysis reagents (Life),excluded control
+centrifugal ultrafiltration devices,US M&A in window: Pall Corp -> Danaher (closed Aug 2015) reshuffled US lab filtration market,excluded control
+centrifugation media,"Ficoll/Percoll density-gradient cell separation substitutes for magnetic bead-based separation (Dynabeads, Life)",excluded control
+chemically competent cells,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+citric acid,"US trade shock: antidumping orders on Chinese citric acid in force through window; new AD/CVD investigations 2017, orders 2018",excluded control
+collagenase,"classification ambiguity: is a cell culture dissociation reagent, a Tier 3 category (Gibco collagenase)",excluded control
+column-based dna and rna extraction kits,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+column-based dna genomic purification kits,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+column-based dna plasmid gigaprep,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+column-based dna plasmid maxiprep,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+column-based dna plasmid megaprep,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+column-based dna plasmid midiprep,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+column-based dna plasmid miniprep,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+column-based dna purification kits,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+column-based gel dna extraction kits,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+column-based gel rna extraction kits,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+column-based microbial dna purification kits,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+column-based pcr and gel purification kit,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+column-based pcr purification kits,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+column-based pcr purification reagent,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+column-based plant dna purification kits,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+column-based plant rna purification kits,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+column-based protein purification kit,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+column-based rna purification kits,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+column-based yeast dna purification kits,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+crystallizing dishes,US M&A in window: Kimble + Wheaton + Duran merged into DWK Life Sciences 2017; Corning absorbed BD Discovery Labware Oct 2012,excluded control
+cylindrical carboys,Nalgene (Thermo) dominates category; exposed to acquirer portfolio repricing despite no Life overlap,excluded control
+dextrose,"US commodity shock: corn exposure, 2012 Midwest drought (parallel to ethanol); also ambiguous with Tier 3 supplements-glucose",excluded control
+direct pcr lysis reagents,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+dna-salmon sperm,judgment call: hybridization-era blocking agent in secular decline with NGS shift; nominal Invitrogen overlap,excluded control
+drug - anticoagulant,US shock: heparin Chinese crude API cost pressure through window; US shortage from 2017,excluded control
+egta solution,classification ambiguity: prepared buffer solution in same family as Tier 2 process liquids (PBS/TE/HBSS/EBSS),excluded control
+electrocompetent cells,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+ethanol,US commodity shock: 2012 Midwest drought + RFS volatility 2012-2014 moved corn-ethanol prices,excluded control
+expression plasmids,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+flash chromatography columns - silica gel,judgment call: synthetic-chemistry product with non-life-science buyer base,excluded control
+formaldehydes and paraformaldehydes,"US regulatory shock: EPA IRIS 2010, NTP 12th RoC 2011 listed as known human carcinogen, OSHA tightening",excluded control
+formic acid,industrial commodity priced off petrochemical feedstocks; 2014-15 oil price collapse coincides with merger,excluded control
+gel blotting papers,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+gene expression inducers,US shock: doxycycline (standard Tet-On/Off inducer) generic price spike 2013-14,excluded control
+growth medium supplement,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+human serum,substitute for Tier 1 FBS in cell culture; merger-induced FBS price changes shift demand,excluded control
+hypodermic needles,US M&A in window: Becton Dickinson + CareFusion closed Mar 2015; BD dominates US needle/syringe,excluded control
+in vitro transcription kit,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+laemmli sample buffer,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+ldh cytotoxicity assay,horizontal overlap pre-merger: Pierce LDH cytotoxicity assay (Thermo) + Invitrogen/Molecular Probes cytotoxicity assay lines (Life),excluded control
+lds sample buffer,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+liquid-based dna plasmid purification kit,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+mes-sds buffer,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+mops-sds buffer,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+native page running buffers,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+native-page sample buffer,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+nitrile gloves,US-relevant shock: 2017-2018 NBR feedstock shortage drove 20-40% lab glove price increases,excluded control
+nitrogen,"US M&A in window: Air Liquide-Airgas closed May 2016, Praxair-Linde announced 2016; prices track energy",excluded control
+phosphoprotein electrophoresis reagents,classification uncertainty - not shock-based; specialty SDS-PAGE reagent overlapping with Tier 2 protein workflow,excluded control
+pipes buffers,classification ambiguity: prepared buffer solution in same family as Tier 2 process liquids (PBS/TE/HBSS/EBSS),excluded control
+plasmid vectors,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+polyacrylamide gels casting kit,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+primary antibodies,antibody reproducibility crisis 2014-16; Sigma-Aldrich/MilliporeSigma merger Nov 2015 affected major antibody supplier,excluded control
+reducing agents - bme,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+rna extraction reagents,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+rna polymerases,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+rna stabilization reagent,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+secondary antibodies,antibody reproducibility crisis 2014-16; Sigma-Aldrich/MilliporeSigma merger Nov 2015 affected major antibody supplier,excluded control
+silica bead based gel purification kit,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+site-directed mutagenesis kits,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+site-directed mutagenesis systems,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+slide mounting medium,horizontal overlap pre-merger: Molecular Probes ProLong/SlowFade antifade mountants (Life) + Richard-Allan/Shandon histology mounting media (Thermo),excluded control
+sodium hydride,"judgment call: synthetic-chemistry commodity, petrochemical feedstock pricing, non-life-science buyer base",excluded control
+spin columns,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+sucrose,"US shock: AD/CVD case vs Mexican sugar (filed Mar 2014, suspension agreements Dec 2014) + 2012 drought; also ambiguous with Tier 3 supplements-sugars",excluded control
+synthetic dna oligonucleotide - desalted,US-driven secular price collapse: Twist Bioscience entry 2013 + IDT scale-up dropped per-base costs ~10x in window,excluded control
+synthetic dual-labeled probe,US-driven secular price collapse: Twist Bioscience entry 2013 + IDT scale-up dropped per-base costs ~10x in window,excluded control
+synthetic shrna,"tier 2 treated but excluded: CRISPR substitute entry (Cas9 2013, GeCKO libraries 2014) hit knockdown screening at merger date; merger pricing effect not separable from technology substitution",excluded treated (own shock)
+syringe filters,US M&A in window: Pall Corp -> Danaher (closed Aug 2015) reshuffled US lab filtration market,excluded control
+syringes,US M&A in window: Becton Dickinson + CareFusion closed Mar 2015; BD dominates US needle/syringe,excluded control
+tbe buffer,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+transfection reagents - lentiviral packaging kits,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+transfection reagents - polybrene (viral transduction),tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+transposon mutagenesis kits,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+tris-aceate-sds running buffer,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+tris-acetate-edta (tae) buffer,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+tris-glycine buffer,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+tris-glycine-sds (tgs) buffer,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+tris-tricine-sds buffer,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+western blot transfer buffers,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups

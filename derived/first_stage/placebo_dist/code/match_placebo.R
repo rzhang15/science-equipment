@@ -10,7 +10,6 @@ library(stringr)
 # ---------------------------
 PLACEBO_SEED      <- 8975
 N_PLACEBO_ITERS   <- 100
-N_PLACEBO_TREATED <- 46
 # v80 spec: pre-period 3-yr mean (2011-2013) + slope of avg_log_price.
 MATCH_COVARIATES  <- c("avg_log_price_pre_mean", "avg_log_price_slope")
 MATCH_RATIO       <- 2
@@ -22,15 +21,17 @@ dir.create("../output/balance_plots", recursive = TRUE, showWarnings = FALSE)
 # ---------------------------
 # Static data prep (shared across iterations)
 # ---------------------------
+for (SUFFIX in c("", "_all3")) {
+cat("\n########## Running suffix:", ifelse(SUFFIX == "", "baseline", SUFFIX), "##########\n")
 cat("Loading data...\n")
-panel <- read_dta("../external/samp/category_yr_tfidf.dta")
+panel <- read_dta(paste0("../external/samp/category_yr_tfidf", SUFFIX, ".dta"))
 panel <- panel %>% mutate(category = as.character(category))
 
 real_treated_cats <- panel %>%
   filter(treated == 1) %>%
   distinct(category) %>%
   pull(category)
-n_placebo <- N_PLACEBO_TREATED
+n_placebo <- length(real_treated_cats)
 
 cat("Real treated markets (excluded from placebo pool):", length(real_treated_cats), "\n")
 cat("Placebo treated markets per iter:", n_placebo, "\n")
@@ -122,7 +123,7 @@ for (iter in seq_len(N_PLACEBO_ITERS)) {
     tryCatch({
       bal_plot <- love.plot(main_model, binary = "std", thresholds = c(m = .1),
                             title = "Placebo Covariate Balance (iter 1)")
-      ggsave("../output/balance_plots/balance_iter1.pdf", plot = bal_plot, width = 8, height = 6)
+      ggsave(paste0("../output/balance_plots/balance_iter1", SUFFIX, ".pdf"), plot = bal_plot, width = 8, height = 6)
     }, error = function(e) message("WARNING: love.plot failed: ", e$message))
   }
 
@@ -189,8 +190,9 @@ for (iter in seq_len(N_PLACEBO_ITERS)) {
 final_pairs       <- do.call(rbind, all_pairs)
 final_assignments <- do.call(rbind, all_assignments)
 
-write_csv(final_pairs,       "../output/placebo_match_pairs.csv")
-write_csv(final_assignments, "../output/placebo_assignment.csv")
+write_csv(final_pairs,       paste0("../output/placebo_match_pairs", SUFFIX, ".csv"))
+write_csv(final_assignments, paste0("../output/placebo_assignment", SUFFIX, ".csv"))
 
-cat("\nSaved placebo_match_pairs.csv and placebo_assignment.csv across ",
+cat("\nSaved placebo_match_pairs", SUFFIX, ".csv and placebo_assignment", SUFFIX, ".csv across ",
     N_PLACEBO_ITERS, " iterations (", nrow(final_pairs), " rows).\n", sep = "")
+}

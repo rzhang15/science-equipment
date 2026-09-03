@@ -7,49 +7,53 @@ preliminaries
 version 17
 
 program main
-    build_pairs_xw
-    build_category_panel
-    build_uni_category_panel
+    foreach s in "" "_all3" {
+        build_pairs_xw, suffix(`s')
+        build_category_panel, suffix(`s')
+        build_uni_category_panel, suffix(`s')
+    }
 end
 
 program build_pairs_xw
+    syntax, [suffix(string)]
     // pairs xw built from placebo match output (now keyed on iter)
-    import delimited ../output/placebo_match_pairs.csv, clear varn(1)
+    import delimited ../output/placebo_match_pairs`suffix'.csv, clear varn(1)
     rename treated_market category
-    save ../output/placebo_matched_pairs, replace
+    save ../output/placebo_matched_pairs`suffix', replace
 
     preserve
     gcontract iter category
     drop _freq
-    save ../output/placebo_matched_mkts, replace
+    save ../output/placebo_matched_mkts`suffix', replace
     restore
 
     gcontract iter control_market
     drop _freq
     rename control_market category
-    save ../output/placebo_matched_controls, replace
+    save ../output/placebo_matched_controls`suffix', replace
 end
 
 program build_category_panel
-    use ../output/placebo_matched_mkts, clear
+    syntax, [suffix(string)]
+    use ../output/placebo_matched_mkts`suffix', clear
     qui sum iter
     local n_iter = r(max)
 
     tempfile stacked mkts_i ctrls_i
     forvalues i = 1/`n_iter' {
         di "===== build_category_panel iter `i' / `n_iter' ====="
-        use ../output/placebo_matched_mkts, clear
+        use ../output/placebo_matched_mkts`suffix', clear
         keep if iter == `i'
         keep category
         save `mkts_i', replace
 
-        use ../output/placebo_matched_controls, clear
+        use ../output/placebo_matched_controls`suffix', clear
         keep if iter == `i'
         keep category
         duplicates drop category, force
         save `ctrls_i', replace
 
-        use ../external/samp/category_yr_tfidf, clear
+        use ../external/samp/category_yr_tfidf`suffix', clear
         drop if treated == 1
         drop treated
         merge m:1 category using `mkts_i'
@@ -70,29 +74,30 @@ program build_category_panel
         save `stacked', replace
     }
     use `stacked', clear
-    save ../output/placebo_matched_category_panel, replace
+    save ../output/placebo_matched_category_panel`suffix', replace
 end
 
 program build_uni_category_panel
-    use ../output/placebo_matched_mkts, clear
+    syntax, [suffix(string)]
+    use ../output/placebo_matched_mkts`suffix', clear
     qui sum iter
     local n_iter = r(max)
 
     tempfile stacked mkts_i ctrls_i
     forvalues i = 1/`n_iter' {
         di "===== build_uni_category_panel iter `i' / `n_iter' ====="
-        use ../output/placebo_matched_mkts, clear
+        use ../output/placebo_matched_mkts`suffix', clear
         keep if iter == `i'
         keep category
         save `mkts_i', replace
 
-        use ../output/placebo_matched_controls, clear
+        use ../output/placebo_matched_controls`suffix', clear
         keep if iter == `i'
         keep category
         duplicates drop category, force
         save `ctrls_i', replace
 
-        use ../external/samp/uni_category_yr_tfidf, clear
+        use ../external/samp/uni_category_yr_tfidf`suffix', clear
         drop if treated == 1
         drop treated
         merge m:1 category using `mkts_i'
@@ -113,7 +118,7 @@ program build_uni_category_panel
         save `stacked', replace
     }
     use `stacked', clear
-    save ../output/placebo_matched_uni_category_panel, replace
+    save ../output/placebo_matched_uni_category_panel`suffix', replace
 end
 
 main

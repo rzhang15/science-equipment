@@ -5,14 +5,18 @@ program drop _all
 set scheme modern
 preliminaries
 version 17
+global exhibit_mode both // paper | presentation | both
 
 program main
-    overlay_hist, real_file("../external/real/did_coefs_price") ///
-        placebo_file("../external/placebo/did_coefs_placebo") ///
-        outcome("price") suf("")
-    overlay_hist, real_file("../external/real/did_coefs_spend") ///
-        placebo_file("../external/placebo/did_coefs_placebo_spend") ///
-        outcome("spend") suf("_spend")
+    foreach s in "" "_all3" {
+        global suffix `s'
+        overlay_hist, real_file("../external/real/did_coefs_price$suffix") ///
+            placebo_file("../external/placebo/did_coefs_placebo$suffix") ///
+            outcome("price") suf("")
+        overlay_hist, real_file("../external/real/did_coefs_spend$suffix") ///
+            placebo_file("../external/placebo/did_coefs_placebo_spend$suffix") ///
+            outcome("spend") suf("_spend")
+    }
 end
 
 program overlay_hist
@@ -104,6 +108,9 @@ program overlay_hist
         qui sum b
         local gmin  = r(min)
         local gmax  = r(max)
+        local xmin  = floor(`gmin' * 10) / 10
+        local xmax  = ceil(`gmax' * 10) / 10
+        local xstep = cond(`xmax' - `xmin' > 1.5, 0.2, 0.1)
         local ngrid = 400
         if _N < `ngrid' set obs `ngrid'
         gen xgrid = `gmin' + (`gmax' - `gmin') * (_n - 1) / (`ngrid' - 1) in 1/`ngrid'
@@ -115,20 +122,30 @@ program overlay_hist
         gen hi_p = dens_p if dens_p >  dens_r
         gen lo_p = dens_r if dens_p >  dens_r
 
-        tw rarea hi_r lo_r xgrid, color(ebblue%25) lwidth(none) || ///
-           rarea hi_p lo_p xgrid, color(gs12%50) lwidth(none) || ///
-           line dens_r xgrid, color(ebblue%70) lwidth(medthick) || ///
-           line dens_p xgrid, color(gs10%80) lwidth(medthick) lpattern(dash) ///
-           xtitle("DiD Coefficient (log `outcome')") ///
-           ytitle("Density") ///
-           xlab(-0.6(0.1)0.6) ///
-           xline(0, lcolor(gs6) lpattern(dash)) ///
-           xline(`mean_r_raw', lcolor(ebblue) lpattern(solid) lwidth(medthin)) ///
-           legend(on order(3 "Actual Treatment Effects (N=`N_r', mean=`mean_r', sd=`sd_r')" ///
-                           4 "Placebo Treatment Effects (N=`N_p', mean=`mean_p', sd=`sd_p')") ///
-                           /// - "Randomization Inference p `p_two'; Kolmogorov-Smirnov p `ks_p'") ///
-                  pos(7) ring(1) region(fcolor(none)) size(small))
-        graph export ../output/figures/did_coefs_overlay_kdens_eb`suf'.pdf, replace
+        local modes $exhibit_mode
+        if "$exhibit_mode" == "both" local modes presentation paper
+        foreach mode in `modes' {
+            local figdir ../output/figures
+            local stats_note `"- "Randomization Inference p `p_two'; Kolmogorov-Smirnov p `ks_p'""'
+            if "`mode'" == "paper" {
+                local figdir ../output/figures/paper
+                local stats_note
+            }
+            tw rarea hi_r lo_r xgrid, color(ebblue%25) lwidth(none) || ///
+               rarea hi_p lo_p xgrid, color(gs12%50) lwidth(none) || ///
+               line dens_r xgrid, color(ebblue%70) lwidth(medthick) || ///
+               line dens_p xgrid, color(gs10%80) lwidth(medthick) lpattern(dash) ///
+               xtitle("DiD Coefficient (log `outcome')") ///
+               ytitle("Density") ///
+               xlab(`xmin'(`xstep')`xmax') ///
+               xline(0, lcolor(gs6) lpattern(dash)) ///
+               xline(`mean_r_raw', lcolor(ebblue) lpattern(solid) lwidth(medthin)) ///
+               legend(on order(3 "Actual Treatment Effects (N=`N_r', mean=`mean_r', sd=`sd_r')" ///
+                               4 "Placebo Treatment Effects (N=`N_p', mean=`mean_p', sd=`sd_p')" ///
+                               `stats_note') ///
+                      pos(7) ring(1) region(fcolor(none)) size(small))
+            graph export `figdir'/did_coefs_overlay_kdens_eb`suf'$suffix.pdf, replace
+        }
     restore
 
     // Companion figure: histogram of the placebo iteration means with the
@@ -145,7 +162,7 @@ program overlay_hist
            legend(off) ///
            title("Placebo iteration means (N=`n_iter'); purple = observed mean (`mean_r')", size(small)) ///
            note("One-sided RI p `p_one'; two-sided RI p `p_two'; KS D = `ks_d', p `ks_p'", size(vsmall))
-        graph export ../output/figures/placebo_iter_means_ri_eb`suf'.pdf, replace
+        graph export ../output/figures/placebo_iter_means_ri_eb`suf'$suffix.pdf, replace
     restore
 
 end

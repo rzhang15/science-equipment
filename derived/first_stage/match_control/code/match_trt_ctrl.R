@@ -30,8 +30,10 @@ OUTCOME_VARS <- c("avg_log_price")
 # ---------------------------
 # Data Preparation
 # ---------------------------
+for (SUFFIX in c("", "_all3")) {
+cat("\n########## Running suffix:", ifelse(SUFFIX == "", "baseline", SUFFIX), "##########\n")
 cat("Loading data...\n")
-panel <- read_dta("../external/samp/category_yr_tfidf.dta")
+panel <- read_dta(paste0("../external/samp/category_yr_tfidf", SUFFIX, ".dta"))
 panel <- panel %>% mutate(category = as.character(category))
 
 cat("Panel dimensions:", dim(panel), "\n")
@@ -153,7 +155,7 @@ cat("\n")
 tryCatch({
   bal_plot <- love.plot(main_model, binary = "std", thresholds = c(m = .1),
                         title = "Overall Covariate Balance (Mahalanobis Matching)")
-  ggsave("../output/balance_plots/balance_overall.pdf", plot = bal_plot, width = 8, height = 6)
+  ggsave(paste0("../output/balance_plots/balance_overall", SUFFIX, ".pdf"), plot = bal_plot, width = 8, height = 6)
   print(bal_plot)
 }, error = function(e) {
   message("WARNING: Overall love.plot failed: ", e$message)
@@ -273,8 +275,8 @@ if (length(missing_cats) > 0) {
   cat("All", length(all_treated_cats), "treated markets successfully matched.\n")
 }
 
-write_csv(match_pairs, "../output/match_pairs.csv")
-cat("Saved match_pairs.csv\n\n")
+write_csv(match_pairs, paste0("../output/match_pairs", SUFFIX, ".csv"))
+cat("Saved match_pairs", SUFFIX, ".csv\n\n", sep = "")
 
 # ---------------------------
 # Generate trend plots for each treated market
@@ -343,7 +345,7 @@ for (treated_cat in unique_treated) {
     tryCatch({
       # Sanitize filename (replace special characters)
       safe_name <- str_replace_all(treated_cat, "[^a-zA-Z0-9_-]", "_")
-      ggsave(paste0("../output/figures/", outcome_var, "_trends_", safe_name, ".pdf"),
+      ggsave(paste0("../output/figures/", outcome_var, "_trends_", safe_name, SUFFIX, ".pdf"),
              plot = p, width = 10, height = 7)
       print(p)
     }, error = function(e) {
@@ -395,6 +397,8 @@ for (treated_cat in unique_treated) {
   } else {
     cat(sprintf("  %-55s | SMD: NA (fallback) | Controls: %d\n", treated_cat, length(controls)))
   }
+}
+
 }
 
 cat("\nDone.\n")

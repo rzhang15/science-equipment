@@ -7,12 +7,15 @@ preliminaries
 version 17
 
 program main
-    indiv_did_placebo
+    foreach s in "" "_all3" {
+        global suffix `s'
+        indiv_did_placebo
+    }
 end
 
 program indiv_did_placebo
     // per-(iter, placebo-treated category) DiD on log_raw_price AND log_raw_spend
-    use ../external/placebo/placebo_matched_mkts, clear
+    use ../external/placebo/placebo_matched_mkts$suffix, clear
     qui sum iter
     local n_iter = r(max)
 
@@ -22,15 +25,15 @@ program indiv_did_placebo
     forvalues i = 1/`n_iter' {
         di as text "===== iter `i' / `n_iter' ====="
 
-        use ../external/placebo/placebo_matched_pairs, clear
+        use ../external/placebo/placebo_matched_pairs$suffix, clear
         keep if iter == `i'
         save `pairs_i', replace
 
-        use ../external/placebo/placebo_matched_uni_category_panel, clear
+        use ../external/placebo/placebo_matched_uni_category_panel$suffix, clear
         keep if iter == `i'
         save `panel_i', replace
 
-        use ../external/placebo/placebo_matched_mkts, clear
+        use ../external/placebo/placebo_matched_mkts$suffix, clear
         keep if iter == `i'
         qui glevelsof category, local(categories)
 
@@ -119,7 +122,7 @@ program indiv_did_placebo
 
     // spend_2013 lookup -- category-level constant, dedupe across iters
     preserve
-    use ../external/placebo/placebo_matched_category_panel, clear
+    use ../external/placebo/placebo_matched_category_panel$suffix, clear
     keep if treated == 1
     gcontract category spend_2013
     drop _freq
@@ -142,7 +145,7 @@ program make_placebo_plots
 
     gen lb = b - 1.96*se
     gen ub = b + 1.96*se
-    save ../output/did_coefs_placebo`suf', replace
+    save ../output/did_coefs_placebo`suf'$suffix, replace
 
     qui sum iter
     local n_iter = r(max)
@@ -160,7 +163,7 @@ program make_placebo_plots
        xtitle("Iteration") ///
        xlab(1(1)`n_iter') ///
        legend(off)
-    graph export ../output/figures/did_coefs_placebo`suf'_top_cats.pdf, replace
+    graph export ../output/figures/did_coefs_placebo`suf'_top_cats$suffix.pdf, replace
     restore
 
     // coef-rank profile: x = within-iter rank, y = b, one line per iter
@@ -171,7 +174,7 @@ program make_placebo_plots
        ytitle("`ylabel'") ///
        xtitle("Within-iter rank (1 = highest)") ///
        yline(0, lcolor(gs6) lpattern(dash))
-    graph export ../output/figures/did_coefs_placebo`suf'_rank_profile.pdf, replace
+    graph export ../output/figures/did_coefs_placebo`suf'_rank_profile$suffix.pdf, replace
     restore
 
     // distribution of point estimates across all (iter, market) pairs
@@ -193,7 +196,7 @@ program make_placebo_plots
                           "p25 = `p25'" "p50 = `p50'" "p75 = `p75'" ///
                           "min = `minv'" "max = `maxv'") ///
                pos(1) ring(0) region(fcolor(none)) size(small))
-    graph export ../output/figures/did_coefs_placebo`suf'_hist.pdf, replace
+    graph export ../output/figures/did_coefs_placebo`suf'_hist$suffix.pdf, replace
 
     tw kdensity b, color(lavender) ///
         xtitle("`ylabel'") ///
@@ -201,7 +204,7 @@ program make_placebo_plots
         xline(0, lcolor(gs6) lpattern(dash)) ///
         legend(on order(- "N = `N'" "iters = `n_iter'" "mean = `mean'" "sd = `sd'") ///
                pos(1) ring(0) region(fcolor(none)) size(small))
-    graph export ../output/figures/did_coefs_placebo`suf'_kdens.pdf, replace
+    graph export ../output/figures/did_coefs_placebo`suf'_kdens$suffix.pdf, replace
 
     // per-iter mean coefficient (one point per placebo replication)
     preserve
@@ -217,7 +220,7 @@ program make_placebo_plots
        yline(0) ytitle("Mean `ylabel' (per iter)") ///
        xlab(1(1)`nr') xtitle("Placebo iteration (ranked)") ///
        legend(off)
-    graph export ../output/figures/did_coefs_placebo`suf'_by_iter.pdf, replace
+    graph export ../output/figures/did_coefs_placebo`suf'_by_iter$suffix.pdf, replace
     restore
 end
 

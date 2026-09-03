@@ -39,14 +39,21 @@ program clean_foia_data
 end
 
 program gen_exposure
+    foreach s in "" "_all3" {
+        build_exposure_suffix `s'
+    }
+end
+
+program build_exposure_suffix
+    args suffix
     use ../output/cleaned_merged_fois, clear
     replace spend = price * qty if mi(spend)
     drop if mi(spend)
     gen lab_spend = spend if category != "Non-Lab"
     replace lab_spend = 0 if mi(lab_spend)
-    merge m:1 category using ../external/ml/categories_tfidf, assert(1 2 3)  keep(1 3) nogen
+    merge m:1 category using ../external/ml/categories_tfidf`suffix', assert(1 2 3)  keep(1 3) nogen
     gcollapse (sum) spend lab_spend (mean) keep, by(athr_id category year)
-    save ../output/athr_category_spend, replace
+    save ../output/athr_category_spend`suffix', replace
 
     preserve
     gen spend_keep = spend if keep == 1
@@ -54,7 +61,7 @@ program gen_exposure
     gen lab_spend_keep = lab_spend if keep == 1
     replace lab_spend_keep = 0 if mi(lab_spend_keep)
     gcollapse (sum) spend lab_spend  spend_keep lab_spend_keep, by(athr_id year)
-    save ../output/athr_spend, replace
+    save ../output/athr_spend`suffix', replace
     restore
 
     // Three definitions of the market spend share denominator:
@@ -64,13 +71,13 @@ program gen_exposure
     //                → mkt_spend_shr sums to 1 per author by construction
     foreach v in hc all treated_hc {
         preserve
-        build_exposure_version `v'
+        build_exposure_version `v' `suffix'
         restore
     }
 end
 
 program build_exposure_version
-    args version
+    args version suffix
     keep if year <= 2013
     gcollapse (sum) spend lab_spend (max) keep, by(athr_id category)
     bys athr_id: egen tot_spend = total(spend)
@@ -85,7 +92,7 @@ program build_exposure_version
     // align slash → hyphen so the two betas in did_coefs merge
     replace category = "acrylamide-bis solution" if category == "acrylamide/bis solution"
     replace category = "dmem-f-12" if category == "dmem/f-12"
-    merge m:1 category using ../external/betas/did_coefs_eb_price, assert(1 3) keep(1 3)
+    merge m:1 category using ../external/betas/did_coefs_eb_price`suffix', assert(1 3) keep(1 3)
     rename _merge has_beta
     replace has_beta = 0 if has_beta == 1
     replace has_beta = 1 if has_beta == 3
@@ -108,7 +115,7 @@ program build_exposure_version
     replace mkt_spend_shr = . if has_beta == 0
     preserve
     contract athr_id category mkt_spend_shr spend tot_shr_spend tot_hc_spend
-    save ../output/athr_exposure_by_category_`version', replace
+    save ../output/athr_exposure_by_category_`version'`suffix', replace
     restore
 
     collapse (sum) exposure treated_spend mkt_spend_shr ///
@@ -117,11 +124,11 @@ program build_exposure_version
              by(athr_id)
     drop if treated_spend == 0
     drop if mi(exposure)
-    save ../output/athr_exposure_`version', replace
+    save ../output/athr_exposure_`version'`suffix', replace
     preserve
     contract athr_id
     drop _freq
-    save ../output/athr_exposure_list_`version', replace
+    save ../output/athr_exposure_list_`version'`suffix', replace
     restore
 end
 

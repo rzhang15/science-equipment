@@ -48,6 +48,9 @@ Filters / suffixes retained:
 
     --k 3
         -> _k3
+
+    --all3
+        -> _{version}_all3 (reads *_all3 betas / spend / share inputs)
 """
 
 import argparse
@@ -60,12 +63,12 @@ from scipy.stats import norm
 
 
 OUT_DIR = "../../output"
-CATEGORY_SPEND_FILE = "../../external/exposure_wts/athr_category_spend.dta"
-CATEGORY_SHARE_FILE = "../../external/exposure_wts/athr_exposure_by_category_{version}.dta"
+CATEGORY_SPEND_FILE = "../../external/exposure_wts/athr_category_spend{sample}.dta"
+CATEGORY_SHARE_FILE = "../../external/exposure_wts/athr_exposure_by_category_{version}{sample}.dta"
 
 DEFAULT_BETAS_FILE = (
     "/n/holylabs/LABS/pakes_lab/Lab/sci_eq/analysis/"
-    "first_stage/output/did_coefs_eb_price.dta"
+    "first_stage/output/did_coefs_eb_price{sample}.dta"
 )
 
 VERSIONS = ["hc", "all", "treated_hc"]
@@ -648,7 +651,15 @@ def main():
 
     # Core
     ap.add_argument("--versions", nargs="+", choices=VERSIONS, default=VERSIONS)
-    ap.add_argument("--betas-path", default=DEFAULT_BETAS_FILE)
+    ap.add_argument("--betas-path", default="")
+    ap.add_argument(
+        "--all3",
+        action="store_true",
+        help=(
+            "Use the _all3 category set: reads *_all3 betas, category spend, "
+            "and share files; outputs carry the _all3 suffix after the version."
+        ),
+    )
 
     ap.add_argument(
         "--k",
@@ -760,6 +771,10 @@ def main():
 
     args = ap.parse_args()
 
+    sample_sfx = "_all3" if args.all3 else ""
+    if not args.betas_path:
+        args.betas_path = DEFAULT_BETAS_FILE.format(sample=sample_sfx)
+
     if not 0 < args.eb_own_weight <= 1:
         raise SystemExit("--eb-own-weight must be in (0,1].")
 
@@ -829,7 +844,7 @@ def main():
             )
 
     chars = compute_pi_characteristics(
-        CATEGORY_SPEND_FILE,
+        CATEGORY_SPEND_FILE.format(sample=sample_sfx),
         foia_ids,
     )
 
@@ -845,7 +860,9 @@ def main():
         print(f"version={version}")
         print("=" * 78)
 
-        share_file = CATEGORY_SHARE_FILE.format(version=version)
+        share_file = CATEGORY_SHARE_FILE.format(
+            version=version, sample=sample_sfx
+        )
 
         if not os.path.exists(share_file):
             raise SystemExit(f"missing: {share_file}")
@@ -1030,7 +1047,7 @@ def main():
         # Outputs
         # ---------------------------------------------------------------------
 
-        stem = f"_{version}{eb_sfx}{filter_sfx}{k_sfx}"
+        stem = f"_{version}{sample_sfx}{eb_sfx}{filter_sfx}{k_sfx}"
 
         out_csv = f"{OUT_DIR}/final_imputed_shift_share{stem}.csv"
         out_npz = f"{OUT_DIR}/imputed_shares_matrix{stem}.npz"
@@ -1134,7 +1151,7 @@ def main():
 
     summary_out = (
         f"{OUT_DIR}/shift_share_summary"
-        f"{eb_sfx}{filter_sfx}{k_sfx}.csv"
+        f"{sample_sfx}{eb_sfx}{filter_sfx}{k_sfx}.csv"
     )
 
     summary.to_csv(summary_out, index=False)

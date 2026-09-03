@@ -10,6 +10,7 @@ from gslab_make.write_logs import *
 # MAKE.PY STARTS
 clear_dir(['../output/', '../temp/'])
 os.mkdir('../output/figures/')
+os.mkdir('../output/figures/paper/')
 remove_dir(['../external/'])
 paths = {'makelog' : '../output/make.log', 'external_dir' : '../external/'}
 start_makelog(paths)

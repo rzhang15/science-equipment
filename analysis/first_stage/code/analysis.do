@@ -8,18 +8,21 @@ version 17
 global exhibit_mode both // paper | presentation | both
 
 program main
-   *raw_plots
-   did
-   robustness
-   balance_check
-   placebo_timing
-   output_tables
-   event_study
-   *uni_fes
+    foreach s in "" "_all3" {
+        global suffix `s'
+        *raw_plots
+        did
+        robustness
+        balance_check
+        placebo_timing
+        output_tables
+        event_study
+        *uni_fes
+    }
 end
 
 program raw_plots
-    use ../external/samp/full_category_yr_tfidf, clear
+    use ../external/samp/full_category_yr_tfidf$suffix, clear
     gen tot_qty = raw_qty
     gen tot_spend = raw_spend
     replace treated = 2 if keep == 0 & treated == 1
@@ -61,17 +64,17 @@ program raw_plots
         qui tw connected trt_`var' year , lcolor(lavender) mcolor(lavender) || connected ctrl_`var' year , lcolor(dkorange) mcolor(dkorange) ///
           || connected othr_trt_`var' year, lcolor(lavender%40) mcolor(lavender%20) lpattern(dash) || ///
           connected othr_ctrl_`var' year, lcolor(dkorange%40) mcolor(dkorange%20) lpattern(dash) legend(on label(1 "Treated") label(2 "Control") label(3 "Bad ML Treated") label(4 "Bad ML Control") ring(1) pos(6) rows(1) size(small)) ytitle("`yname'", size(small)) yline(0, lcolor(gs10) lpattern(solid)) ylabel(#6, labsize(small)) xlabel(2010(1)2019, labsize(small)) xtitle("Year", size(small)) tline(2013.5, lpattern(shortdash) lcolor(gs4%80)) 
-        qui graph export "../output/figures/raw/`var'_trends_pooled.pdf", replace
+        qui graph export "../output/figures/raw/`var'_trends_pooled$suffix.pdf", replace
     }
-    use ../external/merged/matched_mkts, clear
+    use ../external/merged/matched_mkts$suffix, clear
     qui glevelsof category, local(categories)
     foreach c in `categories' {
         preserve
-        use ../external/merged/matched_pairs, clear 
+        use ../external/merged/matched_pairs$suffix, clear 
         local del_hhi
         local sim_hhi
         qui glevelsof control_market if category == "`c'", local(match) 
-        use ../external/merged/matched_category_panel, clear
+        use ../external/merged/matched_category_panel$suffix, clear
         gen keep = 1 if category == "`c'" 
         qui glevelsof delta_hhi if category == "`c'", local(del_hhi) 
         local del_hhi = round(`del_hhi', 0.001)
@@ -114,15 +117,16 @@ program raw_plots
             qui sum ctrl_`var' if year == 2013 
             qui replace ctrl_`var' = ctrl_`var' - r(mean)
             qui tw connected trt_`var' year , lcolor(lavender) mcolor(lavender) || connected ctrl_`var' year , lcolor(dkorange%40) mcolor(dkorange%40) legend(on label(1 "Treated: `name'") label(2 "Control: `match_name'") ring(1) pos(6) rows(1) size(small)) ytitle("`yname'", size(small)) yline(0, lcolor(gs10) lpattern(solid)) ylabel(#6, labsize(small)) xlabel(2010(1)2019, labsize(small)) xtitle("Year", size(small)) tline(2013.5, lpattern(shortdash) lcolor(gs4%80)) title("Simulated HHI: `sim_hhi'; Delta HHI: `del_hhi'", size(small))
-            qui graph export "../output/figures/raw/`var'_trends_category`c'.pdf", replace
+            qui graph export "../output/figures/raw/`var'_trends_category`c'$suffix.pdf", replace
         }
         restore
     }
 end
 
 program did
+    cap mat drop coef_price coef_spend
     // naive did
-    use ../external/samp/uni_category_yr_tfidf, clear
+    use ../external/samp/uni_category_yr_tfidf$suffix, clear
     gegen uni_mkt = group(uni_id mkt)
     bys uni_mkt : egen min_year = min(year)
     bys uni_mkt : egen max_year = max(year)
@@ -136,7 +140,7 @@ program did
     }
 
     // pooled did
-    use ../external/merged/matched_uni_category_panel, clear
+    use ../external/merged/matched_uni_category_panel$suffix, clear
     gegen uni_mkt = group(uni_id mkt)
     bys uni_mkt : egen min_year = min(year)
     bys uni_mkt : egen max_year = max(year)
@@ -149,7 +153,7 @@ program did
         reghdfe `var' posttreat [aw=spend_2013], cluster(mkt) absorb(year uni_id mkt)
     }
    // unexpanded panel pool version
-    use ../external/merged/matched_category_panel, clear
+    use ../external/merged/matched_category_panel$suffix, clear
     gen post = 0
     replace post = 1 if year >= 2014
     gen posttreat = treated * post
@@ -158,13 +162,13 @@ program did
         reghdfe `var' posttreat [aw=spend_2013], cluster(mkt) absorb(year mkt)
     }
     // indiv did -- run both avg_log_price and log_raw_spend per category
-    use ../external/merged/matched_mkts, clear
+    use ../external/merged/matched_mkts$suffix, clear
     qui glevelsof category, local(categories)
     foreach c in `categories' {
         preserve
-        use ../external/merged/matched_pairs, clear
+        use ../external/merged/matched_pairs$suffix, clear
         qui glevelsof control_market if category == "`c'", local(match)
-        use ../external/merged/matched_uni_category_panel, clear
+        use ../external/merged/matched_uni_category_panel$suffix, clear
         gegen uni_mkt = group(uni_id mkt)
         bys uni_mkt : egen min_year = min(year)
         bys uni_mkt : egen max_year = max(year)
@@ -222,13 +226,13 @@ program process_coefs
     syntax, infile(str) outcome(str)
 
     use `infile', clear
-    merge m:1 category using ../external/samp/category_hhi_tfidf, assert(1 2 3) keep(3) nogen
+    merge m:1 category using ../external/samp/category_hhi_tfidf$suffix, assert(1 2 3) keep(3) nogen
 *    drop if delta_hhi <= -2500
-    merge m:1 category using ../external/merged/spend_xw, assert(2 3) keep(3) nogen
+    merge m:1 category using ../external/merged/spend_xw$suffix, assert(2 3) keep(3) nogen
     gen lb = b - 1.96*se
     gen ub = b + 1.96*se
     hashsort b
-    save ../output/did_coefs_`outcome', replace
+    save ../output/did_coefs_`outcome'$suffix, replace
 
     sum b, d
     local N    = r(N)
@@ -241,28 +245,28 @@ program process_coefs
         xline(0, lcolor(gs6) lpattern(dash)) ///
         legend(on order(- "N = `N'" "mean = `mean'" "sd = `sd'") ///
                pos(1) ring(0) region(fcolor(none)))
-    graph export ../output/figures/did_coefs_kdens_`outcome'.pdf, replace
+    graph export ../output/figures/did_coefs_kdens_`outcome'$suffix.pdf, replace
     gen rank = _n
     labmask rank, values(category)
     count
     local n = r(N)
     tw rcap ub lb rank, msize(vsmall) || scatter b rank, msize(tiny) mcolor(lavender) yline(0) ylab(-1(0.2)1, labsize(small)) ysc(titlegap(-6) outergap(0)) ytitle("DiD Estimate (log `outcome') + 95% CI", size(small)) xlab(1(1)`n', angle(45) labsize(small) valuelabel) graphregion(margin(b+35 l+5)) xtitle("") legend(off)
-    graph export ../output/figures/coef_rank_`outcome'.pdf, replace
+    graph export ../output/figures/coef_rank_`outcome'$suffix.pdf, replace
     hashsort spend_2013
     gen rank_spend = _n
     labmask rank_spend, values(category)
     count
     local n = r(N)
     tw rcap ub lb rank_spend, msize(vsmall) || scatter b rank_spend, msize(tiny) mcolor(lavender) yline(0) ylab(-1(0.2)1, labsize(small)) ysc(titlegap(-6) outergap(0)) ytitle("DiD Estimate (log `outcome') + 95% CI", size(small)) xlab(1(1)`n', angle(45) labsize(small) valuelabel) graphregion(margin(b+35 l+5)) xtitle("") legend(off)
-    graph export ../output/figures/coef_spend_rank_`outcome'.pdf, replace
+    graph export ../output/figures/coef_spend_rank_`outcome'$suffix.pdf, replace
     corr b delta_hhi [aw=spend_2013]
     local corr : di %4.3f r(rho)
     binscatter2 b delta_hhi [aw = spend_2013], mcolors(gs6) lcolors(ebblue) legend(on order(- "corr: `corr'") ring(0) pos(1)) xtitle("Delta HHI") ytitle("Estimated Coefficient (log `outcome')")
-    graph export ../output/figures/delta_hhi_corr_`outcome'.pdf, replace
+    graph export ../output/figures/delta_hhi_corr_`outcome'$suffix.pdf, replace
     corr b simulated_hhi [aw=spend_2013]
     local corr : di %4.3f r(rho)
     binscatter2 b simulated_hhi [aw = spend_2013], mcolors(gs6) lcolors(ebblue) legend(on order(- "corr: `corr'") ring(0) pos(1)) xtitle("Simulated HHI") ytitle("Estimated Coefficient (log `outcome')")
-    graph export ../output/figures/sim_hhi_corr_`outcome'.pdf, replace
+    graph export ../output/figures/sim_hhi_corr_`outcome'$suffix.pdf, replace
 
     // ============================================================
     // Empirical Bayes shrinkage of per-market DiD coefficients
@@ -291,7 +295,7 @@ program process_coefs
     gen lb_eb = b_eb - 1.96 * se_eb
     gen ub_eb = b_eb + 1.96 * se_eb
     drop var_se
-    save ../output/did_coefs_eb_`outcome', replace
+    save ../output/did_coefs_eb_`outcome'$suffix, replace
 
     qui sum b_eb, d
     local N_eb    = r(N)
@@ -309,7 +313,7 @@ program process_coefs
         legend(on order(- "N = `N_eb'" "mean = `mean_eb'" "sd = `sd_eb'" ///
                         "raw sd = `sd_raw'" "tau2 = `tau2_lab'" "mu_hat = `mu_lab'") ///
                pos(1) ring(0) region(fcolor(none)))
-    graph export ../output/figures/did_coefs_kdens_eb_`outcome'.pdf, replace
+    graph export ../output/figures/did_coefs_kdens_eb_`outcome'$suffix.pdf, replace
 
     tw kdensity b, color(gs10%70) lpattern(dash) || ///
        kdensity b_eb, color(lavender) ///
@@ -318,7 +322,7 @@ program process_coefs
         xline(0, lcolor(gs6) lpattern(dash)) ///
         legend(on order(1 "Raw (sd=`sd_raw')" 2 "EB-shrunk (sd=`sd_eb')") ///
                ring(0) pos(1) region(fcolor(none)))
-    graph export ../output/figures/did_coefs_kdens_overlay_`outcome'.pdf, replace
+    graph export ../output/figures/did_coefs_kdens_overlay_`outcome'$suffix.pdf, replace
 
     drop rank
     hashsort b_eb
@@ -332,7 +336,7 @@ program process_coefs
        ytitle("EB DiD Estimate (log `outcome') + 95% CI", size(small)) ///
        xlab(1(1)`n', angle(45) labsize(small) valuelabel) ///
        graphregion(margin(b+35 l+5)) xtitle("") legend(off)
-    graph export ../output/figures/coef_rank_eb_`outcome'.pdf, replace
+    graph export ../output/figures/coef_rank_eb_`outcome'$suffix.pdf, replace
 
     drop rank_spend
     hashsort spend_2013
@@ -346,24 +350,24 @@ program process_coefs
        ytitle("EB DiD Estimate (log `outcome') + 95% CI", size(small)) ///
        xlab(1(1)`n', angle(45) labsize(small) valuelabel) ///
        graphregion(margin(b+35 l+5)) xtitle("") legend(off)
-    graph export ../output/figures/coef_spend_rank_eb_`outcome'.pdf, replace
+    graph export ../output/figures/coef_spend_rank_eb_`outcome'$suffix.pdf, replace
 
     corr b_eb delta_hhi [aw=spend_2013]
     local corr_eb : di %4.3f r(rho)
     tw scatter b_eb delta_hhi [aw = spend_2013], ///
         legend(on order(- "corr: `corr_eb'") ring(0) pos(1)) ///
         xtitle("Delta HHI") ytitle("EB DiD Coefficient (log `outcome')")
-    graph export ../output/figures/delta_hhi_corr_eb_`outcome'.pdf, replace
+    graph export ../output/figures/delta_hhi_corr_eb_`outcome'$suffix.pdf, replace
 
     corr b_eb simulated_hhi [aw=spend_2013]
     local corr_eb : di %4.3f r(rho)
     binscatter2 b_eb simulated_hhi [aw = spend_2013], mcolors(gs6) lcolors(ebblue) legend(on order(- "corr: `corr_eb'") ring(0) pos(1)) xtitle("Simulated HHI") ytitle("EB DiD Coefficient (log `outcome')")
-    graph export ../output/figures/sim_hhi_corr_eb_`outcome'.pdf, replace
+    graph export ../output/figures/sim_hhi_corr_eb_`outcome'$suffix.pdf, replace
 end
 
 program robustness
     // robustness: pooled DiD with uni#mkt and uni#year fixed effects
-    use ../external/merged/matched_uni_category_panel, clear
+    use ../external/merged/matched_uni_category_panel$suffix, clear
     gegen uni_mkt = group(uni_id mkt)
     bys uni_mkt : egen min_year = min(year)
     bys uni_mkt : egen max_year = max(year)
@@ -458,7 +462,7 @@ program robustness
            legend(on order(2 "baseline" 4 "uni#mkt + year" 6 "uni#year + mkt" 8 "uni#mkt + uni#year") ///
                   pos(6) rows(2) size(small) region(fcolor(none))) ///
            plotregion(margin(sides))
-        graph export ../output/figures/robust_es_`var'.pdf, replace
+        graph export ../output/figures/robust_es_`var'$suffix.pdf, replace
         restore
     }
 end
@@ -466,7 +470,7 @@ end
 program balance_check
     // Pre-treatment (2010-2013) balance on outcome levels for treated vs matched controls.
     // Weighted mean_t, mean_c, diff, SE cluster(mkt) — matches main DiD spec weighting/clustering.
-    use ../external/merged/matched_uni_category_panel, clear
+    use ../external/merged/matched_uni_category_panel$suffix, clear
     gegen uni_mkt = group(uni_id mkt)
     bys uni_mkt : egen min_year = min(year)
     bys uni_mkt : egen max_year = max(year)
@@ -493,7 +497,7 @@ end
 program placebo_timing
     // Falsification: restrict to pre-period (2010-2013) and shift "treatment" to 2012.
     // Same FE/weight/cluster structure as main DiD (baseline spec). Coef should be ~0.
-    use ../external/merged/matched_uni_category_panel, clear
+    use ../external/merged/matched_uni_category_panel$suffix, clear
     gegen uni_mkt = group(uni_id mkt)
     bys uni_mkt : egen min_year = min(year)
     bys uni_mkt : egen max_year = max(year)
@@ -513,7 +517,7 @@ end
 
 program output_tables
     foreach tab in robust_avg_log_price robust_log_raw_qty robust_log_raw_spend pooled_did balance placebo_timing {
-        qui matrix_to_txt, saving("../output/tables/`tab'.txt") matrix(`tab') ///
+        qui matrix_to_txt, saving("../output/tables/`tab'$suffix.txt") matrix(`tab') ///
             title(<tab:`tab'>) format(%20.4f) replace
     }
     merger_validity_tex
@@ -526,7 +530,7 @@ program merger_validity_tex
     //   (c) real 2014 DiD baseline (`pooled_did' matrix, cols 1/4/7 = price/qty/spend)
     // Uses booktabs + threeparttable to match paper style. Reads matrices from
     // memory — must run after balance_check + placebo_timing + robustness.
-    local texfile "../output/tables/merger_validity.tex"
+    local texfile "../output/tables/merger_validity$suffix.tex"
     cap file close mv
     file open mv using "`texfile'", write replace
 
@@ -636,8 +640,8 @@ end
 
 program event_study
     // naive event study
-    use ../external/samp/uni_category_yr_tfidf, clear
-    merge m:1 category using ../external/samp/category_hhi_tfidf, assert(1 2 3) keep(3) nogen
+    use ../external/samp/uni_category_yr_tfidf$suffix, clear
+    merge m:1 category using ../external/samp/category_hhi_tfidf$suffix, assert(1 2 3) keep(3) nogen
     drop if delta_hhi <= -2000
     gen rel = year - 2014
     replace rel = . if treated == 0
@@ -666,8 +670,8 @@ program event_study
     }
 
     // main pooled result
-    use ../external/merged/matched_uni_category_panel ,clear 
-    merge m:1 category using ../external/samp/category_hhi_tfidf, assert(1 2 3) keep(3) nogen
+    use ../external/merged/matched_uni_category_panel$suffix ,clear 
+    merge m:1 category using ../external/samp/category_hhi_tfidf$suffix, assert(1 2 3) keep(3) nogen
     drop if delta_hhi <= -2000
     gegen uni_mkt = group(uni_id mkt)
     bys uni_mkt : egen min_year = min(year)
@@ -761,9 +765,9 @@ program event_study
 
     qui glevelsof category if treated == 1, local(categories)
 	foreach c in `categories' {
-        use ../external/merged/matched_pairs, clear 
+        use ../external/merged/matched_pairs$suffix, clear 
         qui glevelsof control_market if category == "`c'", local(match) 
-        use ../external/merged/matched_uni_category_panel, clear 
+        use ../external/merged/matched_uni_category_panel$suffix, clear 
         gen rel = year - 2014
         replace rel = . if treated == 0
         gen keep = 1 if category == "`c'"
@@ -822,19 +826,19 @@ program event_study
        xlab(-4(1)5, labsize(small)) ylab(-0.6(0.1)0.6, labsize(vsmall)) ///
           yline(0, lcolor(black) lpattern(solid)) ///
           legend(on order(2 "Delta HHI Q1" 4 "Delta HHI Q2" 6 "Delta HHI Q3" 8 "Delta HHI Q4") pos(11) rows(2) ring(0) size(vsmall) region(fcolor(none))) xtitle("Relative Year", size(small)) ytitle("Avg. Log Price", size(small)) plotregion(margin(sides))
-    graph export ../output/figures/es_estimates_hhi.pdf, replace
+    graph export ../output/figures/es_estimates_hhi$suffix.pdf, replace
     */
     // combined plots
-    use "../temp/es_log_raw_spend_estimatespooled", clear
+    use "../temp/es_log_raw_spend_estimatespooled$suffix", clear
     gen group = "spend"
     replace rel = rel - 0.2 
     sum b if group == "spend" & rel > 0
     local spend_mean : dis %4.3f r(mean)
-    append using ../temp/es_avg_log_price_estimatespooled
+    append using ../temp/es_avg_log_price_estimatespooled$suffix
     replace group = "price" if mi(group)
     sum b if group == "price" & rel > 0
     local price_mean : dis %4.3f r(mean)
-    append using ../temp/es_log_raw_qty_estimatespooled
+    append using ../temp/es_log_raw_qty_estimatespooled$suffix
     replace group = "qty" if mi(group)
     replace rel = rel + 0.2 if group == "qty"
     sum b if group == "qty" & rel >0.2
@@ -849,13 +853,14 @@ program event_study
        xlab(-4(1)5, labsize(small)) ylab(-0.2(0.1)0.6, labsize(vsmall)) ///
           yline(0, lcolor(black) lpattern(solid)) ///
           legend(on order(2 "Spending (Post Period Avg: `spend_mean')" 4 "Price (Post Period Avg: `price_mean')" 6 "Quantity (Post Period Avg: `qty_mean')") pos(11) ring(0) size(small) region(fcolor(none))) xtitle("Relative Year", size(small)) ytitle("Log Estimates", size(small)) plotregion(margin(sides))
-    graph export ../output/figures/es_estimatespooled.pdf, replace
+    graph export ../output/figures/es_estimatespooled$suffix.pdf, replace
 
 end
 
 
 program uni_fes
-    use ../external/merged/matched_uni_category_panel, clear 
+    cap mat drop betas betas_placebo betas_lr_sr
+    use ../external/merged/matched_uni_category_panel$suffix, clear 
     keep if inrange(year, 2015,2019)
     gen post = 0 
     replace post = 1 if year >= 2017
@@ -882,9 +887,9 @@ program uni_fes
     local mean_pl = round(r(mean), 0.001)
     gen lb_pl = beta_u_pl - 1.96*se_pl
     gen ub_pl = beta_u_pl + 1.96*se_pl
-    save ../output/beta_u_placebo, replace
+    save ../output/beta_u_placebo$suffix, replace
 
-    use ../external/merged/matched_uni_category_panel, clear 
+    use ../external/merged/matched_uni_category_panel$suffix, clear 
     global r1 `" "east carolina university" "florida international university" "florida state university (fsu)" "georgia institute of technology" "kent state university" "texas a&m university" "texas tech university" "university of florida" "university of central florida" "university of kentucky" "university of florida" "university of kentucky" "university of michigan at ann arbor" "university of south florida" "university of southern mississippi" "washington state university" "wayne state university" "'
     global r2 `" "central michigan university" "georgia southern university" "idaho state university" "illinois state university" "indiana university of pennsylvania" "kennesaw state university" "louisiana state university health sciences center - new orleans" "northern illinois university" "suny upstate medical university" "the university of akron" "university of michigan - dearborn" "university of new orleans" "university of north carolina-wilmington" "'
     global r3 `" "grand valley state university" "lincoln university" "morehead state university" "northern kentucky university" "sul ross state university" "texas a&m international university" "western kentucky university" "western washington university" "youngstown state university" "'
@@ -903,7 +908,7 @@ program uni_fes
     preserve
     contract uni_id agencyname r1 r2 r3
     drop _freq
-    save ../temp/uni_list, replace
+    save ../temp/uni_list$suffix, replace
     restore
     gen post = 0 
     replace post = 1 if year >= 2014
@@ -922,7 +927,7 @@ program uni_fes
         gen posttreatsr_`u'  = posttreatsr * u_`u'
     }
     reghdfe avg_log_price posttreat_* [aw = spend_2013], absorb(mkt year) cluster(mkt) 
-    estimates save posttreat_beta_u, replace
+    estimates save posttreat_beta_u$suffix, replace
     foreach u in `unis' {
         local val = . 
         local se = . 
@@ -935,7 +940,7 @@ program uni_fes
     keep if !mi(betas1)
     keep betas*
     rename (betas1 betas2 betas3) (uni_id beta_u se)
-    merge 1:1 uni_id using ../temp/uni_list, assert(1 3) keep(1 3) nogen
+    merge 1:1 uni_id using ../temp/uni_list$suffix, assert(1 3) keep(1 3) nogen
     sum beta_u, d
     local N = r(N)
     local min : dis %6.3f r(min)
@@ -947,10 +952,10 @@ program uni_fes
     local sd : dis %6.3f r(sd)
     drop if mi(beta_u)
     tw hist beta_u  , freq ytitle("% of Unis", size(small)) bin(50) xlab(, labsize(vsmall)) ylab(, labsize(vsmall)) xtitle("Beta_u", size(small)) legend(on order(- "N = `N'" "min = `min'" "p25 = `p25'" "p50 = `p50'" "mean = `mean'" "p75 = `p75'" "max = `max'" "sd =`sd'") pos(1) ring(0))
-    graph export ../output/figures/beta_u_dist.pdf, replace
+    graph export ../output/figures/beta_u_dist$suffix.pdf, replace
     gen lb = beta_u - 1.96*se
     gen ub = beta_u + 1.96*se
-    save ../output/beta_u, replace
+    save ../output/beta_u$suffix, replace
     hashsort beta_u
     gen id = _n 
     gen sig = ub < 0 | lb > 0
@@ -967,11 +972,11 @@ program uni_fes
       xtitle("") ytitle("Beta_u + 95% CI", size(vsmall))  ///
       xlab(, nolabel notick labsize(tiny) valuelabel angle(45) nogrid) ylab(`ymin'(0.5)`ymax', labsize(vsmall) nogrid)  yline(0, lcolor(gs12) lwidth(vthin)) ///
       legend(on order(1 "R1 Universities" 3 "R2 Universities" 5 "Other Universities") pos(5) ring(0) size(vsmall))
-    graph export ../output/figures/beta_u_ci.pdf, replace
+    graph export ../output/figures/beta_u_ci$suffix.pdf, replace
     restore
 
     reghdfe avg_log_price posttreatlr_*  posttreatsr_* [aw = spend_2013], absorb(uni_id mkt year) cluster(mkt) 
-    estimates save posttreat_beta_u_lrsr, replace
+    estimates save posttreat_beta_u_lrsr$suffix, replace
     foreach u in `unis' {
         local val_lr = . 
         local val_sr = . 
@@ -999,7 +1004,7 @@ program uni_fes
         local max_`v' : dis %6.3f r(max)
         local sd_`v' : dis %6.3f r(sd)
         tw hist beta`v'_u  , freq bin(50) xlab(,labsize(small)) ylab(, labsize(vsmall)) ytitle("% of Unis") xtitle("Beta`v'_u") legend(on order(- "N = `N_`v''" "min = `min_`v''" "p25 = `p25_`v''" "p50 = `p50_`v''" "mean = `mean_`v''" "p75 = `p75_`v''" "max = `max_`v''" "sd =`sd_`v''") pos(1) ring(0))
-        graph export ../output/figures/beta`v'_u_dist.pdf, replace
+        graph export ../output/figures/beta`v'_u_dist$suffix.pdf, replace
         gen ub_`v' = beta`v'_u + 1.96 * se_`v'
         gen lb_`v' = beta`v'_u - 1.96 * se_`v'
         gen sig_`v' = ub_`v' < 0 | lb_`v' > 0
@@ -1008,34 +1013,34 @@ program uni_fes
         count if sig_`v'==1
         local sig_`v' = r(N)
         tw rcap ub_`v' lb_`v' id if sig_`v' == 0 , lcolor(gs5%70) lwidth(vvthin) msize(vsmall) || rcap ub_`v' lb_`v' id if sig_`v' == 1 , lcolor(emerald) msize(vsmall) lwidth(vthin) , xlab(1(2)82, labsize(tiny) angle(45) nogrid) ylab(-2(0.2)2, labsize(tiny) nogrid)  yline(0, lcolor(blue) lwidth(vthin)) legend(on order(- "# Sig. = `sig_`v''" "Mean = `mean_`v''" "sd = `sd_`v''") pos(5) ring(0) size(vsmall))
-        graph export ../output/figures/beta`v'_u_ci.pdf, replace
+        graph export ../output/figures/beta`v'_u_ci$suffix.pdf, replace
         drop id
     }
     drop sig*
-    save ../output/beta_sr_lr_u, replace
+    save ../output/beta_sr_lr_u$suffix, replace
     restore
     
-    use ../output/beta_u, clear
-    merge 1:1 uni_id using ../output/beta_sr_lr_u, assert(3) keep(3) nogen
-    merge 1:1 uni_id using ../output/beta_u_placebo, assert(1 3) keep(3) nogen
+    use ../output/beta_u$suffix, clear
+    merge 1:1 uni_id using ../output/beta_sr_lr_u$suffix, assert(3) keep(3) nogen
+    merge 1:1 uni_id using ../output/beta_u_placebo$suffix, assert(1 3) keep(3) nogen
     tw kdensity betalr_u, color(ebblue%90) || kdensity betasr_u, color(orange%90)  || ///
         kdensity beta_u ,   color(lavender%80) || kdensity beta_u_pl, color(gs12) ytitle("% of Unis") xtitle("Beta_u") ///
         legend(on order(1 "Long run (mean): `mean_lr'" 2  "Short run (mean): `mean_sr'" 3 "All (mean):  `mean'" 4 "Placebo (mean): `mean_pl'") ring(0) pos(11) region(fcolor(none)))  ///
         xlab(, labsize(small)) xtitle("University Price Estimates", size(small)) 
-    graph export ../output/figures/overlaid_beta_u.pdf, replace
+    graph export ../output/figures/overlaid_beta_u$suffix.pdf, replace
     keep uni_id beta_u betasr_u betalr_u 
-    save ../output/betas, replace
-    use ../output/beta_u, clear
-    merge 1:1 uni_id using ../output/beta_u_placebo, assert(1 3) keep(3) nogen
+    save ../output/betas$suffix, replace
+    use ../output/beta_u$suffix, clear
+    merge 1:1 uni_id using ../output/beta_u_placebo$suffix, assert(1 3) keep(3) nogen
     tw kdensity beta_u ,   color(lavender) || kdensity beta_u_pl, color(dkorange) ytitle("% of Unis") xtitle("Beta_u") ///
         legend(on order(1 "University Price Effect Mean: `mean'" 2 "Placebo Treatment Year (mean): `mean_pl'") ring(0) pos(11) region(fcolor(none)))  ///
         xlab(, labsize(small)) xtitle("University Price Estimates", size(small)) 
-    graph export ../output/figures/overlaid_beta_u_simple.pdf, replace
-    use ../output/beta_u, clear
+    graph export ../output/figures/overlaid_beta_u_simple$suffix.pdf, replace
+    use ../output/beta_u$suffix, clear
     tw kdensity beta_u ,   color(lavender%80) ytitle("% of Unis", size(small)) xtitle("Beta_u", size(small)) ///
         legend(on order(1 "Mean: `mean'") ring(0) pos(11) region(fcolor(none)))  ///
         xlab(, labsize(small))  
-    graph export ../output/figures/overlaid_beta_u_single.pdf, replace
+    graph export ../output/figures/overlaid_beta_u_single$suffix.pdf, replace
 end
 
 program manual_event_study
@@ -1146,8 +1151,8 @@ program manual_event_study
     local ymax = max(`ymax', round(r(max),0.1))
     sum lb , d
     local ymin = min(`ymin', round(r(min),0.1))
-    export delimited using "../output/estimates/`suf'es_`yvar'_estimates`file_suf'.csv", replace
-    save "../temp/`suf'es_`yvar'_estimates`file_suf'", replace
+    export delimited using "../output/estimates/`suf'es_`yvar'_estimates`file_suf'$suffix.csv", replace
+    save "../temp/`suf'es_`yvar'_estimates`file_suf'$suffix", replace
     sum year , d
     local year_min = r(min)
     local year_max = r(max)
@@ -1162,7 +1167,7 @@ program manual_event_study
         ytitle("`name'", size(small)) ylab(`ymin'(`ygap')`ymax', labsize(vsmall)) yline(0, lcolor(gs10) lpattern(solid))  ///
         legend(on order(- "Treatment Level Avg. in t = -1: `trt_mean'" "Control Level Avg. in t = -1: `ctrl_mean'") pos(6) rows(2))  ///
         plotregion(margin(sides))
-        graph export "../output/figures/es/`suf'es_`yvar'_`file_suf'.pdf", replace
+        graph export "../output/figures/es/`suf'es_`yvar'_`file_suf'$suffix.pdf", replace
     }*/
     foreach mode in `modes' {
         local figdir ../output/figures
@@ -1178,7 +1183,7 @@ program manual_event_study
         ytitle("`name'") ysc(titlegap(-6) outergap(0)) ylab(`ymin'(`ygap')`ymax') yline(0, lcolor(gs10) lpattern(solid)) ///
         `legend_lvl' ///
         title(`title', size(small)) plotregion(margin(sides))
-        graph export "`figdir'/es/`suf'es_`yvar'_`file_suf'.pdf", replace
+        graph export "`figdir'/es/`suf'es_`yvar'_`file_suf'$suffix.pdf", replace
     }
 
         tw rcap trt_coef_ub trt_coef_lb year if rel != -1 & inrange(rel, `lead', `lag') , lcolor(ebblue%70) msize(vsmall) || ///
@@ -1190,7 +1195,7 @@ program manual_event_study
         ytitle("`name'") ysc(titlegap(-6) outergap(0)) ylab(`ymin'(`ygap')`ymax') yline(0, lcolor(gs10) lpattern(solid)) ///
         `legend_split' ///
         title(`title', size(small)) plotregion(margin(sides))
-        graph export "../output/figures/es/split_`suf'es_`yvar'_`file_suf'.pdf", replace
+        graph export "../output/figures/es/split_`suf'es_`yvar'_`file_suf'$suffix.pdf", replace
 
         gen trt_coef_raw_ub = trt_coef_raw + 1.96*trt_coef_se
         gen trt_coef_raw_lb = trt_coef_raw - 1.96*trt_coef_se
@@ -1213,7 +1218,7 @@ program manual_event_study
         ytitle("`name'") ysc(titlegap(-6) outergap(0)) ylab(`rymin'(`ygap')`rymax') yline(0, lcolor(gs10) lpattern(solid)) ///
         `legend_split' ///
         title(`title', size(small)) plotregion(margin(sides))
-        graph export "../output/figures/es/split_nodetrend_`suf'es_`yvar'_`file_suf'.pdf", replace
+        graph export "../output/figures/es/split_nodetrend_`suf'es_`yvar'_`file_suf'$suffix.pdf", replace
     restore
 end
 **

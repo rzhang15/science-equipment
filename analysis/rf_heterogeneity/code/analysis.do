@@ -11,7 +11,7 @@ global EXPOSURE_VERSION "hc"
 global EXPOSURE_FILTER  "_cf_k3"
 global FE_MODE "author"
 * pres = event studies with stats legend (slides); paper = legend-free copies under <figdir>/paper/
-global FIG_MODES "paper"
+global FIG_MODES "pres"
 global HET_RUN_OLS 0
 global DEBUG_YVAR "ppr_cnt"
 global HET_INCLUDE_INSTWTD 0
