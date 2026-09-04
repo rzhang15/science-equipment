@@ -1,5 +1,5 @@
 --------------------------------------------------------------------------------
-Makelog started: 2026-09-03 18:34:51
+Makelog started: 2026-09-04 00:36:07
 Working directory: /n/holylabs/pakes_lab/Lab/sci_eq/derived/first_stage/select_categories/code
 --------------------------------------------------------------------------------
 External links successfully created!
@@ -72,20 +72,12 @@ Notes:
   4.     drop if inlist(category, "macro avg", "weighted avg", "Non-Lab", "accuracy")
   5. 
 . *===============================================================================
-. * TREATED PRODUCT MARKET CLASSIFICATION (STRICT AUDIT)
-. * Thermo Fisher / Life Technologies Merger
-. *
-. * Strict rule: a category is treated only when the antitrust document text
-. * directly supports the placement.
-. *   - Tier 1: subject of an EU "serious doubts" finding (EU paras 41, 69, 98,
-. *             105, 278) OR explicitly named in the FTC Dharmacon Gene Modulation
-. *             Products definition (FTC Order def. U) for siRNA/miRNA-specific items.
-. *   - Tier 2: named in EU para 11 (detailed analysis, no doubts) or para 12
-. *             (mentioned overlap, summary clearance) or otherwise identified
-. *             as an overlap in the body text of section IV (e.g., footnote 44
-. *             for non-FBS sera).
-. *   - Tier 3: bundling/extension robustness (NOT directly antitrust-document-
-. *             named; co-purchased with Tier 1/Tier 2 products).
+. * Thermo Fisher / Life Technologies merger: treated product markets
+. *   Tier 1: EU serious-doubts finding (paras 41, 69, 98, 105, 278) or named in
+. *           the FTC Dharmacon Gene Modulation Products definition (Order def. U)
+. *   Tier 2: overlap named in the EU decision, cleared without serious doubts
+. *           (paras 11-12, section IV, fn 44)
+. *   Tier 3: not document-named; co-purchased/bundled with Tier 1-2 products
 . *===============================================================================
 . 
 . gen tier1 = 0
@@ -94,10 +86,10 @@ Notes:
   8. global flag_nomatch = 0
   9. 
 . *-------------------------------------------------------------------------------
-. * TIER 1: SERIOUS DOUBTS FINDING IN EU OR FTC GENE MODULATION DIVESTITURE
+. * TIER 1
 . *-------------------------------------------------------------------------------
 . 
-. * --- Cell culture media (EU para 41 serious doubts; FTC HyClone divested) ---
+. * Cell culture media (para 41 serious doubts; FTC HyClone divestiture)
 . flag tier1 "basal medium eagle"
  10. flag tier1 "dmem"
  11. flag tier1 "dmem/f-12"
@@ -114,9 +106,7 @@ Notes:
  22. flag tier1 "specialty cell culture media"
  23. flag tier1 "stem cell media"
  24. 
-. * --- FBS (EU para 69 serious doubts; FTC HyClone divested) ---
-. *     EU para 58: "main area of overlap is the supply of FBS"
-. *     Non-FBS sera (calf, adult bovine, equine) -> Tier 2 (footnote 44)
+. * Sera (para 69 serious doubts, para 58; FTC HyClone divestiture)
 . flag tier1 "australian fbs"
  25. flag tier1 "canadian fbs"  // Table 8
  26. flag tier1 "new zealand fbs"
@@ -126,61 +116,59 @@ Notes:
  30. flag tier1 "nz bovine calf serum"
  31. flag tier1 "horse serum"
  32. 
-. * --- siRNA (EU para 98 serious doubts; FTC Dharmacon Gene Modulation
-. *     Products def. U includes "small/short interfering RNA (siRNA)") ---
+. * siRNA (para 98 serious doubts; FTC Dharmacon def. U names siRNA)
 . flag tier1 "synthetic sirna"
- 33. 
-. * --- miRNA: no exact "synthetic mirna" category in current data; FTC def. U
-. *     includes microRNA. (gene-specific rnai reagents is ambiguous -> Tier 2)
+ 33. * miRNA is in FTC def. U but no synthetic-miRNA category exists in the data
 . 
 . count if tier1 == 1
  34. 
 . *-------------------------------------------------------------------------------
-. * TIER 2: NAMED OVERLAP, NO SERIOUS DOUBTS
+. * TIER 2
 . *-------------------------------------------------------------------------------
-. flag tier2 "sirna buffers"  // para-126 standard reagent
+. 
+. * siRNA-adjacent consumables (para 126 standard reagents; Dharmacon workflow)
+. flag tier2 "sirna buffers"
  35. flag tier2 "sirna transfection medium"
  36. flag tier2 "sirna transfection reagents"
  37. 
-. * --- shRNA (EU para 88: no serious doubts; bundled in Dharmacon divestiture) ---
+. * shRNA (para 88, no serious doubts; bundled in Dharmacon divestiture)
 . flag tier2 "synthetic shrna"
  38. 
-. * --- Non-FBS sera (footnote 44: overlap markets covered by FBS commitment,
-. *     "not further considered" by EU) ---
+. * Non-FBS sera (fn 44: overlap markets covered by the FBS commitment)
 . flag tier2 "goat serum"
  39. flag tier2 "donkey serum"
  40. flag tier2 "mouse serum"
  41. flag tier2 "rat serum"
  42. flag tier2 "rabbit serum"
  43. flag tier2 "sheep serum"
- 44. * --- Process liquids (EU para 27: separate product market; FTC HyClone
-. *     divestiture covers them but EU did not analyze for serious doubts) ---
+ 44. 
+. * Process liquids (para 27 separate product market; FTC HyClone divestiture)
 . flag tier2 "phosphate-buffered saline (pbs) buffer"
- 45. flag tier2 "tris-edta (te) buffer"  // para-126 standard reagent
+ 45. flag tier2 "tris-edta (te) buffer"  // also para-126 standard reagent
  46. flag tier2 "dulbecco's phosphate-buffered saline (dpbs) buffer"
  47. flag tier2 "hanks' balanced salt solution (hbss) buffer"
  48. flag tier2 "earle's balanced salt solution (ebss) buffer"
  49. 
-. * --- RNAi mixed/ambiguous (placed conservatively in Tier 2) ---
+. * RNAi reagents spanning si/sh/miRNA products above
 . flag tier2 "gene-specific rnai reagents"
  50. 
-. * --- Transfection (EU para 11(iii), section IV.D.2; cleared para 122) ---
+. * Transfection (para 11(iii), section IV.D.2, cleared para 122)
 . flag tier2 "transfection reagents - cellfectin (insect cell)"
  51. flag tier2 "transfection reagents - in vivo delivery reagents"
  52. flag tier2 "transfection reagents - protein transfection reagents"
- 53. * --- Chemical transfection variants (one market per EU para 112; Lipofectamine/
-. *     TurboFect/DharmaFect named at para 119) ---
+ 53. * chemical transfection is one market (para 112); Lipofectamine/TurboFect/
+. * DharmaFect named at para 119
 . flag tier2 "transfection reagents - calcium phosphate"
  54. flag tier2 "transfection reagents - cationic lipid"
  55. flag tier2 "transfection reagents - deae-dextran"
  56. flag tier2 "transfection reagents - non-liposomal polymer"
  57. flag tier2 "transfection reagents - pei (bulk)"
- 58. * viral transduction: outside para 107's chemical-transfection overlap -> Tier 3
+ 58. * viral transduction is outside the para-107 chemical-transfection market
 . flag tier3 "transfection reagents - lentiviral packaging kits"
  59. flag tier3 "transfection reagents - polybrene (viral transduction)"
  60. 
-. * --- NA amplification standalone enzymes (EU para 11(iv), section IV.D.3;
-. *     paras 142, 152, 159, 165, 175 cleared) ---
+. * NA amplification standalone enzymes (para 11(iv), section IV.D.3;
+. * cleared paras 142, 152, 159, 165, 175)
 . flag tier2 "high-fidelity dna polymerase"
  61. flag tier2 "high-fidelity hot start dna polymerase"
  62. flag tier2 "high-fidelity hot start pcr systems"
@@ -190,9 +178,8 @@ Notes:
  66. flag tier2 "reverse transcriptase"
  67. flag tier2 "taq polymerases"
  68. 
-. * --- NA amplification ready-to-use kits (EU para 12(iv), para 135 list:
-. *     PCR kits, dye/probe-based qPCR kits, cDNA synthesis kits, RT-PCR kits,
-. *     dye/probe-based RT-qPCR kits) ---
+. * NA amplification ready-to-use kits (para 12(iv); para 135 lists PCR, dye/
+. * probe-based qPCR, cDNA synthesis, RT-PCR, dye/probe-based RT-qPCR kits)
 . flag tier2 "pcr systems"
  69. flag tier2 "dye-based qpcr systems"
  70. flag tier2 "probe-based qpcr systems"
@@ -206,10 +193,10 @@ Notes:
  78. flag tier2 "pre amplification kits"
  79. flag tier2 "qrt-pcr titration kit"
  80. 
-. * --- NA purification kits: para-9 consumables, never market-defined (para 180:
-. *     affected purification markets are instruments + gel boxes); real TF/LT
-. *     overlap -> Tier 3 bundled (M.5264 para 75: Qiagen [40-50]% vs combined
-. *     [5-10]%); magnetic kits stay Tier 2 (fn 127, para 210) ---
+. * NA purification kits: para-9 consumables, never market-defined (para 180
+. * names instruments + gel boxes as the affected purification markets; M.5264
+. * para 75 puts Qiagen at [40-50]% vs combined [5-10]%) -> Tier 3;
+. * magnetic kits are named (fn 127, para 210) -> Tier 2
 . flag tier3 "column-based dna and rna extraction kits"
  81. flag tier3 "column-based dna genomic purification kits"
  82. flag tier3 "column-based dna plasmid gigaprep"
@@ -230,15 +217,15 @@ Notes:
  97. flag tier3 "column-based rna purification kits"
  98. flag tier3 "column-based yeast dna purification kits"
  99. flag tier3 "liquid-based dna plasmid purification kit"
-100. flag tier2 "magnetic-bead based purification kit"
-101. flag tier2 "magnetic bacterial rna purification kit"
-102. flag tier2 "magnetic bead-based mrna selection kit"
-103. flag tier3 "rna extraction reagents"
-104. flag tier3 "rna stabilization reagent"
-105. flag tier3 "silica bead based gel purification kit"
-106. flag tier3 "spin columns"
+100. flag tier3 "rna extraction reagents"
+101. flag tier3 "rna stabilization reagent"
+102. flag tier3 "silica bead based gel purification kit"
+103. flag tier3 "spin columns"
+104. flag tier2 "magnetic-bead based purification kit"
+105. flag tier2 "magnetic bacterial rna purification kit"
+106. flag tier2 "magnetic bead-based mrna selection kit"
 107. 
-. * --- Molecular weight standards (EU para 11(v), paras 197-201) ---
+. * Molecular weight standards (para 11(v), paras 197-201)
 . flag tier2 "pre-stained dna ladders"
 108. flag tier2 "pre-stained protein molecular-weight ladder"
 109. flag tier2 "pre-stained rna ladders"
@@ -249,7 +236,9 @@ Notes:
 114. flag tier2 "protein ladders"
 115. flag tier2 "radiolabeled protein molecular-weight ladder"
 116. 
-. * --- Cloning enzymes (restriction + modifying; EU para 12(vi), paras 202-207) ---
+. * Cloning enzymes: restriction + modifying (para 12(vi), paras 202-207);
+. * creatine kinase excluded as a non-nucleic-acid enzyme; enzyme reaction
+. * buffers retained as para-126 standard reagents
 . flag tier2 "restriction enzymes"
 117. flag tier2 "dnase i"
 118. flag tier2 "rnase"
@@ -282,11 +271,8 @@ Notes:
 145. flag tier2 "nucleic acid modifying enzymes - terminal transferase"
 146. flag tier2 "nucleic acid modifying enzymes - topoisomerases"
 147. flag tier2 "nucleic acid modifying enzymes - transposases"
-148. * (Excluded: creatine kinase by category-name flag "non-nucleic acid enzyme".
-. *  Enzyme reaction buffers retained as Tier 2 standard reagents (para 126,
-. *  named market).)
-. 
-. * --- Cloning kits (EU para 12(vi), para 205) ---
+148. 
+. * Cloning kits (para 12(vi), para 205)
 . flag tier2 "blunt-end cloning kits"
 149. flag tier2 "directional topo cloning kits"
 150. flag tier2 "gateway cloning kits"
@@ -296,106 +282,101 @@ Notes:
 154. flag tier2 "topo ta cloning kits"
 155. flag tier2 "zero blunt topo cloning kits"
 156. 
-. * --- Cloning-adjacent: bacterial transformation (cloning workflow, not named
-. *     in paras 202-207) ---
+. * Bacterial transformation and mutagenesis: cloning workflow, not named in
+. * paras 202-207
 . flag tier3 "chemically competent cells"
 157. flag tier3 "electrocompetent cells"
 158. flag tier3 "bacterial transformation reagents"
 159. flag tier3 "expression plasmids"
 160. flag tier3 "plasmid vectors"
-161. 
-. * --- Mutagenesis (cloning workflow, not named in paras 202-207) ---
-. flag tier3 "site-directed mutagenesis systems"
+161. flag tier3 "site-directed mutagenesis systems"
 162. flag tier3 "site-directed mutagenesis kits"
 163. flag tier3 "transposon mutagenesis kits"
 164. 
-. * --- SDS-PAGE (EU para 12(vii), paras 302-306; named: vertical gel boxes,
-. *     power suppliers, pre-cast gels, standards, gel stains) ---
+. * End-user magnetic beads (paras 210-228 name and examine the end-user
+. * segment; para 278 serious doubts confined to OEM supply)
+. flag tier2 "affinity resins - activated coupling matrices (magnetic)"
+165. flag tier2 "affinity resins - anti-ig secondary (magnetic)"
+166. flag tier2 "affinity resins - epitope tags (flag/ha/myc/v5) (magnetic)"
+167. flag tier2 "affinity resins - glycoprotein (lectin-immobilized) (magnetic)"
+168. flag tier2 "affinity resins - gst-tag (magnetic)"
+169. flag tier2 "affinity resins - his-tag (imac) (magnetic)"
+170. flag tier2 "affinity resins - mbp-tag (magnetic)"
+171. flag tier2 "affinity resins - other (magnetic)"
+172. flag tier2 "affinity resins - protein a (magnetic)"
+173. flag tier2 "affinity resins - protein a/g (magnetic)"
+174. flag tier2 "affinity resins - protein g (magnetic)"
+175. flag tier2 "affinity resins - strep-tag (magnetic)"
+176. flag tier2 "affinity resins - streptavidin/avidin (magnetic)"
+177. flag tier2 "immunomagnetic cell separation beads"
+178. flag tier2 "immunomagnetic cell separation columns"
+179. flag tier2 "magnetic beads - other"
+180. flag tier2 "magnetic cell separation kits"
+181. flag tier2 "magnetic ip kit"
+182. 
+. * SDS-PAGE (para 12(vii), paras 302-306: vertical gel boxes, power supplies,
+. * pre-cast gels, standards, gel stains)
 . flag tier2 "horizontal electrophoresis systems"  // para 12(v), para 180
-165. * acrylamide/bis + casting kit: outside para 303's closed SDS-PAGE list -> Tier 3
+183. flag tier2 "pre-cast bis-tris gels"
+184. flag tier2 "pre-cast tbe gels"
+185. flag tier2 "pre-cast tris-acetate gels"
+186. flag tier2 "pre-cast tris-glycine gels"
+187. flag tier2 "pre-cast tris-hcl gels"
+188. flag tier2 "pre-cast tris-tricine gels"
+189. flag tier2 "protein gel stains"
+190. flag tier2 "nucleic acid gel stains"
+191. flag tier2 "vertical electrophoresis systems"
+192. * acrylamide/bis + casting kit are outside para 303's list
 . flag tier3 "acrylamide/bis solution"
-166. flag tier3 "polyacrylamide gels casting kit"
-167. flag tier2 "pre-cast bis-tris gels"
-168. flag tier2 "pre-cast tbe gels"
-169. flag tier2 "pre-cast tris-acetate gels"
-170. flag tier2 "pre-cast tris-glycine gels"
-171. flag tier2 "pre-cast tris-hcl gels"
-172. flag tier2 "pre-cast tris-tricine gels"
-173. flag tier2 "protein gel stains"
-174. flag tier2 "nucleic acid gel stains"
-175. flag tier2 "vertical electrophoresis systems"
-176. 
-. * --- Western blotting: TRANSFER BOXES, MEMBRANES, CHEMILUM SUBSTRATES ONLY
-. *     (EU para 307 narrowly defines this overlap) ---
+193. flag tier3 "polyacrylamide gels casting kit"
+194. 
+. * Western blotting: transfer boxes, membranes, chemiluminescent substrates
+. * only (para 307)
 . flag tier2 "chemiluminescent substrates"
-177. flag tier2 "chemiluminescent western blot detection"
-178. flag tier2 "nitrocellulose blotting membranes"
-179. flag tier2 "precut nitrocellulose transfer blotting packs"
-180. flag tier2 "precut pvdf transfer blotting packs"
-181. flag tier2 "pvdf blotting membranes"
-182. flag tier2 "western blot boxes"
-183. 
-. * --- Protein modification (EU para 12(ix), paras 313-317;
-. *     chemical modification, cross-linking, proteases) ---
+195. flag tier2 "chemiluminescent western blot detection"
+196. flag tier2 "nitrocellulose blotting membranes"
+197. flag tier2 "precut nitrocellulose transfer blotting packs"
+198. flag tier2 "precut pvdf transfer blotting packs"
+199. flag tier2 "pvdf blotting membranes"
+200. flag tier2 "western blot boxes"
+201. 
+. * Protein modification (para 12(ix), paras 313-317)
 . flag tier2 "antibody labeling kits"
-184. flag tier2 "bioconjugation reagents"
-185. flag tier2 "crosslinking reagents"
-186. flag tier2 "protein and antibody labeling kits"
-187. flag tier2 "protein modifying enzymes"
-188. 
-. * --- Reactive dyes (EU para 12(x), paras 318-321) ---
-. *     STRICT: only "reactive dyes" — amine/thiol-reactive activated fluorophores.
-. *     General fluorophores, NA stains, indicator dyes are NOT reactive dyes.
+202. flag tier2 "bioconjugation reagents"
+203. flag tier2 "crosslinking reagents"
+204. flag tier2 "protein and antibody labeling kits"
+205. flag tier2 "protein modifying enzymes"
+206. 
+. * Reactive dyes only (para 12(x), paras 318-321): amine/thiol-reactive
+. * activated fluorophores; general fluorophores and stains are not in scope
 . flag tier2 "fluorophore - bioconjugate dyes"
-189. 
+207. 
 . count if tier2 == 1
-190. 
+208. 
 . *-------------------------------------------------------------------------------
-. * TIER 3: BUNDLING / EXTENSION ROBUSTNESS
+. * TIER 3: BUNDLED WITH TIER 1-2 MARKETS
 . *-------------------------------------------------------------------------------
 . 
-. * --- Cell culture supplements (bundled with HyClone media) ---
+. * Cell culture supplements (bundled with HyClone/Gibco media)
 . flag tier3 "cell culture nutritional supplements - amino acids"
-191. flag tier3 "cell culture nutritional supplements - b27"
-192. flag tier3 "cell culture nutritional supplements - casamino acids"
-193. flag tier3 "cell culture nutritional supplements - glucose"
-194. flag tier3 "cell culture nutritional supplements - insulin"
-195. flag tier3 "cell culture nutritional supplements - its-g"
-196. flag tier3 "cell culture nutritional supplements - l-glutamine"
-197. flag tier3 "cell culture nutritional supplements - lif"
-198. flag tier3 "cell culture nutritional supplements - other"
-199. flag tier3 "cell culture nutritional supplements - peptone"
-200. flag tier3 "cell culture nutritional supplements - sodium pyruvate"
-201. flag tier3 "cell culture nutritional supplements - sugars"
-202. flag tier3 "cell culture nutritional supplements - tryptone"
-203. flag tier3 "cell culture nutritional supplements - vitamins"
-204. flag tier3 "cell culture nutritional supplements - yeast"
-205. flag tier3 "cell culture dissociation reagents"
-206. flag tier3 "growth medium supplement"
-207. 
-. * --- End-user magnetic beads (EU beads section paras 250-278: overlap named;
-. *     serious doubts + OEM divestiture confined to OEM supply, so end-user
-. *     side = named overlap, no serious doubts -> Tier 2) ---
-. flag tier2 "affinity resins - activated coupling matrices (magnetic)"
-208. flag tier2 "affinity resins - anti-ig secondary (magnetic)"
-209. flag tier2 "affinity resins - epitope tags (flag/ha/myc/v5) (magnetic)"
-210. flag tier2 "affinity resins - glycoprotein (lectin-immobilized) (magnetic)"
-211. flag tier2 "affinity resins - gst-tag (magnetic)"
-212. flag tier2 "affinity resins - his-tag (imac) (magnetic)"
-213. flag tier2 "affinity resins - mbp-tag (magnetic)"
-214. flag tier2 "affinity resins - other (magnetic)"
-215. flag tier2 "affinity resins - protein a (magnetic)"
-216. flag tier2 "affinity resins - protein a/g (magnetic)"
-217. flag tier2 "affinity resins - protein g (magnetic)"
-218. flag tier2 "affinity resins - strep-tag (magnetic)"
-219. flag tier2 "affinity resins - streptavidin/avidin (magnetic)"
-220. flag tier2 "immunomagnetic cell separation beads"
-221. flag tier2 "immunomagnetic cell separation columns"
-222. flag tier2 "magnetic beads - other"
-223. flag tier2 "magnetic cell separation kits"
-224. flag tier2 "magnetic ip kit"
+209. flag tier3 "cell culture nutritional supplements - b27"
+210. flag tier3 "cell culture nutritional supplements - casamino acids"
+211. flag tier3 "cell culture nutritional supplements - glucose"
+212. flag tier3 "cell culture nutritional supplements - insulin"
+213. flag tier3 "cell culture nutritional supplements - its-g"
+214. flag tier3 "cell culture nutritional supplements - l-glutamine"
+215. flag tier3 "cell culture nutritional supplements - lif"
+216. flag tier3 "cell culture nutritional supplements - other"
+217. flag tier3 "cell culture nutritional supplements - peptone"
+218. flag tier3 "cell culture nutritional supplements - sodium pyruvate"
+219. flag tier3 "cell culture nutritional supplements - sugars"
+220. flag tier3 "cell culture nutritional supplements - tryptone"
+221. flag tier3 "cell culture nutritional supplements - vitamins"
+222. flag tier3 "cell culture nutritional supplements - yeast"
+223. flag tier3 "cell culture dissociation reagents"
+224. flag tier3 "growth medium supplement"
 225. 
-. * --- Electrophoresis sample/running buffers (bundled with Tier 2 SDS-PAGE) ---
+. * Electrophoresis sample/running buffers (bundled with Tier 2 SDS-PAGE)
 . flag tier3 "laemmli sample buffer"
 226. flag tier3 "lds sample buffer"
 227. flag tier3 "mes-sds buffer"
@@ -410,20 +391,18 @@ Notes:
 236. flag tier3 "tris-glycine-sds (tgs) buffer"
 237. flag tier3 "tris-tricine-sds buffer"
 238. 
-. * --- Western blot membrane-adjacent consumables (papers and transfer buffers
-. *     are pre-/at-transfer; EU para 307 transfer-step overlap) ---
+. * Western blot transfer-step consumables (adjacent to para-307 markets)
 . flag tier3 "gel blotting papers"
 239. flag tier3 "western blot transfer buffers"
 240. 
-. * --- IVT specialty kits (cloning workflow extension) ---
+. * IVT kits and enzymes (cloning workflow extension)
 . flag tier3 "capped mrna synthesis kits"
 241. flag tier3 "in vitro transcription kit"
 242. flag tier3 "rna polymerases"
 243. flag tier3 "direct pcr lysis reagents"
 244. 
-. * --- BSA: bovine-derived (shares input with Tier 1 FBS); HyClone sold BSA as
-. *     part of cell-culture portfolio; co-purchased with FBS as serum
-. *     supplement/blocker (bundling) ---
+. * BSA (bovine-derived like Tier 1 FBS; sold in the HyClone cell-culture
+. * portfolio and co-purchased with FBS)
 . flag tier3 "bovine serum albumin"
 245. 
 . count if tier3 == 1
@@ -433,7 +412,7 @@ Notes:
 249. 
 . label var tier1          "Tier 1: serious-doubts finding (EU paras 41/69/98/105/278) or FTC Dharmacon"
 250. label var tier2          "Tier 2: named overlap, no serious doubts (EU paras 11, 12, fn 44)"
-251. label var tier3          "Tier 3: bundling / extension robustness"
+251. label var tier3          "Tier 3: bundled with Tier 1-2 markets, not document-named"
 252. label var treated_strict "Treated (Tier 1 only)"
 253. label var treated_1and2  "Treated (Tier 1 + Tier 2)"
 254. 
@@ -443,182 +422,142 @@ Notes:
 257. tab treated_strict
 258. tab treated_1and2
 259. 
+. *-------------------------------------------------------------------------------
+. * BAD CONTROLS: each flag's reason is recorded in bad_control_reason and
+. * exported to ../output/bad_control_documentation_*.csv
+. *-------------------------------------------------------------------------------
+. 
 . gen bad_control = 0
 260. gen bad_control_reason = ""
-261. * Rule: bad_control = US-based exogenous shock to price/spending during
-. * 2010-2018, OR a product where Thermo and Life Tech had genuine
-. * horizontal overlap pre-merger (so bundling/portfolio effects bias the
-. * control), OR classification ambiguity. Bundling alone (without horizontal
-. * overlap) is NOT sufficient -- those belong in Tier 3.
-. 
-. * --- Antibody market shocks: reproducibility crisis 2014-16 + Sigma-Aldrich
-. *     -> MilliporeSigma merger Nov 2015 absorbed one of the largest antibody
-. *     portfolios in the industry ---
+261. 
+. * Own US shock or supplier M&A during the window
 . flag bad_control "primary antibodies" "secondary antibodies"
 262. replace bad_control_reason = "antibody reproducibility crisis 2014-16; Sigma-Aldrich/MilliporeSigma merger Nov 2015 affected major antibody supplier" ///
 >     if inlist(category, "primary antibodies", "secondary antibodies")
-263. 
-. * --- Avidin products: Thermo (Pierce NeutrAvidin) AND Life (Molecular Probes
-. *     streptavidin conjugates) both had strong franchises -> horizontal
-. *     overlap from the merger ---
+263. flag bad_control "acetonitrile"
+264. replace bad_control_reason = "US shock: Hurricane Ike (2008) hit Texas Gulf ACN production; global shortage with lingering US price effects 2010-2011" ///
+>     if category == "acetonitrile"
+265. flag bad_control "nitrile gloves"
+266. replace bad_control_reason = "US-relevant shock: 2017-2018 NBR feedstock shortage drove 20-40% lab glove price increases" ///
+>     if category == "nitrile gloves"
+267. flag bad_control "synthetic dna oligonucleotide - desalted" "synthetic dual-labeled probe"
+268. replace bad_control_reason = "US-driven secular price collapse: Twist Bioscience entry 2013 + IDT scale-up dropped per-base costs ~10x in window" ///
+>     if inlist(category, "synthetic dna oligonucleotide - desalted", "synthetic dual-labeled probe")
+269. flag bad_control "bottle top filters" "syringe filters" "centrifugal ultrafiltration devices"
+270. replace bad_control_reason = "US M&A in window: Pall Corp -> Danaher (closed Aug 2015) reshuffled US lab filtration market" ///
+>     if inlist(category, "bottle top filters", "syringe filters", "centrifugal ultrafiltration devices")
+271. flag bad_control "hypodermic needles" "syringes"
+272. replace bad_control_reason = "US M&A in window: Becton Dickinson + CareFusion closed Mar 2015; BD dominates US needle/syringe" ///
+>     if inlist(category, "hypodermic needles", "syringes")
+273. flag bad_control "capillary blood collection tubes"
+274. replace bad_control_reason = "US M&A in window: BD (Microtainer) dominates; BD-CareFusion closed Mar 2015 (same reason as needles/syringes)" ///
+>     if category == "capillary blood collection tubes"
+275. flag bad_control "formaldehydes and paraformaldehydes"
+276. replace bad_control_reason = "US regulatory shock: EPA IRIS 2010, NTP 12th RoC 2011 listed as known human carcinogen, OSHA tightening" ///
+>     if category == "formaldehydes and paraformaldehydes"
+277. flag bad_control "ethanol"
+278. replace bad_control_reason = "US commodity shock: 2012 Midwest drought + RFS volatility 2012-2014 moved corn-ethanol prices" ///
+>     if category == "ethanol"
+279. flag bad_control "ldh cytotoxicity assay"
+280. replace bad_control_reason = "US shock in window: Roche Cytotoxicity Detection Kit (LDH) moved to Sigma-Aldrich distribution with the Roche biochemicals portfolio 2014; Sigma absorbed by Merck KGaA Nov 2015" ///
+>     if category == "ldh cytotoxicity assay"
+281. flag bad_control "human serum"
+282. replace bad_control_reason = "US demand shock: clinical cell/gene therapy manufacturing scale-up (CAR-T approvals 2017) drove human AB serum demand through the post-period" ///
+>     if category == "human serum"
+283. flag bad_control "gene expression inducers"
+284. replace bad_control_reason = "US shock: doxycycline (standard Tet-On/Off inducer) generic price spike 2013-14" ///
+>     if category == "gene expression inducers"
+285. flag bad_control "drug - anticoagulant"
+286. replace bad_control_reason = "US shock: heparin Chinese crude API cost pressure through window; US shortage from 2017" ///
+>     if category == "drug - anticoagulant"
+287. flag bad_control "bacterial selection antibiotics - rifampicin"
+288. replace bad_control_reason = "US shock: rifampin on FDA drug-shortage list 2013-14 and 2017" ///
+>     if category == "bacterial selection antibiotics - rifampicin"
+289. flag bad_control "sucrose"
+290. replace bad_control_reason = "US shock: AD/CVD case vs Mexican sugar (filed Mar 2014, suspension agreements Dec 2014) + 2012 drought; also ambiguous with Tier 3 supplements-sugars" ///
+>     if category == "sucrose"
+291. flag bad_control "dextrose"
+292. replace bad_control_reason = "US commodity shock: corn exposure, 2012 Midwest drought (parallel to ethanol); also ambiguous with Tier 3 supplements-glucose" ///
+>     if category == "dextrose"
+293. flag bad_control "citric acid"
+294. replace bad_control_reason = "US trade shock: antidumping orders on Chinese citric acid in force through window; new AD/CVD investigations 2017, orders 2018" ///
+>     if category == "citric acid"
+295. flag bad_control "formic acid"
+296. replace bad_control_reason = "industrial commodity priced off petrochemical feedstocks; 2014-15 oil price collapse coincides with merger" ///
+>     if category == "formic acid"
+297. flag bad_control "nitrogen"
+298. replace bad_control_reason = "US M&A in window: Air Liquide-Airgas closed May 2016, Praxair-Linde announced 2016; prices track energy" ///
+>     if category == "nitrogen"
+299. flag bad_control "crystallizing dishes"
+300. replace bad_control_reason = "US M&A in window: Kimble + Wheaton + Duran merged into DWK Life Sciences 2017; Corning absorbed BD Discovery Labware Oct 2012" ///
+>     if category == "crystallizing dishes"
+301. 
+. * Technology or composition confounds timed with the merger
+. flag bad_control "synthetic shrna"
+302. replace bad_control_reason = "tier 2 treated but excluded: CRISPR substitute entry (Cas9 2013, GeCKO libraries 2014) hit knockdown screening at merger date; merger pricing effect not separable from technology substitution" ///
+>     if category == "synthetic shrna"
+303. flag bad_control "cell culture antibiotics - blasticidin"
+304. replace bad_control_reason = "CRISPR demand shock timed with merger: lentiCas9-Blast (2014) made blasticidin a standard selection marker, demand jump 2014-16; single-source fermentation supply (Kaken) passes through supply/FX shocks" ///
+>     if category == "cell culture antibiotics - blasticidin"
+305. flag bad_control "slide mounting medium"
+306. replace bad_control_reason = "quality upgrading in window: ProLong Diamond (~2014), ProLong Glass (~2017), VectaShield Vibrance (~2018) premium launches for confocal/superresolution; spend-per-unit rises from composition shift without SKU repricing" 
+> ///
+>     if category == "slide mounting medium"
+307. flag bad_control "dna-salmon sperm"
+308. replace bad_control_reason = "secular demand decline: hybridization-era blocking agent displaced by the NGS shift" ///
+>     if category == "dna-salmon sperm"
+309. 
+. * Unmeasurable price series: dollar-weighted misclassification or a category
+. * pooling distinct products, so spend-per-unit tracks item mix
 . flag bad_control "avidin products"
-264. replace bad_control_reason = "horizontal overlap pre-merger: Pierce biotin-avidin franchise + Molecular Probes streptavidin-fluor conjugates" ///
+310. replace bad_control_reason = "US M&A in window: Vector Laboratories (Vectastain ABC, dominant supplier per basket) acquired by Maravai LifeSciences 2016; also heterogeneous bucket pooling raw avidin, NeutrAvidin, conjugates, and IHC kits spanning USD
+>  20-2,500/unit" ///
 >     if category == "avidin products"
-265. 
-. * --- Phosphoprotein electrophoresis reagents: ambiguous classification
-. *     (Tier 2 -> control in changelog); flag rather than contaminate either group ---
+311. flag bad_control "catalase"
+312. replace bad_control_reason = "dollar-contaminated price series: 'catalog' substring misclassifications carry >20% of category spend (USD 3.4k 'catalog-ppt support', USD 2k 'catalog-revision'); enzyme/assay-kit/antibody mix in remainder" ///
+>     if category == "catalase"
+313. flag bad_control "cell lysis detergents - np-40 (igepal ca-630)"
+314. replace bad_control_reason = "dollar-contaminated price series: top spend items are misclassified 'np' matches (Whatman Autovial syringeless filters, NobelActive dental implant), ~22% of category spend" ///
+>     if category == "cell lysis detergents - np-40 (igepal ca-630)"
+315. flag bad_control "centrifugation media"
+316. replace bad_control_reason = "dollar-contaminated price series: misclassified USD 34.4k stage-lighting purchase (ETC Selador Lustr) carries 13% of category spend" ///
+>     if category == "centrifugation media"
+317. flag bad_control "cylindrical carboys"
+318. replace bad_control_reason = "unmeasurable price series: thin category (~155 purchases) pooling vessels with caps/spigots/funnels/replacement parts, plus dollar-dominant misclassification (USD 17.5k environmental chamber with carboy water-fill line)"
+>  ///
+>     if category == "cylindrical carboys"
+319. 
+. * Classification ambiguity with treated families
 . flag bad_control "phosphoprotein electrophoresis reagents"
-266. replace bad_control_reason = "classification uncertainty - not shock-based; specialty SDS-PAGE reagent overlapping with Tier 2 protein workflow" ///
+320. replace bad_control_reason = "classification uncertainty - not shock-based; specialty SDS-PAGE reagent overlapping with Tier 2 protein workflow" ///
 >     if category == "phosphoprotein electrophoresis reagents"
-267. 
+321. flag bad_control "pipes buffers" "egta solution"
+322. replace bad_control_reason = "classification ambiguity: prepared buffer solution in same family as Tier 2 process liquids (PBS/TE/HBSS/EBSS)" ///
+>     if inlist(category, "pipes buffers", "egta solution")
+323. flag bad_control "collagenase"
+324. replace bad_control_reason = "classification ambiguity: is a cell culture dissociation reagent, a Tier 3 category (Gibco collagenase)" ///
+>     if category == "collagenase"
+325. 
+. * Outside life-sciences consumables scope
+. flag bad_control "sodium hydride"
+326. replace bad_control_reason = "outside life-sciences consumables scope: synthetic-chemistry commodity, petrochemical feedstock pricing, non-life-science buyer base" ///
+>     if category == "sodium hydride"
+327. flag bad_control "flash chromatography columns - silica gel"
+328. replace bad_control_reason = "outside life-sciences consumables scope: synthetic-chemistry product with non-life-science buyer base" ///
+>     if category == "flash chromatography columns - silica gel"
+329. 
+. count if bad_control == 1
+330. tab bad_control
+331. 
+. label var bad_control        "Excluded from control pool (see bad_control_reason)"
+332. label var bad_control_reason "Reason category was excluded"
+333. 
 . *-------------------------------------------------------------------------------
-. * US-based exogenous shocks during 2010-2018 window
+. * TREATED DEFINITION AND ANALYSIS SAMPLE
 . *-------------------------------------------------------------------------------
 . 
-. * --- Acetonitrile: Hurricane Ike (Sep 2008) hit BP/INEOS Texas Gulf plant,
-. *     one of few US producers; global ACN shortage with lingering US price
-. *     effects through 2010-2011 ---
-. flag bad_control "acetonitrile"
-268. replace bad_control_reason = "US shock: Hurricane Ike (2008) hit Texas Gulf ACN production; global shortage with lingering US price effects 2010-2011" ///
->     if category == "acetonitrile"
-269. 
-. * --- Nitrile gloves: 2017-2018 NBR (nitrile butadiene rubber) feedstock
-. *     shortage drove ~20-40% US lab glove price hikes; Malaysian production
-. *     consolidation ---
-. flag bad_control "nitrile gloves"
-270. replace bad_control_reason = "US-relevant shock: 2017-2018 NBR feedstock shortage drove 20-40% lab glove price increases" ///
->     if category == "nitrile gloves"
-271. 
-. * --- Synthetic DNA oligonucleotides + dual-labeled probes: US-driven secular
-. *     price collapse from Twist Bioscience entry (founded 2013, SF) and IDT
-. *     (Coralville IA) scale-up; per-base costs fell ~10x in window ---
-. flag bad_control "synthetic dna oligonucleotide - desalted" "synthetic dual-labeled probe"
-272. replace bad_control_reason = "US-driven secular price collapse: Twist Bioscience entry 2013 + IDT scale-up dropped per-base costs ~10x in window" ///
->     if inlist(category, "synthetic dna oligonucleotide - desalted", "synthetic dual-labeled probe")
-273. 
-. * --- Filtration (bottle top, syringe, centrifugal ultrafiltration): Pall Corp
-. *     (Port Washington NY) -> Danaher (closed Aug 2015), US M&A overlapping
-. *     the TF/Life window ---
-. flag bad_control "bottle top filters" "syringe filters" "centrifugal ultrafiltration devices"
-274. replace bad_control_reason = "US M&A in window: Pall Corp -> Danaher (closed Aug 2015) reshuffled US lab filtration market" ///
->     if inlist(category, "bottle top filters", "syringe filters", "centrifugal ultrafiltration devices")
-275. 
-. * --- Needles and syringes: Becton Dickinson (Franklin Lakes NJ) + CareFusion
-. *     (San Diego CA) closed Mar 2015; BD dominates US needle/syringe ---
-. flag bad_control "hypodermic needles" "syringes"
-276. replace bad_control_reason = "US M&A in window: Becton Dickinson + CareFusion closed Mar 2015; BD dominates US needle/syringe" ///
->     if inlist(category, "hypodermic needles", "syringes")
-277. 
-. * --- Formaldehyde / paraformaldehyde: US-specific regulatory tightening -
-. *     EPA IRIS draft assessment 2010, NTP 12th Report on Carcinogens (Jun 2011)
-. *     listed as known human carcinogen, OSHA exposure tightening ---
-. flag bad_control "formaldehydes and paraformaldehydes"
-278. replace bad_control_reason = "US regulatory shock: EPA IRIS 2010, NTP 12th RoC 2011 listed as known human carcinogen, OSHA tightening" ///
->     if category == "formaldehydes and paraformaldehydes"
-279. 
-. * --- Ethanol: US corn ethanol commodity exposure - 2012 Midwest drought,
-. *     RFS waiver fights 2012-2014, EPA RFS proposal Nov 2013 ---
-. flag bad_control "ethanol"
-280. replace bad_control_reason = "US commodity shock: 2012 Midwest drought + RFS volatility 2012-2014 moved corn-ethanol prices" ///
->     if category == "ethanol"
-281. 
-. count if bad_control == 1
-282. tab bad_control
-283. 
-. label var bad_control        "Drop from controls: action/shock/bundling in 2010-2018 window"
-284. label var bad_control_reason "Reason category was flagged as bad control"
-285. gen keep = (support >= 25 & precision >= 0.8 & recall >= 0.8) //| (inrange(support, 10, 25) & precision >= 0.9 & recall >=0.90)
-286. * --- shRNA: Tier 2 treated but removed from sample entirely (via keep = 0) ---
-. flag bad_control "synthetic shrna"
-287. replace bad_control_reason = "tier 2 treated but excluded: CRISPR substitute entry (Cas9 2013, GeCKO libraries 2014) hit knockdown screening at merger date; merger pricing effect not separable from technology substitution" ///
->     if category == "synthetic shrna"
-288. 
-. * --- Undocumented horizontal overlap (same logic as avidin) ---
-. flag bad_control "slide mounting medium"
-289. replace bad_control_reason = "horizontal overlap pre-merger: Molecular Probes ProLong/SlowFade antifade mountants (Life) + Richard-Allan/Shandon histology mounting media (Thermo)" ///
->     if category == "slide mounting medium"
-290. flag bad_control "ldh cytotoxicity assay"
-291. replace bad_control_reason = "horizontal overlap pre-merger: Pierce LDH cytotoxicity assay (Thermo) + Invitrogen/Molecular Probes cytotoxicity assay lines (Life)" ///
->     if category == "ldh cytotoxicity assay"
-292. * tmb + tween temporarily left as controls: string bugs meant they were controls
-. * in all original runs, so this preserves the baseline for the before/after
-. * comparison. Re-flag once compared:
-. *   flag bad_control "colorimetric substrates - tmb"  (Pierce TMB + Invitrogen/
-. *     Novex ELISA substrates overlap; substitute for Tier 2 chemilum substrates)
-. *   flag bad_control "cell lysis detergents - tween detergents"  (Pierce/
-. *     Invitrogen lysis reagent overlap)
-. flag bad_control "cell lysis detergents - np-40 (igepal ca-630)"
-293. replace bad_control_reason = "horizontal overlap pre-merger: Pierce surfactants/lysis buffers (Thermo) + Invitrogen lysis reagents (Life)" ///
->     if category == "cell lysis detergents - np-40 (igepal ca-630)"
-294. 
-. * --- Substitutes for treated markets (demand spillover contaminates control) ---
-. flag bad_control "human serum"
-295. replace bad_control_reason = "substitute for Tier 1 FBS in cell culture; merger-induced FBS price changes shift demand" ///
->     if category == "human serum"
-296. flag bad_control "centrifugation media"
-297. replace bad_control_reason = "Ficoll/Percoll density-gradient cell separation substitutes for magnetic bead-based separation (Dynabeads, Life)" ///
->     if category == "centrifugation media"
-298. 
-. * --- US-based shocks in window ---
-. flag bad_control "gene expression inducers"
-299. replace bad_control_reason = "US shock: doxycycline (standard Tet-On/Off inducer) generic price spike 2013-14" ///
->     if category == "gene expression inducers"
-300. flag bad_control "drug - anticoagulant"
-301. replace bad_control_reason = "US shock: heparin Chinese crude API cost pressure through window; US shortage from 2017" ///
->     if category == "drug - anticoagulant"
-302. flag bad_control "bacterial selection antibiotics - rifampicin"
-303. replace bad_control_reason = "US shock: rifampin on FDA drug-shortage list 2013-14 and 2017" ///
->     if category == "bacterial selection antibiotics - rifampicin"
-304. flag bad_control "sucrose"
-305. replace bad_control_reason = "US shock: AD/CVD case vs Mexican sugar (filed Mar 2014, suspension agreements Dec 2014) + 2012 drought; also ambiguous with Tier 3 supplements-sugars" ///
->     if category == "sucrose"
-306. flag bad_control "dextrose"
-307. replace bad_control_reason = "US commodity shock: corn exposure, 2012 Midwest drought (parallel to ethanol); also ambiguous with Tier 3 supplements-glucose" ///
->     if category == "dextrose"
-308. flag bad_control "citric acid"
-309. replace bad_control_reason = "US trade shock: antidumping orders on Chinese citric acid in force through window; new AD/CVD investigations 2017, orders 2018" ///
->     if category == "citric acid"
-310. flag bad_control "formic acid"
-311. replace bad_control_reason = "industrial commodity priced off petrochemical feedstocks; 2014-15 oil price collapse coincides with merger" ///
->     if category == "formic acid"
-312. flag bad_control "nitrogen"
-313. replace bad_control_reason = "US M&A in window: Air Liquide-Airgas closed May 2016, Praxair-Linde announced 2016; prices track energy" ///
->     if category == "nitrogen"
-314. flag bad_control "capillary blood collection tubes"
-315. replace bad_control_reason = "US M&A in window: BD (Microtainer) dominates; BD-CareFusion closed Mar 2015 (same reason as needles/syringes)" ///
->     if category == "capillary blood collection tubes"
-316. flag bad_control "crystallizing dishes"
-317. replace bad_control_reason = "US M&A in window: Kimble + Wheaton + Duran merged into DWK Life Sciences 2017; Corning absorbed BD Discovery Labware Oct 2012" ///
->     if category == "crystallizing dishes"
-318. 
-. * --- Classification ambiguity with treated families / merged-firm dominance ---
-. flag bad_control "pipes buffers" "egta solution"
-319. replace bad_control_reason = "classification ambiguity: prepared buffer solution in same family as Tier 2 process liquids (PBS/TE/HBSS/EBSS)" ///
->     if inlist(category, "pipes buffers", "egta solution")
-320. flag bad_control "collagenase"
-321. replace bad_control_reason = "classification ambiguity: is a cell culture dissociation reagent, a Tier 3 category (Gibco collagenase)" ///
->     if category == "collagenase"
-322. flag bad_control "cell culture antibiotics - blasticidin"
-323. replace bad_control_reason = "Invitrogen-dominant selection antibiotic tied to Tier 3 expression plasmid/vector systems; portfolio pricing exposure" ///
->     if category == "cell culture antibiotics - blasticidin"
-324. flag bad_control "cylindrical carboys"
-325. replace bad_control_reason = "Nalgene (Thermo) dominates category; exposed to acquirer portfolio repricing despite no Life overlap" ///
->     if category == "cylindrical carboys"
-326. 
-. * --- Weaker rationale (judgment calls) ---
-. flag bad_control "catalase"
-327. replace bad_control_reason = "judgment call: bovine-liver-derived biologic sharing bovine supply chain with FBS/BSA" ///
->     if category == "catalase"
-328. flag bad_control "sodium hydride"
-329. replace bad_control_reason = "judgment call: synthetic-chemistry commodity, petrochemical feedstock pricing, non-life-science buyer base" ///
->     if category == "sodium hydride"
-330. flag bad_control "dna-salmon sperm"
-331. replace bad_control_reason = "judgment call: hybridization-era blocking agent in secular decline with NGS shift; nominal Invitrogen overlap" ///
->     if category == "dna-salmon sperm"
-332. flag bad_control "flash chromatography columns - silica gel"
-333. replace bad_control_reason = "judgment call: synthetic-chemistry product with non-life-science buyer base" ///
->     if category == "flash chromatography columns - silica gel"
-334. * Version switch, placed after the named flags so specific reasons win
+. gen keep = (support >= 25 & precision >= 0.8 & recall >= 0.8)
+334. 
 . if "`tier3treated'" != "" {
 335.     gen treated = (tier1 == 1 | tier2 == 1 | tier3 == 1)
 336.     label var treated "Treated (Tiers 1-3)"
@@ -628,12 +567,12 @@ Notes:
 340.     gen treated = (tier1 == 1 | tier2 == 1)
 341.     label var treated "Treated (Tiers 1-2); tier 3 excluded from both groups"
 342.     replace bad_control = 1 if tier3 == 1
-343.     replace bad_control_reason = "tier 3: bundled/undocumented overlap; excluded from control pool" ///
+343.     replace bad_control_reason = "tier 3: bundled with treated markets; excluded from control pool" ///
 >         if tier3 == 1 & bad_control_reason == ""
 344.     local vtag t12
 345. }
 346. tab treated
-347. replace keep = 0 if bad_control == 1  // drop bad controls from analysis sample
+347. replace keep = 0 if bad_control == 1
 348. gen excluded_type = cond(bad_control == 0, "", ///
 >     cond(treated == 1, "excluded treated (own shock)", ///
 >     cond(tier3 == 1, "tier 3 excluded from both groups", "excluded control")))
@@ -647,7 +586,6 @@ Notes:
 355.     exit 498
 356. }
 357. 
-. * --- Export bad_control documentation CSV ---
 . preserve
 358.     keep if bad_control == 1
 359.     keep category excluded_type bad_control_reason
@@ -665,7 +603,7 @@ Notes:
 (5 vars, 1,109 obs)
 (4 observations deleted)
   24
-  119
+  137
   73
 
     Tier 1: |
@@ -696,9 +634,13 @@ overlap, no |
       Total |      1,105      100.00
 
     Tier 3: |
- bundling / |
-  extension |
- robustness |      Freq.     Percent        Cum.
+    bundled |
+  with Tier |
+        1-2 |
+   markets, |
+        not |
+document-na |
+        med |      Freq.     Percent        Cum.
 ------------+-----------------------------------
           0 |      1,032       93.39       93.39
           1 |         73        6.61      100.00
@@ -725,8 +667,6 @@ overlap, no |
 (1,105 missing values generated)
 variable bad_control_reason was str1 now str118
 (2 real changes made)
-(1 real change made)
-(1 real change made)
 variable bad_control_reason was str118 now str119
 (1 real change made)
 (1 real change made)
@@ -735,15 +675,8 @@ variable bad_control_reason was str118 now str119
 (2 real changes made)
 (1 real change made)
 (1 real change made)
-  15
-
-bad_control |      Freq.     Percent        Cum.
-------------+-----------------------------------
-          0 |      1,090       98.64       98.64
-          1 |         15        1.36      100.00
-------------+-----------------------------------
-      Total |      1,105      100.00
-variable bad_control_reason was str119 now str191
+(1 real change made)
+variable bad_control_reason was str119 now str176
 (1 real change made)
 (1 real change made)
 (1 real change made)
@@ -754,6 +687,15 @@ variable bad_control_reason was str119 now str191
 (1 real change made)
 (1 real change made)
 (1 real change made)
+(1 real change made)
+variable bad_control_reason was str176 now str191
+(1 real change made)
+variable bad_control_reason was str191 now str202
+(1 real change made)
+variable bad_control_reason was str202 now str218
+(1 real change made)
+(1 real change made)
+variable bad_control_reason was str218 now str234
 (1 real change made)
 (1 real change made)
 (1 real change made)
@@ -764,10 +706,14 @@ variable bad_control_reason was str119 now str191
 (1 real change made)
 (1 real change made)
 (1 real change made)
-(1 real change made)
-(1 real change made)
-(1 real change made)
-(1 real change made)
+  40
+
+bad_control |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          0 |      1,065       96.38       96.38
+          1 |         40        3.62      100.00
+------------+-----------------------------------
+      Total |      1,105      100.00
 
     Treated |
 (Tiers 1-3) |      Freq.     Percent        Cum.
@@ -791,7 +737,7 @@ file ../output/categories_tfidf_all3.dta saved
 (5 vars, 1,109 obs)
 (4 observations deleted)
   24
-  119
+  137
   73
 
     Tier 1: |
@@ -822,9 +768,13 @@ overlap, no |
       Total |      1,105      100.00
 
     Tier 3: |
- bundling / |
-  extension |
- robustness |      Freq.     Percent        Cum.
+    bundled |
+  with Tier |
+        1-2 |
+   markets, |
+        not |
+document-na |
+        med |      Freq.     Percent        Cum.
 ------------+-----------------------------------
           0 |      1,032       93.39       93.39
           1 |         73        6.61      100.00
@@ -851,8 +801,6 @@ overlap, no |
 (1,105 missing values generated)
 variable bad_control_reason was str1 now str118
 (2 real changes made)
-(1 real change made)
-(1 real change made)
 variable bad_control_reason was str118 now str119
 (1 real change made)
 (1 real change made)
@@ -861,15 +809,8 @@ variable bad_control_reason was str118 now str119
 (2 real changes made)
 (1 real change made)
 (1 real change made)
-  15
-
-bad_control |      Freq.     Percent        Cum.
-------------+-----------------------------------
-          0 |      1,090       98.64       98.64
-          1 |         15        1.36      100.00
-------------+-----------------------------------
-      Total |      1,105      100.00
-variable bad_control_reason was str119 now str191
+(1 real change made)
+variable bad_control_reason was str119 now str176
 (1 real change made)
 (1 real change made)
 (1 real change made)
@@ -880,6 +821,15 @@ variable bad_control_reason was str119 now str191
 (1 real change made)
 (1 real change made)
 (1 real change made)
+(1 real change made)
+variable bad_control_reason was str176 now str191
+(1 real change made)
+variable bad_control_reason was str191 now str202
+(1 real change made)
+variable bad_control_reason was str202 now str218
+(1 real change made)
+(1 real change made)
+variable bad_control_reason was str218 now str234
 (1 real change made)
 (1 real change made)
 (1 real change made)
@@ -890,10 +840,14 @@ variable bad_control_reason was str119 now str191
 (1 real change made)
 (1 real change made)
 (1 real change made)
-(1 real change made)
-(1 real change made)
-(1 real change made)
-(1 real change made)
+  40
+
+bad_control |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          0 |      1,065       96.38       96.38
+          1 |         40        3.62      100.00
+------------+-----------------------------------
+      Total |      1,105      100.00
 (73 real changes made)
 (73 real changes made)
 
@@ -928,6 +882,6 @@ file ../output/categories_tfidf.dta saved
 end of do-file
 
 --------------------------------------------------------------------------------
-Makelog ended: 2026-09-03 18:34:53
+Makelog ended: 2026-09-04 00:36:08
 Working directory: /n/holylabs/pakes_lab/Lab/sci_eq/derived/first_stage/select_categories/code
 --------------------------------------------------------------------------------

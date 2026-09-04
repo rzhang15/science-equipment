@@ -2316,63 +2316,63 @@ add_het_splits all_jrnls_r1_r2 min_year_nonsolo median = 2001; 8 PIs with no non
 (80 missing values generated)
 (80 missing values generated)
 add_het_splits all_jrnls_r1_r2 min_year_any (first pub ever) median = 1994
-(105,030 missing values generated)
-(59,850 missing values generated)
-add_het_splits all_jrnls_r1_r2 nihg N_pi=7530 p50=1
-(59,850 missing values generated)
-(59,850 missing values generated)
-(105,030 missing values generated)
-(59,850 missing values generated)
-add_het_splits all_jrnls_r1_r2 nihd N_pi=7530 p50=357260.75
-(59,850 missing values generated)
-(59,850 missing values generated)
-add_het_splits all_jrnls_r1_r2 young-only nihd N_pi=3567 p25=104500 p50=294531 p75=523376.5
-(99,480 missing values generated)
-(99,480 missing values generated)
-(117,310 missing values generated)
-(117,310 missing values generated)
-add_het_splits all_jrnls_r1_r2 NIH-matched PIs = 7562
-(59,530 missing values generated)
-(59,530 missing values generated)
-(125,244 missing values generated)
-(36,090 missing values generated)
+(104,972 missing values generated)
+(59,810 missing values generated)
+add_het_splits all_jrnls_r1_r2 nihg N_pi=7527 p50=1
+(59,810 missing values generated)
+(59,810 missing values generated)
+(104,972 missing values generated)
+(59,810 missing values generated)
+add_het_splits all_jrnls_r1_r2 nihd N_pi=7527 p50=357331
+(59,810 missing values generated)
+(59,810 missing values generated)
+add_het_splits all_jrnls_r1_r2 young-only nihd N_pi=3566 p25=104500 p50=294510.5 p75=523376.5
+(99,420 missing values generated)
+(99,420 missing values generated)
+(117,240 missing values generated)
+(117,240 missing values generated)
+add_het_splits all_jrnls_r1_r2 NIH-matched PIs = 7559
+(59,490 missing values generated)
+(59,490 missing values generated)
+(125,178 missing values generated)
+(36,060 missing values generated)
 
     Result                      Number of obs
     -----------------------------------------
     Not matched                             0
-    Matched                           135,150  
+    Matched                           135,080  
     -----------------------------------------
 add_het_splits all_jrnls_r1_r2 ic_tfnd inst-wtd N_inst=166 p25=35136 p50=100092 p75=351514.5
-(25,530 missing values generated)
-(25,530 missing values generated)
-(25,530 missing values generated)
-(25,530 missing values generated)
-(25,530 missing values generated)
-add_het_splits all_jrnls_r1_r2 ic_tfnd pi-wtd N_pi=10962 p25=342518.75 p50=619335.75 p75=866202.5
-(25,530 missing values generated)
-(25,530 missing values generated)
-(25,530 missing values generated)
-(25,530 missing values generated)
-(25,530 missing values generated)
+(25,510 missing values generated)
+(25,510 missing values generated)
+(25,510 missing values generated)
+(25,510 missing values generated)
+(25,510 missing values generated)
+add_het_splits all_jrnls_r1_r2 ic_tfnd pi-wtd N_pi=10957 p25=342518.75 p50=619335.75 p75=866202.5
+(25,510 missing values generated)
+(25,510 missing values generated)
+(25,510 missing values generated)
+(25,510 missing values generated)
+(25,510 missing values generated)
 add_het_splits all_jrnls_r1_r2 ic_lsf inst-wtd N_inst=165 p25=6775 p50=32028.25 p75=177465.25
-(25,600 missing values generated)
-(25,600 missing values generated)
-(25,600 missing values generated)
-(25,600 missing values generated)
-(25,600 missing values generated)
-add_het_splits all_jrnls_r1_r2 ic_lsf pi-wtd N_pi=10955 p25=137415.75 p50=360813.5 p75=594804
-(25,600 missing values generated)
-(25,600 missing values generated)
-(25,600 missing values generated)
-(25,600 missing values generated)
-(25,600 missing values generated)
+(25,580 missing values generated)
+(25,580 missing values generated)
+(25,580 missing values generated)
+(25,580 missing values generated)
+(25,580 missing values generated)
+add_het_splits all_jrnls_r1_r2 ic_lsf pi-wtd N_pi=10950 p25=137415.75 p50=360813.5 p75=594804
+(25,580 missing values generated)
+(25,580 missing values generated)
+(25,580 missing values generated)
+(25,580 missing values generated)
+(25,580 missing values generated)
 add_het_splits all_jrnls_r1_r2 ic_endow inst-wtd N_inst=196 p25=5984 p50=17144.375 p75=45788.125
 (1,920 missing values generated)
 (1,920 missing values generated)
 (1,920 missing values generated)
 (1,920 missing values generated)
 (1,920 missing values generated)
-add_het_splits all_jrnls_r1_r2 ic_endow pi-wtd N_pi=13323 p25=20022.5 p50=47319.25 p75=189332
+add_het_splits all_jrnls_r1_r2 ic_endow pi-wtd N_pi=13316 p25=20022.5 p50=47319.25 p75=189332
 (1,920 missing values generated)
 (1,920 missing values generated)
 (1,920 missing values generated)
@@ -2380,29 +2380,29 @@ add_het_splits all_jrnls_r1_r2 ic_endow pi-wtd N_pi=13323 p25=20022.5 p50=47319.
 (1,920 missing values generated)
 add_het_splits all_jrnls_r1_r2 pre_ppr p25=5 p75=10
 add_het_splits all_jrnls_r1_r2 nihg p25=.5 p75=1.75
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-add_het_splits all_jrnls_r1_r2 nihd p25=163253.75 p75=659789
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(25,530 missing values generated)
-(25,530 missing values generated)
-(25,530 missing values generated)
-(25,530 missing values generated)
-(25,600 missing values generated)
-(25,600 missing values generated)
-(25,600 missing values generated)
-(25,600 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+add_het_splits all_jrnls_r1_r2 nihd p25=163175.75 p75=659789
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(25,510 missing values generated)
+(25,510 missing values generated)
+(25,510 missing values generated)
+(25,510 missing values generated)
+(25,580 missing values generated)
+(25,580 missing values generated)
+(25,580 missing values generated)
+(25,580 missing values generated)
 (1,920 missing values generated)
 (1,920 missing values generated)
 (1,920 missing values generated)
 (1,920 missing values generated)
 add_het_splits all_jrnls_r1_r2 lab_age median = 14
 add_het_splits all_jrnls_r1_r2 lab_age quartile cuts: p25=8 p50=14 p75=24
-(36,090 missing values generated)
-(36,090 missing values generated)
+(36,060 missing values generated)
+(36,060 missing values generated)
   variable athr_indicator was float now byte
   variable high_pre_ppr was float now byte
   variable low_pre_ppr was float now byte
@@ -2413,13 +2413,13 @@ add_het_splits all_jrnls_r1_r2 lab_age quartile cuts: p25=8 p50=14 p75=24
   variable r2 was float now byte
   variable inst_indicator was float now byte
   variable lab_age_2014 was float now byte
-  (4,054,500 bytes saved)
+  (4,052,400 bytes saved)
 (file ../temp/es_all_jrnls_r1_r2.dta not found)
 file ../temp/es_all_jrnls_r1_r2.dta saved
-(81,090 observations deleted)
+(81,048 observations deleted)
 (0 observations deleted)
 
-desc_pre_output_by_age all_jrnls_r1_r2: pre-period = 2010-2013, N young = 6613, N old = 6902
+desc_pre_output_by_age all_jrnls_r1_r2: pre-period = 2010-2013, N young = 6610, N old = 6898
   ppr_tot: young mean=8.0 p50=7.0 | old mean=9.3 p50=7.0
 
 Two-sample Kolmogorov–Smirnov test for equality of distribution functions
@@ -2427,36 +2427,36 @@ Two-sample Kolmogorov–Smirnov test for equality of distribution functions
 Smaller group             D     p-value  
 ---------------------------------------
 0                    0.0000       1.000
-1                   -0.1088       0.000
-Combined K-S         0.1088       0.000
+1                   -0.1084       0.000
+Combined K-S         0.1084       0.000
 
 Note: Ties exist in combined dataset;
-      there are 54 unique values out of 13515 observations.
-  ppr_tot: young-old diff =   -1.327 (se    0.111)
-(13,315 missing values generated)
-(13,315 missing values generated)
+      there are 54 unique values out of 13508 observations.
+  ppr_tot: young-old diff =   -1.325 (se    0.111)
+(13,308 missing values generated)
+(13,308 missing values generated)
 file ../output/figures/all_jrnls/desc_kd_pre_ppr_tot_ln_r1_r2.pdf saved as PDF format
-(13,315 missing values generated)
-(13,315 missing values generated)
+(13,308 missing values generated)
+(13,308 missing values generated)
 file ../output/figures/all_jrnls/desc_kd_pre_ppr_tot_raw_r1_r2.pdf saved as PDF format
-  cite: young mean=16.2 p50=10.2 | old mean=17.8 p50=11.1
+  cite: young mean=16.2 p50=10.2 | old mean=17.8 p50=11.0
 
 Two-sample Kolmogorov–Smirnov test for equality of distribution functions
 
 Smaller group             D     p-value  
 ---------------------------------------
-0                    0.0014       0.987
-1                   -0.0418       0.000
-Combined K-S         0.0418       0.000
+0                    0.0013       0.989
+1                   -0.0417       0.000
+Combined K-S         0.0417       0.000
 
 Note: Ties exist in combined dataset;
-      there are 13502 unique values out of 13515 observations.
-  cite: young-old diff =   -1.611 (se    0.403)
-(13,315 missing values generated)
-(13,315 missing values generated)
+      there are 13495 unique values out of 13508 observations.
+  cite: young-old diff =   -1.601 (se    0.404)
+(13,308 missing values generated)
+(13,308 missing values generated)
 file ../output/figures/all_jrnls/desc_kd_pre_cite_ln_r1_r2.pdf saved as PDF format
-(13,315 missing values generated)
-(13,315 missing values generated)
+(13,308 missing values generated)
+(13,308 missing values generated)
 file ../output/figures/all_jrnls/desc_kd_pre_cite_raw_r1_r2.pdf saved as PDF format
   first: young mean=0.8 p50=0.0 | old mean=0.6 p50=0.0
 
@@ -2464,18 +2464,18 @@ Two-sample Kolmogorov–Smirnov test for equality of distribution functions
 
 Smaller group             D     p-value  
 ---------------------------------------
-0                    0.0662       0.000
+0                    0.0660       0.000
 1                   -0.0004       0.999
-Combined K-S         0.0662       0.000
+Combined K-S         0.0660       0.000
 
 Note: Ties exist in combined dataset;
-      there are 20 unique values out of 13515 observations.
+      there are 20 unique values out of 13508 observations.
   first: young-old diff =    0.217 (se    0.024)
-(13,315 missing values generated)
-(13,315 missing values generated)
+(13,308 missing values generated)
+(13,308 missing values generated)
 file ../output/figures/all_jrnls/desc_kd_pre_first_ln_r1_r2.pdf saved as PDF format
-(13,315 missing values generated)
-(13,315 missing values generated)
+(13,308 missing values generated)
+(13,308 missing values generated)
 file ../output/figures/all_jrnls/desc_kd_pre_first_raw_r1_r2.pdf saved as PDF format
   last: young mean=8.1 p50=7.0 | old mean=9.5 p50=8.0
 
@@ -2484,17 +2484,17 @@ Two-sample Kolmogorov–Smirnov test for equality of distribution functions
 Smaller group             D     p-value  
 ---------------------------------------
 0                    0.0000       1.000
-1                   -0.1094       0.000
-Combined K-S         0.1094       0.000
+1                   -0.1091       0.000
+Combined K-S         0.1091       0.000
 
 Note: Ties exist in combined dataset;
-      there are 56 unique values out of 13515 observations.
-  last: young-old diff =   -1.379 (se    0.112)
-(13,315 missing values generated)
-(13,315 missing values generated)
+      there are 56 unique values out of 13508 observations.
+  last: young-old diff =   -1.377 (se    0.112)
+(13,308 missing values generated)
+(13,308 missing values generated)
 file ../output/figures/all_jrnls/desc_kd_pre_last_ln_r1_r2.pdf saved as PDF format
-(13,315 missing values generated)
-(13,315 missing values generated)
+(13,308 missing values generated)
+(13,308 missing values generated)
 file ../output/figures/all_jrnls/desc_kd_pre_last_raw_r1_r2.pdf saved as PDF format
   ppr_yr: young mean=1.99 p50=1.75 | old mean=2.32 p50=1.75
 
@@ -2503,61 +2503,61 @@ Two-sample Kolmogorov–Smirnov test for equality of distribution functions
 Smaller group             D     p-value  
 ---------------------------------------
 0                    0.0000       1.000
-1                   -0.1088       0.000
-Combined K-S         0.1088       0.000
+1                   -0.1084       0.000
+Combined K-S         0.1084       0.000
 
 Note: Ties exist in combined dataset;
-      there are 54 unique values out of 13515 observations.
-  ppr_yr: young-old diff =   -0.332 (se    0.028)
-(13,315 missing values generated)
-(13,315 missing values generated)
+      there are 54 unique values out of 13508 observations.
+  ppr_yr: young-old diff =   -0.331 (se    0.028)
+(13,308 missing values generated)
+(13,308 missing values generated)
 file ../output/figures/all_jrnls/desc_kd_pre_ppr_yr_ln_r1_r2.pdf saved as PDF format
-(13,315 missing values generated)
-(13,315 missing values generated)
+(13,308 missing values generated)
+(13,308 missing values generated)
 file ../output/figures/all_jrnls/desc_kd_pre_ppr_yr_raw_r1_r2.pdf saved as PDF format
 (file ../temp/desc_pre_output_all_jrnls_r1_r2.dta not found)
 file ../temp/desc_pre_output_all_jrnls_r1_r2.dta saved
-(121,635 missing values generated)
-(121,635 missing values generated)
-(121,635 missing values generated)
-(121,635 missing values generated)
-(121,635 missing values generated)
-(121,635 missing values generated)
-(121,635 missing values generated)
-(121,635 missing values generated)
-(121,635 missing values generated)
-(121,635 missing values generated)
-(121,635 missing values generated)
-(121,635 missing values generated)
-(121,635 missing values generated)
-(121,635 missing values generated)
-(121,635 missing values generated)
-(121,635 missing values generated)
-(121,635 missing values generated)
-(121,635 missing values generated)
-(121,635 missing values generated)
-(121,635 missing values generated)
+(121,572 missing values generated)
+(121,572 missing values generated)
+(121,572 missing values generated)
+(121,572 missing values generated)
+(121,572 missing values generated)
+(121,572 missing values generated)
+(121,572 missing values generated)
+(121,572 missing values generated)
+(121,572 missing values generated)
+(121,572 missing values generated)
+(121,572 missing values generated)
+(121,572 missing values generated)
+(121,572 missing values generated)
+(121,572 missing values generated)
+(121,572 missing values generated)
+(121,572 missing values generated)
+(121,572 missing values generated)
+(121,572 missing values generated)
+(121,572 missing values generated)
+(121,572 missing values generated)
 int_lead1   int_lead2   int_lead3   int_lead4   int_lag0    int_lag1    int_lag2    int_lag3    int_lag4    int_lag5    mshr_lead1  mshr_lead2  mshr_lead3  mshr_lead4  mshr_lag0   mshr_lag1   mshr_lag2   mshr_lag3   mshr_lag4   mshr_lag5
-(121,635 real changes made)
-(121,635 real changes made)
-(121,635 real changes made)
-(121,635 real changes made)
-(121,635 real changes made)
-(121,635 real changes made)
-(121,635 real changes made)
-(121,635 real changes made)
-(121,635 real changes made)
-(121,635 real changes made)
-(121,635 real changes made)
-(121,635 real changes made)
-(121,635 real changes made)
-(121,635 real changes made)
-(121,635 real changes made)
-(121,635 real changes made)
-(121,635 real changes made)
-(121,635 real changes made)
-(121,635 real changes made)
-(121,635 real changes made)
+(121,572 real changes made)
+(121,572 real changes made)
+(121,572 real changes made)
+(121,572 real changes made)
+(121,572 real changes made)
+(121,572 real changes made)
+(121,572 real changes made)
+(121,572 real changes made)
+(121,572 real changes made)
+(121,572 real changes made)
+(121,572 real changes made)
+(121,572 real changes made)
+(121,572 real changes made)
+(121,572 real changes made)
+(121,572 real changes made)
+(121,572 real changes made)
+(121,572 real changes made)
+(121,572 real changes made)
+(121,572 real changes made)
+(121,572 real changes made)
 (80 missing values generated)
 (80 missing values generated)
 (80 missing values generated)
@@ -2596,310 +2596,310 @@ int_lead1   int_lead2   int_lead3   int_lead4   int_lag0    int_lag1    int_lag2
 (80 missing values generated)
 (80 missing values generated)
 (80 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,850 missing values generated)
-(59,530 missing values generated)
-(59,530 missing values generated)
-(59,530 missing values generated)
-(59,530 missing values generated)
-(59,530 missing values generated)
-(59,530 missing values generated)
-(59,530 missing values generated)
-(59,530 missing values generated)
-(59,530 missing values generated)
-(59,530 missing values generated)
-(59,530 missing values generated)
-(59,530 missing values generated)
-(59,530 missing values generated)
-(59,530 missing values generated)
-(59,530 missing values generated)
-(59,530 missing values generated)
-(59,530 missing values generated)
-(59,530 missing values generated)
-(59,530 missing values generated)
-(59,530 missing values generated)
-(59,530 missing values generated)
-(59,530 missing values generated)
-(59,530 missing values generated)
-(59,530 missing values generated)
-(59,530 missing values generated)
-(59,530 missing values generated)
-(59,530 missing values generated)
-(59,530 missing values generated)
-(59,530 missing values generated)
-(59,530 missing values generated)
-(59,530 missing values generated)
-(59,530 missing values generated)
-(59,530 missing values generated)
-(59,530 missing values generated)
-(59,530 missing values generated)
-(59,530 missing values generated)
-(59,530 missing values generated)
-(59,530 missing values generated)
-(36,090 missing values generated)
-(36,090 missing values generated)
-(36,090 missing values generated)
-(36,090 missing values generated)
-(36,090 missing values generated)
-(36,090 missing values generated)
-(36,090 missing values generated)
-(36,090 missing values generated)
-(36,090 missing values generated)
-(36,090 missing values generated)
-(36,090 missing values generated)
-(36,090 missing values generated)
-(36,090 missing values generated)
-(36,090 missing values generated)
-(36,090 missing values generated)
-(36,090 missing values generated)
-(36,090 missing values generated)
-(36,090 missing values generated)
-(36,090 missing values generated)
-(36,090 missing values generated)
-(36,090 missing values generated)
-(36,090 missing values generated)
-(36,090 missing values generated)
-(36,090 missing values generated)
-(36,090 missing values generated)
-(36,090 missing values generated)
-(36,090 missing values generated)
-(36,090 missing values generated)
-(36,090 missing values generated)
-(36,090 missing values generated)
-(36,090 missing values generated)
-(36,090 missing values generated)
-(36,090 missing values generated)
-(36,090 missing values generated)
-(36,090 missing values generated)
-(36,090 missing values generated)
-(36,090 missing values generated)
-(36,090 missing values generated)
-(99,480 missing values generated)
-(99,480 missing values generated)
-(99,480 missing values generated)
-(99,480 missing values generated)
-(99,480 missing values generated)
-(99,480 missing values generated)
-(99,480 missing values generated)
-(99,480 missing values generated)
-(99,480 missing values generated)
-(99,480 missing values generated)
-(99,480 missing values generated)
-(99,480 missing values generated)
-(99,480 missing values generated)
-(99,480 missing values generated)
-(99,480 missing values generated)
-(99,480 missing values generated)
-(99,480 missing values generated)
-(99,480 missing values generated)
-(99,480 missing values generated)
-(99,480 missing values generated)
-(99,480 missing values generated)
-(99,480 missing values generated)
-(99,480 missing values generated)
-(99,480 missing values generated)
-(99,480 missing values generated)
-(99,480 missing values generated)
-(99,480 missing values generated)
-(99,480 missing values generated)
-(99,480 missing values generated)
-(99,480 missing values generated)
-(99,480 missing values generated)
-(99,480 missing values generated)
-(99,480 missing values generated)
-(99,480 missing values generated)
-(99,480 missing values generated)
-(99,480 missing values generated)
-(99,480 missing values generated)
-(99,480 missing values generated)
-(117,310 missing values generated)
-(117,310 missing values generated)
-(117,310 missing values generated)
-(117,310 missing values generated)
-(117,310 missing values generated)
-(117,310 missing values generated)
-(117,310 missing values generated)
-(117,310 missing values generated)
-(117,310 missing values generated)
-(117,310 missing values generated)
-(117,310 missing values generated)
-(117,310 missing values generated)
-(117,310 missing values generated)
-(117,310 missing values generated)
-(117,310 missing values generated)
-(117,310 missing values generated)
-(117,310 missing values generated)
-(117,310 missing values generated)
-(117,310 missing values generated)
-(117,310 missing values generated)
-(117,310 missing values generated)
-(117,310 missing values generated)
-(117,310 missing values generated)
-(117,310 missing values generated)
-(117,310 missing values generated)
-(117,310 missing values generated)
-(117,310 missing values generated)
-(117,310 missing values generated)
-(117,310 missing values generated)
-(117,310 missing values generated)
-(117,310 missing values generated)
-(117,310 missing values generated)
-(117,310 missing values generated)
-(117,310 missing values generated)
-(117,310 missing values generated)
-(117,310 missing values generated)
-(117,310 missing values generated)
-(117,310 missing values generated)
-(25,530 missing values generated)
-(25,530 missing values generated)
-(25,530 missing values generated)
-(25,530 missing values generated)
-(25,530 missing values generated)
-(25,530 missing values generated)
-(25,530 missing values generated)
-(25,530 missing values generated)
-(25,530 missing values generated)
-(25,530 missing values generated)
-(25,530 missing values generated)
-(25,530 missing values generated)
-(25,530 missing values generated)
-(25,530 missing values generated)
-(25,530 missing values generated)
-(25,530 missing values generated)
-(25,530 missing values generated)
-(25,530 missing values generated)
-(25,530 missing values generated)
-(25,530 missing values generated)
-(25,530 missing values generated)
-(25,530 missing values generated)
-(25,530 missing values generated)
-(25,530 missing values generated)
-(25,530 missing values generated)
-(25,530 missing values generated)
-(25,530 missing values generated)
-(25,530 missing values generated)
-(25,530 missing values generated)
-(25,530 missing values generated)
-(25,530 missing values generated)
-(25,530 missing values generated)
-(25,530 missing values generated)
-(25,530 missing values generated)
-(25,530 missing values generated)
-(25,530 missing values generated)
-(25,530 missing values generated)
-(25,530 missing values generated)
-(25,600 missing values generated)
-(25,600 missing values generated)
-(25,600 missing values generated)
-(25,600 missing values generated)
-(25,600 missing values generated)
-(25,600 missing values generated)
-(25,600 missing values generated)
-(25,600 missing values generated)
-(25,600 missing values generated)
-(25,600 missing values generated)
-(25,600 missing values generated)
-(25,600 missing values generated)
-(25,600 missing values generated)
-(25,600 missing values generated)
-(25,600 missing values generated)
-(25,600 missing values generated)
-(25,600 missing values generated)
-(25,600 missing values generated)
-(25,600 missing values generated)
-(25,600 missing values generated)
-(25,600 missing values generated)
-(25,600 missing values generated)
-(25,600 missing values generated)
-(25,600 missing values generated)
-(25,600 missing values generated)
-(25,600 missing values generated)
-(25,600 missing values generated)
-(25,600 missing values generated)
-(25,600 missing values generated)
-(25,600 missing values generated)
-(25,600 missing values generated)
-(25,600 missing values generated)
-(25,600 missing values generated)
-(25,600 missing values generated)
-(25,600 missing values generated)
-(25,600 missing values generated)
-(25,600 missing values generated)
-(25,600 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,810 missing values generated)
+(59,490 missing values generated)
+(59,490 missing values generated)
+(59,490 missing values generated)
+(59,490 missing values generated)
+(59,490 missing values generated)
+(59,490 missing values generated)
+(59,490 missing values generated)
+(59,490 missing values generated)
+(59,490 missing values generated)
+(59,490 missing values generated)
+(59,490 missing values generated)
+(59,490 missing values generated)
+(59,490 missing values generated)
+(59,490 missing values generated)
+(59,490 missing values generated)
+(59,490 missing values generated)
+(59,490 missing values generated)
+(59,490 missing values generated)
+(59,490 missing values generated)
+(59,490 missing values generated)
+(59,490 missing values generated)
+(59,490 missing values generated)
+(59,490 missing values generated)
+(59,490 missing values generated)
+(59,490 missing values generated)
+(59,490 missing values generated)
+(59,490 missing values generated)
+(59,490 missing values generated)
+(59,490 missing values generated)
+(59,490 missing values generated)
+(59,490 missing values generated)
+(59,490 missing values generated)
+(59,490 missing values generated)
+(59,490 missing values generated)
+(59,490 missing values generated)
+(59,490 missing values generated)
+(59,490 missing values generated)
+(59,490 missing values generated)
+(36,060 missing values generated)
+(36,060 missing values generated)
+(36,060 missing values generated)
+(36,060 missing values generated)
+(36,060 missing values generated)
+(36,060 missing values generated)
+(36,060 missing values generated)
+(36,060 missing values generated)
+(36,060 missing values generated)
+(36,060 missing values generated)
+(36,060 missing values generated)
+(36,060 missing values generated)
+(36,060 missing values generated)
+(36,060 missing values generated)
+(36,060 missing values generated)
+(36,060 missing values generated)
+(36,060 missing values generated)
+(36,060 missing values generated)
+(36,060 missing values generated)
+(36,060 missing values generated)
+(36,060 missing values generated)
+(36,060 missing values generated)
+(36,060 missing values generated)
+(36,060 missing values generated)
+(36,060 missing values generated)
+(36,060 missing values generated)
+(36,060 missing values generated)
+(36,060 missing values generated)
+(36,060 missing values generated)
+(36,060 missing values generated)
+(36,060 missing values generated)
+(36,060 missing values generated)
+(36,060 missing values generated)
+(36,060 missing values generated)
+(36,060 missing values generated)
+(36,060 missing values generated)
+(36,060 missing values generated)
+(36,060 missing values generated)
+(99,420 missing values generated)
+(99,420 missing values generated)
+(99,420 missing values generated)
+(99,420 missing values generated)
+(99,420 missing values generated)
+(99,420 missing values generated)
+(99,420 missing values generated)
+(99,420 missing values generated)
+(99,420 missing values generated)
+(99,420 missing values generated)
+(99,420 missing values generated)
+(99,420 missing values generated)
+(99,420 missing values generated)
+(99,420 missing values generated)
+(99,420 missing values generated)
+(99,420 missing values generated)
+(99,420 missing values generated)
+(99,420 missing values generated)
+(99,420 missing values generated)
+(99,420 missing values generated)
+(99,420 missing values generated)
+(99,420 missing values generated)
+(99,420 missing values generated)
+(99,420 missing values generated)
+(99,420 missing values generated)
+(99,420 missing values generated)
+(99,420 missing values generated)
+(99,420 missing values generated)
+(99,420 missing values generated)
+(99,420 missing values generated)
+(99,420 missing values generated)
+(99,420 missing values generated)
+(99,420 missing values generated)
+(99,420 missing values generated)
+(99,420 missing values generated)
+(99,420 missing values generated)
+(99,420 missing values generated)
+(99,420 missing values generated)
+(117,240 missing values generated)
+(117,240 missing values generated)
+(117,240 missing values generated)
+(117,240 missing values generated)
+(117,240 missing values generated)
+(117,240 missing values generated)
+(117,240 missing values generated)
+(117,240 missing values generated)
+(117,240 missing values generated)
+(117,240 missing values generated)
+(117,240 missing values generated)
+(117,240 missing values generated)
+(117,240 missing values generated)
+(117,240 missing values generated)
+(117,240 missing values generated)
+(117,240 missing values generated)
+(117,240 missing values generated)
+(117,240 missing values generated)
+(117,240 missing values generated)
+(117,240 missing values generated)
+(117,240 missing values generated)
+(117,240 missing values generated)
+(117,240 missing values generated)
+(117,240 missing values generated)
+(117,240 missing values generated)
+(117,240 missing values generated)
+(117,240 missing values generated)
+(117,240 missing values generated)
+(117,240 missing values generated)
+(117,240 missing values generated)
+(117,240 missing values generated)
+(117,240 missing values generated)
+(117,240 missing values generated)
+(117,240 missing values generated)
+(117,240 missing values generated)
+(117,240 missing values generated)
+(117,240 missing values generated)
+(117,240 missing values generated)
+(25,510 missing values generated)
+(25,510 missing values generated)
+(25,510 missing values generated)
+(25,510 missing values generated)
+(25,510 missing values generated)
+(25,510 missing values generated)
+(25,510 missing values generated)
+(25,510 missing values generated)
+(25,510 missing values generated)
+(25,510 missing values generated)
+(25,510 missing values generated)
+(25,510 missing values generated)
+(25,510 missing values generated)
+(25,510 missing values generated)
+(25,510 missing values generated)
+(25,510 missing values generated)
+(25,510 missing values generated)
+(25,510 missing values generated)
+(25,510 missing values generated)
+(25,510 missing values generated)
+(25,510 missing values generated)
+(25,510 missing values generated)
+(25,510 missing values generated)
+(25,510 missing values generated)
+(25,510 missing values generated)
+(25,510 missing values generated)
+(25,510 missing values generated)
+(25,510 missing values generated)
+(25,510 missing values generated)
+(25,510 missing values generated)
+(25,510 missing values generated)
+(25,510 missing values generated)
+(25,510 missing values generated)
+(25,510 missing values generated)
+(25,510 missing values generated)
+(25,510 missing values generated)
+(25,510 missing values generated)
+(25,510 missing values generated)
+(25,580 missing values generated)
+(25,580 missing values generated)
+(25,580 missing values generated)
+(25,580 missing values generated)
+(25,580 missing values generated)
+(25,580 missing values generated)
+(25,580 missing values generated)
+(25,580 missing values generated)
+(25,580 missing values generated)
+(25,580 missing values generated)
+(25,580 missing values generated)
+(25,580 missing values generated)
+(25,580 missing values generated)
+(25,580 missing values generated)
+(25,580 missing values generated)
+(25,580 missing values generated)
+(25,580 missing values generated)
+(25,580 missing values generated)
+(25,580 missing values generated)
+(25,580 missing values generated)
+(25,580 missing values generated)
+(25,580 missing values generated)
+(25,580 missing values generated)
+(25,580 missing values generated)
+(25,580 missing values generated)
+(25,580 missing values generated)
+(25,580 missing values generated)
+(25,580 missing values generated)
+(25,580 missing values generated)
+(25,580 missing values generated)
+(25,580 missing values generated)
+(25,580 missing values generated)
+(25,580 missing values generated)
+(25,580 missing values generated)
+(25,580 missing values generated)
+(25,580 missing values generated)
+(25,580 missing values generated)
+(25,580 missing values generated)
 (1,920 missing values generated)
 (1,920 missing values generated)
 (1,920 missing values generated)
@@ -2940,411 +2940,148 @@ int_lead1   int_lead2   int_lead3   int_lead4   int_lag0    int_lag1    int_lag2
 (1,920 missing values generated)
 DEBUG_YVAR set -- restricting yvar loop to: ppr_cnt
 (file ../temp/phet_results_all_jrnls_r1_r2_ppr_cnt.dta not found)
-Iteration 1:   deviance = 1.5071e+05  eps = .         iters = 3    tol = 1.0e-04  min(eta) =  -1.54  P   
-Iteration 2:   deviance = 1.4656e+05  eps = 2.83e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.85      
-Iteration 3:   deviance = 1.4652e+05  eps = 2.50e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.91      
-Iteration 4:   deviance = 1.4652e+05  eps = 2.16e-07  iters = 2    tol = 1.0e-04  min(eta) =  -1.92      
-Iteration 5:   deviance = 1.4652e+05  eps = 8.82e-12  iters = 2    tol = 1.0e-05  min(eta) =  -1.92   S  
-Iteration 6:   deviance = 1.4652e+05  eps = 0.00e+00  iters = 2    tol = 1.0e-08  min(eta) =  -1.92   S O
+Iteration 1:   deviance = 1.5063e+05  eps = .         iters = 3    tol = 1.0e-04  min(eta) =  -1.54  P   
+Iteration 2:   deviance = 1.4648e+05  eps = 2.83e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.85      
+Iteration 3:   deviance = 1.4644e+05  eps = 2.49e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.91      
+Iteration 4:   deviance = 1.4644e+05  eps = 2.13e-07  iters = 2    tol = 1.0e-04  min(eta) =  -1.92      
+Iteration 5:   deviance = 1.4644e+05  eps = 8.47e-12  iters = 2    tol = 1.0e-05  min(eta) =  -1.92   S  
+Iteration 6:   deviance = 1.4644e+05  eps = 0.00e+00  iters = 2    tol = 1.0e-08  min(eta) =  -1.92   S O
 ------------------------------------------------------------------------------------------------------------
 (legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
 Converged in 6 iterations and 13 HDFE sub-iterations (tol = 1.0e-08)
 
-HDFE PPML regression                              No. of obs      =    135,150
-Absorbing 2 HDFE groups                           Residual df     =     13,514
-Statistics robust to heteroskedasticity           Wald chi2(5)    =     113.32
-Deviance             =  146521.2743               Prob > chi2     =     0.0000
-Log pseudolikelihood =  -203524.559               Pseudo R2       =     0.1955
+HDFE PPML regression                              No. of obs      =    135,080
+Absorbing 2 HDFE groups                           Residual df     =     13,507
+Statistics robust to heteroskedasticity           Wald chi2(5)    =     117.40
+Deviance             =  146444.3192               Prob > chi2     =     0.0000
+Log pseudolikelihood = -203418.2403               Pseudo R2       =     0.1955
 
-Number of clusters (athr_id)=     13,515
-                           (Std. err. adjusted for 13,515 clusters in athr_id)
+Number of clusters (athr_id)=     13,508
+                           (Std. err. adjusted for 13,508 clusters in athr_id)
 ------------------------------------------------------------------------------
              |               Robust
      ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
 -------------+----------------------------------------------------------------
-     Z_young |  -.6482524   .2350133    -2.76   0.006     -1.10887   -.1876348
-       Z_old |    -.20297   .2468529    -0.82   0.411    -.6867928    .2808527
-     S_young |   .0457456   .0785481     0.58   0.560    -.1082058    .1996969
-       S_old |  -.0637388   .0692423    -0.92   0.357    -.1994512    .0719736
-    PT_young |   .1033273   .0306516     3.37   0.001     .0432513    .1634034
-       _cons |    .756298   .0100353    75.36   0.000     .7366292    .7759667
+     Z_young |  -1.217181    .350508    -3.47   0.001    -1.904164   -.5301981
+       Z_old |  -.1271997   .3747209    -0.34   0.734    -.8616393    .6072398
+     S_young |   .1629199   .1008631     1.62   0.106    -.0347681    .3606079
+       S_old |  -.0738204   .0982845    -0.75   0.453    -.2664545    .1188136
+    PT_young |   .1067414   .0240501     4.44   0.000      .059604    .1538788
+       _cons |   .7525078   .0078207    96.22   0.000     .7371795    .7678362
 ------------------------------------------------------------------------------
 
 Absorbed degrees of freedom:
 -----------------------------------------------------+
  Absorbed FE | Categories  - Redundant  = Num. Coefs |
 -------------+---------------------------------------|
-     athr_id |     13515       13515           0    *|
+     athr_id |     13508       13508           0    *|
         year |        10           1           9     |
 -----------------------------------------------------+
 * = FE nested within cluster; treated as redundant for DoF computation
-N = 66,130; 6,613 balanced groups of size 10
-N = 66,130; 195 unbalanced groups of sizes 10 to 2,320
-pooled-DiD int PPML all_jrnls_r1_r2 ppr_cnt young med_pi: b= -0.6483 (se=  0.2350)   N=   135150 PIs=6613 Insts=195
-N = 69,020; 6,902 balanced groups of size 10
-N = 69,020; 178 unbalanced groups of sizes 10 to 2,600
-pooled-DiD int PPML all_jrnls_r1_r2 ppr_cnt old med_pi: b= -0.2030 (se=  0.2469)   N=   135150 PIs=6902 Insts=178
+N = 66,100; 6,610 balanced groups of size 10
+N = 66,100; 195 unbalanced groups of sizes 10 to 2,320
+pooled-DiD int PPML all_jrnls_r1_r2 ppr_cnt young med_pi: b= -1.2172 (se=  0.3505)   N=   135080 PIs=6610 Insts=195
+N = 68,980; 6,898 balanced groups of size 10
+N = 68,980; 178 unbalanced groups of sizes 10 to 2,600
+pooled-DiD int PPML all_jrnls_r1_r2 ppr_cnt old med_pi: b= -0.1272 (se=  0.3747)   N=   135080 PIs=6898 Insts=178
 
  ( 1)  Z_young - Z_old = 0
 
 ------------------------------------------------------------------------------
      ppr_cnt | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
 -------------+----------------------------------------------------------------
-         (1) |  -.4452824   .3408337    -1.31   0.191    -1.113304    .2227394
+         (1) |  -1.089981      .5131    -2.12   0.034    -2.095639   -.0843239
 ------------------------------------------------------------------------------
-pooled-DiD int PPML DIFF all_jrnls_r1_r2 ppr_cnt young-old med_pi: b= -0.4453 (se=  0.3408) p=0.1914
-Iteration 1:   deviance = 1.5050e+05  eps = .         iters = 3    tol = 1.0e-04  min(eta) =  -1.57  P   
-Iteration 2:   deviance = 1.4634e+05  eps = 2.84e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.89      
-Iteration 3:   deviance = 1.4631e+05  eps = 2.51e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.96      
-Iteration 4:   deviance = 1.4631e+05  eps = 2.24e-07  iters = 2    tol = 1.0e-04  min(eta) =  -1.96      
-Iteration 5:   deviance = 1.4631e+05  eps = 1.04e-11  iters = 2    tol = 1.0e-05  min(eta) =  -1.96   S  
-Iteration 6:   deviance = 1.4631e+05  eps = 1.84e-16  iters = 2    tol = 1.0e-08  min(eta) =  -1.96   S O
+pooled-DiD int PPML DIFF all_jrnls_r1_r2 ppr_cnt young-old med_pi: b= -1.0900 (se=  0.5131) p=0.0336
+Iteration 1:   deviance = 1.5044e+05  eps = .         iters = 3    tol = 1.0e-04  min(eta) =  -1.59  P   
+Iteration 2:   deviance = 1.4629e+05  eps = 2.84e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.92      
+Iteration 3:   deviance = 1.4626e+05  eps = 2.50e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.98      
+Iteration 4:   deviance = 1.4626e+05  eps = 2.22e-07  iters = 2    tol = 1.0e-04  min(eta) =  -1.99      
+Iteration 5:   deviance = 1.4626e+05  eps = 9.92e-12  iters = 2    tol = 1.0e-05  min(eta) =  -1.99   S  
+Iteration 6:   deviance = 1.4626e+05  eps = 0.00e+00  iters = 2    tol = 1.0e-08  min(eta) =  -1.99   S O
 ------------------------------------------------------------------------------------------------------------
 (legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
 Converged in 6 iterations and 13 HDFE sub-iterations (tol = 1.0e-08)
 
-HDFE PPML regression                              No. of obs      =    135,150
-Absorbing 2 HDFE groups                           Residual df     =     13,514
-Statistics robust to heteroskedasticity           Wald chi2(37)   =     246.85
-Deviance             =  146308.1692               Prob > chi2     =     0.0000
-Log pseudolikelihood = -203418.0065               Pseudo R2       =     0.1960
+HDFE PPML regression                              No. of obs      =    135,080
+Absorbing 2 HDFE groups                           Residual df     =     13,507
+Statistics robust to heteroskedasticity           Wald chi2(37)   =     235.97
+Deviance             =   146256.446               Prob > chi2     =     0.0000
+Log pseudolikelihood = -203324.3036               Pseudo R2       =     0.1959
 
-Number of clusters (athr_id)=     13,515
-                               (Std. err. adjusted for 13,515 clusters in athr_id)
+Number of clusters (athr_id)=     13,508
+                               (Std. err. adjusted for 13,508 clusters in athr_id)
 ----------------------------------------------------------------------------------
                  |               Robust
          ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
 -----------------+----------------------------------------------------------------
- int_lead4_young |   .3032877   .3854938     0.79   0.431    -.4522661    1.058842
- int_lead3_young |  -.1628006   .3561529    -0.46   0.648    -.8608475    .5352464
- int_lead2_young |   .0778665   .3353235     0.23   0.816    -.5793554    .7350885
-  int_lag0_young |  -.1380188   .3785622    -0.36   0.715     -.879987    .6039495
-  int_lag1_young |  -.3485278   .3734098    -0.93   0.351    -1.080398     .383342
-  int_lag2_young |   -.556366   .4207549    -1.32   0.186     -1.38103    .2682984
-  int_lag3_young |  -.6567224   .4363874    -1.50   0.132    -1.512026    .1985811
-  int_lag4_young |  -1.016691   .4537856    -2.24   0.025    -1.906095   -.1272879
-  int_lag5_young |  -1.116736   .4665793    -2.39   0.017    -2.031215   -.2022577
-   int_lead4_old |   .1174313   .3835454     0.31   0.759    -.6343038    .8691664
-   int_lead3_old |  -.4109347   .3673461    -1.12   0.263     -1.13092    .3090505
-   int_lead2_old |  -.0166827   .3556855    -0.05   0.963    -.7138134     .680448
-    int_lag0_old |  -.0227024   .3859607    -0.06   0.953    -.7791714    .7337666
-    int_lag1_old |  -.7550869   .4184887    -1.80   0.071     -1.57531    .0651359
-    int_lag2_old |   .0212101   .4437165     0.05   0.962    -.8484583    .8908784
-    int_lag3_old |  -.4988926    .462865    -1.08   0.281    -1.406091    .4083061
-    int_lag4_old |   .0052633   .4794211     0.01   0.991    -.9343849    .9449115
-    int_lag5_old |  -.4179725   .5006557    -0.83   0.404     -1.39924    .5632947
-mshr_lead4_young |   -.261618   .0894238    -2.93   0.003    -.4368855   -.0863505
-mshr_lead3_young |  -.0531088   .0821292    -0.65   0.518    -.2140792    .1078615
-mshr_lead2_young |  -.0671676   .0790319    -0.85   0.395    -.2220672    .0877319
- mshr_lag0_young |  -.0253449    .101439    -0.25   0.803    -.2241617     .173472
- mshr_lag1_young |  -.0545269   .1020011    -0.53   0.593    -.2544455    .1453917
- mshr_lag2_young |  -.0994094   .1121714    -0.89   0.375    -.3192613    .1204425
- mshr_lag3_young |  -.0805204   .1171268    -0.69   0.492    -.3100848     .149044
- mshr_lag4_young |   .0203574   .1199418     0.17   0.865    -.2147241     .255439
- mshr_lag5_young |  -.0219307   .1255187    -0.17   0.861    -.2679428    .2240814
-  mshr_lead4_old |   .4110963    .087545     4.70   0.000     .2395112    .5826814
-  mshr_lead3_old |   .2582703   .0810184     3.19   0.001     .0994772    .4170634
-  mshr_lead2_old |   .1250368   .0807581     1.55   0.122    -.0332463    .2833198
-   mshr_lag0_old |   .3674332   .0949851     3.87   0.000     .1812659    .5536006
-   mshr_lag1_old |   .3143501   .1010772     3.11   0.002     .1162425    .5124577
-   mshr_lag2_old |  -.0254363   .1065784    -0.24   0.811    -.2343262    .1834536
-   mshr_lag3_old |   .0416531   .1113502     0.37   0.708    -.1765893    .2598954
-   mshr_lag4_old |   .0116774   .1193688     0.10   0.922    -.2222811    .2456359
-   mshr_lag5_old |  -.0154253    .122895    -0.13   0.900     -.256295    .2254445
-        PT_young |   .1029866   .0306652     3.36   0.001      .042884    .1630892
-           _cons |   .7399714   .0155591    47.56   0.000     .7094762    .7704666
+ int_lead4_young |   .6998805    .571141     1.23   0.220    -.4195353    1.819296
+ int_lead3_young |   .7252709   .4984507     1.46   0.146    -.2516746    1.702216
+ int_lead2_young |   1.012758   .4971926     2.04   0.042     .0382783    1.987237
+  int_lag0_young |   .0443094   .5245871     0.08   0.933    -.9838623    1.072481
+  int_lag1_young |   -.264718   .5336197    -0.50   0.620    -1.310593    .7811575
+  int_lag2_young |  -.7220812   .6269926    -1.15   0.249    -1.950964    .5068017
+  int_lag3_young |  -.8937029   .6112162    -1.46   0.144    -2.091665    .3042588
+  int_lag4_young |  -.8516484   .6321159    -1.35   0.178    -2.090573    .3872759
+  int_lag5_young |  -1.308874   .6920093    -1.89   0.059    -2.665188    .0474388
+   int_lead4_old |  -.5478066   .5513586    -0.99   0.320     -1.62845    .5328365
+   int_lead3_old |  -.9371794   .5530579    -1.69   0.090    -2.021153    .1467941
+   int_lead2_old |  -.6854092   .5307711    -1.29   0.197    -1.725701     .354883
+    int_lag0_old |  -.0019241   .5787082    -0.00   0.997    -1.136171    1.132323
+    int_lag1_old |  -1.390165   .6289427    -2.21   0.027     -2.62287   -.1574605
+    int_lag2_old |  -.6086028   .6567614    -0.93   0.354    -1.895831    .6786258
+    int_lag3_old |  -.6868185   .6989228    -0.98   0.326    -2.056682     .683045
+    int_lag4_old |  -.3400731    .723159    -0.47   0.638    -1.757439    1.077293
+    int_lag5_old |  -1.139368   .7605185    -1.50   0.134    -2.629957    .3512206
+mshr_lead4_young |  -.4911311    .132371    -3.71   0.000    -.7505735   -.2316888
+mshr_lead3_young |   -.315402   .1169485    -2.70   0.007    -.5446169   -.0861872
+mshr_lead2_young |  -.3498612   .1175249    -2.98   0.003    -.5802057   -.1195166
+ mshr_lag0_young |  -.1858904   .1353997    -1.37   0.170    -.4512689    .0794881
+ mshr_lag1_young |  -.2100114   .1380257    -1.52   0.128    -.4805368     .060514
+ mshr_lag2_young |  -.1332296   .1565027    -0.85   0.395    -.4399693    .1735101
+ mshr_lag3_young |  -.0469225   .1581593    -0.30   0.767     -.356909    .2630641
+ mshr_lag4_young |  -.0852407   .1613703    -0.53   0.597    -.4015207    .2310393
+ mshr_lag5_young |  -.0031319   .1699279    -0.02   0.985    -.3361844    .3299207
+  mshr_lead4_old |   .6296267   .1294559     4.86   0.000     .3758979    .8833556
+  mshr_lead3_old |   .3609397    .123883     2.91   0.004     .1181335    .6037458
+  mshr_lead2_old |    .217422   .1227601     1.77   0.077    -.0231834    .4580274
+   mshr_lag0_old |   .3741567   .1405964     2.66   0.008     .0985928    .6497205
+   mshr_lag1_old |   .4672098    .148934     3.14   0.002     .1753044    .7591151
+   mshr_lag2_old |   .1075396   .1573989     0.68   0.494    -.2009566    .4160358
+   mshr_lag3_old |   .1480501   .1650622     0.90   0.370    -.1754659     .471566
+   mshr_lag4_old |   .0790576   .1734599     0.46   0.649    -.2609175    .4190328
+   mshr_lag5_old |   .1079022   .1786527     0.60   0.546    -.2422507    .4580551
+        PT_young |   .1066831   .0240475     4.44   0.000     .0595507    .1538154
+           _cons |   .7480637   .0118026    63.38   0.000     .7249311    .7711964
 ----------------------------------------------------------------------------------
 
 Absorbed degrees of freedom:
 -----------------------------------------------------+
  Absorbed FE | Categories  - Redundant  = Num. Coefs |
 -------------+---------------------------------------|
-     athr_id |     13515       13515           0    *|
+     athr_id |     13508       13508           0    *|
         year |        10           1           9     |
 -----------------------------------------------------+
 * = FE nested within cluster; treated as redundant for DoF computation
-N = 66,130; 6,613 balanced groups of size 10
-N = 66,130; 195 unbalanced groups of sizes 10 to 2,320
+N = 66,100; 6,610 balanced groups of size 10
+N = 66,100; 195 unbalanced groups of sizes 10 to 2,320
 
                         (sum) ppr_cnt
 -------------------------------------------------------------
       Percentiles      Smallest
  1%            0              0
  5%            0              0
-10%            0              0       Obs              26,452
-25%            1              0       Sum of wgt.      26,452
+10%            0              0       Obs              26,440
+25%            1              0       Sum of wgt.      26,440
 
-50%            2                      Mean           1.992175
-                        Largest       Std. dev.      1.677704
+50%            2                      Mean           1.992474
+                        Largest       Std. dev.      1.677973
 75%            3             17
-90%            4             17       Variance       2.814691
-95%            5             18       Skewness       1.878987
-99%            8             23       Kurtosis       9.762039
-(135,140 observations deleted)
+90%            4             17       Variance       2.815594
+95%            5             18       Skewness       1.878462
+99%            8             23       Kurtosis       9.758814
+(135,070 observations deleted)
 (9 missing values generated)
 (9 real changes made)
 (7 real changes made)
 (1 real change made)
-file ../output/figures/all_jrnls/es_ppml/es_ppr_cnt_r1_r2_young_ppml_medpi_mshrctrl.pdf saved as PDF format
-(file ../temp/es_ppr_cnt_r1_r2_young_ppml_medpi_mshrctrl.dta not found)
-file ../temp/es_ppr_cnt_r1_r2_young_ppml_medpi_mshrctrl.dta saved
-N = 69,020; 6,902 balanced groups of size 10
-N = 69,020; 178 unbalanced groups of sizes 10 to 2,600
-
-                        (sum) ppr_cnt
--------------------------------------------------------------
-      Percentiles      Smallest
- 1%            0              0
- 5%            0              0
-10%            0              0       Obs              27,608
-25%            1              0       Sum of wgt.      27,608
-
-50%            2                      Mean              2.324
-                        Largest       Std. dev.      2.020997
-75%            3             23
-90%            5             27       Variance       4.084428
-95%            6             28       Skewness       2.262085
-99%           10             32       Kurtosis       13.55635
-(135,140 observations deleted)
-(9 missing values generated)
-(9 real changes made)
-(7 real changes made)
-(1 real change made)
-file ../output/figures/all_jrnls/es_ppml/es_ppr_cnt_r1_r2_old_ppml_medpi_mshrctrl.pdf saved as PDF format
-(file ../temp/es_ppr_cnt_r1_r2_old_ppml_medpi_mshrctrl.dta not found)
-file ../temp/es_ppr_cnt_r1_r2_old_ppml_medpi_mshrctrl.dta saved
-(80 missing values generated)
-(80 missing values generated)
-(80 missing values generated)
-(80 missing values generated)
-(80 missing values generated)
-Iteration 1:   deviance = 1.5063e+05  eps = .         iters = 3    tol = 1.0e-04  min(eta) =  -1.53  P   
-Iteration 2:   deviance = 1.4648e+05  eps = 2.83e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.85      
-Iteration 3:   deviance = 1.4644e+05  eps = 2.49e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.92      
-Iteration 4:   deviance = 1.4644e+05  eps = 2.15e-07  iters = 2    tol = 1.0e-04  min(eta) =  -1.92      
-Iteration 5:   deviance = 1.4644e+05  eps = 8.83e-12  iters = 2    tol = 1.0e-05  min(eta) =  -1.92   S  
-Iteration 6:   deviance = 1.4644e+05  eps = 0.00e+00  iters = 2    tol = 1.0e-08  min(eta) =  -1.92   S O
-------------------------------------------------------------------------------------------------------------
-(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
-Converged in 6 iterations and 13 HDFE sub-iterations (tol = 1.0e-08)
-
-HDFE PPML regression                              No. of obs      =    135,070
-Absorbing 2 HDFE groups                           Residual df     =     13,506
-Statistics robust to heteroskedasticity           Wald chi2(5)    =     111.25
-Deviance             =  146441.2885               Prob > chi2     =     0.0000
-Log pseudolikelihood = -203418.9409               Pseudo R2       =     0.1954
-
-Number of clusters (athr_id)=     13,507
-                           (Std. err. adjusted for 13,507 clusters in athr_id)
-------------------------------------------------------------------------------
-             |               Robust
-     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
--------------+----------------------------------------------------------------
-  Z_young_ns |  -.5976975   .2419027    -2.47   0.013    -1.071818   -.1235768
-    Z_old_ns |  -.2768724   .2391599    -1.16   0.247    -.7456172    .1918724
-  S_young_ns |   .0631638   .0811397     0.78   0.436    -.0958671    .2221947
-    S_old_ns |  -.0575267   .0677443    -0.85   0.396     -.190303    .0752496
- PT_young_ns |   .0964966   .0308055     3.13   0.002      .036119    .1568742
-       _cons |   .7575214   .0099252    76.32   0.000     .7380685    .7769744
-------------------------------------------------------------------------------
-
-Absorbed degrees of freedom:
------------------------------------------------------+
- Absorbed FE | Categories  - Redundant  = Num. Coefs |
--------------+---------------------------------------|
-     athr_id |     13507       13507           0    *|
-        year |        10           1           9     |
------------------------------------------------------+
-* = FE nested within cluster; treated as redundant for DoF computation
-N = 64,310; 6,431 balanced groups of size 10
-N = 64,310; 195 unbalanced groups of sizes 10 to 2,390
-pooled-DiD int PPML all_jrnls_r1_r2 ppr_cnt young_ns med_pi: b= -0.5977 (se=  0.2419)   N=   135070 PIs=6431 Insts=195
-N = 70,760; 7,076 balanced groups of size 10
-N = 70,760; 177 unbalanced groups of sizes 10 to 2,530
-pooled-DiD int PPML all_jrnls_r1_r2 ppr_cnt old_ns med_pi: b= -0.2769 (se=  0.2392)   N=   135070 PIs=7076 Insts=177
-
- ( 1)  Z_young_ns - Z_old_ns = 0
-
-------------------------------------------------------------------------------
-     ppr_cnt | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
--------------+----------------------------------------------------------------
-         (1) |  -.3208251   .3401682    -0.94   0.346    -.9875425    .3458923
-------------------------------------------------------------------------------
-pooled-DiD int PPML DIFF all_jrnls_r1_r2 ppr_cnt young_ns-old_ns med_pi: b= -0.3208 (se=  0.3402) p=0.3456
-Iteration 1:   deviance = 1.5039e+05  eps = .         iters = 3    tol = 1.0e-04  min(eta) =  -1.58  P   
-Iteration 2:   deviance = 1.4625e+05  eps = 2.84e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.91      
-Iteration 3:   deviance = 1.4621e+05  eps = 2.50e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.97      
-Iteration 4:   deviance = 1.4621e+05  eps = 2.24e-07  iters = 2    tol = 1.0e-04  min(eta) =  -1.97      
-Iteration 5:   deviance = 1.4621e+05  eps = 1.04e-11  iters = 2    tol = 1.0e-05  min(eta) =  -1.97   S  
-Iteration 6:   deviance = 1.4621e+05  eps = 1.84e-16  iters = 2    tol = 1.0e-08  min(eta) =  -1.97   S O
-------------------------------------------------------------------------------------------------------------
-(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
-Converged in 6 iterations and 13 HDFE sub-iterations (tol = 1.0e-08)
-
-HDFE PPML regression                              No. of obs      =    135,070
-Absorbing 2 HDFE groups                           Residual df     =     13,506
-Statistics robust to heteroskedasticity           Wald chi2(37)   =     256.62
-Deviance             =  146209.2479               Prob > chi2     =     0.0000
-Log pseudolikelihood = -203302.9206               Pseudo R2       =     0.1959
-
-Number of clusters (athr_id)=     13,507
-                                  (Std. err. adjusted for 13,507 clusters in athr_id)
--------------------------------------------------------------------------------------
-                    |               Robust
-            ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
---------------------+----------------------------------------------------------------
- int_lead4_young_ns |   .3727345   .3970977     0.94   0.348    -.4055627    1.151032
- int_lead3_young_ns |   .0743964   .3555336     0.21   0.834    -.6224367    .7712295
- int_lead2_young_ns |    .272088   .3430332     0.79   0.428    -.4002447    .9444208
-  int_lag0_young_ns |   .1338164     .39005     0.34   0.732    -.6306676    .8983003
-  int_lag1_young_ns |  -.1028733   .3793596    -0.27   0.786    -.8464044    .6406578
-  int_lag2_young_ns |  -.3714049   .4258481    -0.87   0.383    -1.206052     .463242
-  int_lag3_young_ns |  -.6438516   .4416696    -1.46   0.145    -1.509508     .221805
-  int_lag4_young_ns |  -.8233485   .4639435    -1.77   0.076    -1.732661     .085964
-  int_lag5_young_ns |  -.9989074   .4709365    -2.12   0.034    -1.921926   -.0758888
-   int_lead4_old_ns |   .0826942    .376048     0.22   0.826    -.6543463    .8197346
-   int_lead3_old_ns |  -.6400797   .3664052    -1.75   0.081    -1.358221    .0780612
-   int_lead2_old_ns |  -.2014388   .3483053    -0.58   0.563    -.8841047    .4812271
-    int_lag0_old_ns |   -.286048   .3748908    -0.76   0.445     -1.02082    .4487245
-    int_lag1_old_ns |  -.9725701   .4096019    -2.37   0.018    -1.775375    -.169765
-    int_lag2_old_ns |  -.2020637   .4368917    -0.46   0.644    -1.058356    .6542283
-    int_lag3_old_ns |  -.5123409   .4567625    -1.12   0.262    -1.407579    .3828972
-    int_lag4_old_ns |   -.206703   .4677148    -0.44   0.659    -1.123407    .7100012
-    int_lag5_old_ns |  -.5730783   .4949156    -1.16   0.247    -1.543095    .3969384
-mshr_lead4_young_ns |  -.3090467   .0919417    -3.36   0.001     -.489249   -.1288443
-mshr_lead3_young_ns |  -.0694988   .0829907    -0.84   0.402    -.2321576    .0931601
-mshr_lead2_young_ns |  -.0990832   .0800541    -1.24   0.216    -.2559863    .0578199
- mshr_lag0_young_ns |  -.0651541   .1039423    -0.63   0.531    -.2688772    .1385691
- mshr_lag1_young_ns |  -.0739845    .104421    -0.71   0.479     -.278646    .1306769
- mshr_lag2_young_ns |  -.0893186   .1146107    -0.78   0.436    -.3139515    .1353143
- mshr_lag3_young_ns |  -.0646905   .1200365    -0.54   0.590    -.2999578    .1705767
- mshr_lag4_young_ns |   .0086426   .1230732     0.07   0.944    -.2325764    .2498616
- mshr_lag5_young_ns |   .0019156   .1276968     0.02   0.988    -.2483655    .2521968
-  mshr_lead4_old_ns |   .3889206    .086409     4.50   0.000     .2195622    .5582791
-  mshr_lead3_old_ns |    .246506     .08052     3.06   0.002     .0886897    .4043223
-  mshr_lead2_old_ns |   .1333507   .0800684     1.67   0.096    -.0235805    .2902819
-   mshr_lag0_old_ns |   .3792416   .0934491     4.06   0.000     .1960848    .5623984
-   mshr_lag1_old_ns |   .3107948   .0990595     3.14   0.002     .1166418    .5049478
-   mshr_lag2_old_ns |  -.0335336   .1049055    -0.32   0.749    -.2391446    .1720774
-   mshr_lag3_old_ns |    .029215   .1092478     0.27   0.789    -.1849068    .2433368
-   mshr_lag4_old_ns |   .0310129   .1167063     0.27   0.790    -.1977274    .2597531
-   mshr_lag5_old_ns |  -.0307225   .1209908    -0.25   0.800    -.2678601     .206415
-        PT_young_ns |   .0958805   .0308265     3.11   0.002     .0354616    .1562995
-              _cons |   .7436586   .0154022    48.28   0.000     .7134709    .7738464
--------------------------------------------------------------------------------------
-
-Absorbed degrees of freedom:
------------------------------------------------------+
- Absorbed FE | Categories  - Redundant  = Num. Coefs |
--------------+---------------------------------------|
-     athr_id |     13507       13507           0    *|
-        year |        10           1           9     |
------------------------------------------------------+
-* = FE nested within cluster; treated as redundant for DoF computation
-N = 64,310; 6,431 balanced groups of size 10
-N = 64,310; 195 unbalanced groups of sizes 10 to 2,390
-
-                        (sum) ppr_cnt
--------------------------------------------------------------
-      Percentiles      Smallest
- 1%            0              0
- 5%            0              0
-10%            0              0       Obs              25,724
-25%            1              0       Sum of wgt.      25,724
-
-50%            2                      Mean           1.971194
-                        Largest       Std. dev.      1.651187
-75%            3             17
-90%            4             17       Variance       2.726418
-95%            5             18       Skewness       1.866542
-99%            8             23       Kurtosis       9.870547
-(135,140 observations deleted)
-(9 missing values generated)
-(9 real changes made)
-(7 real changes made)
-(1 real change made)
-file ../output/figures/all_jrnls/es_ppml/es_ppr_cnt_r1_r2_young_ns_ppml_medpi_mshrctrl.pdf saved as PDF format
-(file ../temp/es_ppr_cnt_r1_r2_young_ns_ppml_medpi_mshrctrl.dta not found)
-file ../temp/es_ppr_cnt_r1_r2_young_ns_ppml_medpi_mshrctrl.dta saved
-N = 70,760; 7,076 balanced groups of size 10
-N = 70,760; 177 unbalanced groups of sizes 10 to 2,530
-
-                        (sum) ppr_cnt
--------------------------------------------------------------
-      Percentiles      Smallest
- 1%            0              0
- 5%            0              0
-10%            0              0       Obs              28,304
-25%            1              0       Sum of wgt.      28,304
-
-50%            2                      Mean           2.334511
-                        Largest       Std. dev.      2.030113
-75%            3             23
-90%            5             27       Variance        4.12136
-95%            6             28       Skewness       2.239657
-99%           10             32       Kurtosis       13.24602
-(135,140 observations deleted)
-(9 missing values generated)
-(9 real changes made)
-(7 real changes made)
-(1 real change made)
-file ../output/figures/all_jrnls/es_ppml/es_ppr_cnt_r1_r2_old_ns_ppml_medpi_mshrctrl.pdf saved as PDF format
-(file ../temp/es_ppr_cnt_r1_r2_old_ns_ppml_medpi_mshrctrl.dta not found)
-file ../temp/es_ppr_cnt_r1_r2_old_ns_ppml_medpi_mshrctrl.dta saved
-Iteration 1:   deviance = 1.5068e+05  eps = .         iters = 3    tol = 1.0e-04  min(eta) =  -1.53  P   
-Iteration 2:   deviance = 1.4653e+05  eps = 2.83e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.85      
-Iteration 3:   deviance = 1.4649e+05  eps = 2.48e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.91      
-Iteration 4:   deviance = 1.4649e+05  eps = 2.07e-07  iters = 2    tol = 1.0e-04  min(eta) =  -1.91      
-Iteration 5:   deviance = 1.4649e+05  eps = 8.37e-12  iters = 2    tol = 1.0e-05  min(eta) =  -1.91   S  
-Iteration 6:   deviance = 1.4649e+05  eps = 1.84e-16  iters = 2    tol = 1.0e-08  min(eta) =  -1.91   S O
-------------------------------------------------------------------------------------------------------------
-(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
-Converged in 6 iterations and 13 HDFE sub-iterations (tol = 1.0e-08)
-
-HDFE PPML regression                              No. of obs      =    135,150
-Absorbing 2 HDFE groups                           Residual df     =     13,514
-Statistics robust to heteroskedasticity           Wald chi2(5)    =     132.11
-Deviance             =  146494.6598               Prob > chi2     =     0.0000
-Log pseudolikelihood = -203511.2518               Pseudo R2       =     0.1956
-
-Number of clusters (athr_id)=     13,515
-                           (Std. err. adjusted for 13,515 clusters in athr_id)
-------------------------------------------------------------------------------
-             |               Robust
-     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
--------------+----------------------------------------------------------------
- Z_young_any |  -.8485285   .2361154    -3.59   0.000    -1.311306   -.3857508
-   Z_old_any |   .0120727   .2450546     0.05   0.961    -.4682255    .4923708
- S_young_any |  -.0575561    .077076    -0.75   0.455    -.2086223    .0935102
-   S_old_any |   .0160492   .0707079     0.23   0.820    -.1225356    .1546341
-PT_young_any |   .1716575   .0306244     5.61   0.000     .1116348    .2316803
-       _cons |   .7403197   .0101151    73.19   0.000     .7204945    .7601449
-------------------------------------------------------------------------------
-
-Absorbed degrees of freedom:
------------------------------------------------------+
- Absorbed FE | Categories  - Redundant  = Num. Coefs |
--------------+---------------------------------------|
-     athr_id |     13515       13515           0    *|
-        year |        10           1           9     |
------------------------------------------------------+
-* = FE nested within cluster; treated as redundant for DoF computation
-N = 64,950; 6,495 balanced groups of size 10
-N = 64,950; 191 unbalanced groups of sizes 10 to 2,360
-pooled-DiD int PPML all_jrnls_r1_r2 ppr_cnt young_any med_pi: b= -0.8485 (se=  0.2361)   N=   135150 PIs=6495 Insts=191
-N = 70,200; 7,020 balanced groups of size 10
-N = 70,200; 179 unbalanced groups of sizes 10 to 2,560
-pooled-DiD int PPML all_jrnls_r1_r2 ppr_cnt old_any med_pi: b=  0.0121 (se=  0.2451)   N=   135150 PIs=7020 Insts=179
-
- ( 1)  Z_young_any - Z_old_any = 0
-
-------------------------------------------------------------------------------
-     ppr_cnt | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
--------------+----------------------------------------------------------------
-         (1) |  -.8606011   .3402973    -2.53   0.011    -1.527572   -.1936308
-------------------------------------------------------------------------------
-pooled-DiD int PPML DIFF all_jrnls_r1_r2 ppr_cnt young_any-old_any med_pi: b= -0.8606 (se=  0.3403) p=0.0114
-Iteration 1:   deviance = 1.5049e+05  eps = .         iters = 3    tol = 1.0e-04  min(eta) =  -1.57  P   
-Iteration 2:   deviance = 1.4634e+05  eps = 2.83e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.91      
-Iteration 3:   deviance = 1.4631e+05  eps = 2.48e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.97      
-Iteration 4:   deviance = 1.4631e+05  eps = 2.12e-07  iters = 2    tol = 1.0e-04  min(eta) =  -1.98      

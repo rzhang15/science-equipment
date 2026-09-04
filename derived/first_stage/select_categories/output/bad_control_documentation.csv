@@ -1,114 +1,114 @@
 category,bad_control_reason,excluded_type
 acetonitrile,US shock: Hurricane Ike (2008) hit Texas Gulf ACN production; global shortage with lingering US price effects 2010-2011,excluded control
-acrylamide/bis solution,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-avidin products,horizontal overlap pre-merger: Pierce biotin-avidin franchise + Molecular Probes streptavidin-fluor conjugates,excluded control
+acrylamide/bis solution,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+avidin products,"US M&A in window: Vector Laboratories (Vectastain ABC, dominant supplier per basket) acquired by Maravai LifeSciences 2016; also heterogeneous bucket pooling raw avidin, NeutrAvidin, conjugates, and IHC kits spanning USD 20-2,500/unit",excluded control
 bacterial selection antibiotics - rifampicin,US shock: rifampin on FDA drug-shortage list 2013-14 and 2017,excluded control
-bacterial transformation reagents,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+bacterial transformation reagents,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
 bottle top filters,US M&A in window: Pall Corp -> Danaher (closed Aug 2015) reshuffled US lab filtration market,excluded control
-bovine serum albumin,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+bovine serum albumin,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
 capillary blood collection tubes,US M&A in window: BD (Microtainer) dominates; BD-CareFusion closed Mar 2015 (same reason as needles/syringes),excluded control
-capped mrna synthesis kits,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-catalase,judgment call: bovine-liver-derived biologic sharing bovine supply chain with FBS/BSA,excluded control
-cell culture antibiotics - blasticidin,Invitrogen-dominant selection antibiotic tied to Tier 3 expression plasmid/vector systems; portfolio pricing exposure,excluded control
-cell culture dissociation reagents,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-cell culture nutritional supplements - amino acids,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-cell culture nutritional supplements - b27,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-cell culture nutritional supplements - casamino acids,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-cell culture nutritional supplements - glucose,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-cell culture nutritional supplements - insulin,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-cell culture nutritional supplements - its-g,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-cell culture nutritional supplements - l-glutamine,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-cell culture nutritional supplements - lif,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-cell culture nutritional supplements - other,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-cell culture nutritional supplements - peptone,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-cell culture nutritional supplements - sodium pyruvate,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-cell culture nutritional supplements - sugars,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-cell culture nutritional supplements - tryptone,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-cell culture nutritional supplements - vitamins,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-cell culture nutritional supplements - yeast,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-cell lysis detergents - np-40 (igepal ca-630),horizontal overlap pre-merger: Pierce surfactants/lysis buffers (Thermo) + Invitrogen lysis reagents (Life),excluded control
+capped mrna synthesis kits,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+catalase,"dollar-contaminated price series: 'catalog' substring misclassifications carry >20% of category spend (USD 3.4k 'catalog-ppt support', USD 2k 'catalog-revision'); enzyme/assay-kit/antibody mix in remainder",excluded control
+cell culture antibiotics - blasticidin,"CRISPR demand shock timed with merger: lentiCas9-Blast (2014) made blasticidin a standard selection marker, demand jump 2014-16; single-source fermentation supply (Kaken) passes through supply/FX shocks",excluded control
+cell culture dissociation reagents,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+cell culture nutritional supplements - amino acids,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+cell culture nutritional supplements - b27,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+cell culture nutritional supplements - casamino acids,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+cell culture nutritional supplements - glucose,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+cell culture nutritional supplements - insulin,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+cell culture nutritional supplements - its-g,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+cell culture nutritional supplements - l-glutamine,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+cell culture nutritional supplements - lif,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+cell culture nutritional supplements - other,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+cell culture nutritional supplements - peptone,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+cell culture nutritional supplements - sodium pyruvate,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+cell culture nutritional supplements - sugars,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+cell culture nutritional supplements - tryptone,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+cell culture nutritional supplements - vitamins,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+cell culture nutritional supplements - yeast,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+cell lysis detergents - np-40 (igepal ca-630),"dollar-contaminated price series: top spend items are misclassified 'np' matches (Whatman Autovial syringeless filters, NobelActive dental implant), ~22% of category spend",excluded control
 centrifugal ultrafiltration devices,US M&A in window: Pall Corp -> Danaher (closed Aug 2015) reshuffled US lab filtration market,excluded control
-centrifugation media,"Ficoll/Percoll density-gradient cell separation substitutes for magnetic bead-based separation (Dynabeads, Life)",excluded control
-chemically competent cells,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+centrifugation media,dollar-contaminated price series: misclassified USD 34.4k stage-lighting purchase (ETC Selador Lustr) carries 13% of category spend,excluded control
+chemically competent cells,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
 citric acid,"US trade shock: antidumping orders on Chinese citric acid in force through window; new AD/CVD investigations 2017, orders 2018",excluded control
 collagenase,"classification ambiguity: is a cell culture dissociation reagent, a Tier 3 category (Gibco collagenase)",excluded control
-column-based dna and rna extraction kits,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-column-based dna genomic purification kits,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-column-based dna plasmid gigaprep,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-column-based dna plasmid maxiprep,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-column-based dna plasmid megaprep,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-column-based dna plasmid midiprep,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-column-based dna plasmid miniprep,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-column-based dna purification kits,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-column-based gel dna extraction kits,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-column-based gel rna extraction kits,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-column-based microbial dna purification kits,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-column-based pcr and gel purification kit,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-column-based pcr purification kits,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-column-based pcr purification reagent,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-column-based plant dna purification kits,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-column-based plant rna purification kits,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-column-based protein purification kit,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-column-based rna purification kits,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-column-based yeast dna purification kits,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+column-based dna and rna extraction kits,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+column-based dna genomic purification kits,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+column-based dna plasmid gigaprep,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+column-based dna plasmid maxiprep,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+column-based dna plasmid megaprep,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+column-based dna plasmid midiprep,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+column-based dna plasmid miniprep,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+column-based dna purification kits,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+column-based gel dna extraction kits,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+column-based gel rna extraction kits,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+column-based microbial dna purification kits,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+column-based pcr and gel purification kit,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+column-based pcr purification kits,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+column-based pcr purification reagent,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+column-based plant dna purification kits,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+column-based plant rna purification kits,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+column-based protein purification kit,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+column-based rna purification kits,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+column-based yeast dna purification kits,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
 crystallizing dishes,US M&A in window: Kimble + Wheaton + Duran merged into DWK Life Sciences 2017; Corning absorbed BD Discovery Labware Oct 2012,excluded control
-cylindrical carboys,Nalgene (Thermo) dominates category; exposed to acquirer portfolio repricing despite no Life overlap,excluded control
+cylindrical carboys,"unmeasurable price series: thin category (~155 purchases) pooling vessels with caps/spigots/funnels/replacement parts, plus dollar-dominant misclassification (USD 17.5k environmental chamber with carboy water-fill line)",excluded control
 dextrose,"US commodity shock: corn exposure, 2012 Midwest drought (parallel to ethanol); also ambiguous with Tier 3 supplements-glucose",excluded control
-direct pcr lysis reagents,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-dna-salmon sperm,judgment call: hybridization-era blocking agent in secular decline with NGS shift; nominal Invitrogen overlap,excluded control
+direct pcr lysis reagents,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+dna-salmon sperm,secular demand decline: hybridization-era blocking agent displaced by the NGS shift,excluded control
 drug - anticoagulant,US shock: heparin Chinese crude API cost pressure through window; US shortage from 2017,excluded control
 egta solution,classification ambiguity: prepared buffer solution in same family as Tier 2 process liquids (PBS/TE/HBSS/EBSS),excluded control
-electrocompetent cells,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+electrocompetent cells,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
 ethanol,US commodity shock: 2012 Midwest drought + RFS volatility 2012-2014 moved corn-ethanol prices,excluded control
-expression plasmids,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-flash chromatography columns - silica gel,judgment call: synthetic-chemistry product with non-life-science buyer base,excluded control
+expression plasmids,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+flash chromatography columns - silica gel,outside life-sciences consumables scope: synthetic-chemistry product with non-life-science buyer base,excluded control
 formaldehydes and paraformaldehydes,"US regulatory shock: EPA IRIS 2010, NTP 12th RoC 2011 listed as known human carcinogen, OSHA tightening",excluded control
 formic acid,industrial commodity priced off petrochemical feedstocks; 2014-15 oil price collapse coincides with merger,excluded control
-gel blotting papers,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+gel blotting papers,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
 gene expression inducers,US shock: doxycycline (standard Tet-On/Off inducer) generic price spike 2013-14,excluded control
-growth medium supplement,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-human serum,substitute for Tier 1 FBS in cell culture; merger-induced FBS price changes shift demand,excluded control
+growth medium supplement,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+human serum,US demand shock: clinical cell/gene therapy manufacturing scale-up (CAR-T approvals 2017) drove human AB serum demand through the post-period,excluded control
 hypodermic needles,US M&A in window: Becton Dickinson + CareFusion closed Mar 2015; BD dominates US needle/syringe,excluded control
-in vitro transcription kit,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-laemmli sample buffer,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-ldh cytotoxicity assay,horizontal overlap pre-merger: Pierce LDH cytotoxicity assay (Thermo) + Invitrogen/Molecular Probes cytotoxicity assay lines (Life),excluded control
-lds sample buffer,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-liquid-based dna plasmid purification kit,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-mes-sds buffer,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-mops-sds buffer,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-native page running buffers,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-native-page sample buffer,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+in vitro transcription kit,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+laemmli sample buffer,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+ldh cytotoxicity assay,US shock in window: Roche Cytotoxicity Detection Kit (LDH) moved to Sigma-Aldrich distribution with the Roche biochemicals portfolio 2014; Sigma absorbed by Merck KGaA Nov 2015,excluded control
+lds sample buffer,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+liquid-based dna plasmid purification kit,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+mes-sds buffer,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+mops-sds buffer,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+native page running buffers,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+native-page sample buffer,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
 nitrile gloves,US-relevant shock: 2017-2018 NBR feedstock shortage drove 20-40% lab glove price increases,excluded control
 nitrogen,"US M&A in window: Air Liquide-Airgas closed May 2016, Praxair-Linde announced 2016; prices track energy",excluded control
 phosphoprotein electrophoresis reagents,classification uncertainty - not shock-based; specialty SDS-PAGE reagent overlapping with Tier 2 protein workflow,excluded control
 pipes buffers,classification ambiguity: prepared buffer solution in same family as Tier 2 process liquids (PBS/TE/HBSS/EBSS),excluded control
-plasmid vectors,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-polyacrylamide gels casting kit,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+plasmid vectors,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+polyacrylamide gels casting kit,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
 primary antibodies,antibody reproducibility crisis 2014-16; Sigma-Aldrich/MilliporeSigma merger Nov 2015 affected major antibody supplier,excluded control
-reducing agents - bme,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-rna extraction reagents,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-rna polymerases,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-rna stabilization reagent,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+reducing agents - bme,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+rna extraction reagents,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+rna polymerases,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+rna stabilization reagent,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
 secondary antibodies,antibody reproducibility crisis 2014-16; Sigma-Aldrich/MilliporeSigma merger Nov 2015 affected major antibody supplier,excluded control
-silica bead based gel purification kit,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-site-directed mutagenesis kits,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-site-directed mutagenesis systems,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-slide mounting medium,horizontal overlap pre-merger: Molecular Probes ProLong/SlowFade antifade mountants (Life) + Richard-Allan/Shandon histology mounting media (Thermo),excluded control
-sodium hydride,"judgment call: synthetic-chemistry commodity, petrochemical feedstock pricing, non-life-science buyer base",excluded control
-spin columns,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+silica bead based gel purification kit,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+site-directed mutagenesis kits,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+site-directed mutagenesis systems,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+slide mounting medium,"quality upgrading in window: ProLong Diamond (~2014), ProLong Glass (~2017), VectaShield Vibrance (~2018) premium launches for confocal/superresolution; spend-per-unit rises from composition shift without SKU repricing",excluded control
+sodium hydride,"outside life-sciences consumables scope: synthetic-chemistry commodity, petrochemical feedstock pricing, non-life-science buyer base",excluded control
+spin columns,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
 sucrose,"US shock: AD/CVD case vs Mexican sugar (filed Mar 2014, suspension agreements Dec 2014) + 2012 drought; also ambiguous with Tier 3 supplements-sugars",excluded control
 synthetic dna oligonucleotide - desalted,US-driven secular price collapse: Twist Bioscience entry 2013 + IDT scale-up dropped per-base costs ~10x in window,excluded control
 synthetic dual-labeled probe,US-driven secular price collapse: Twist Bioscience entry 2013 + IDT scale-up dropped per-base costs ~10x in window,excluded control
 synthetic shrna,"tier 2 treated but excluded: CRISPR substitute entry (Cas9 2013, GeCKO libraries 2014) hit knockdown screening at merger date; merger pricing effect not separable from technology substitution",excluded treated (own shock)
 syringe filters,US M&A in window: Pall Corp -> Danaher (closed Aug 2015) reshuffled US lab filtration market,excluded control
 syringes,US M&A in window: Becton Dickinson + CareFusion closed Mar 2015; BD dominates US needle/syringe,excluded control
-tbe buffer,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-transfection reagents - lentiviral packaging kits,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-transfection reagents - polybrene (viral transduction),tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-transposon mutagenesis kits,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-tris-aceate-sds running buffer,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-tris-acetate-edta (tae) buffer,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-tris-glycine buffer,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-tris-glycine-sds (tgs) buffer,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-tris-tricine-sds buffer,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
-western blot transfer buffers,tier 3: bundled/undocumented overlap; excluded from control pool,tier 3 excluded from both groups
+tbe buffer,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+transfection reagents - lentiviral packaging kits,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+transfection reagents - polybrene (viral transduction),tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+transposon mutagenesis kits,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+tris-aceate-sds running buffer,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+tris-acetate-edta (tae) buffer,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+tris-glycine buffer,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+tris-glycine-sds (tgs) buffer,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+tris-tricine-sds buffer,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups
+western blot transfer buffers,tier 3: bundled with treated markets; excluded from control pool,tier 3 excluded from both groups

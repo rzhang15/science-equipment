@@ -1,0 +1,132 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 120,000; see help set_maxvar.
+
+. do /tmp/claude-67049/-n-holylabs-pakes-lab-Lab-sci-eq/741534f8-e599-4ffd-aef8
+> -e3a47d5f4938/scratchpad/peek.do 
+
+. foreach f in es_ppr_cnt_r1_r2_ppml_mshrctrl es_ppr_cnt_r1_r2_mshrctrl es_ppr_
+> cnt_r1_r2_ppml_mshrctrl_foia {
+  2.   use ../temp/`f', clear
+  3.   di "=== `f'"
+  4.   list rel year b se, noobs clean
+  5. }
+=== es_ppr_cnt_r1_r2_ppml_mshrctrl
+
+    rel   year           b         se  
+     -4   2010    .3265168   .2944207  
+     -3   2011   -.1937859   .2761884  
+     -2   2012    .1520112   .2617598  
+     -1   2013           0          0  
+      0   2014    .0777123   .2929002  
+      1   2015   -.5279745   .3042672  
+      2   2016   -.2497571   .3288729  
+      3   2017   -.3625223   .3450002  
+      4   2018   -.5367671   .3601916  
+      5   2019   -.5945033   .3727493  
+=== es_ppr_cnt_r1_r2_mshrctrl
+
+    rel   year           b         se  
+     -4   2010    .6717138    .660789  
+     -3   2011   -.4636986   .6383009  
+     -2   2012    .3426975   .5977896  
+     -1   2013           0          0  
+      0   2014   -.0157067    .597055  
+      1   2015   -1.121302   .6017691  
+      2   2016   -.5993551   .6033778  
+      3   2017   -.7798005   .6182098  
+      4   2018   -1.023732   .6248434  
+      5   2019   -1.066873   .6129764  
+=== es_ppr_cnt_r1_r2_ppml_mshrctrl_foia
+
+    rel   year           b         se  
+     -4   2010   -1.750501   3.136873  
+     -3   2011    -2.07607   2.467741  
+     -2   2012   -.2128639   3.436526  
+     -1   2013           0          0  
+      0   2014    1.253806   4.032438  
+      1   2015    2.470725   3.875853  
+      2   2016    2.113143   3.919363  
+      3   2017    6.121519    4.13827  
+      4   2018    3.615018   5.190559  
+      5   2019    9.937914   5.216491  
+
+. use ../output/prepped_samples/es_all_jrnls_r1_r2, clear
+
+. sum year exposure mkt_spend_shr, d
+
+                            year
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%         2010           2010
+ 5%         2010           2010
+10%       2010.5           2010       Obs             135,150
+25%         2012           2010       Sum of wgt.     135,150
+
+50%       2014.5                      Mean             2014.5
+                        Largest       Std. dev.      2.872292
+75%         2017           2019
+90%       2018.5           2019       Variance       8.250061
+95%         2019           2019       Skewness              0
+99%         2019           2019       Kurtosis       1.775758
+
+                          exposure
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%    -.0542486      -.1789057
+ 5%    -.0087312      -.1789057
+10%     .0010243      -.1789057       Obs             135,150
+25%     .0118151      -.1789057       Sum of wgt.     135,150
+
+50%     .0244606                      Mean           .0298809
+                        Largest       Std. dev.       .030218
+75%     .0470339       .2295386
+90%     .0707319       .2295386       Variance       .0009131
+95%     .0829213       .2295386       Skewness        .217728
+99%     .1102295       .2295386       Kurtosis       5.049169
+
+                        mkt_spend_shr
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%      .081444       .0230821
+ 5%     .1255824       .0230821
+10%     .1466286       .0230821       Obs             135,150
+25%     .1918472       .0230821       Sum of wgt.     135,150
+
+50%      .254432                      Mean           .2715408
+                        Largest       Std. dev.      .1102453
+75%     .3277336       .7627527
+90%     .4315531       .7627527       Variance        .012154
+95%     .4926331       .7627527       Skewness       .8330455
+99%      .583621       .7627527       Kurtosis       3.544215
+
+. corr exposure mkt_spend_shr
+(obs=135,150)
+
+             | exposure mkt_sp~r
+-------------+------------------
+    exposure |   1.0000
+mkt_spend_~r |   0.3092   1.0000
+
+
+. 
+end of do-file
