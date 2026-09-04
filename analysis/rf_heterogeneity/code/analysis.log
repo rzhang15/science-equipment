@@ -3085,3 +3085,262 @@ N = 66,100; 195 unbalanced groups of sizes 10 to 2,320
 (9 real changes made)
 (7 real changes made)
 (1 real change made)
+file ../output/figures/all_jrnls/es_ppml/es_ppr_cnt_r1_r2_young_ppml_medpi_mshrctrl.pdf saved as PDF format
+(file ../temp/es_ppr_cnt_r1_r2_young_ppml_medpi_mshrctrl.dta not found)
+file ../temp/es_ppr_cnt_r1_r2_young_ppml_medpi_mshrctrl.dta saved
+N = 68,980; 6,898 balanced groups of size 10
+N = 68,980; 178 unbalanced groups of sizes 10 to 2,600
+
+                        (sum) ppr_cnt
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            0              0
+ 5%            0              0
+10%            0              0       Obs              27,592
+25%            1              0       Sum of wgt.      27,592
+
+50%            2                      Mean            2.32379
+                        Largest       Std. dev.      2.021121
+75%            3             23
+90%            5             27       Variance       4.084929
+95%            6             28       Skewness       2.262817
+99%           10             32       Kurtosis       13.56081
+(135,070 observations deleted)
+(9 missing values generated)
+(9 real changes made)
+(7 real changes made)
+(1 real change made)
+file ../output/figures/all_jrnls/es_ppml/es_ppr_cnt_r1_r2_old_ppml_medpi_mshrctrl.pdf saved as PDF format
+(file ../temp/es_ppr_cnt_r1_r2_old_ppml_medpi_mshrctrl.dta not found)
+file ../temp/es_ppr_cnt_r1_r2_old_ppml_medpi_mshrctrl.dta saved
+(80 missing values generated)
+(80 missing values generated)
+(80 missing values generated)
+(80 missing values generated)
+(80 missing values generated)
+Iteration 1:   deviance = 1.5055e+05  eps = .         iters = 3    tol = 1.0e-04  min(eta) =  -1.53  P   
+Iteration 2:   deviance = 1.4640e+05  eps = 2.83e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.85      
+Iteration 3:   deviance = 1.4637e+05  eps = 2.49e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.92      
+Iteration 4:   deviance = 1.4637e+05  eps = 2.12e-07  iters = 2    tol = 1.0e-04  min(eta) =  -1.92      
+Iteration 5:   deviance = 1.4637e+05  eps = 8.44e-12  iters = 2    tol = 1.0e-05  min(eta) =  -1.92   S  
+Iteration 6:   deviance = 1.4637e+05  eps = 0.00e+00  iters = 2    tol = 1.0e-08  min(eta) =  -1.92   S O
+------------------------------------------------------------------------------------------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
+Converged in 6 iterations and 13 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =    135,000
+Absorbing 2 HDFE groups                           Residual df     =     13,499
+Statistics robust to heteroskedasticity           Wald chi2(5)    =     114.38
+Deviance             =  146367.5742               Prob > chi2     =     0.0000
+Log pseudolikelihood = -203314.2426               Pseudo R2       =     0.1954
+
+Number of clusters (athr_id)=     13,500
+                           (Std. err. adjusted for 13,500 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+  Z_young_ns |  -1.083589   .3538482    -3.06   0.002    -1.777119   -.3900595
+    Z_old_ns |  -.2658588   .3696019    -0.72   0.472    -.9902652    .4585476
+  S_young_ns |    .130038   .1020685     1.27   0.203    -.0700125    .3300885
+    S_old_ns |  -.0462727   .0974682    -0.47   0.635    -.2373069    .1447616
+ PT_young_ns |   .1103294   .0241637     4.57   0.000     .0629693    .1576895
+       _cons |   .7527977   .0076812    98.01   0.000     .7377428    .7678526
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |     13500       13500           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+N = 64,280; 6,428 balanced groups of size 10
+N = 64,280; 195 unbalanced groups of sizes 10 to 2,390
+pooled-DiD int PPML all_jrnls_r1_r2 ppr_cnt young_ns med_pi: b= -1.0836 (se=  0.3538)   N=   135000 PIs=6428 Insts=195
+N = 70,720; 7,072 balanced groups of size 10
+N = 70,720; 177 unbalanced groups of sizes 10 to 2,530
+pooled-DiD int PPML all_jrnls_r1_r2 ppr_cnt old_ns med_pi: b= -0.2659 (se=  0.3696)   N=   135000 PIs=7072 Insts=177
+
+ ( 1)  Z_young_ns - Z_old_ns = 0
+
+------------------------------------------------------------------------------
+     ppr_cnt | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |  -.8177305   .5116777    -1.60   0.110      -1.8206    .1851395
+------------------------------------------------------------------------------
+pooled-DiD int PPML DIFF all_jrnls_r1_r2 ppr_cnt young_ns-old_ns med_pi: b= -0.8177 (se=  0.5117) p=0.1100
+Iteration 1:   deviance = 1.5035e+05  eps = .         iters = 3    tol = 1.0e-04  min(eta) =  -1.59  P   
+Iteration 2:   deviance = 1.4620e+05  eps = 2.84e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.92      
+Iteration 3:   deviance = 1.4617e+05  eps = 2.50e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.98      
+Iteration 4:   deviance = 1.4617e+05  eps = 2.20e-07  iters = 2    tol = 1.0e-04  min(eta) =  -1.99      
+Iteration 5:   deviance = 1.4617e+05  eps = 9.70e-12  iters = 2    tol = 1.0e-05  min(eta) =  -1.99   S  
+Iteration 6:   deviance = 1.4617e+05  eps = 0.00e+00  iters = 2    tol = 1.0e-08  min(eta) =  -1.99   S O
+------------------------------------------------------------------------------------------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
+Converged in 6 iterations and 13 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =    135,000
+Absorbing 2 HDFE groups                           Residual df     =     13,499
+Statistics robust to heteroskedasticity           Wald chi2(37)   =     245.34
+Deviance             =  146166.7954               Prob > chi2     =     0.0000
+Log pseudolikelihood = -203213.8532               Pseudo R2       =     0.1958
+
+Number of clusters (athr_id)=     13,500
+                                  (Std. err. adjusted for 13,500 clusters in athr_id)
+-------------------------------------------------------------------------------------
+                    |               Robust
+            ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+--------------------+----------------------------------------------------------------
+ int_lead4_young_ns |   .7729607    .579862     1.33   0.183     -.363548    1.909469
+ int_lead3_young_ns |    1.08822   .5064709     2.15   0.032     .0955554    2.080885
+ int_lead2_young_ns |   1.141456   .5091899     2.24   0.025     .1434625     2.13945
+  int_lag0_young_ns |   .5298966   .5345139     0.99   0.322    -.5177314    1.577525
+  int_lag1_young_ns |  -.0684024   .5435749    -0.13   0.900     -1.13379    .9969848
+  int_lag2_young_ns |  -.4791107   .6368013    -0.75   0.452    -1.727218     .768997
+  int_lag3_young_ns |  -.6584991   .6186637    -1.06   0.287    -1.871058    .5540595
+  int_lag4_young_ns |  -.6187487   .6434373    -0.96   0.336    -1.879863    .6423653
+  int_lag5_young_ns |  -1.079299   .7011965    -1.54   0.124    -2.453618    .2950212
+   int_lead4_old_ns |  -.6381935   .5456415    -1.17   0.242    -1.707631    .4312441
+   int_lead3_old_ns |  -1.266193   .5422002    -2.34   0.020    -2.328885   -.2034997
+   int_lead2_old_ns |  -.7827186   .5180925    -1.51   0.131    -1.798161    .2327241
+    int_lag0_old_ns |  -.5027958   .5667358    -0.89   0.375    -1.613578    .6079859
+    int_lag1_old_ns |  -1.549869   .6148941    -2.52   0.012     -2.75504   -.3446989
+    int_lag2_old_ns |  -.8471328   .6447528    -1.31   0.189    -2.110825    .4165593
+    int_lag3_old_ns |  -.9137347   .6869057    -1.33   0.183    -2.260045    .4325756
+    int_lag4_old_ns |  -.5560163   .7073889    -0.79   0.432    -1.942473    .8304405
+    int_lag5_old_ns |  -1.360026   .7486014    -1.82   0.069    -2.827258    .1072058
+mshr_lead4_young_ns |  -.5226951   .1334516    -3.92   0.000    -.7842555   -.2611346
+mshr_lead3_young_ns |  -.3422407   .1180237    -2.90   0.004     -.573563   -.1109185
+mshr_lead2_young_ns |   -.366114   .1190084    -3.08   0.002    -.5993662   -.1328618
+ mshr_lag0_young_ns |  -.2908631   .1366958    -2.13   0.033    -.5587819   -.0229444
+ mshr_lag1_young_ns |  -.2379648   .1401954    -1.70   0.090    -.5127427    .0368131
+ mshr_lag2_young_ns |   -.159801   .1593353    -1.00   0.316    -.4720925    .1524905
+ mshr_lag3_young_ns |  -.1017014   .1597752    -0.64   0.524     -.414855    .2114522
+ mshr_lag4_young_ns |  -.1309149   .1632818    -0.80   0.423    -.4509413    .1891116
+ mshr_lag5_young_ns |  -.0398736   .1707588    -0.23   0.815    -.3745548    .2948075
+  mshr_lead4_old_ns |   .6369769   .1291684     4.93   0.000     .3838114    .8901423
+  mshr_lead3_old_ns |   .3713041    .122672     3.03   0.002     .1308714    .6117367
+  mshr_lead2_old_ns |   .2189588   .1212116     1.81   0.071    -.0186116    .4565291
+   mshr_lag0_old_ns |   .4585385    .139282     3.29   0.001     .1855508    .7315262
+   mshr_lag1_old_ns |   .4683233   .1469054     3.19   0.001      .180394    .7562527
+   mshr_lag2_old_ns |    .111731   .1547191     0.72   0.470    -.1915129     .414975
+   mshr_lag3_old_ns |   .1875679   .1634085     1.15   0.251    -.1327069    .5078427
+   mshr_lag4_old_ns |   .1132621   .1713194     0.66   0.509    -.2225178     .449042
+   mshr_lag5_old_ns |   .1315858   .1780986     0.74   0.460    -.2174811    .4806527
+        PT_young_ns |   .1102298   .0241623     4.56   0.000     .0628727     .157587
+              _cons |   .7484403   .0117426    63.74   0.000     .7254253    .7714554
+-------------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |     13500       13500           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+N = 64,280; 6,428 balanced groups of size 10
+N = 64,280; 195 unbalanced groups of sizes 10 to 2,390
+
+                        (sum) ppr_cnt
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            0              0
+ 5%            0              0
+10%            0              0       Obs              25,712
+25%            1              0       Sum of wgt.      25,712
+
+50%            2                      Mean           1.971492
+                        Largest       Std. dev.       1.65146
+75%            3             17
+90%            4             17       Variance       2.727319
+95%            5             18       Skewness       1.866009
+99%            8             23       Kurtosis       9.867237
+(135,070 observations deleted)
+(9 missing values generated)
+(9 real changes made)
+(7 real changes made)
+(1 real change made)
+file ../output/figures/all_jrnls/es_ppml/es_ppr_cnt_r1_r2_young_ns_ppml_medpi_mshrctrl.pdf saved as PDF format
+(file ../temp/es_ppr_cnt_r1_r2_young_ns_ppml_medpi_mshrctrl.dta not found)
+file ../temp/es_ppr_cnt_r1_r2_young_ns_ppml_medpi_mshrctrl.dta saved
+N = 70,720; 7,072 balanced groups of size 10
+N = 70,720; 177 unbalanced groups of sizes 10 to 2,530
+
+                        (sum) ppr_cnt
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            0              0
+ 5%            0              0
+10%            0              0       Obs              28,288
+25%            1              0       Sum of wgt.      28,288
+
+50%            2                      Mean           2.334311
+                        Largest       Std. dev.       2.03024
+75%            3             23
+90%            5             27       Variance       4.121873
+95%            6             28       Skewness       2.240349
+99%           10             32       Kurtosis       13.25013
+(135,070 observations deleted)
+(9 missing values generated)
+(9 real changes made)
+(7 real changes made)
+(1 real change made)
+file ../output/figures/all_jrnls/es_ppml/es_ppr_cnt_r1_r2_old_ns_ppml_medpi_mshrctrl.pdf saved as PDF format
+(file ../temp/es_ppr_cnt_r1_r2_old_ns_ppml_medpi_mshrctrl.dta not found)
+file ../temp/es_ppr_cnt_r1_r2_old_ns_ppml_medpi_mshrctrl.dta saved
+Iteration 1:   deviance = 1.5061e+05  eps = .         iters = 3    tol = 1.0e-04  min(eta) =  -1.53  P   
+Iteration 2:   deviance = 1.4647e+05  eps = 2.83e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.85      
+Iteration 3:   deviance = 1.4643e+05  eps = 2.47e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.91      
+Iteration 4:   deviance = 1.4643e+05  eps = 2.05e-07  iters = 2    tol = 1.0e-04  min(eta) =  -1.92      
+Iteration 5:   deviance = 1.4643e+05  eps = 8.21e-12  iters = 2    tol = 1.0e-05  min(eta) =  -1.92   S  
+Iteration 6:   deviance = 1.4643e+05  eps = 0.00e+00  iters = 2    tol = 1.0e-08  min(eta) =  -1.92   S O
+------------------------------------------------------------------------------------------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
+Converged in 6 iterations and 13 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =    135,080
+Absorbing 2 HDFE groups                           Residual df     =     13,507
+Statistics robust to heteroskedasticity           Wald chi2(5)    =     124.92
+Deviance             =  146430.1119               Prob > chi2     =     0.0000
+Log pseudolikelihood = -203411.1366               Pseudo R2       =     0.1956
+
+Number of clusters (athr_id)=     13,508
+                           (Std. err. adjusted for 13,508 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+ Z_young_any |  -1.121963   .3667987    -3.06   0.002    -1.840875   -.4030505
+   Z_old_any |  -.2658506   .3566658    -0.75   0.456    -.9649027    .4332014
+ S_young_any |   .0703383   .1031838     0.68   0.495    -.1318982    .2725748
+   S_old_any |   .0455539   .0955904     0.48   0.634    -.1417998    .2329077
+PT_young_any |   .1426058   .0239187     5.96   0.000     .0957261    .1894856
+       _cons |   .7421479   .0078435    94.62   0.000     .7267748     .757521
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |     13508       13508           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+N = 64,910; 6,491 balanced groups of size 10
+N = 64,910; 191 unbalanced groups of sizes 10 to 2,360
+pooled-DiD int PPML all_jrnls_r1_r2 ppr_cnt young_any med_pi: b= -1.1220 (se=  0.3668)   N=   135080 PIs=6491 Insts=191
+N = 70,170; 7,017 balanced groups of size 10
+N = 70,170; 179 unbalanced groups of sizes 10 to 2,560
+pooled-DiD int PPML all_jrnls_r1_r2 ppr_cnt old_any med_pi: b= -0.2659 (se=  0.3567)   N=   135080 PIs=7017 Insts=179
+
+ ( 1)  Z_young_any - Z_old_any = 0
+
+------------------------------------------------------------------------------
+     ppr_cnt | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |  -.8561121   .5116168    -1.67   0.094    -1.858863    .1466384
+------------------------------------------------------------------------------
+pooled-DiD int PPML DIFF all_jrnls_r1_r2 ppr_cnt young_any-old_any med_pi: b= -0.8561 (se=  0.5116) p=0.0943
