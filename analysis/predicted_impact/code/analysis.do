@@ -1,50 +1,3 @@
-/* ---------------------------------------------------------------------------
- analysis/predicted_impact/code/analysis.do
-
- Event study on predicted-impact tier counts and self-management outcomes.
-
- Outcomes
- --------
-   Tier counts (from derived/openalex/predict_impact):
-     n_pred_high            predicted high cite_pct (within field-year)
-     n_pred_low             predicted low cite_pct
-     n_pred_high_topdecile  predicted high P(topdecile)
-     n_pred_low_topdecile   predicted low P(topdecile)
-     n_pred_high_top15      predicted high P(top-15 journal)
-     n_pred_low_top15       predicted low P(top-15 journal)
-     n_real_high            realized high cite_pct (discriminator)
-     n_real_low             realized low cite_pct (discriminator)
-   Self-management (Phase 3.2 / 3.3):
-     n_main_line            paper modal cluster == PI's pre-2013 modal
-     n_side_line            otherwise
-     n_large_team           team_size in top quartile within field-year
-     n_small_team           team_size in bottom quartile
-     n_high_junior          junior_share in top quartile
-     n_low_junior           junior_share in bottom quartile
-
- Headline plot
- -------------
- combine_pred_real_plot draws predicted-high vs predicted-low and realized-high
- vs realized-low coefficients side-by-side. If publications fall in
- n_pred_low while n_pred_high is preserved, foresight wins within PI.
-
- Heterogeneity (Phase 3.1)
- -------------------------
- het_event_study re-runs the event study on median-splits of:
-   portfolio_hhi      Herfindahl on paper_modal_cluster over pre-2014 papers
-   lab_size_pre       distinct pre-2014 coauthors
-   grants_per_pub_pre num_grants pre-2014 sum / pre_ppr_cnt_sum
-
- Outputs
- -------
-   ../output/figures/<samp>/es_<yvar>[<suf>].pdf
-   ../output/figures/<samp>/es_pred_vs_real<suf>.pdf
-   ../output/tables/<samp>/pdid_<yvar><suf>.txt
-   ../temp/es_<samp><suf>.dta                 (built by restrict_samp)
---------------------------------------------------------------------------- */
-
-* Match analysis/reduced_form/code/analysis.do preamble so plot styling
-* (scheme modern + preliminaries defaults) is identical.
 set more off
 clear all
 capture log close
@@ -58,15 +11,9 @@ cap mkdir ../output/figures
 cap mkdir ../output/tables
 cap mkdir ../temp
 
-* ============================================================
-*  Match the switches in analysis/reduced_form/code/analysis.do
-*  so the sample construction here is identical to the reduced
-*  form. See that file's header comment for switch semantics.
-*  Update in lockstep with reduced_form if you change one.
-* ============================================================
 global EXPOSURE_VERSION "hc"
 global EXPOSURE_FILTER  "_cf"
-* pres = event studies with stats legend (slides); paper = legend-free copies under figures/<samp>/paper/
+* FIG_MODES : pres (stats legend) | paper (no legend)
 global FIG_MODES "pres paper"
 
 global TIER_OUTCOMES n_pred_high n_pred_low                              ///
@@ -81,11 +28,6 @@ global ALL_OUTCOMES $TIER_OUTCOMES $SELFMGMT_OUTCOMES
 global SPLITS portfolio_hhi lab_size_pre grants_per_pub_pre
 
 program main
-    /* Match analysis/reduced_form/code/analysis.do: only the R1+R2+public panel
-     is run. The base all_jrnls panel does not carry the `type' column
-     (R1/R2/other), which restrict_samp needs to build r1/r2 flags. The r1_r2
-     panel would work here too but reduced_form treats r1_r2_public as canonical
-     so we stay in lockstep. */
     gather_external_data
     foreach samp in all_jrnls {
         cap mkdir ../output/figures/`samp'
@@ -97,7 +39,6 @@ program main
         output_tables, samp(`samp') r1r2(1) public(1)
         combine_pred_real_plot, samp(`samp') r1r2(1) public(1)
 
-        /* Phase 3.1: PI heterogeneity */
         foreach s of global SPLITS {
             foreach half in high low {
                 het_event_study, samp(`samp') r1r2(1) public(1) ///
@@ -107,14 +48,7 @@ program main
     }
 end
 
-/* ---------------------------------------------------------------------------
- gather_external_data
- Build the per-PI exposure file and the PI-year grant count file consumed by
- restrict_samp. Mirrors analysis/reduced_form/code/analysis.do.
---------------------------------------------------------------------------- */
 program gather_external_data
-    * Mirrors analysis/reduced_form/code/analysis.do: same shift_share source,
-    * same variable renames. Switches keyed off $EXPOSURE_VERSION/$EXPOSURE_FILTER.
     import delimited ../external/exposure/final_imputed_shift_share_${EXPOSURE_VERSION}${EXPOSURE_FILTER}, clear
     rename exposure_ss imputed
     rename sum_imputed_shares imputed_mkt_spend_shr
@@ -126,9 +60,6 @@ program gather_external_data
     drop _freq
     save ../temp/athr_yr_grnt_cnt, replace
 
-    * author -> us_cluster_fields 30-cluster assignment (kept for parity with
-    * reduced_form; predicted_impact currently uses author FEs but the file is
-    * cheap to build and future specs may want it).
     cap confirm file ../temp/athr_cluster30.dta
     if _rc {
         import delimited ../external/cluster/author_static_clusters_30_ls.csv, clear varnames(1)
@@ -138,19 +69,7 @@ program gather_external_data
     }
 end
 
-/* ---------------------------------------------------------------------------
- restrict_samp
- Build the analysis panel for this samp/suf. Reuses the columns the
- reduced-form sample already has (exposure, mkt_spend_shr, etc.) and adds the
- Phase 3.1 het flags.
---------------------------------------------------------------------------- */
 program restrict_samp
-    /* Sample construction mirrors analysis/reduced_form/code/analysis.do's
-     restrict_samp so the two analyses run on the identical panel. Any
-     departures below are called out inline with "PREDICT_IMPACT:" comments
-     and only add predict_impact-specific columns; the sample-filtering
-     logic stays identical.
-    */
     syntax, samp(string) [, r1r2(int 0) public(int 0)]
     local suf ""
     if (`r1r2' == 1 & `public' == 0) local suf "_r1_r2"
@@ -169,15 +88,11 @@ program restrict_samp
     gen foia_athr = 1 if !mi(exposure)
     bys athr_id : gen athr_indicator = _n == 1
 
-    * Percentiles from imputed distribution -- same reference used in reduced_form
-    * so exposure quartiles are on identical cuts.
     sum imputed if athr_indicator == 1, d
     local imputed_p25: di %4.3f r(p25)
     local imputed_p50: di %4.3f r(p50)
     local imputed_p75: di %4.3f r(p75)
 
-    * Prefer observed exposure/mkt_spend_shr; fall back to imputed. Matches
-    * reduced_form.
     replace imputed = exposure if !mi(exposure)
     replace imputed_mkt_spend_shr = mkt_spend_shr if !mi(mkt_spend_shr)
     drop exposure
@@ -200,8 +115,6 @@ program restrict_samp
     drop if num_yrs <= 2
     keep if num_place == 1
 
-    * PREDICT_IMPACT: capture the static self-mgmt columns before the tsfill
-    * blows them away. Same trick reduced_form uses for exposure/q1..q4/type.
     local static_extras
     foreach v in portfolio_hhi lab_size_pre {
         cap confirm variable `v'
@@ -226,9 +139,6 @@ program restrict_samp
         replace `var' = 0 if mi(`var')
     }
 
-    * PREDICT_IMPACT: same zero-fill for tier / self-management outcomes. These
-    * are missing (a) on tsfill rows because they only exist on real panel
-    * years, and (b) on years/PIs the scoring step didn't reach.
     foreach v of global ALL_OUTCOMES {
         cap confirm variable `v'
         if !_rc replace `v' = 0 if mi(`v')
@@ -267,8 +177,6 @@ program restrict_samp
     gen high_grants = pre_grants_sum >= `g_cut'
     gen low_grants  = pre_grants_sum <  `g_cut'
 
-    * Winsorize cite_affl_wt / affl_wt at pooled p99 to cap mega-cite outliers.
-    * Matches reduced_form.
     foreach v in cite_affl_wt affl_wt {
         qui sum `v', d
         local p99_`v' = r(p99)
@@ -279,9 +187,6 @@ program restrict_samp
     assert !mi(exposure)
     assert !mi(mkt_spend_shr)
 
-    * PREDICT_IMPACT-specific splits (portfolio_hhi, lab_size_pre,
-    * grants_per_pub_pre) — same median-split idiom, on the reduced-form
-    * sample above.
     cap confirm variable portfolio_hhi
     if !_rc {
         sum portfolio_hhi if !mi(portfolio_hhi), d
@@ -302,12 +207,6 @@ program restrict_samp
     save ../temp/es_`samp'`suf', replace
 end
 
-/* ---------------------------------------------------------------------------
- event_study
- Standard event study spec with cluster-robust SEs at the PI level. Outcomes:
- every tier-count + self-management column we built. Outputs both the saved
- coefficient panel and a per-outcome plot.
---------------------------------------------------------------------------- */
 program event_study
     syntax, samp(string) [r1r2(int 0) public(int 0)]
     local fes athr_id year
@@ -349,8 +248,6 @@ program event_study
     foreach yvar of global ALL_OUTCOMES {
         cap confirm variable `yvar'
         if _rc continue
-        * Compute pre-mean and PI count BEFORE preserve so the locals persist
-        * across the reshape-into-coefficient-table below (mirrors reduced_form).
         sum `yvar' if rel <= -1 & exposure > 0, d
         local pre_mean : di %6.3f r(mean)
         gunique athr_id
@@ -382,11 +279,6 @@ program event_study
         plot_one, yvar(`yvar') samp(`samp') suf(`suf') pre_mean(`pre_mean') n_athrs(`n_athrs')
         restore
 
-        * PPML event study: tier / self-mgmt outcomes are non-negative counts,
-        * so ppmlhdfe is a natural fit alongside the linear reghdfe above.
-        * Coefficients are semielasticities (percent change in E[y] per unit
-        * exposure). Mirrors the reghdfe spec above (same regressor list, same
-        * FEs, same clustering) so the two are directly comparable.
         preserve
         mat drop _all
         cap noi ppmlhdfe `yvar' `int_leads' `int_lags' int_lead1 ///
@@ -422,16 +314,6 @@ program event_study
 end
 
 program plot_one
-    /* Event-study point plot in the same visual grammar as
-     analysis/reduced_form/code/analysis.do:
-       - rcap + scatter in ebblue
-       - grey translucent shaded band at 2013.75-2014.25 marking the
-         treatment discontinuity (via scatteri recast(area))
-       - yline at 0
-       - legend with num-PIs / pre-period-avg annotations at pos(7) ring(1)
-     n_athrs is optional; the caller can compute gunique athr_id before
-     preserve and pass it in. Falls back to "" if omitted.
-    */
     syntax, yvar(string) samp(string) pre_mean(string) [suf(string) n_athrs(string)]
     local ytit "`yvar'"
     if strpos("`suf'", "_ppml") local ytit "Output-Cost Elasticity"
@@ -441,7 +323,6 @@ program plot_one
     local ymin = r(min)
     local range = `ymax' - `ymin'
     local gap = max(0.1, round(`range'/10, 0.1))
-    * Round ymax up and ymin down to nearest `gap' so ylab hits are clean.
     local ymax = ceil(`ymax' / `gap') * `gap'
     local ymin = floor(`ymin' / `gap') * `gap'
 
@@ -469,11 +350,6 @@ program plot_one
     }
 end
 
-/* ---------------------------------------------------------------------------
- combine_pred_real_plot
- Side-by-side: predicted-high vs predicted-low coefficients, realized-high vs
- realized-low coefficients. The headline figure for the foresight claim.
---------------------------------------------------------------------------- */
 program combine_pred_real_plot
     syntax, samp(string) [r1r2(int 0) public(int 0)]
     local suf ""
@@ -531,8 +407,6 @@ program combine_pred_real_plot
         graph export ../output/figures/`samp'/es_`pair'_`samp'`suf'.pdf, replace
     }
 
-    /* Combined pred+real overlay for n_pred_low vs n_real_low: the
-       discriminator plot. */
     cap confirm file ../temp/es_n_pred_low_`samp'`suf'.dta
     if _rc exit 0
     cap confirm file ../temp/es_n_real_low_`samp'`suf'.dta
@@ -571,11 +445,6 @@ program combine_pred_real_plot
     graph export ../output/figures/`samp'/es_pred_vs_real`suf'.pdf, replace
 end
 
-/* ---------------------------------------------------------------------------
- pooled_did
- Headline pooled DiD on each outcome. Stores pdid_<yvar> matrix in memory for
- output_tables to dump.
---------------------------------------------------------------------------- */
 program pooled_did
     syntax, samp(string) [r1r2(int 0) public(int 0)]
     local fes athr_id year
@@ -630,14 +499,6 @@ program pooled_did
     }
 end
 
-/* ---------------------------------------------------------------------------
- ppml_specs
- Poisson (ppmlhdfe) analog of pooled_did. Same base + with_share pattern,
- same FE/cluster, so coefficients are directly comparable to their reghdfe
- counterparts. Mirrors analysis/reduced_form/code/analysis.do:ppml_specs.
- Matrix ppml_pdid_<yvar> has rows [b_x, se_x, b_share, se_share, pre_mean,
- N, r2_p] and cols [base, with_share].
---------------------------------------------------------------------------- */
 program ppml_specs
     syntax, samp(string) [r1r2(int 0) public(int 0)]
     local fes athr_id year
@@ -707,10 +568,6 @@ program ppml_specs
     }
 end
 
-/* ---------------------------------------------------------------------------
- output_tables
- Dump each pdid_<yvar> and ppml_pdid_<yvar> matrix to txt.
---------------------------------------------------------------------------- */
 program output_tables
     syntax, samp(string) [r1r2(int 0) public(int 0)]
     local suf ""
@@ -727,12 +584,6 @@ program output_tables
     }
 end
 
-/* ---------------------------------------------------------------------------
- het_event_study
- Phase 3.1: re-run the event study restricted to the half indicated by
- `half'_`split' flag (e.g., high_portfolio_hhi). Suf gains a "_`split'_`half'"
- tag so output filenames are distinct.
---------------------------------------------------------------------------- */
 program het_event_study
     syntax, samp(string) split(string) half(string) [r1r2(int 0) public(int 0)]
     local fes athr_id year
@@ -753,8 +604,6 @@ program het_event_study
     event_study_inline, samp(`samp') suf(`hsuf')
 end
 
-/* Stripped-down event study that takes a fully-formed suffix (used by
-   het_event_study so it doesn't need to re-derive suf from r1r2/public). */
 program event_study_inline
     syntax, samp(string) [suf(string)]
     local fes athr_id year

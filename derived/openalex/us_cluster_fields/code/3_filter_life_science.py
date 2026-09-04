@@ -1,87 +1,3 @@
-"""
-Identify clusters corresponding to LIFE-SCIENCE LAB researchers.
-
-Target population
------------------
-Researchers whose scientific work plausibly involves experimental life-science
-laboratory activity: molecular biology, cell biology, biochemistry, genetics,
-microbiology, immunology, experimental neuroscience, experimental physiology,
-preclinical biomedical research, wet-lab pharmacology, etc.
-
-This is intentionally narrower than:
-    * all life scientists,
-    * all biomedical researchers,
-    * all physicians/clinical researchers,
-    * all researchers publishing on diseases or biological outcomes.
-
-A disease/anatomy/organism term alone is NOT sufficient. The positive signal
-should indicate laboratory production: molecular mechanisms, cells/proteins/
-genes, wet-lab methods, experimental model systems, reagents, assays, etc.
-
-Examples
---------
-KEEP:
-    protein, kinase, phosphorylation, receptor, western blot
-    macrophage, cytokine, knockout, mouse, inflammation
-    plasmid, transfection, RNA, qPCR, fibroblast
-    bacterial, virulence, mutant, gene, sequencing
-    tumor, apoptosis, xenograft, antibody, immunohistochemistry
-
-DROP:
-    diabetes, insurance, cost, Medicare, hospitalization
-    cancer, survival, cohort, questionnaire, patient
-    neuron, algorithm, network, simulation, prediction
-    exercise, survey, adolescent, obesity, behavior
-    biodiversity, habitat, wildlife, ecosystem, conservation
-    polymer, catalyst, electrode, nanoparticle, semiconductor
-
-Heuristic
----------
-Clusters receive rank-weighted evidence in four categories:
-
-    BENCH_CORE
-        Strong evidence of experimental/wet-lab life science.
-
-    BIO_CONTEXT
-        Biological/medical subject matter. Supports bench evidence but
-        cannot independently make a cluster a lab-science cluster.
-
-    CLINICAL_PRACTICE
-        Clinical trials, patient care, epidemiologic/practice-oriented signals.
-
-    ANTI_LEXICON
-        Social science, health services, computing, engineering, physical
-        science, education, etc.
-
-Default automatic keep rule:
-
-    1. At least --min-bench distinct BENCH_CORE top-term hits; AND
-    2. bench weighted score >= --min-bench-score; AND
-    3. bench evidence is not dominated by clinical/non-lab evidence.
-
-A particularly strong laboratory cluster can survive some anti/clinical terms,
-but disease/anatomy vocabulary by itself cannot make a cluster survive.
-
-Workflow
---------
-1. Run once:
-       writes cluster_label_worksheet_{K}.csv with `keep` pre-filled,
-       author_static_clusters_{K}_ls.csv, and an audit.
-
-2. Hand-edit `keep` in the worksheet for any desired overrides.
-
-3. Re-run:
-       existing worksheet values are respected.
-
-4. Use --reset-worksheet to discard manual overrides.
-
-Outputs
--------
-../output/cluster_label_worksheet_{K}.csv
-../output/author_static_clusters_{K}_ls.csv
-../output/cluster_filter_audit_{K}.txt
-"""
-
 import argparse
 import math
 import os
@@ -93,20 +9,8 @@ import pandas as pd
 OUT_DIR = "../output"
 
 
-# -------------------------------------------------------------------------
-# 1. STRONG POSITIVE EVIDENCE: EXPERIMENTAL LIFE-SCIENCE LAB WORK
-# -------------------------------------------------------------------------
-#
-# Terms here should be difficult to generate in large amounts without doing
-# experimental biological / biomedical laboratory research.
-#
-# These terms CAN carry a cluster.
-#
 BENCH_CORE = {
 
-    # ------------------------------------------------------------------
-    # Molecular biology / genetics
-    # ------------------------------------------------------------------
     "dna", "rna", "mrna", "trna",
     "gene", "genom", "epigenet", "epigenom",
     "chromatin", "histon", "chromosom",
@@ -118,9 +22,6 @@ BENCH_CORE = {
     "loci", "locu",
     "promot",
 
-    # ------------------------------------------------------------------
-    # Proteins / enzymes / signaling
-    # ------------------------------------------------------------------
     "protein",
     "enzym",
     "kinas",
@@ -140,9 +41,6 @@ BENCH_CORE = {
     "substrat",
     "repressor",
 
-    # ------------------------------------------------------------------
-    # Cell biology
-    # ------------------------------------------------------------------
     "cell",
     "cellular",
     "cytoplasm",
@@ -161,9 +59,6 @@ BENCH_CORE = {
     "osteoblast",
     "osteoclast",
 
-    # ------------------------------------------------------------------
-    # Immunology
-    # ------------------------------------------------------------------
     "antibodi",
     "antigen",
     "immun",
@@ -183,9 +78,6 @@ BENCH_CORE = {
     "adjuv",
     "virul",
 
-    # ------------------------------------------------------------------
-    # Microbiology / virology / parasitology
-    # ------------------------------------------------------------------
     "bacteri",
     "bacterium",
     "bacteria",
@@ -217,9 +109,6 @@ BENCH_CORE = {
     "gametocyt",
     "trophozoit",
 
-    # ------------------------------------------------------------------
-    # Explicit wet-lab methods
-    # ------------------------------------------------------------------
     "pcr",
     "qpcr",
     "primer",
@@ -270,9 +159,6 @@ BENCH_CORE = {
     "pipett",
     "dissect",
 
-    # ------------------------------------------------------------------
-    # Cell / tissue / experimental systems
-    # ------------------------------------------------------------------
     "organoid",
     "spheroid",
     "explant",
@@ -283,9 +169,6 @@ BENCH_CORE = {
 
     "hela",
 
-    # ------------------------------------------------------------------
-    # Experimental model organisms
-    # ------------------------------------------------------------------
     "mous",
     "mice",
     "rodent",
@@ -295,9 +178,6 @@ BENCH_CORE = {
     "xenopu",
     "xenograft",
 
-    # ------------------------------------------------------------------
-    # Experimental neuroscience
-    # ------------------------------------------------------------------
     "neuron",
     "axon",
     "dendrit",
@@ -305,9 +185,6 @@ BENCH_CORE = {
     "synapt",
     "myelin",
 
-    # ------------------------------------------------------------------
-    # Experimental hematology
-    # ------------------------------------------------------------------
     "platelet",
     "erythrocyt",
     "rbc",
@@ -316,25 +193,13 @@ BENCH_CORE = {
     "globin",
     "hemoglobin",
 
-    # ------------------------------------------------------------------
-    # Biological fluids frequently used experimentally
-    # ------------------------------------------------------------------
     "serum",
     "plasma",
 }
 
 
-# -------------------------------------------------------------------------
-# 2. BIOLOGICAL / BIOMEDICAL CONTEXT
-# -------------------------------------------------------------------------
-#
-# These indicate biological subject matter, but NOT necessarily lab work.
-#
-# They SUPPORT a BENCH_CORE call but cannot carry the cluster by themselves.
-#
 BIO_CONTEXT = {
 
-    # anatomy / physiology
     "tissu",
     "muscl",
     "skelet",
@@ -404,7 +269,6 @@ BIO_CONTEXT = {
     "retin",
     "retinal",
 
-    # disease
     "tumor",
     "tumour",
     "cancer",
@@ -469,7 +333,6 @@ BIO_CONTEXT = {
     "osteoarthr",
     "osteoporo",
 
-    # reproduction/development
     "pregnan",
     "pregnanc",
     "gestat",
@@ -486,7 +349,6 @@ BIO_CONTEXT = {
     "infertil",
     "ovul",
 
-    # hormones / metabolites
     "estrogen",
     "testosteron",
     "progesteron",
@@ -502,7 +364,6 @@ BIO_CONTEXT = {
     "gaba",
     "acetylcholin",
 
-    # pharmacology / therapeutics
     "pharmacokinet",
     "pharmacolog",
     "antiviral",
@@ -511,13 +372,11 @@ BIO_CONTEXT = {
     "antifung",
     "immunotherapi",
 
-    # generic biological observations
     "phenotyp",
     "biopsi",
     "marrow",
     "lesion",
 
-    # animal/veterinary context
     "rabbit",
     "porcin",
     "bovin",
@@ -527,14 +386,6 @@ BIO_CONTEXT = {
 }
 
 
-# -------------------------------------------------------------------------
-# 3. CLINICAL / PRACTICE / PATIENT-ORIENTED SIGNALS
-# -------------------------------------------------------------------------
-#
-# These are not "bad research". They simply indicate that the work is likely
-# clinical, epidemiologic, health-services, or patient-care oriented rather
-# than experimental life-science lab production.
-#
 CLINICAL_PRACTICE = {
 
     "randomis",
@@ -597,17 +448,8 @@ CLINICAL_PRACTICE = {
 }
 
 
-# -------------------------------------------------------------------------
-# 4. CLEAR NEGATIVE EVIDENCE
-# -------------------------------------------------------------------------
-#
-# These are areas we generally do NOT want in a lab-life-science PI sample.
-#
 ANTI_LEXICON = {
 
-    # ---------------------------------------------------------------
-    # economics / policy / health services
-    # ---------------------------------------------------------------
     "econom",
     "economi",
     "cost",
@@ -625,9 +467,6 @@ ANTI_LEXICON = {
     "poverti",
     "unemploy",
 
-    # ---------------------------------------------------------------
-    # education
-    # ---------------------------------------------------------------
     "school",
     "student",
     "colleg",
@@ -638,9 +477,6 @@ ANTI_LEXICON = {
     "literaci",
     "pedagog",
 
-    # ---------------------------------------------------------------
-    # social / behavioral science
-    # ---------------------------------------------------------------
     "psycholog",
     "psychologist",
     "psychotherap",
@@ -667,9 +503,6 @@ ANTI_LEXICON = {
 
     "marketing",
 
-    # ---------------------------------------------------------------
-    # humanities
-    # ---------------------------------------------------------------
     "music",
     "literatur",
     "religi",
@@ -677,9 +510,6 @@ ANTI_LEXICON = {
     "theolog",
     "philosoph",
 
-    # ---------------------------------------------------------------
-    # computational / statistical methods
-    # ---------------------------------------------------------------
     "algorithm",
     "softwar",
     "processor",
@@ -695,17 +525,11 @@ ANTI_LEXICON = {
     "bayesian",
     "regress",
 
-    # ---------------------------------------------------------------
-    # bibliometrics / publication metadata
-    # ---------------------------------------------------------------
     "bibliograph",
     "bibliometri",
     "citat",
     "scholar",
 
-    # ---------------------------------------------------------------
-    # physical sciences / engineering
-    # ---------------------------------------------------------------
     "semiconductor",
     "photovolta",
     "laser",
@@ -727,9 +551,6 @@ ANTI_LEXICON = {
     "aerodynam",
     "finit",
 
-    # ---------------------------------------------------------------
-    # general chemistry/materials: not sufficient for our target
-    # ---------------------------------------------------------------
     "polymer",
     "polym",
     "copolym",
@@ -743,12 +564,6 @@ ANTI_LEXICON = {
     "nanotub",
     "graphen",
 
-    # ---------------------------------------------------------------
-    # ecology / environmental / earth science
-    #
-    # These can be life science in a broad disciplinary sense, but the
-    # target here is laboratory life-science PIs.
-    # ---------------------------------------------------------------
     "ecolog",
     "ecosystem",
     "habitat",
@@ -769,9 +584,6 @@ ANTI_LEXICON = {
     "sediment",
     "soil",
 
-    # ---------------------------------------------------------------
-    # publisher / scraper junk
-    # ---------------------------------------------------------------
     "jama",
     "cooki",
     "forum",
@@ -780,12 +592,7 @@ ANTI_LEXICON = {
 }
 
 
-# -------------------------------------------------------------------------
-# HELPERS
-# -------------------------------------------------------------------------
-
 def parse_descriptions(path: str) -> dict[int, list[str]]:
-    """Read cluster descriptions and return {cluster_id: [ranked terms]}."""
     out = {}
 
     pat = re.compile(
@@ -823,41 +630,18 @@ def parse_descriptions(path: str) -> dict[int, list[str]]:
 
 
 def term_tokens(term: str) -> list[str]:
-    """
-    Tokenize a cluster term.
-
-    Exact token matching is intentional because the lexicons already contain
-    stemmed forms corresponding to the TF-IDF vocabulary.
-    """
     return re.findall(r"[a-z0-9]+", term.lower())
 
 
 def term_matches(term: str, lexicon: set[str]) -> bool:
-    """Return True if any token in term matches the lexicon exactly."""
     return any(tok in lexicon for tok in term_tokens(term))
 
 
 def rank_weight(rank: int) -> float:
-    """
-    Weight high-ranked cluster terms more heavily.
-
-    rank is zero-indexed.
-
-    sqrt decay is deliberately moderate:
-        rank 1  -> 1.00
-        rank 4  -> 0.50
-        rank 9  -> 0.33
-        rank 16 -> 0.25
-    """
     return 1.0 / math.sqrt(rank + 1)
 
 
 def score_terms(terms):
-    """
-    Score ranked cluster terms.
-
-    Returns matched terms and rank-weighted evidence in each category.
-    """
 
     hits = {
         "bench": [],
@@ -877,10 +661,6 @@ def score_terms(terms):
 
         w = rank_weight(rank)
 
-        # Categories are deliberately NOT mutually exclusive.
-        #
-        # E.g. a term could theoretically contain evidence belonging to
-        # multiple dimensions. We want to preserve that information.
 
         if term_matches(term, BENCH_CORE):
             hits["bench"].append(term)
@@ -908,18 +688,6 @@ def automatic_keep(
     min_bench_score: float,
     dominance_ratio: float,
 ):
-    """
-    Determine whether a cluster belongs to experimental life-science lab work.
-
-    Requirements
-    ------------
-    1. There must be real BENCH_CORE evidence.
-    2. It must reach a minimum rank-weighted strength.
-    3. Clinical + anti evidence cannot strongly dominate bench evidence.
-
-    BIO_CONTEXT helps us characterize the cluster but does not independently
-    qualify it.
-    """
 
     n_bench = len(hits["bench"])
 
@@ -931,7 +699,6 @@ def automatic_keep(
 
     nonlab_score = scores["clinical"] + scores["anti"]
 
-    # Strongly non-lab context can veto weak/incidental molecular language.
     if nonlab_score > dominance_ratio * scores["bench"]:
         return 0, "NONLAB_DOMINATES"
 
@@ -939,7 +706,6 @@ def automatic_keep(
 
 
 def validate_manual_worksheet(prior: pd.DataFrame):
-    """Fail loudly on malformed manual classification files."""
 
     required = {"cluster_label", "keep"}
 
@@ -979,10 +745,6 @@ def validate_manual_worksheet(prior: pd.DataFrame):
             f"`keep` must contain only 0/1. Found: {bad}"
         )
 
-
-# -------------------------------------------------------------------------
-# MAIN
-# -------------------------------------------------------------------------
 
 def main():
 
@@ -1055,9 +817,6 @@ def main():
         f"{OUT_DIR}/cluster_filter_audit_{args.k}.txt"
     )
 
-    # ------------------------------------------------------------------
-    # Validate inputs
-    # ------------------------------------------------------------------
 
     for p in (clusters_csv, desc_txt):
         if not os.path.exists(p):
@@ -1097,10 +856,6 @@ def main():
 
     descs = parse_descriptions(desc_txt)
 
-    # ------------------------------------------------------------------
-    # Crucial safety check:
-    # every assigned cluster must have a description.
-    # ------------------------------------------------------------------
 
     cluster_ids = set(df["cluster_label"].unique())
     description_ids = set(descs)
@@ -1120,9 +875,6 @@ def main():
             f"assigned authors: {sorted(extra_descriptions)}"
         )
 
-    # ------------------------------------------------------------------
-    # Score clusters
-    # ------------------------------------------------------------------
 
     rows = []
 
@@ -1199,8 +951,6 @@ def main():
 
     agg = pd.DataFrame(rows)
 
-    # Useful ranking for manual inspection:
-    # weak bench clusters and mixed clusters appear near one another.
     agg["lab_margin"] = (
         agg["bench_score"] -
         agg["nonlab_score"]
@@ -1223,9 +973,6 @@ def main():
         .reset_index(drop=True)
     )
 
-    # ------------------------------------------------------------------
-    # Manual worksheet
-    # ------------------------------------------------------------------
 
     manual = (
         os.path.exists(work_csv)
@@ -1251,7 +998,6 @@ def main():
             prior["cluster_label"]
         )
 
-        # Old worksheets can become stale when clustering changes.
         unknown_manual = (
             worksheet_clusters - cluster_ids
         )
@@ -1268,7 +1014,6 @@ def main():
             how="left",
         )
 
-        # New clusters get the heuristic call.
         agg["keep"] = (
             agg["keep"]
             .fillna(agg["keep_auto"])
@@ -1279,9 +1024,6 @@ def main():
 
         agg["keep"] = agg["keep_auto"]
 
-    # ------------------------------------------------------------------
-    # Save worksheet
-    # ------------------------------------------------------------------
 
     cols = [
         "cluster_label",
@@ -1330,9 +1072,6 @@ def main():
             f"{work_csv}"
         )
 
-    # ------------------------------------------------------------------
-    # Produce author-level life-science-lab mask
-    # ------------------------------------------------------------------
 
     keep_clusters = set(
         agg.loc[
@@ -1370,9 +1109,6 @@ def main():
         f"{len(cluster_ids) - len(keep_clusters):>7,}"
     )
 
-    # ------------------------------------------------------------------
-    # Audit
-    # ------------------------------------------------------------------
 
     with open(
         audit_txt,
@@ -1503,15 +1239,6 @@ def main():
         f"Saved {audit_txt}"
     )
 
-    # ------------------------------------------------------------------
-    # Borderline clusters for manual review
-    # ------------------------------------------------------------------
-    #
-    # These deserve inspection:
-    #
-    # 1. Kept automatically but have meaningful clinical/anti evidence.
-    # 2. Dropped despite having some bench evidence.
-    #
 
     borderline = agg[
         (

@@ -1,72 +1,3 @@
-"""
-Exposure variogram in TF-IDF text space.
-
-The holdout designs (5_holdout_stress, 5b_holdout_by_sim) ask "how well does the
-KNN predict a held-out anchor", which needs the held-out PI to have a usable
-neighbour and so silently conditions on the anchor set's own geometry. The
-object that actually governs imputation error is more primitive: how fast does
-agreement in exposure decay with text similarity? That is estimable from pairs.
-
-All C(208,2) = 21,528 anchor pairs contribute. Each pair gives one cosine
-similarity s_ij and one exposure gap e_i - e_j. Nobody is held out and nobody is
-dropped for being isolated -- an isolated PI simply contributes many
-low-similarity pairs, which is the informative part of the curve for a panel PI
-who also has no close donor.
-
-Estimated on the upper triangle:
-
-  semivariance   gamma(s) = 0.5 * E[(e_i - e_j)^2 | sim = s]
-  covariogram    C(s)     = E[(e_i - mu)(e_j - mu) | sim = s]
-  agreement      rho(s)   = C(s) / sigma^2
-
-Pooled over all pairs gamma equals Var(e) exactly (the sill), so the curve is
-anchored: rho -> 0 where text similarity carries no information about exposure.
-
-What the curve buys:
-
-  1. Expected error of imputing a panel PI whose best donor sits at similarity
-     s.  For a single donor, MSE = 2*gamma(s).  For weights w summing to one
-     over donors with target-donor similarities s_0k and donor-donor s_kl,
-        MSE(w) = 2 * sum_k w_k gamma(s_0k) - sum_kl w_k w_l gamma(s_kl),
-     the ordinary-kriging error variance.  Integrating that over the panel's
-     realized max-similarity distribution is the measurement error in the
-     exposure measure itself.
-  2. A principled choice of K and of the neighbour weights: minimizing MSE(w)
-     subject to sum(w) = 1 is the ordinary-kriging system, which replaces
-     "accuracy peaks at three".
-  3. A defensible sample cut.  Where rho(s) is flat at zero the imputation has
-     no signal at any K; the smallest s* at which rho is bounded away from zero
-     is the cut, in place of an arbitrary top-N% of max_sim.
-
-Two design choices follow the same logic.  Bins are the PANEL's max_sim
-quantiles, not the pair distribution's, so every reported point is a similarity
-level the panel actually occupies and the n column shows how much anchor-pair
-support that level has.  Models are fitted in the Euclidean chordal distance
-h = sqrt(2 - 2s), which is a genuine metric on the unit sphere the L2-normalized
-TF-IDF rows live on, so the exponential and spherical models are valid.
-
-Conditioning on the realized similarity is selection on the covariate, not on
-exposure, so gamma(s) read at a panel PI's max_sim is unbiased for that PI's
-1-donor error even though the donor was chosen as the argmax.
-
-Inference is a PI-level (cluster) bootstrap: pairs share PIs, so pair-level
-standard errors would be badly understated.  Each replicate resamples the 208
-PIs with replacement and rebuilds the curve; pairs formed from a duplicated PI
-against itself are dropped.
-
-Exposure is right-skewed, so the classical squared-gap estimator is reported
-alongside the Cressie-Hawkins robust estimator, which downweights the few
-extreme PIs that would otherwise drive gamma.
-
-Outputs (under ../../output):
-  exposure_variogram_pairs_{stem}.csv       one row per anchor pair
-  exposure_variogram_bins_{stem}.csv        binned curve, both binning schemes
-  exposure_variogram_threshold_{stem}.csv   rho(s >= s*) scan with CIs
-  exposure_variogram_ksweep_{stem}.csv      K x weight-scheme implied error
-  exposure_variogram_fit_{stem}.json        fitted model parameters
-  exposure_variogram_summary_{stem}.txt     headline numbers
-  figures/exposure_variogram_{stem}.png     curve, threshold scan, K sweep
-"""
 import argparse
 import json
 import os
@@ -85,22 +16,15 @@ OUT_DIR = "../../output"
 FIG_DIR = f"{OUT_DIR}/figures"
 EXPOSURE_DIR = "../../external/exposure_wts"
 
-
 def _norm_tag(tag):
     if tag and not tag.startswith("_"):
         return "_" + tag
     return tag or ""
 
-
 def chordal(s):
-    """Euclidean distance between L2-normalized vectors with cosine s."""
     return np.sqrt(np.maximum(2.0 - 2.0 * np.asarray(s, float), 0.0))
 
-
-# ---------------------------------------------------------------- estimation
-
 def pair_frame(e, S, idx):
-    """Upper-triangle pair arrays for the PI subset `idx` (bootstrap-safe)."""
     sub_e = e[idx]
     a, b = np.triu_indices(len(idx), 1)
     keep = idx[a] != idx[b]
@@ -115,9 +39,7 @@ def pair_frame(e, S, idx):
         "a": a, "b": b,
     }
 
-
 def bin_curve(pf, edges):
-    """Binned semivariance / covariogram. Empty bins come back NaN."""
     nb = len(edges) - 1
     k = np.clip(np.digitize(pf["sim"], edges) - 1, 0, nb - 1)
     gap, prod, sim = pf["gap"], pf["prod"], pf["sim"]
@@ -130,7 +52,6 @@ def bin_curve(pf, edges):
     smean = np.bincount(k, weights=sim, minlength=nb) / safe
     aad = np.bincount(k, weights=np.abs(gap), minlength=nb) / safe
 
-    # Cressie-Hawkins: robust to the heavy right tail of exposure.
     with np.errstate(invalid="ignore", divide="ignore"):
         ch = absr ** 4 / (2.0 * (0.457 + 0.494 / safe))
 
@@ -145,9 +66,7 @@ def bin_curve(pf, edges):
         "mad": aad,
     }
 
-
 def bootstrap_curves(e, S, edges, thresh_grid, B, seed):
-    """PI-level cluster bootstrap of the binned curve and the threshold scan."""
     n = len(e)
     rng = np.random.default_rng(seed)
     nb, nt = len(edges) - 1, len(thresh_grid)
@@ -169,9 +88,7 @@ def bootstrap_curves(e, S, edges, thresh_grid, B, seed):
 
     return g_reps, r_reps, t_reps, slope_reps
 
-
 def threshold_rho(pf, grid):
-    """rho among pairs at or above each cutoff. Cumulative from the top."""
     order = np.argsort(-pf["sim"])
     s_sorted = pf["sim"][order]
     p_cum = np.cumsum(pf["prod"][order])
@@ -181,16 +98,11 @@ def threshold_rho(pf, grid):
     out[ok] = p_cum[counts[ok] - 1] / counts[ok] / pf["var"]
     return out
 
-
 def gap2_slope(pf):
-    """OLS slope of squared gap on similarity. Negative = agreement rises."""
     s, y = pf["sim"], pf["gap"] ** 2
     sc = s - s.mean()
     denom = float(sc @ sc)
     return float(sc @ (y - y.mean()) / denom) if denom > 0 else np.nan
-
-
-# --------------------------------------------------------------- model fit
 
 def gamma_model(h, c0, c1, a, kind):
     h = np.asarray(h, float)
@@ -203,9 +115,7 @@ def gamma_model(h, c0, c1, a, kind):
         raise ValueError(kind)
     return np.where(h <= 1e-12, 0.0, g)
 
-
 def fit_model(sim_mean, gamma, n, sill, kind):
-    """Weighted least squares on the binned curve, weights = pair counts."""
     m = np.isfinite(sim_mean) & np.isfinite(gamma) & (n > 0)
     h, g, w = chordal(sim_mean[m]), gamma[m], np.sqrt(n[m])
 
@@ -234,14 +144,10 @@ def fit_model(sim_mean, gamma, n, sill, kind):
         "n_bins_used": int(m.sum()),
     }
 
-
-# ------------------------------------------------------------ K and weights
-
 def production_weights(s0, sharpen, floor):
     v = np.where(s0 >= floor, s0, 0.0).astype(float) ** sharpen
     tot = v.sum()
     return v / tot if tot > 0 else np.full(len(s0), 1.0 / len(s0))
-
 
 def ok_weights(Gam, g0):
     k = len(g0)
@@ -256,14 +162,7 @@ def ok_weights(Gam, g0):
         sol = np.linalg.lstsq(A, rhs, rcond=None)[0]
     return sol[:k], float(sol[k])
 
-
 def anchor_ksweep(e, S, gfun, ks, sharpen, floor):
-    """Each anchor as a pseudo-target against the other 207.
-
-    Error variances are model-implied, not holdout residuals: the ranking of K
-    and of weight schemes comes from the fitted variogram, so an anchor with no
-    close neighbour still contributes rather than being dropped.
-    """
     n = len(e)
     Sm = S.copy()
     np.fill_diagonal(Sm, -np.inf)
@@ -293,21 +192,8 @@ def anchor_ksweep(e, S, gfun, ks, sharpen, floor):
             })
     return pd.DataFrame(rows)
 
-
 def sample_profile_from_weights(weight_npz, universe_ids_parquet, sample_ids,
                                 max_sim_by_id, sharpen):
-    """Exact donor set, production weights, and target-donor similarities for
-    each analysis-sample PI, read off the production weight matrix.
-
-    Production weights are w_k proportional to s_k^sharpen over donors above the
-    floor, then L1-normalized, so the similarity profile inverts exactly:
-        s_k = s_max * (w_k / w_max) ** (1 / sharpen),  s_max = max_sim.
-    Donors below the floor carry zero weight and drop out of the predictor
-    entirely, so their unrecoverable similarities never enter the error.
-
-    This is the profile K=3 actually draws on -- first-, second- and
-    third-nearest -- rather than max_sim alone.
-    """
     W = scipy.sparse.load_npz(weight_npz).tocsr()
     uids = pd.read_parquet(universe_ids_parquet)["athr_id"].astype(str)
     pos = pd.Series(np.arange(len(uids)), index=uids.to_numpy())
@@ -338,10 +224,7 @@ def sample_profile_from_weights(weight_npz, universe_ids_parquet, sample_ids,
         groups[int(k)] = {"sel": sel, "don": don, "w": w, "s0": s0}
     return groups, kept, int((~have).sum()), int((nnz == 0).sum())
 
-
 def profile_mse(don, w, s0, Saa, gfun, chunk=4000):
-    """Model-implied error variance for the supplied weights and for the
-    ordinary-kriging weights on the same donor set."""
     n, k = don.shape
     mp = np.empty(n)
     mo = np.empty(n)
@@ -372,14 +255,7 @@ def profile_mse(don, w, s0, Saa, gfun, chunk=4000):
         neg[a:b] = (wk < 0).mean(1)
     return mp, mo, neg
 
-
 def grid_reweight(anchor_vals, anchor_sim, panel_sim, width):
-    """Average `anchor_vals` over the panel's max_sim distribution.
-
-    Anchors are binned on a fixed similarity grid; each bin's mean is weighted
-    by the panel's mass in that bin. Bins with no anchor support are excluded
-    and their panel mass is reported as uncovered.
-    """
     hi = max(float(np.max(anchor_sim)), float(np.max(panel_sim))) + width
     edges = np.arange(0.0, hi + width, width)
     nb = len(edges) - 1
@@ -398,9 +274,6 @@ def grid_reweight(anchor_vals, anchor_sim, panel_sim, width):
         return np.nan, 0.0
     return float(np.average(bin_mean[covered], weights=mass)), float(mass.sum())
 
-
-# ------------------------------------------------------------------- panel
-
 def load_panel_sims(panel_csv, diag_parquet, foia_ids):
     panel = pd.read_csv(panel_csv, usecols=["athr_id"], dtype={"athr_id": str})
     panel = panel.drop_duplicates("athr_id")
@@ -412,9 +285,6 @@ def load_panel_sims(panel_csv, diag_parquet, foia_ids):
     if n_miss:
         print(f"  WARN: {n_miss:,} panel PIs missing from diagnostics; dropped.")
     return panel.dropna(subset=["max_sim"])["max_sim"].to_numpy(np.float64)
-
-
-# ------------------------------------------------------------------ figure
 
 def make_figure(bins_panel, thr, ks_summary, pair_sim, panel_sims, fit, sill,
                 gfun, out_png, stem, prod_k, exact=None, pop="panel"):
@@ -502,9 +372,6 @@ def make_figure(bins_panel, thr, ks_summary, pair_sim, panel_sims, fit, sill,
     fig.savefig(out_png, dpi=150, bbox_inches="tight")
     print(f"Saved {out_png}")
 
-
-# --------------------------------------------------------------------- main
-
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--tag", default="",
@@ -553,7 +420,6 @@ def main():
         raise SystemExit(f"missing: {args.diag_parquet}")
     os.makedirs(FIG_DIR, exist_ok=True)
 
-    # ---- anchors
     X = scipy.sparse.load_npz(foia_matrix).tocsr().astype(np.float64)
     foia_ids = pd.read_csv(foia_ids_csv,
                            dtype={"athr_id": str})["athr_id"].tolist()
@@ -587,7 +453,6 @@ def main():
         raise SystemExit(f"identity check failed: pooled gamma {pooled_gamma} "
                          f"!= sill {sill}")
 
-    # ---- panel
     panel_ids = None
     if args.panel_dta:
         d = pd.read_stata(args.panel_dta,
@@ -607,7 +472,6 @@ def main():
     print(f"Panel: {len(panel_sims):,} PIs   max_sim p10/p25/p50/p75/p90 = "
           + "/".join(f"{v:.3f}" for v in pq))
 
-    # ---- binning: panel quantiles, so every point is a level the panel occupies
     inner = np.unique(np.percentile(panel_sims,
                                     np.linspace(0, 100, args.n_bins + 1)))
     edges_panel = np.unique(np.concatenate(
@@ -616,8 +480,6 @@ def main():
                                          np.linspace(0, 100, args.n_bins + 1)))
     edges_pair[0], edges_pair[-1] = 0.0, edges_pair[-1] + 1e-9
 
-    # Cutoffs span both distributions: the panel's upper tail reaches past the
-    # pair distribution's, and that is where a cut would bind.
     thr_grid = np.unique(np.round(np.concatenate([
         np.percentile(pf["sim"], np.linspace(1, 99, 60)),
         np.percentile(panel_sims, np.linspace(5, 99, 20)),
@@ -649,7 +511,6 @@ def main():
     bins_panel["panel_share"] = [
         float(np.mean((panel_sims >= lo) & (panel_sims < hi)))
         for lo, hi in zip(edges_panel[:-1], edges_panel[1:])]
-    # The panel's top tail runs past the anchors', leaving empty top bins.
     bins_panel = bins_panel[bins_panel["n_pairs"] > 0].reset_index(drop=True)
     bins_panel["n_pairs"] = bins_panel["n_pairs"].astype(int)
 
@@ -672,7 +533,6 @@ def main():
                        "gamma", "rho_cov", "rho_lo", "rho_hi"]]
     print(show.to_string(index=False, float_format=lambda v: f"{v:9.4f}"))
 
-    # ---- model fit on the evenly-supported pair-quantile bins
     fits = [f for f in (fit_model(cur_pair["sim_mean"], cur_pair["gamma"],
                                   cur_pair["n"], sill, kind)
                         for kind in ("exponential", "spherical")) if f]
@@ -683,9 +543,6 @@ def main():
                                  fit["range"], fit["kind"])
     n_high = int((pf["sim"] > 0.5).sum())
     h_span = float(chordal(pf["sim"].min()) - chordal(pf["sim"].max()))
-    # Beyond the observed distance span the model never reaches its sill, so
-    # nugget / psill / range trade off against each other and only the fitted
-    # curve inside support is meaningful.
     range_unidentified = fit["range"] > chordal(pf["sim"].min())
     fit["range_unidentified"] = bool(range_unidentified)
     fit["h_span_observed"] = h_span
@@ -696,7 +553,6 @@ def main():
         print("  WARN: fitted range exceeds the observed distance span; read "
               "the curve, not the parameters.")
 
-    # ---- threshold scan
     panel_share_above = np.array([float(np.mean(panel_sims >= s))
                                   for s in thr_grid])
     thr = pd.DataFrame({
@@ -708,9 +564,6 @@ def main():
     })
     thr["panel_pct_cut"] = 100.0 * thr["panel_share_above"]
 
-    # Smallest cutoff from which agreement stays bounded away from zero all the
-    # way up. Cutoffs with too few pairs to estimate are excluded rather than
-    # counted as failures, otherwise the thin top tail always breaks the run.
     valid = thr[np.isfinite(thr["rho_lo"])].reset_index(drop=True)
     s_star, share_star = np.nan, np.nan
     if len(valid):
@@ -724,7 +577,6 @@ def main():
     slope = gap2_slope(pf)
     slope_lo, slope_hi = pct(slope_reps, [2.5, 97.5])
 
-    # ---- K and weights
     print("Sweeping K with model-implied error ...")
     ks = anchor_ksweep(e, S, gfun, args.k_grid, args.sharpen, args.floor)
     anchor_max_sim = ks.groupby("i")["max_sim"].first().to_numpy()
@@ -755,11 +607,8 @@ def main():
                       "rel_ok", "ok_neg_share"]]
           .to_string(index=False, float_format=lambda v: f"{v:9.4f}"))
 
-    # ---- exact production error over the sample's own donor profiles
     exact = None
     if panel_ids is not None and n_miss:
-        # Weight-matrix columns index the original anchor order; dropping an
-        # anchor for missing exposure would silently misalign every donor id.
         print("  SKIP exact donor profiles: anchors were dropped for missing "
               "exposure, so weight-matrix columns no longer align.")
     elif panel_ids is not None and os.path.exists(args.weight_npz):
@@ -795,7 +644,6 @@ def main():
         print(f"  sample PIs with donors: {exact['n']:,}  "
               f"(no universe row: {n_nomatch}, zero weights: {n_zero})")
 
-    # ---- integrate over the panel's realized max_sim distribution
     g_panel = gfun(panel_sims)
     rho_panel = 1.0 - g_panel / sill
     mse_1nn = float(np.mean(2.0 * g_panel))
@@ -943,7 +791,6 @@ def main():
     for p in ("pairs", "bins", "threshold", "ksweep", "summary"):
         ext = "txt" if p == "summary" else "csv"
         print(f"Saved {OUT_DIR}/exposure_variogram_{p}_{stem}.{ext}")
-
 
 if __name__ == "__main__":
     main()

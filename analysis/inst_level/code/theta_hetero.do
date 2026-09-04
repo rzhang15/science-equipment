@@ -7,34 +7,6 @@ set scheme modern
 set linesize 200
 set maxvar 20000
 
-* ============================================================================
-* What explains institution-specific exposure responses.
-*
-* Takes the SPEC 2 estimates from analysis.do as given -- no PPML is run here.
-* Spec 2 is
-*   E[Y_it] = exp(a_i + d_t + b*Z_it + g*Zs_it + pi_j*Post_t + beta_j*Z_it)
-* so beta_j is institution j's exposure slope net of its own post-2014 level
-* shift pi_j. Carrying pi_j is what makes beta_j interpretable: without it,
-* beta_j would also absorb any institution that simply lost output after 2014.
-*
-* beta_inst = beta_j, se_inst = se_beta, both read from
-* ../output/inst_effects.dta. inst_ord 1 is the omitted reference, so
-* beta_inst is a deviation from the median-output institution. The level
-* slope b + beta_j is also on file; every second-stage delta below is
-* identical on either scale (they differ by the constant b) -- only the
-* intercept moves -- but the weights are not, and the plan specifies
-* 1/se_inst^2 on beta_inst.
-*
-* STEP 4  beta_inst = Z'delta + e, inverse-variance weighted OLS, Z the 31
-*         standardized characteristics. Exhibit: all 31 coefficients.
-* STEP 5  Elastic net on the same y and Z, alpha and lambda by CV. Exhibit:
-*         selected variables and signs, plus CV curve and coefficient path.
-* STEP 6  Random forest on the same y and Z, via rf_theta.py -- tuned by
-*         5-fold CV, honest OOS R2/RMSE from an outer fold, SHAP values.
-*         Neither rforest nor pystacked is installed and Stata has no forest.
-*
-* Steps 4-6 share ONE complete-case sample so the three answers compare.
-* ============================================================================
 
 global SAMPLE    es_all_jrnls_r1_r2
 global MIN_PI    10
@@ -59,7 +31,6 @@ program main
     log close
 end
 
-* ====================================================== spec 2 estimates in
 program load_effects
     confirm file ../output/inst_effects.dta
     use ../output/inst_effects.dta, clear
@@ -67,8 +38,6 @@ program load_effects
         pi_j se_pi beta_j se_beta slope se_slope base report
     rename (beta_j se_beta) (beta_inst se_inst)
 
-    * base's 0 is structural and ppmlhdfe returns collinear-dropped terms as an
-    * exact 0 with se 0; both are excluded.
     keep if report & !base & !mi(beta_inst) & se_inst > 0 & !mi(se_inst)
     qui count
     global NJ = r(N)
@@ -86,13 +55,6 @@ program load_effects
     save ../temp/beta_inst.dta, replace
 end
 
-* =========================================================== characteristics
-* 31 characteristics in five concept groups. Levels are logged, composition
-* enters as shares so scale is not counted twice. HERD carries no direct
-* procurement or overhead measure -- contract / subrecipient funding is the
-* closest proxy and is labelled as such. Health-sciences and medical-school
-* fields are on file but sit below the coverage floor, so they are excluded
-* by construction rather than dropped later.
 program char_groups
     global G1 ln_endowment ln_tot_fund shr_fed_fund shr_state_fund ///
               shr_inst_fund shr_bus_fund shr_nonprof_fund
@@ -200,9 +162,6 @@ program build_chars
     save ../temp/chars_wide.dta, replace
 end
 
-* panel.dta is analysis.do's; rebuild it only if make.py wiped ../temp and
-* analysis.do ran with REUSE_PANEL, in which case inst_base has to be
-* reconstructed the same way (modal pre-2014 institution per PI).
 program ensure_panel
     cap confirm file ../temp/panel.dta
     if _rc == 0 exit 0
@@ -221,7 +180,6 @@ program ensure_panel
     save ../temp/panel.dta, replace
 end
 
-* ============================================ common sample + standardization
 program make_sample
     char_groups
     use ../temp/beta_inst.dta, clear
@@ -295,7 +253,6 @@ program make_sample
         using ../temp/theta_chars.csv, replace
 end
 
-* ============================================================ step 4 -- WLS
 program step4_wls
     char_groups
     use ../temp/step_sample.dta, clear
@@ -344,12 +301,6 @@ program step4_wls
         xtitle("Change in {&beta}{sub:inst} per 1 SD of characteristic")
 end
 
-* ==================================================== step 5 -- elastic net
-* Elastic net rather than pure LASSO: the characteristics are strongly
-* correlated and LASSO keeps one member of a correlated block arbitrarily.
-* lasso/elasticnet take iweights, not aweights, so w_prec is rescaled to mean
-* 1 -- that leaves the weighted objective unchanged and keeps lambda on a
-* comparable scale.
 program step5_enet
     char_groups
     use ../temp/step_sample.dta, clear
@@ -357,11 +308,7 @@ program step5_enet
     gen double w_i = w_prec / r(mean)
 
     di as text _n "===== STEP 5: elastic net, alpha and lambda by cross-validation ====="
-    * $ZALL is unparenthesized: parentheses would mark the characteristics as
-    * always-included and there would be nothing left to select over.
-    * alllambdas traces the whole grid instead of stopping at the first CV
-    * minimum, so the CV curve and the coefficient path are complete even when
-    * the minimum sits at the null model.
+    * $ZALL unparenthesized: parentheses would mark every characteristic always-included
     cap noi elasticnet linear beta_inst $ZALL [iweight = w_i], ///
         alpha(0.25 0.5 0.75 1) selection(cv, alllambdas) rseed($RSEED) nolog
     if _rc {
@@ -414,8 +361,6 @@ program step5_enet
     enet_post_ols
 end
 
-* Nonzero entries of e(b). Read off the coefficient vector rather than
-* e(post_sel_vars), which returns the dependent variable, not the covariates.
 program enet_selected
     mat L = e(b)
     global ENET_SEL ""
@@ -427,9 +372,6 @@ program enet_selected
     di as text "nonzero coefficients (" wordcount("$ENET_SEL") "): $ENET_SEL"
 end
 
-* Walk down the path at the CV-selected alpha to the first knot carrying at
-* least TARGET nonzero coefficients. Refitting with a single alpha keeps the
-* knot table to one block, so the first qualifying row is unambiguous.
 program enet_entry
     local a = $ENET_A
     if mi(`a') local a = 1
@@ -511,7 +453,6 @@ program enet_post_ols
     regress beta_inst $ENET_SEL [aweight = w_prec], robust
 end
 
-* =================================================== step 6 -- random forest
 program step6_rf
     char_groups
     di as text _n "===== STEP 6: random forest with SHAP (rf_theta.py) ====="
@@ -574,10 +515,6 @@ program step6_rf
         xtitle("Mean |SHAP| (units of {&beta}{sub:inst})")
 end
 
-* ============================================================ shared plotter
-* One colour throughout; concept groups are distinguished by marker symbol and
-* separated by a blank band on the y axis. Legend sits below the plot region
-* (ring(1)) so it never covers a coefficient.
 program coefplot_grouped
     syntax, using(string) name(string) [xtitle(string) points note(string)]
     preserve
@@ -604,8 +541,6 @@ program coefplot_grouped
 
         local pl ""
         if "`points'" == "" local pl (rcap lo hi ord, horizontal lcolor(gs11) lwidth(vthin))
-        * symbol is keyed to gnum, not to legend position, so a concept group
-        * keeps the same marker across exhibits even when it is absent from one
         local syms O T S D X Oh
         local lgd ""
         local k = 0
@@ -634,7 +569,6 @@ program coefplot_grouped
     restore
 end
 
-* =============================================================== text tables
 program output_tables
     cap confirm matrix WLS
     if !_rc {

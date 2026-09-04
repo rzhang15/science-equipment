@@ -1,14 +1,3 @@
-"""Step 6: random forest on institution-specific exposure responses.
-
-Reads ../temp/theta_chars.csv (written by theta_hetero.do, so the sample and
-the standardized characteristics are identical to steps 4-5), tunes a weighted
-forest by 5-fold CV, scores it out of sample on an outer fold, and writes SHAP
-values back for Stata to plot.
-
-Neither rforest nor pystacked is installed and Stata has no native forest, so
-this runs under the system python3.
-"""
-
 import os
 import sys
 
@@ -22,8 +11,6 @@ from sklearn.inspection import permutation_importance
 from sklearn.model_selection import GridSearchCV, KFold
 
 SEED = 90210
-# joblib reads cpu_count(), which is 1 inside the cgroup on the login node and
-# would silently serialize the grid; the affinity mask is the real allocation.
 NJOBS = len(os.sched_getaffinity(0))
 SRC = "../temp/theta_chars.csv"
 OUT_IMP = "../temp/rf_importance.csv"
@@ -82,10 +69,6 @@ print(f"random forest: n = {n} institutions, p = {p} characteristics", flush=Tru
 if n < 60:
     print("WARNING: thin sample; treat the forest as descriptive only", flush=True)
 
-# ------------------------------------------------------------------ tuning
-# Depth and leaf size are the binding hyperparameters at n in the low
-# hundreds -- deep trees on ~100 rows memorize, so the grid is deliberately
-# shallow-leaning and n_estimators is only large enough to stabilize.
 grid = {
     "n_estimators": [300, 1000],
     "max_depth": [2, 3, 5, None],
@@ -108,10 +91,6 @@ print(f"  best inner CV R2 = {search.best_score_:8.4f}", flush=True)
 
 rf = search.best_estimator_
 
-# --------------------------------------------------------------- performance
-# The tuned model's own CV score is optimistic (the grid was picked on it), so
-# out-of-sample fit is taken from predictions made by a forest that never saw
-# the held-out institution, with the tuning held fixed.
 outer = KFold(n_splits=5, shuffle=True, random_state=SEED + 1)
 yhat = np.empty_like(y)
 for tr, te in outer.split(X):
@@ -149,7 +128,6 @@ pd.DataFrame(
     }
 ).to_csv(OUT_MET, index=False)
 
-# --------------------------------------------------------------------- SHAP
 import shap  # noqa: E402
 
 expl = shap.TreeExplainer(rf)

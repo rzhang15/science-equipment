@@ -1,35 +1,3 @@
-"""
-Grid sweep over LR hyperparameters and decision threshold to find a better
-operating point for a chosen embedding (tfidf / minilm / specter2).
-
-Reuses the existing embeddings on disk (no 1b refit) and the same stratified
-hold-out split that 2_train_binary_classifier.py uses (random_state=42,
-test_size=0.2).  Sweeps:
-  - LogisticRegression C
-  - LogisticRegression class_weight
-  - decision threshold (corresponds to config.PREDICTION_THRESHOLD at
-    inference time)
-
-Writes the full results table to
-output/<variant>/param_sweep_results_<model>.csv and prints the top
-configurations by macro F1.
-
-Usage:
-    PIPELINE_VARIANT=umich_supplier python sweep_params.py tfidf
-    PIPELINE_VARIANT=umich_supplier python sweep_params.py minilm
-
-After picking a winner, update:
-  - C and class_weight   -> 2_train_binary_classifier.py (the LR call)
-  - threshold            -> config.PREDICTION_THRESHOLD
-and rerun 2 / 3 / 5 to confirm the gain transfers through the hybrid model.
-
-Caveat: this sweep evaluates the raw LR head, not the full HybridClassifier
-(seed/anti-seed/supplier-prior overrides are not applied).  It identifies
-the LR operating point most likely to be a good foundation; the hybrid
-overrides will then further refine it.  See conversation transcript for
-the script-2 vs sweep number divergence: rule-decided rows are unchanged
-by LR tuning.
-"""
 import os
 import argparse
 import joblib
@@ -66,13 +34,12 @@ def main(embedding_name):
     y_test  = df_test['label'].values
     print(f"  Train: {X_train.shape[0]:>6}  Test: {X_test.shape[0]:>6}\n")
 
-    # Grid — tune these if the first sweep suggests a different neighborhood
     Cs = [0.3, 1.0, 3.0, 10.0]
     class_weights = [
         ('balanced',     'balanced'),
         ('equal',        {0: 1.0, 1: 1.0}),
-        ('precision_++', {0: 1.5, 1: 1.0}),  # punish FP harder
-        ('recall_++',    {0: 1.0, 1: 1.5}),  # punish FN harder
+        ('precision_++', {0: 1.5, 1: 1.0}),
+        ('recall_++',    {0: 1.0, 1: 1.5}),
     ]
     thresholds = [0.4, 0.5, 0.6, 0.7, 0.8]
 
@@ -106,7 +73,6 @@ def main(embedding_name):
     print("Top 15 by macro F1:")
     print(df_results.head(15).to_string(index=False))
 
-    # Current production config for reference
     cur_thr = getattr(config, 'PREDICTION_THRESHOLD', 0.7)
     print(f"\nCurrent production: C=1.0, class_weight='balanced', threshold={cur_thr}")
     cur = df_results[

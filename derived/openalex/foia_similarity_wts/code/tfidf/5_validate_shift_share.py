@@ -1,47 +1,3 @@
-"""
-Shift-share imputation validation exhibits (KNN k=3, hc + _cf).
-
-Produces five referee-ready exhibits from the ONE object that matters:
-S_hat = W @ S (universe x 46), imputed pre-period share matrix.
-
-  E1  Leave-one-FOIA-out (LOFO) cross-validation of KNN
-      For each of the 208 FOIAs, hold out, rebuild top-k on remaining 207,
-      predict held-out shares. Report cell-level + PI-level-exposure metrics
-      overall and by max_sim_to_train quintile. Scatter of predicted vs
-      actual z = S @ g at the PI level.
-
-  E2  Baseline comparison (same LOFO folds, different smoothers)
-      Compare KNN(k=3) against: grand-mean, k=30-cluster-mean,
-      KNN(k=1), KNN(k=5), KNN(k=10). Table of PI-level metrics.
-
-  E3  Support diagnostics on the universe (under _cf filter)
-      Histograms (as CSV) of max_sim and 3rd-neighbor sim. From the LOFO
-      results, coverage-vs-accuracy curve: RMSE binned by max_sim.
-
-  E4  Placebo (shuffled-share LOFO)
-      Randomly permute FOIA rows of S so each FOIA gets another's shares.
-      Re-run LOFO KNN, show PI-level exposure R2 collapses. Evidence that
-      the neighbor structure carries the signal (not baseline levels).
-
-  E5  Face-validity table (stratified by max_sim quintile)
-      Under _cf, pick 2 universe PIs per quintile. For each: list its 3
-      FOIA neighbors and each neighbor's top-5 TF-IDF terms. Reproducible
-      via --seed.
-
-Uses the production KNN recipe (top-k + floor + sharpen^p + L1-norm) so the
-LOFO speaks to the same object 4_impute_shift_share.py produces.
-
-Outputs (under ../../output/validation/):
-  E1  lofo_pi_hc_cf_k3.csv                 per-FOIA (true_z, pred_z, max_sim,...)
-      lofo_cell_hc_cf_k3.csv               per-market cell RMSE / n_nonzero
-      lofo_summary_hc_cf_k3.txt            headline numbers
-  E2  baselines_pi_hc_cf.csv               method x PI-metric table
-  E3  support_hist_hc_cf.csv               max_sim + 3rd-sim histograms
-      coverage_vs_rmse_hc_cf_k3.csv        LOFO RMSE by max_sim quintile
-  E4  placebo_pi_hc_cf_k3.csv              PI-level metrics (shuffled)
-      placebo_summary_hc_cf_k3.txt         headline
-  E5  face_validity_hc_cf_k3.csv           universe PI + 3 neighbors + terms
-"""
 import argparse
 import os
 import pickle
@@ -64,11 +20,6 @@ CATEGORY_RENAMES = {
     "acrylamide/bis solution": "acrylamide-bis solution",
     "dmem/f-12": "dmem-f-12",
 }
-
-
-# --------------------------------------------------------------------------- #
-# Shared loaders                                                              #
-# --------------------------------------------------------------------------- #
 
 def load_shocks(path):
     df = pd.read_stata(path)
@@ -97,9 +48,6 @@ def build_share_matrix(share_path, foia_ids, market_index):
 
 
 def apply_cf_filter(df_univ, W, cluster_path, foia_ids, min_n=1):
-    """Cluster-filter the universe: drop universe authors whose k=30 cluster
-    has fewer than min_n FOIA anchors. Matches 4_impute_shift_share.py's
-    apply_filters logic. Returns (keep_mask, cl_df)."""
     cl = pd.read_csv(cluster_path)
     cl["athr_id"] = cl["athr_id"].astype(str)
     if "cluster_label" not in cl.columns:
@@ -114,22 +62,14 @@ def apply_cf_filter(df_univ, W, cluster_path, foia_ids, min_n=1):
     mask = m["cluster_label"].notna() & m["cluster_label"].isin(kept)
     return mask.to_numpy(), cl
 
-
-# --------------------------------------------------------------------------- #
-# KNN prediction (mirrors 2_similarity_wts.process_batch exactly)             #
-# --------------------------------------------------------------------------- #
-
 def knn_predict(sim, S_train, k, sharpen, floor):
-    """sim: (n_test, n_train) cosine. S_train: (n_train, M) shares.
-    Returns (S_pred, max_sim_to_train, sim_at_k). Applies floor -> sharpen ->
-    L1-norm exactly like production."""
     n_test, n_train = sim.shape
     k = min(k, n_train)
     topk = np.argpartition(-sim, k - 1, axis=1)[:, :k]
     r = np.arange(n_test)[:, None]
     vals = sim[r, topk].copy()
     max_sim = sim.max(axis=1)
-    sim_at_k = vals.min(axis=1)          # k-th neighbor sim (worst kept)
+    sim_at_k = vals.min(axis=1)
     vals = np.where(vals >= floor, vals, 0.0)
     if sharpen != 1.0:
         vals = np.where(vals > 0, np.power(vals, sharpen), 0.0)
@@ -142,14 +82,7 @@ def knn_predict(sim, S_train, k, sharpen, floor):
         S_pred[i] = w[i] @ S_train_dense[topk[i]]
     return S_pred, max_sim, sim_at_k
 
-
-# --------------------------------------------------------------------------- #
-# LOFO driver                                                                 #
-# --------------------------------------------------------------------------- #
-
 def lofo_folds(n, n_folds, rng):
-    """Yield (test_idx, train_idx). If n_folds >= n: leave-one-out.
-    Else: K-fold shuffled."""
     perm = rng.permutation(n)
     if n_folds >= n:
         for i in range(n):
@@ -167,13 +100,11 @@ def lofo_folds(n, n_folds, rng):
 
 def run_lofo(X_foia, S, g, k, sharpen, floor, n_folds, rng,
              method="knn", clusters=None):
-    """Run LOFO for one smoother. Returns per-FOIA DataFrame with
-    (fold, foia_row, true_z, pred_z, max_sim, sim_at_k, cell_l1)."""
     n = X_foia.shape[0]
     M = S.shape[1]
     S_dense = S.toarray()
     true_z = np.asarray(S @ g).ravel()
-    Xn = X_foia.astype(np.float32)     # rows already L2-normalized by 1_vectorize
+    Xn = X_foia.astype(np.float32)
 
     rows = []
     for test_idx, train_idx in lofo_folds(n, n_folds, rng):
@@ -243,8 +174,6 @@ def pi_metrics(df):
 
 def cell_metrics(lofo_df, S, X_foia, foia_ids, market_index, g,
                  k, sharpen, floor, n_folds, rng):
-    """Recompute LOFO holding cell-level residuals per market. Cheap: just
-    aggregate S_pred - S over the same folds. Returns per-market DataFrame."""
     n = X_foia.shape[0]
     M = S.shape[1]
     S_dense = S.toarray()
@@ -269,18 +198,8 @@ def cell_metrics(lofo_df, S, X_foia, foia_ids, market_index, g,
         "g": g,
     })
 
-
-# --------------------------------------------------------------------------- #
-# E3 support diagnostics                                                      #
-# --------------------------------------------------------------------------- #
-
 def support_hist(diag_df, keep_mask, k, bins=25):
-    """Return DataFrame with max_sim + sim_at_k histograms on the _cf universe."""
     d = diag_df.loc[keep_mask].copy()
-    # max_sim already computed. Third-neighbor sim would need the raw sim
-    # matrix. We approximate with mean_topk_sim if k matches — but honest
-    # option: use max_sim only for E3 histogram (the LOFO sim_at_k covers
-    # k-th neighbor behavior).
     max_edges = np.linspace(0, max(d["max_sim"].max(), 0.5), bins + 1)
     max_h, _ = np.histogram(d["max_sim"], bins=max_edges)
     mean_edges = np.linspace(0, max(d["mean_topk_sim"].max(), 0.5), bins + 1)
@@ -296,7 +215,6 @@ def support_hist(diag_df, keep_mask, k, bins=25):
 
 
 def coverage_vs_rmse(lofo_df, n_bins=5):
-    """LOFO cell-l1 error binned by max_sim quintile."""
     q = np.quantile(lofo_df["max_sim"], np.linspace(0, 1, n_bins + 1))
     lofo_df = lofo_df.copy()
     lofo_df["sim_bin"] = np.digitize(lofo_df["max_sim"], q[1:-1])
@@ -317,17 +235,8 @@ def coverage_vs_rmse(lofo_df, n_bins=5):
         })
     return pd.DataFrame(rows)
 
-
-# --------------------------------------------------------------------------- #
-# E5 face-validity                                                            #
-# --------------------------------------------------------------------------- #
-
 def face_validity_table(X_univ, X_foia, W, universe_ids, foia_ids,
                         feature_names, keep_mask, k, per_quintile, rng):
-    """Stratify _cf universe by max_sim quintile, sample per_quintile per bin.
-    For each sampled universe PI: list its top-k FOIA neighbors from W, and
-    top-5 TF-IDF terms per neighbor.
-    """
     keep_idx = np.where(keep_mask)[0]
     W_kept = W[keep_idx]
     max_sim = np.asarray(W_kept.max(axis=1).todense()).ravel()
@@ -343,7 +252,6 @@ def face_validity_table(X_univ, X_foia, W, universe_ids, foia_ids,
         for local_idx in picks:
             univ_idx = keep_idx[local_idx]
             row = W[univ_idx]
-            # get k largest by weight
             dense = row.toarray().ravel()
             if dense.sum() == 0:
                 continue
@@ -352,7 +260,6 @@ def face_validity_table(X_univ, X_foia, W, universe_ids, foia_ids,
             neighbor_ids = [foia_ids[j] for j in top]
             neighbor_wts = [float(dense[j]) for j in top]
 
-            # Top TF-IDF terms per neighbor
             neighbor_terms = []
             for j in top:
                 r = X_foia[j].toarray().ravel()
@@ -371,11 +278,6 @@ def face_validity_table(X_univ, X_foia, W, universe_ids, foia_ids,
                 "neighbor_top_terms": " || ".join(neighbor_terms),
             })
     return pd.DataFrame(rows)
-
-
-# --------------------------------------------------------------------------- #
-# Main                                                                        #
-# --------------------------------------------------------------------------- #
 
 def main():
     ap = argparse.ArgumentParser()
@@ -414,7 +316,6 @@ def main():
     sfx = "_cf" if args.min_foia_per_cluster <= 1 else f"_cf{args.min_foia_per_cluster}"
     stem = f"{args.version}{sfx}_k{args.k}"
 
-    # ---- Load pipeline artifacts ----
     print(f"[load] tag={args.tag}  version={args.version}  filter={sfx}  k={args.k}")
     X_foia = sp.load_npz(f"{OUT_DIR}/tfidf_foia{tag}.npz").tocsr().astype(np.float32)
     X_univ = sp.load_npz(f"{OUT_DIR}/tfidf_universe{tag}.npz").tocsr().astype(np.float32)
@@ -436,7 +337,6 @@ def main():
     )
     print(f"  S={S.shape}  nnz={S.nnz:,}   #shocks={len(g)}")
 
-    # _cf filter
     if not os.path.exists(args.cluster_file):
         raise SystemExit(f"missing cluster file: {args.cluster_file}")
     keep_mask, cl_df = apply_cf_filter(
@@ -445,7 +345,6 @@ def main():
     print(f"  _cf universe: kept {keep_mask.sum():,}/{len(keep_mask):,}"
           f" ({100*keep_mask.mean():.1f}%)")
 
-    # FOIA cluster labels (for E2 cluster-mean baseline)
     foia_clusters = (
         pd.DataFrame({"athr_id": foia_ids})
         .merge(cl_df, on="athr_id", how="left")["cluster_label"]
@@ -454,7 +353,6 @@ def main():
 
     rng = np.random.default_rng(args.seed)
 
-    # ------ E1: LOFO ------
     if "e1" not in args.skip:
         print("\n[E1] LOFO cross-validation of KNN(k=3)")
         lofo = run_lofo(X_foia, S, g, args.k, args.sharpen, args.floor,
@@ -480,14 +378,13 @@ def main():
         print(f"  Saved {VAL_DIR}/lofo_cell_{stem}.csv")
         print(f"  Saved {VAL_DIR}/lofo_summary_{stem}.txt")
 
-    # ------ E2: baselines ------
     if "e2" not in args.skip:
         print("\n[E2] Baseline comparison on the same LOFO folds")
         rows = []
         methods = []
         for name in args.baselines + ["knn3"] if "knn3" not in args.baselines else args.baselines:
             methods.append(name)
-        methods = list(dict.fromkeys(methods))     # dedupe, preserve order
+        methods = list(dict.fromkeys(methods))
         for m_name in methods:
             if m_name.startswith("knn"):
                 kk = int(m_name[3:])
@@ -512,7 +409,6 @@ def main():
             .to_csv(f"{VAL_DIR}/baselines_pi_{args.version}{sfx}.csv", index=False)
         print(f"  Saved {VAL_DIR}/baselines_pi_{args.version}{sfx}.csv")
 
-    # ------ E3: support diagnostics ------
     if "e3" not in args.skip:
         print("\n[E3] Support diagnostics under _cf")
         hist = support_hist(diag, keep_mask, args.k)
@@ -524,7 +420,6 @@ def main():
             print(f"  Saved {VAL_DIR}/coverage_vs_rmse_{stem}.csv")
             print(cov.to_string(index=False))
 
-    # ------ E4: placebo (shuffled shares) ------
     if "e4" not in args.skip:
         print("\n[E4] Placebo: shuffle FOIA rows of S, re-run LOFO KNN")
         perm = rng.permutation(X_foia.shape[0])
@@ -541,7 +436,6 @@ def main():
         print(f"  placebo corr={pm['corr']:.3f}  r2={pm['r2']:.3f}")
         print(f"  Saved {VAL_DIR}/placebo_pi_{stem}.csv")
 
-    # ------ E5: face validity ------
     if "e5" not in args.skip:
         print("\n[E5] Face-validity table (stratified by max_sim quintile)")
         face_rng = np.random.default_rng(args.seed + 1)

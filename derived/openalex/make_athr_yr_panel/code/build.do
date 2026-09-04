@@ -22,16 +22,11 @@ end
 
 program make_panel
     syntax, time(string) samp(str) [, firstlast(int 0) last(int 0) first(int 0) us(int 0) second(int 0) nosolo(int 0)]
-    // route openalex-level loads to the clinical-filtered folder when samp
-    // ends in _no_clin; sub_athrs paths stay the same
     local src "openalex"
     if regexm("`samp'", "_no_clin$") local src "openalex_no_clin"
     import delimited ../external/clusters/author_static_clusters_30.csv, clear
     save ../temp/clusters, replace
 
-    // Build coauthor structures from the full-authors sample so team-size
-    // measures are correct even when the working sample restricts to a
-    // single author position (e.g., last=1).
     use pmid athr_id using ../external/`src'/cleaned_`samp', clear
     gcontract pmid athr_id
     drop _freq
@@ -65,8 +60,6 @@ program make_panel
     merge m:1 athr_id using ../temp/clusters, assert(1 2 3) keep(3) nogen
     merge m:1 id using ../external/patents/patent_ppr_cnt, assert(1 2 3) keep(1 3) nogen keepusing(patent_count front_only body_only)
     merge m:1 pmid using ../temp/paper_team_size_`samp', assert(2 3) keep(3) nogen
-    // paper_team_size comes from the full-authors sample, so this drops solo
-    // papers correctly even in position subsamples where num_athrs == 1 by construction
     if `nosolo' == 1 drop if paper_team_size == 1
     rename cluster_label field
 
@@ -139,7 +132,6 @@ program make_panel
        qui sum `v'
        assert round(r(sum)-`articles') == 0
     }
-    // restrict to USA
     if `us' == 1 {
         keep if country_code == "US" & !mi(msa_comb)
     }
@@ -160,8 +152,6 @@ program make_panel
     save ../temp/coauthors_`samp'`suf', replace
     restore
 
-    // Count distinct coauthors (self-excluded) per (focal, year) across all
-    // of the focal's papers in the year, using the full-authors sample.
     preserve
     use ../temp/focal_list_`samp'`suf', clear
     joinby pmid using ../temp/all_athrs_`samp'
@@ -202,33 +192,17 @@ program make_panel
         save ../output/num_fund_coauthors_`samp'`suf', replace
         restore
     }
-    // avg team size = mean coauthors per paper (self-excluded) across the
-    // focal's unique pmids in the year
     bys athr_id pmid : gen athr_pmid_cntr = _n == 1
     bys athr_id `time': gegen avg_team_size = mean(paper_team_size) if athr_pmid_cntr == 1
     replace avg_team_size = avg_team_size - 1
 
-    // Paper-position metrics (only informative in the all-authors panel; in the
-    // sub_athrs/last panel which_athr == num_athrs by construction, so
-    // n_last_ppr = ppr_cnt and the others collapse to 0/1).
-    //   paper_position       : the focal's slot on the paper (1 = first, num_athrs = last)
-    //   paper_position_rat   : normalized to [0,1] — 1 = last author, 0 = first
-    //   paper_is_first/last/middle : dummies for role
-    //   team_size_when_(not)last  : paper team size split by whether the focal
-    //                               is last author on that paper
-    // Only computed on one row per (athr, pmid) so gcollapse (sum) and (mean)
-    // aggregate paper-counts correctly rather than double-counting affiliations.
     gen paper_position     = which_athr                              if athr_pmid_cntr == 1
     gen paper_position_rat = which_athr / num_athrs                  if athr_pmid_cntr == 1
-    // Solo-author papers (num_athrs == 1): the focal is both position 1 and
-    // position N. Convention: count them as "last / senior" only (the PI is
-    // senior on their own solo work) so n_first + n_middle + n_last = ppr_cnt.
+    // solo papers count as last only, so n_first + n_middle + n_last = ppr_cnt
     gen paper_is_first     = (which_athr == 1) & (num_athrs > 1)     if athr_pmid_cntr == 1
     gen paper_is_last      = (which_athr == num_athrs)               if athr_pmid_cntr == 1
     gen paper_is_middle    = (which_athr > 1) & (which_athr < num_athrs) if athr_pmid_cntr == 1
     gen paper_is_solo      = (num_athrs == 1)                        if athr_pmid_cntr == 1
-    // team-size split: last includes solo (denominator = 1). notlast is
-    // strictly middle + non-senior first — well defined only when num_athrs > 1.
     gen team_size_last     = paper_team_size if athr_pmid_cntr == 1 & which_athr == num_athrs
     gen team_size_notlast  = paper_team_size if athr_pmid_cntr == 1 & which_athr <  num_athrs & num_athrs > 1
     preserve
@@ -262,7 +236,6 @@ program make_panel
         replace num_coauthors_same_msa = 0 if mi(num_coauthors_same_msa)
         merge m:1 athr_id `time' using ../temp/unique_coauthors_`samp'`suf', keep(1 3) nogen
         replace n_coauthors_yr = 0 if mi(n_coauthors_yr)
-        // make into balanced panel
         merge m:1 athr_id `time' using ../external/year_insts/filled_in_panel_all_`time', assert(1 2 3) keep(2 3) nogen
     }
     bys athr_id `time': gen name_id = _n == 1
@@ -321,7 +294,6 @@ program make_panel
         replace num_coauthors_same_msa = 0 if mi(num_coauthors_same_msa)
         merge m:1 athr_id `time' using ../temp/unique_coauthors_`samp'`suf', keep(1 3) nogen
         replace n_coauthors_yr = 0 if mi(n_coauthors_yr)
-        // make into balanced panel
         merge m:1 athr_id `time' using ../external/year_insts/filled_in_panel_all_`time', assert(1 2 3) keep(2 3) nogen
     }
     bys athr_id `time': gen name_id = _n == 1
@@ -374,5 +346,4 @@ program merge_ipeds
     keep if public == 1
     save ../output/athr_panel_full_`time'`suf'_`samp'_r1_r2_public, replace
 end
-**k 
 main

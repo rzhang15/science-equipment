@@ -3,22 +3,12 @@ clear all
 capture log close
 version 17
 
-* Numbers for tab:rf_exposure_variants: the Poisson DiD under alternative
-* exposure measures -- (1) baseline, (2) shares renormalized to sum to one,
-* (3) PIs with strictly positive exposure, (4) precision-weighted (pw=max_sim,
-* the _msimwt weighting), (5) high-similarity subsample (top `hisim_pct'% of
-* imputed PIs by max_sim; FOIA anchors sit at max_sim=1 and always survive).
-* Reads the prepped sample from the last analysis.do run, which must have been
-* built with EXPOSURE_FILTER _cf_k3. Column (1) keeps the paper's \RFCoef /
-* \RFObs / \OutputDecline macros.
 local samp all_jrnls
 local suf  _r1_r2
 local hisim_pct 50
 
 use ../output/prepped_samples/es_`samp'`suf', clear
 gen post = year >= 2014
-* (2): dividing by the sum of shares handles incomplete shares by
-* renormalization, the Borusyak et al. alternative to the S_i control
 gen exposure_rn = cond(mkt_spend_shr > 0, exposure / mkt_spend_shr, 0)
 gen Z_it  = exposure      * post
 gen Zs_it = mkt_spend_shr * post
@@ -55,7 +45,6 @@ local wt5
 forval c = 1/5 {
     local mean1 exposure
     if `c' == 2 local mean1 exposure_rn
-    * (4): decline evaluated at the similarity-weighted average exposure
     local meanwt ""
     if "`wt`c''" != "" local meanwt [aw=max_sim]
 
@@ -73,7 +62,6 @@ forval c = 1/5 {
     mat expvar[7,`c'] = e(N)
     mat expvar[8,`c'] = `xbar'
 
-    * (2) has no with/without-S_i contrast: renormalization replaces the control
     if "`svar`c''" != "" {
         ppmlhdfe ppr_cnt `xvar`c'' `wt`c'' if 1 `cond`c'', ///
             absorb(athr_id year) vce(cluster athr_id)
@@ -113,7 +101,7 @@ forval c = 1/5 {
 }
 
 local out ../output/tables/`samp'/robustness/rf_exposure_variants`suf'.tex
-* closing $ via char(36): "\$" fails to escape right after an empty macro
+* char(36): "\$" fails to escape right after an empty macro
 local d = char(36)
 tempname fh
 file open `fh' using "`out'", write replace

@@ -24,7 +24,6 @@ program merge_w_openalex
     save ../output/patent_ppr_cnt, replace
 end
 
-** 
 main
 
 

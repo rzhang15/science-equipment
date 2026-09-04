@@ -12,7 +12,6 @@ ATHR_PANEL_DTA = '../external/athr_panel/athr_panel_full_year_all_jrnls.dta'
 OUT_DIR        = '../output'
 TMP_DIR        = '../temp'
 
-# --- name normalization ------------------------------------------------------
 
 _RE_PUNCT   = re.compile(r'[^a-z\s]')
 _RE_MULTISP = re.compile(r'\s+')
@@ -20,15 +19,12 @@ _RE_SUFFIX  = re.compile(r'\b(jr|sr|ii|iii|iv|md|phd|mph|do|dds|dvm|rn|esq|facp)
 _RE_ROLE    = re.compile(r'\((contact|multi[-\s]?pi|former|previous)\)', re.IGNORECASE)
 _RE_APOS    = re.compile(r"['‘’ʼ`]")
 
-# These have no NFKD decomposition, so the ascii encode would delete them:
-# Ostbye must come out 'ostbye', not 'stbye'.
 _TRANSLIT = str.maketrans({
     'ø':'o','Ø':'O','æ':'ae','Æ':'Ae','œ':'oe','Œ':'Oe','ß':'ss',
     'đ':'d','Đ':'D','ð':'d','Ð':'D','þ':'th','Þ':'Th','ł':'l','Ł':'L',
     'ħ':'h','Ħ':'H','ı':'i','ŋ':'n','Ŋ':'N'})
 
 def _fold(s: str) -> str:
-    """Muller/Muller, Garcia/Garcia: RePORTER is ASCII, OpenAlex is not."""
     return unicodedata.normalize('NFKD', s.translate(_TRANSLIT)).encode('ascii', 'ignore').decode('ascii')
 
 def _strip_name(s: str) -> str:
@@ -40,14 +36,12 @@ def _strip_name(s: str) -> str:
     s = _RE_MULTISP.sub(' ', s).strip()
     return s
 
-# Particles are dropped from the blocking keys but kept in `full` for scoring.
 _PARTICLES = {'de','del','della','di','da','dos','das','du','la','le','van','von',
               'der','den','ten','ter','bin','ibn','al','st','san','santa'}
 
 _RE_UMLAUT = re.compile(r'(ue|oe|ae)')
 
 def _deumlaut(t: str) -> str:
-    """RePORTER holds MULLER where OpenAlex may hold Mueller."""
     return _RE_UMLAUT.sub(lambda m: m.group(0)[0], t).replace('ss', 's')
 
 def _glue_variants(toks):
@@ -58,10 +52,6 @@ def _glue_variants(toks):
     return out
 
 def _last_keys(toks):
-    """Every token that could carry the surname, plus glued trailing runs, so
-    'garcia marquez' blocks under garciamarquez and OpenAlex's 'O Brien' meets
-    RePORTER's O'BRIEN. Runs are built over the single-letter tokens too --
-    those are what an apostrophe or a dropped hyphen leaves behind."""
     core = [t for t in toks if t not in _PARTICLES and len(t) > 1]
     if not core:
         core = [t for t in toks if t]
@@ -79,8 +69,6 @@ def _initials(toks, cap=2):
 _RE_NONALPHA = re.compile(r'[^A-Za-z]')
 
 def _expand_glued_initials(raw: str) -> str:
-    """OpenAlex holds 'DK O'Dowd' where RePORTER holds 'O'DOWD, DIANE K';
-    DK is two initials, not a given name Diane has to outscore."""
     if raw.isupper():
         return raw
     def ex(seg, guard_last):
@@ -99,7 +87,6 @@ def _expand_glued_initials(raw: str) -> str:
     return ex(raw, True)
 
 def norm_pi(raw: str):
-    """RePORTER 'LAST, FIRST M' -> given tokens / surname tokens / block keys."""
     if not isinstance(raw, str):
         return None
     s = raw.strip()
@@ -121,11 +108,6 @@ def norm_pi(raw: str):
             'lasts': _last_keys(sur), 'fis': _initials(given)}
 
 def norm_athr(raw: str):
-    """OpenAlex 'First M Last' / 'F. Last' / 'Last, First' -> same fields.
-
-    Without a comma we cannot tell a middle name from the first half of a
-    compound surname, so middle tokens are offered to both sides and the
-    scorer settles it."""
     if not isinstance(raw, str):
         return None
     raw = _expand_glued_initials(raw)
@@ -143,10 +125,8 @@ def norm_athr(raw: str):
     return {'given': given, 'sur': sur,
             'lasts': _last_keys(sur), 'fis': _initials(given)}
 
-# --- name comparison ---------------------------------------------------------
 
 def _tok_score(a: str, b: str) -> int:
-    """An initial matches the name it abbreviates; a prefix nearly does."""
     if len(a) == 1 or len(b) == 1:
         return 100 if a[0] == b[0] else 0
     if a == b:
@@ -163,7 +143,6 @@ def _sur_score(ps, as_) -> int:
         return 95
     if p & a:
         return 88
-    # a hyphen or apostrophe dropped on one side leaves the same letters glued
     best = fuzz.token_set_ratio(' '.join(ps), ' '.join(as_))
     for g1 in _glue_variants(ps):
         for g2 in _glue_variants(as_):
@@ -175,25 +154,20 @@ def _given_score(gp, ga) -> float:
     for i, tp in enumerate(gp):
         for j, ta in enumerate(ga):
             if (i or j) and (len(tp) == 1 or len(ta) == 1):
-                continue    # a middle initial cannot vouch for a first name
+                continue
             s = _tok_score(tp, ta)
             if i or j:
-                s -= 6      # published under a middle name
+                s -= 6
             if s > best:
                 best = s
     if len(gp) > 1 and len(ga) > 1:
         if len({t[0] for t in gp} & {t[0] for t in ga}) < 2:
-            best -= 8       # both sides give a middle name and they disagree
+            best -= 8
     return max(best, 0)
 
 def name_score(p, a) -> float:
-    """0-100, over anything exposing .given and .sur. 'John Smith' vs
-    'J. Smith' scores 100, not the 86 token_set_ratio gives it: a dropped
-    given name is not a mismatch, and it is the most common way OpenAlex
-    writes a name we hold in full."""
     return 0.45 * _sur_score(p.sur, a.sur) + 0.55 * _given_score(p.given, a.given)
 
-# --- institution normalization / matching ------------------------------------
 
 _RE_INST_PUNCT = re.compile(r'[^a-z0-9\s]')
 _INST_STOP = {
@@ -231,17 +205,6 @@ def _ctry(s: str) -> str:
 
 def build_inst_crosswalk(org_df: pd.DataFrame, inst_df: pd.DataFrame,
                          threshold: int = 88) -> pd.DataFrame:
-    """org_df: org_ipf_code, org_name [+ org_state, org_country]
-       inst_df: inst_id, inst [+ state, country]
-       Returns: org_ipf_code -> set of candidate inst_id (matched).
-
-       Ties at the token-set score are real and dangerous: 'UNIVERSITY OF
-       PENNSYLVANIA' reduces to the token 'pennsylvania', which every
-       Pennsylvania inst matches at 100, and an arbitrary cap used to be able
-       to drop Penn itself. Exact key equality, then same state, then the full
-       string decide who survives the cap; a country conflict kills the edge.
-       Orgs the string match strands get one more chance against the insts of
-       their own state at a lower bar."""
     org_df  = org_df.copy()
     inst_df = inst_df.copy()
     org_df['org_key']   = org_df['org_name'].map(inst_tokens)
@@ -258,7 +221,6 @@ def build_inst_crosswalk(org_df: pd.DataFrame, inst_df: pd.DataFrame,
     inst_state = inst_df['state'].fillna('').tolist() if geo else ['']*len(inst_ids)
     inst_ctry  = [_ctry(c) for c in inst_df['country'].fillna('')] if geo else ['']*len(inst_ids)
 
-    # token -> inst positions, used to block candidates before scoring
     postings, by_state = defaultdict(list), defaultdict(list)
     for j, k in enumerate(inst_keys):
         for t in set(k.split()):
@@ -328,7 +290,6 @@ def build_inst_crosswalk(org_df: pd.DataFrame, inst_df: pd.DataFrame,
                 rows.append((code, inst_ids[j], s))
     return pd.DataFrame(rows, columns=['org_ipf_code','inst_id','inst_score'])
 
-# --- PI <-> athr matching within institution --------------------------------
 
 RARE_THRESHOLD = 94
 MIN_EDGE_SUPPORT = 3
@@ -351,7 +312,6 @@ def _index_athr(athr_df):
     return by_block, by_name, athr_insts
 
 def _pass_inst(pi_rows, by_block, inst_lookup, threshold, tag='inst'):
-    """Blocked on (institution, surname key, given initial)."""
     hit, miss = [], []
     for i, r in enumerate(pi_rows, 1):
         if i % 20000 == 0:
@@ -378,10 +338,6 @@ NAME_DOM_GAP = 6
 
 def _pass_name(pi_rows, by_name, threshold,
                org_state=None, inst_state=None, athr_insts=None):
-    """No institution required, but the name must pick out one author.
-    A rare surname resolves outright; among several candidates, a clear
-    scoring winner or a lone candidate in the grantee's state does.
-    'SMITH, JOHN' still stays unmatched, as it should."""
     hit, miss = [], []
     geo = org_state is not None and inst_state is not None and athr_insts is not None
     for i, r in enumerate(pi_rows, 1):
@@ -420,9 +376,6 @@ def _pass_name(pi_rows, by_name, threshold,
     return hit, miss
 
 def _learn_edges(rows, inst_lookup):
-    """Where several rare-name PIs at one grantee org all land on the same
-    OpenAlex institution, that is a real org-institution relation the string
-    matcher missed -- hospital to affiliated school, campus to system."""
     cnt = Counter((row[1], row[4]) for row in rows)
     return [(org, iid) for (org, iid), c in cnt.items()
             if c >= MIN_EDGE_SUPPORT and iid not in inst_lookup.get(org, ())]
@@ -430,10 +383,6 @@ def _learn_edges(rows, inst_lookup):
 def match_pi_to_athr(pi_df: pd.DataFrame, athr_df: pd.DataFrame,
                      inst_xw: pd.DataFrame, threshold: int = 88,
                      org_state=None, inst_state=None) -> pd.DataFrame:
-    """pi_df: pi_raw, org_ipf_code, given, sur, lasts, fis
-       athr_df: athr_id, athr_name, inst_id, given, sur, lasts, fis
-       inst_xw: org_ipf_code -> inst_id (string-matched)
-       org_state/inst_state: code -> 2-letter state, for name-pass tiebreaks"""
     by_block, by_name, athr_insts = _index_athr(athr_df)
     inst_lookup = defaultdict(set)
     for r in inst_xw.itertuples(index=False):
@@ -463,7 +412,6 @@ def match_pi_to_athr(pi_df: pd.DataFrame, athr_df: pd.DataFrame,
         f'{OUT_DIR}/inst_crosswalk_learned.csv', index=False)
     return pd.DataFrame(rows, columns=COLS)
 
-# --- io ----------------------------------------------------------------------
 
 def read_dta(path, columns):
     try:
@@ -487,7 +435,6 @@ def athr_universe():
     athr.to_parquet(cache, index=False)
     return athr
 
-# --- main -------------------------------------------------------------------
 
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)

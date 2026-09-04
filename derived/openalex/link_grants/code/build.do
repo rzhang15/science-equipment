@@ -26,5 +26,4 @@ program main
     gduplicates drop
     save ../output/pi_ppr_grants, replace
 end
-**
 main

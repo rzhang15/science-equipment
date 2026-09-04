@@ -69,7 +69,7 @@ program create_athr_split
     qui bys id: replace avg_frnt_yr = . if _n != 1
     qui bys id: replace avg_body_yr = . if _n != 1
     qui sum avg_cite_yr
-    gen cite_wt = avg_cite_yr/r(sum) // each article is no longer weighted 1 
+    gen cite_wt = avg_cite_yr/r(sum)
     qui sum avg_pat_yr
     gen pat_wt = avg_pat_yr/r(sum)
     qui sum avg_frnt_yr

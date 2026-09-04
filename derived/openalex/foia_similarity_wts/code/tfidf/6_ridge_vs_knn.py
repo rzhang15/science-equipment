@@ -1,27 +1,3 @@
-"""
-Head-to-head K-fold holdout: Ridge regression vs top-K weighted-average K-NN,
-on identical splits.
-
-Each fold:
-  1. Draw the same random train/test partition of the 208 FOIA anchors.
-  2. K-NN prediction:  the production recipe from 5_holdout_stress.py
-                       (top-K on cosine sim, floor, sharpen, L1-normalize,
-                       weighted average of train exposure).
-  3. Ridge prediction: RidgeCV over `--alphas` on the train fold to pick alpha
-                       (efficient LOO GCV), then Ridge.predict on the test fold.
-  4. Also record `max_sim_to_train` for stratifying error curves by
-                       "how close is my nearest anchor" — same axis as 5_.
-
-The point is a fair comparison: same folds, same seed, same target file. The
-ridge alpha is picked on the training fold only (no leakage from test) and the
-K-NN knobs are held at their production defaults.
-
-Output:
-  ../../output/ridge_vs_knn_pairs{tag}{out_tag}.csv     per (fold, FOIA) row
-                                                        with pred_knn, pred_ridge
-  ../../output/ridge_vs_knn_summary{tag}{out_tag}.csv   per method x sim_bin
-  ../../output/ridge_vs_knn_overall{tag}{out_tag}.txt   headline comparison
-"""
 import argparse
 import os
 import numpy as np
@@ -49,8 +25,6 @@ def _paths(tag: str, out_suffix: str = "") -> dict:
 
 
 def predict_knn(sim_test_train, E_train, k, sharpen, floor):
-    """Top-K sharpened weighted average. Mirrors 5_holdout_stress.predict_holdout
-    (which itself mirrors 2_similarity_wts.process_batch)."""
     n_test, n_train = sim_test_train.shape
     k = min(k, n_train)
     topk_idx = np.argpartition(-sim_test_train, k - 1, axis=1)[:, :k]
@@ -67,7 +41,6 @@ def predict_knn(sim_test_train, E_train, k, sharpen, floor):
 
 
 def predict_ridge(X_train, y_train, X_test, alphas):
-    """Pick alpha by GCV on train, predict on test. Returns pred, alpha_chosen."""
     m = RidgeCV(alphas=alphas, fit_intercept=True, scoring=None, cv=None)
     m.fit(X_train, y_train)
     alpha = float(m.alpha_)
@@ -153,7 +126,6 @@ def main():
         X_test = X[test_idx]
         X_train = X[train_idx]
 
-        # cosine sim (rows already L2-normalized by 1_vectorize)
         sim = (X_test @ X_train.T).toarray().astype(np.float64)
         max_sim = sim.max(axis=1)
 
@@ -182,7 +154,6 @@ def main():
     df.to_csv(paths["out_pairs"], index=False)
     print(f"\nSaved per-(fold,FOIA) rows: {paths['out_pairs']}")
 
-    # ----- aggregate by max_sim_to_train quintile, side by side -----
     q = np.quantile(df["max_sim_to_train"].values, [0.2, 0.4, 0.6, 0.8])
     df["sim_bin"] = np.digitize(df["max_sim_to_train"].values, q)
     bin_names = {0: "Q1 (most isolated)", 1: "Q2", 2: "Q3", 3: "Q4",
@@ -221,7 +192,6 @@ def main():
             "mse", "mae", "corr", "slope", "r2"]
     print(df_summary[cols].to_string(index=False))
 
-    # ----- one-line headline -----
     knn_all   = df_summary[(df_summary["method"] == "knn")   & (df_summary["sim_bin"] == -1)].iloc[0]
     ridge_all = df_summary[(df_summary["method"] == "ridge") & (df_summary["sim_bin"] == -1)].iloc[0]
     knn_q1   = df_summary[(df_summary["method"] == "knn")   & (df_summary["sim_bin"] == 0)].iloc[0]

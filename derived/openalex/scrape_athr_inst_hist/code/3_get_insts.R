@@ -8,7 +8,6 @@ library(purrr)
 library(tidyverse)
 set.seed(8975)
 
-################################### MAIN ###################################
 insts <- read_dta('../output/list_of_insts.dta')
 nr <- nrow(insts)
 split_insts <- split(insts, rep(1:ceiling(nr/5000), each = 5000, length.out=nr))

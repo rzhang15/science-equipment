@@ -8,17 +8,10 @@ import scipy.sparse
 from joblib import Parallel, delayed
 from sklearn.feature_extraction.text import TfidfVectorizer
 
-# --- CONFIGURATION ---
-# Reads the cleaned US corpus (v2) produced by us_cluster_fields/0b_clean_us_corpus.py:
-# scraper-boilerplate + <200-char authors dropped. Matches the universe that
-# us_cluster_fields/2_cluster.py clusters, so cluster_sanity_check.py sees
-# 1:1 coverage between imputation universe and cluster labels.
 UNIVERSE_PATH = "../../external/us_appended_text/cleaned_static_author_text_pre_us_v2.parquet"
 FOIA_PATH = "../../output/foia_author_text_final.csv"
 OUTPUT_DIR = "../../output/"
 
-# Default sources for --restrict-to-ls-clusters: author→cluster mapping plus
-# the worksheet that flags which clusters are life-science (keep=1).
 DEFAULT_CLUSTER_LABELS = (
     "../../external/appended_text/author_static_clusters_100.csv"
 )
@@ -26,58 +19,33 @@ DEFAULT_CLUSTER_WORKSHEET = (
     "../../external/appended_text/cluster_label_worksheet_100.csv"
 )
 
-# Vocab-shaping for universe→FOIA matching:
-#   - Larger vocab + lower min_df lets long-tail PI-specific terms survive.
-#   - max_df trims generic terms (boilerplate, super-common bio words).
-#   - sublinear_tf is critical: per-author text is concatenated career output, so raw
-#     token counts scale with productivity. log(1+tf) shifts the signal to topical mix,
-#     i.e. "what fraction of an author's career is about X" — which is what we need
-#     for the spending-share imputation assumption (same topics ⇒ same product mix).
 MAX_FEATURES = 100_000
 MIN_DF = 5 
 MAX_DF = 0.15
 NGRAM_RANGE = (1, 4)
 
-# Fit corpus cap. FOIA texts are always added to the fit sample so PI-specific
-# vocabulary cannot be excluded by random universe sampling.
 SAMPLE_SIZE = 500_000
 
-# After fitting, prune vocab to features that appear in ≥ FOIA_MIN_DF FOIA PIs and
-# ≤ FOIA_MAX_DF_FRAC fraction of FOIA PIs. Terms outside this band cannot help
-# differentiate among the 200 FOIA PIs (the matching targets), so dropping them
-# tightens the cosine geometry around the discriminative axes.
 FOIA_MIN_DF = 2
 FOIA_MAX_DF_FRAC = 0.85
 
-# Parallelism for the universe transform (fit is single-threaded in sklearn).
 N_JOBS = int(os.environ.get("SLURM_CPUS_PER_TASK", os.cpu_count() or 1))
-TRANSFORM_CHUNK_SIZE = 20_000  # rows per worker task; smaller → better load balance
+TRANSFORM_CHUNK_SIZE = 20_000
 
 
 def _l2_normalize_rows(M):
-    """Vectorized per-row L2 normalization for a sparse matrix."""
     norms = np.sqrt(np.asarray(M.multiply(M).sum(axis=1)).ravel())
     inv = 1.0 / np.maximum(norms, 1e-12)
     return (scipy.sparse.diags(inv) @ M).astype(np.float32)
 
 
 def transform_chunk(vec, texts, keep_idx):
-    """Worker: transform a slice of texts, prune to FOIA-relevant cols, L2-renormalize."""
     m = vec.transform(texts)[:, keep_idx]
     return _l2_normalize_rows(m).tocsr()
 
 
 def restrict_to_ls_clusters(df_universe, df_foia, cluster_labels_path,
                             worksheet_path):
-    """Filter universe to authors in clusters flagged life-science (keep=1).
-
-    Reads two files from cluster_fields/output:
-      - cluster_labels_path: (athr_id, cluster_label) per universe author
-      - worksheet_path:      (cluster_label, keep) per cluster
-    Drops universe authors with no cluster assignment OR in clusters with keep=0.
-    The FOIA list is just used for audit reporting (how many FOIA PIs fall in
-    kept vs dropped clusters).
-    """
     if not os.path.exists(cluster_labels_path):
         raise SystemExit(f"cluster labels not found: {cluster_labels_path}")
     if not os.path.exists(worksheet_path):
@@ -158,7 +126,6 @@ def main():
     print(f"Using N_JOBS={N_JOBS} for parallel transform")
     print(f"Output tag suffix: {tag!r}")
 
-    # --- LOAD DATA ---
     print("Loading Universe Data...")
     df_universe = pd.read_parquet(UNIVERSE_PATH, columns=['athr_id', 'processed_text'])
     print(f"Total authors loaded: {df_universe['athr_id'].nunique()}")
@@ -175,9 +142,6 @@ def main():
     print("Loading FOIA Data...")
     df_foia = pd.read_csv(FOIA_PATH)
     df_foia['processed_text'] = df_foia['processed_text'].fillna("").astype(str)
-    # Defensive: FOIA rows with no usable text embed as all-zero TF-IDF
-    # vectors. They pollute LOOV and the FOIA-aware vocab pruning. Drop
-    # them here too (0_get_foia_text.py also filters at the source).
     text_len = df_foia['processed_text'].str.len()
     if (text_len < 50).any():
         dropped = df_foia.loc[text_len < 50, 'athr_id'].tolist()
@@ -193,7 +157,6 @@ def main():
     n_foia = len(df_foia)
     print(f"FOIA PIs: {n_foia}")
 
-    # --- OPTIONAL: RESTRICT UNIVERSE TO LIFE-SCIENCE CLUSTERS ---
     audit = None
     if args.restrict_to_ls_clusters:
         df_universe, audit = restrict_to_ls_clusters(
@@ -202,7 +165,6 @@ def main():
         )
         final_count = len(df_universe)
 
-    # --- FIT VECTORIZER ---
     print(f"Fitting vectorizer (min_df={cfg_min_df}, max_df={cfg_max_df}, "
           f"max_features={cfg_max_features})...")
     tfidf = TfidfVectorizer(
@@ -232,11 +194,9 @@ def main():
 
     print(f"Vocab size after fit: {len(tfidf.get_feature_names_out())}")
 
-    # --- TRANSFORM FOIA (single-threaded, 200 docs) ---
     print("Transforming FOIA...")
     matrix_foia_full = tfidf.transform(df_foia['processed_text'].tolist())
 
-    # --- FOIA-AWARE VOCAB PRUNING ---
     foia_binary = (matrix_foia_full > 0).astype(np.int32)
     foia_df_counts = np.asarray(foia_binary.sum(axis=0)).ravel()
     foia_max_count = int(np.floor(cfg_foia_max_df_frac * n_foia))
@@ -249,7 +209,6 @@ def main():
     matrix_foia = _l2_normalize_rows(matrix_foia_full[:, keep_idx]).tocsr()
     del matrix_foia_full
 
-    # --- TRANSFORM UNIVERSE IN PARALLEL ---
     texts = df_universe['processed_text'].tolist()
     n = len(texts)
     n_chunks = math.ceil(n / TRANSFORM_CHUNK_SIZE)
@@ -268,7 +227,6 @@ def main():
     print(f"Universe Matrix Shape: {matrix_universe.shape}")
     print(f"FOIA Matrix Shape:     {matrix_foia.shape}")
 
-    # --- SAVE ARTIFACTS ---
     print("Saving Sparse Matrices...")
     scipy.sparse.save_npz(f"{OUTPUT_DIR}tfidf_universe{tag}.npz", matrix_universe)
     scipy.sparse.save_npz(f"{OUTPUT_DIR}tfidf_foia{tag}.npz", matrix_foia)

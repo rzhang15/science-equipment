@@ -1,14 +1,3 @@
-"""
-Generates and saves multiple sets of embeddings from the prepared text data.
-Each function creates a file of vectors for a specific model (TF-IDF, BERT, etc.).
-
-When USE_SUPPLIER is True, description and supplier tokens are vectorized
-separately and combined with explicit weights (config.DESC_WEIGHT / SUPPLIER_WEIGHT).
-
-Transformer encoding uses GPU when available (fp16 + larger batch + dedup) to
-keep wall-clock low; the model object itself is no longer pickled — downstream
-scripts re-instantiate from the HuggingFace cache via config.BERT_MODELS.
-"""
 import pandas as pd
 import numpy as np
 import joblib
@@ -47,9 +36,6 @@ def generate_tfidf_vectors(df):
         joblib.dump(supplier_vectorizer, os.path.join(config.OUTPUT_DIR, "vectorizer_supplier_tfidf.joblib"))
         print(f"  Supplier vectorizer saved ({supp_vectors.shape[1]} features).")
 
-        # L2-normalize each, apply weights, combine.  hstack returns COO by
-        # default; convert to CSR so downstream row-indexing (X[train_idx])
-        # works.
         desc_norm = normalize(desc_vectors, norm='l2')
         supp_norm = normalize(supp_vectors, norm='l2')
         combined = hstack([desc_norm * config.DESC_WEIGHT, supp_norm * config.SUPPLIER_WEIGHT]).tocsr()
@@ -77,8 +63,6 @@ def generate_tfidf_vectors(df):
 
 
 def _load_encoder(model_id):
-    """Instantiate a SentenceTransformer on the best available device.
-    fp16 on GPU; fp32 on CPU."""
     import torch
     from sentence_transformers import SentenceTransformer
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -90,10 +74,6 @@ def _load_encoder(model_id):
 
 
 def _encode_dedup(model, texts, batch_size=256):
-    """Encode a list of strings with deduplication.  FOIA descriptions repeat
-    heavily; encoding only the unique strings and broadcasting back is usually
-    the largest practical speedup."""
-    # pd.factorize preserves order of first occurrence and returns int codes
     codes, uniques = pd.factorize(pd.Series(texts), sort=False)
     print(f"    Encoding {len(uniques)} unique texts (from {len(texts)} total, "
           f"{100.0 * (1 - len(uniques)/max(len(texts),1)):.1f}% dedup)")
@@ -102,7 +82,7 @@ def _encode_dedup(model, texts, batch_size=256):
         batch_size=batch_size,
         show_progress_bar=True,
         convert_to_numpy=True,
-        normalize_embeddings=True,  # downstream L2-normalize becomes a no-op
+        normalize_embeddings=True,
     )
     return uniq_vecs[codes].astype(np.float32)
 
@@ -116,8 +96,6 @@ def generate_transformer_vectors(df, short_name, model_id):
     output_filename = f"embeddings_{short_name}.joblib"
 
     if config.USE_SUPPLIER and 'supplier_token' in df.columns:
-        # Reuse the supplier vectorizer fit during the TF-IDF step so the
-        # token vocabulary is identical across embedding variants.
         supp_vec_path = os.path.join(config.OUTPUT_DIR, "vectorizer_supplier_tfidf.joblib")
         if os.path.exists(supp_vec_path):
             supplier_vectorizer = joblib.load(supp_vec_path)
@@ -153,7 +131,6 @@ def generate_transformer_vectors(df, short_name, model_id):
 
     print(f"  {short_name} vectors saved to {output_filename}")
 
-    # Free GPU memory before loading the next model
     del model
     try:
         import torch
@@ -175,10 +152,6 @@ def main(embedding_name):
     if embedding_name == 'tfidf':
         generate_tfidf_vectors(df)
     elif embedding_name in config.BERT_MODELS:
-        # Transformer paths reuse the supplier TF-IDF vectorizer when
-        # USE_SUPPLIER is on; generate_transformer_vectors auto-fits it
-        # if the joblib isn't on disk yet, so order between the tfidf
-        # and transformer runs doesn't matter.
         generate_transformer_vectors(df, embedding_name, config.BERT_MODELS[embedding_name])
     else:
         raise ValueError(

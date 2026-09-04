@@ -8,9 +8,6 @@ version 17
 
 program main
 
-    // Run the observed (FOIA) first stage once -- it doesn't depend on
-    // imputation tag. Save its estimates so we can stack them next to the
-    // imputed columns inside imputed_expenditure_fd.
     capture noisily observed_expenditure_fd
     local rc = _rc
     if `rc' {
@@ -23,17 +20,12 @@ program main
         di as error "imputed_expenditure_fd failed (rc=`rc'); continuing"
     }
 
-    // Observed-only: qty (headline) + price (robustness). Imputed pipeline
-    // doesn't produce per-author price/qty so these are FOIA-sample only.
     capture noisily observed_qty_price_fd
     local rc = _rc
     if `rc' {
         di as error "observed_qty_price_fd failed (rc=`rc'); continuing"
     }
 
-    // Level trajectories by exposure quartile -- shows whether the
-    // aggregate "spend up, qty flat, price up" decomposition holds within
-    // and across exposure groups. Complements the FD coefs above.
     capture noisily level_trajectories_by_exposure
     local rc = _rc
     if `rc' {
@@ -42,20 +34,10 @@ program main
 end
 
 program imputed_expenditure_fd
-    // First-stage on imputed annual spending, run two ways:
-    //   1. Long difference: per-author (post mean - pre mean) regressed on
-    //      exposure (+ mkt_spend_shr). Cross-section, robust SE.
-    //   2. Year-on-year FD: D.ln(spend) on D.Z_it (+ D.s_it) with year FE,
-    //      clustered on athr.
-    //
-    // `tag' selects which Python-pipeline outputs to consume:
-    //   ""           -> baseline artifacts
-    //   "_restricted"-> --restrict-to-foia-clusters variant
     args tag
     local label = cond("`tag'" == "", "baseline", "`tag'")
     di _newline "=== Imputed annual spending first-difference  [`label'] ==="
 
-    // -------- Build imputed panel once, save to ../temp/ --------
     import delimited ../external/imputed/final_imputed_exposure`tag'.csv, ///
         varnames(1) stringcols(1) clear
     save ../temp/exposure`tag'.dta, replace
@@ -71,7 +53,6 @@ program imputed_expenditure_fd
     }
     save ../temp/imputed_panel`tag'.dta, replace
 
-    // -------- Long difference --------
     use ../temp/imputed_panel`tag'.dta, clear
     gen post = year >= 2014
     gcollapse (mean) ln_spend ln_lab_spend ln_spend_keep ///
@@ -115,14 +96,12 @@ program imputed_expenditure_fd
             addnotes("Long difference. Imputed universe (`label'), exposure>0. Robust SE.")
     }
 
-    // -------- Year-on-year FD --------
     use ../temp/imputed_panel`tag'.dta, clear
     gegen athr = group(athr_id)
     xtset athr year
     gen post = year >= 2014
     gen Z_it = exposure * post
     gen s_it = mkt_spend_shr * post
-    // Materialize FDs so binscatter2 can residualize against them
     foreach v in ln_spend ln_lab_spend ln_spend_keep Z_it s_it {
         gen d_`v' = D.`v'
     }
@@ -161,13 +140,6 @@ program imputed_expenditure_fd
 end
 
 program observed_expenditure_fd
-    // First stage on directly observed FOIA expenditure, high-confidence
-    // consumables only (categories_tfidf.keep == 1). Split into:
-    //   tot   = all keep==1 spend (matches imputed pipeline scope)
-    //   trt   = keep==1 & treated==1 (merger-affected categories)
-    //   ctrl  = keep==1 & treated==0 (clean control categories)
-    // Treated/control split = placebo: ctrl spend should not move with exposure.
-    // Saved estimates (.ster) are picked up by imputed_expenditure_fd.
     di _newline "=== Observed (FOIA, keep==1) first-difference ==="
 
     use ../external/samp/merged_foias_with_pis, clear
@@ -177,9 +149,6 @@ program observed_expenditure_fd
     merge m:1 category using ../external/categories/categories_tfidf, ///
         keep(1 3) nogen
     keep if keep == 1
-    // Missing spend is a data-quality flag -- includes misclassified
-    // instruments (e.g. KPA/Gilson autosamplers tagged as cuvettes/vials)
-    // that have a printed unit price but no recorded expenditure.
     drop if mi(spend)
     gen tot_spend  = spend
     gen trt_spend  = spend if treated == 1
@@ -206,7 +175,6 @@ program observed_expenditure_fd
     }
     save ../temp/observed_panel.dta, replace
 
-    // -------- Long difference --------
     use ../temp/observed_panel.dta, clear
     gen post = year >= 2014
     gcollapse (mean) ln_tot_spend ln_trt_spend ln_ctrl_spend exposure mkt_spend_shr, by(athr_id post)
@@ -224,7 +192,6 @@ program observed_expenditure_fd
             ytitle("{&Delta}ln(observed `v' + 1)") xtitle("exposure")
         graph export ../output/bs_observed_longdiff_`v'.pdf, replace
     }
-    // Back-compat .ster for the total spend run (consumed by imputed_expenditure_fd)
     estimates restore m_ln_tot_spend
     estimates save ../temp/observed_longdiff.ster, replace
 
@@ -236,7 +203,6 @@ program observed_expenditure_fd
         addnotes("Long difference. FOIA authors, exposure>0. Robust SE." ///
                  "tot = keep==1; trt = keep==1 & treated==1; ctrl = keep==1 & treated==0.")
 
-    // -------- Year-on-year FD --------
     use ../temp/observed_panel.dta, clear
     xtset athr year
     gen post = year >= 2014
@@ -267,17 +233,6 @@ program observed_expenditure_fd
 end
 
 program observed_qty_price_fd
-    // Observed-only first stages on quantity (headline) and price (robustness),
-    // each split into total / treated / control:
-    //   - qty: ln(qty+1), tsfill + zero-fill (no purchase = qty 0). Captures
-    //     extensive + intensive margin response. trt_qty = qty in treated==1
-    //     categories; ctrl_qty = qty in treated==0 categories. Both zero-filled.
-    //   - price: ln(price), no zero fill (no purchase != price 0). Sample
-    //     restricted to athr-years with positive observed price (separately
-    //     for tot/trt/ctrl). Long-diff additionally requires both pre and post
-    //     means to exist per athr in that outcome's sample.
-    // ctrl regressions serve as a placebo: should not move with exposure.
-    // No imputed counterpart -- imputation pipeline only produces spend.
     di _newline "=== Observed (FOIA, keep==1) qty & price first-difference ==="
 
     use ../external/samp/merged_foias_with_pis, clear
@@ -287,7 +242,7 @@ program observed_qty_price_fd
     merge m:1 category using ../external/categories/categories_tfidf, ///
         keep(1 3) nogen
     keep if keep == 1
-    drop if mi(spend)  // see observed_expenditure_fd for rationale
+    drop if mi(spend)
 
     gen tot_qty    = qty
     gen trt_qty    = qty   if treated == 1
@@ -321,8 +276,6 @@ program observed_qty_price_fd
     }
     save ../temp/observed_qty_price_panel.dta, replace
 
-    // ============ Quantity (headline) ============
-    // -------- long difference --------
     use ../temp/observed_qty_price_panel.dta, clear
     gen post = year >= 2014
     gcollapse (mean) ln_tot_qty ln_trt_qty ln_ctrl_qty exposure mkt_spend_shr, by(athr_id post)
@@ -348,7 +301,6 @@ program observed_qty_price_fd
         addnotes("Long difference. FOIA authors, exposure>0. Robust SE." ///
                  "tot = keep==1; trt = keep==1 & treated==1; ctrl = keep==1 & treated==0.")
 
-    // -------- year-on-year FD --------
     use ../temp/observed_qty_price_panel.dta, clear
     xtset athr year
     gen post = year >= 2014
@@ -374,10 +326,6 @@ program observed_qty_price_fd
         addnotes("Year-on-year FD. FOIA authors, exposure>0. Year FE, cluster athr." ///
                  "tot = keep==1; trt = keep==1 & treated==1; ctrl = keep==1 & treated==0.")
 
-    // ============ Price (robustness) ============
-    // -------- long difference --------
-    // Sample drops + n_periods==2 filter applied per outcome (tot/trt/ctrl)
-    // since transacting pre AND post may differ across treated/control cats.
     eststo clear
     foreach v in ln_tot_price ln_trt_price ln_ctrl_price {
         preserve
@@ -405,8 +353,6 @@ program observed_qty_price_fd
         addnotes("Long difference. FOIA authors, mean price conditional on transacting both pre and post, exposure>0. Robust SE." ///
                  "tot = keep==1; trt = keep==1 & treated==1; ctrl = keep==1 & treated==0.")
 
-    // -------- year-on-year FD --------
-    // D operator already conditions on consecutive non-missing years per outcome.
     use ../temp/observed_qty_price_panel.dta, clear
     xtset athr year
     gen post = year >= 2014
@@ -434,13 +380,6 @@ program observed_qty_price_fd
 end
 
 program level_trajectories_by_exposure
-    // Pure level trajectories of spend / qty / price by exposure quartile
-    // (FOIA, keep==1). No FE, no controls. Mirrors the aggregate plots
-    // people typically show alongside FD tables -- helps see whether the
-    // market-level pattern (e.g. price+spend up, qty flat) shows up
-    // similarly within each exposure group, or whether it's concentrated
-    // in low-exposure athrs. Also outputs the pooled aggregate trajectory
-    // (Total spend, Total qty, Mean price) for comparison.
     di _newline "=== Level trajectories by exposure quartile (FOIA, keep==1) ==="
 
     use ../external/samp/merged_foias_with_pis, clear
@@ -450,14 +389,12 @@ program level_trajectories_by_exposure
     merge m:1 category using ../external/categories/categories_tfidf, ///
         keep(1 3) nogen
     keep if keep == 1
-    drop if mi(spend)  // see observed_expenditure_fd for rationale
+    drop if mi(spend)
     gcollapse (sum) spend qty (mean) price, by(athr_id year)
     merge m:1 athr_id using ../external/real_exposure/athr_exposure, ///
         keep(3) nogen
     drop if exposure <= 0
 
-    // Time-invariant exposure quartile per athr (computed before tsfill so
-    // pooled quantiles use one obs per athr, not one per athr-year).
     preserve
         bys athr_id: keep if _n == 1
         sum exposure, d
@@ -473,10 +410,6 @@ program level_trajectories_by_exposure
     restore
     merge m:1 athr_id using ../temp/exposure_quartiles.dta, keep(3) nogen
 
-    // tsfill + zero-fill spend & qty so quartile means reflect both
-    // extensive (any purchase) and intensive (how much) margins.
-    // Price kept missing on no-purchase years -> quartile mean = mean price
-    // among athrs who actually transacted.
     gegen athr = group(athr_id)
     xtset athr year
     tsfill
@@ -492,7 +425,6 @@ program level_trajectories_by_exposure
     drop if mi(qrtl)
     save ../temp/observed_levels_panel.dta, replace
 
-    // -------- per-athr mean by quartile-year --------
     preserve
         gcollapse (mean) spend qty price, by(qrtl year)
         foreach v in spend qty price {
@@ -511,7 +443,6 @@ program level_trajectories_by_exposure
         }
     restore
 
-    // -------- pooled aggregate (everyone) --------
     preserve
         gcollapse (sum) tot_spend = spend tot_qty = qty (mean) mean_price = price, by(year)
         foreach v in tot_spend tot_qty mean_price {

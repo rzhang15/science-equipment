@@ -1,26 +1,3 @@
-"""
-Coauthor exposure validation for the K-NN imputation.
-
-For every (FOIA PI, coauthor) pair from coauthors.dta:
-  - true_partner_exposure = the FOIA PI's true exposure
-  - pred_knn(coauthor)    = top-K weighted average of FOIA exposures using
-                            cosine sim in FOIA TF-IDF space (mirrors the
-                            production recipe in 2_similarity_wts.py exactly)
-
-Then compare (pred, true) across all pairs and broken out by n_copubs
-(computed against author_paper_edges.parquet).
-
-Why this is a valid exhibit: coauthors are a natural external validation —
-no holdout needed, uses ALL 208 anchors, and the "true" label (partner FOIA
-exposure) is independent of the anchor pool used to fit. Strong pairs (many
-copubs) should track partner exposure best; that gradient is what we're
-checking.
-
-Output:
-  ../../output/coauthor_validation_pairs{tag}{out_tag}.csv
-  ../../output/coauthor_validation_by_copubs{tag}{out_tag}.csv
-  ../../output/coauthor_validation_summary{tag}{out_tag}.txt
-"""
 import argparse
 import os
 import pickle
@@ -35,7 +12,6 @@ COAUTHOR_CSV = f"{OUT_DIR}/coauthor_text_stemmed.csv"
 COAUTHORS_DTA = "../../external/coauthors/coauthors.dta"
 EDGES = "/n/home02/cxu75/sci_eq/derived/openalex/cluster_fields/output/bert/author_paper_edges.parquet"
 DEFAULT_EXPOSURE = "../../external/exposure_wts/athr_exposure_hc.dta"
-
 
 def _paths(tag: str, out_tag: str = "") -> dict:
     if tag and not tag.startswith("_"):
@@ -52,9 +28,7 @@ def _paths(tag: str, out_tag: str = "") -> dict:
         "out_summary":   f"{OUT_DIR}/coauthor_validation_summary{tag}{out_tag}.txt",
     }
 
-
 def vectorize_in_foia_space(texts, vocab, idf_values):
-    """Replicate 1_vectorize.py's transform on coauthor text using saved vocab+idf."""
     cv = CountVectorizer(
         vocabulary=vocab,
         tokenizer=str.split,
@@ -70,10 +44,7 @@ def vectorize_in_foia_space(texts, vocab, idf_values):
     inv = 1.0 / np.maximum(norms, 1e-12)
     return (scipy.sparse.diags(inv) @ tfidf).astype(np.float32).tocsr()
 
-
 def knn_predict_from_sim(sim, e_foia, k, sharpen, floor):
-    """Top-K, floor, sharpen, L1-normalize, weighted average. Matches
-    2_similarity_wts.process_batch."""
     n_co, n_foia = sim.shape
     k = min(k, n_foia)
     topk_idx = np.argpartition(-sim, k - 1, axis=1)[:, :k]
@@ -87,9 +58,7 @@ def knn_predict_from_sim(sim, e_foia, k, sharpen, floor):
     w = vals / row_sums
     return (w * e_foia[topk_idx]).sum(axis=1)
 
-
 def compute_copubs(pairs, edges_path=EDGES):
-    """For each (FOIA, coauthor) return their # of shared papers."""
     foia_ids = pairs["athr_id"].unique().tolist()
     co_ids   = pairs["coauthor_id"].unique().tolist()
     foia_edges = (
@@ -114,9 +83,7 @@ def compute_copubs(pairs, edges_path=EDGES):
     )
     return pairs.merge(counts, on=["athr_id", "coauthor_id"], how="left")["copubs"].fillna(0).astype(int)
 
-
 def metrics_pair(y_true, y_pred, rng_perm=None):
-    """corr, MAE, MAE-random."""
     y_true = np.asarray(y_true, dtype=np.float64)
     y_pred = np.asarray(y_pred, dtype=np.float64)
     mask = np.isfinite(y_true) & np.isfinite(y_pred)
@@ -129,7 +96,6 @@ def metrics_pair(y_true, y_pred, rng_perm=None):
     else:
         mae_r = np.nan
     return {"n": int(len(yt)), "corr": corr, "mae": mae, "mae_rand": mae_r}
-
 
 def main():
     ap = argparse.ArgumentParser()
@@ -174,7 +140,6 @@ def main():
     print(f"tag={args.tag!r}  exposure={args.exposure_dta!r}")
     print(f"KNN: K={args.k} sharpen={args.sharpen} floor={args.floor}")
 
-    # ---- Load artifacts ----
     X_foia = scipy.sparse.load_npz(paths["foia_matrix"]).tocsr().astype(np.float64)
     foia_ids = pd.read_csv(paths["foia_ids"])["athr_id"].astype(str).tolist()
     with open(paths["feature_names"], "rb") as f:
@@ -197,13 +162,11 @@ def main():
               .reindex(foia_ids).fillna(0).values.astype(np.float64))
     print(f"  Exposure (anchors): mean={e_foia.mean():.4f} sd={e_foia.std():.4f}")
 
-    # ---- KNN predictions for every coauthor row ----
     print("Cosine sim (coauthors -> FOIA)...")
     sim = (X_co @ X_foia.T).toarray().astype(np.float64)
     print("Predicting via K-NN...")
     pred_knn_all = knn_predict_from_sim(sim, e_foia, args.k, args.sharpen, args.floor)
 
-    # ---- Attach to (FOIA, coauthor) pairs ----
     df_map = pd.read_stata(COAUTHORS_DTA)
     df_map["athr_id"] = df_map["athr_id"].astype(str)
     df_map["coauthor_id"] = df_map["coauthor_id"].astype(str)
@@ -226,7 +189,6 @@ def main():
     df["copubs"] = compute_copubs(df[["athr_id", "coauthor_id"]].copy())
     print(f"  copub distribution: {df['copubs'].value_counts().head().to_dict()}")
 
-    # ---- Optional cluster filter (mirror the '_cfN' subset used downstream) ----
     if args.cluster_filter and args.min_foia_per_cluster >= 1:
         if not os.path.exists(args.cluster_filter):
             raise SystemExit(f"--cluster-filter not found: {args.cluster_filter}")
@@ -254,12 +216,10 @@ def main():
               f"({100*(n_before-len(df))/n_before:.2f}%; "
               f"{n_no_cluster:,} had no cluster assignment).")
 
-    # ---- Overall metrics ----
     rng = np.random.default_rng(args.seed)
     perm = rng.permutation(len(df))
     m_knn_all = metrics_pair(df["e_foia_true"].values, df["pred_knn"].values, rng_perm=perm)
 
-    # ---- By-copubs table ----
     bins = sorted(set(int(x) for x in args.copub_bins.split(",")))
     print(f"By-copubs bin edges (right-inclusive): {bins}")
 
@@ -285,12 +245,10 @@ def main():
     df_bin.to_csv(paths["out_bybin"], index=False)
     print(f"Saved by-copubs table: {paths['out_bybin']}")
 
-    # ---- Save pair-level csv (columns needed for downstream figures) ----
     df[["athr_id", "coauthor_id", "e_foia_true", "pred_knn",
         "sim_to_partner", "partner_rank", "copubs"]].to_csv(paths["out_pairs"], index=False)
     print(f"Saved pair-level CSV: {paths['out_pairs']}")
 
-    # ---- Summary txt ----
     n_foia_pool = len(foia_ids)
     filter_line = (
         f"  cluster filter: {args.cluster_filter}   min-foia-per-cluster="
@@ -330,7 +288,6 @@ def main():
     print()
     print(text)
     print(f"Saved summary: {paths['out_summary']}")
-
 
 if __name__ == "__main__":
     main()

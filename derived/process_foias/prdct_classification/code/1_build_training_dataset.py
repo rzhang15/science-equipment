@@ -1,11 +1,3 @@
-# 1_build_training_dataset.py
-"""
-Loads the pre-cleaned UT Dallas data, combines it with other sources,
-and creates the final unified training set with a sophisticated labeling hierarchy.
-
-Uses Aho-Corasick substring matching for all keyword labeling -- the same method
-used by the HybridClassifier at inference time (classifier.py).
-"""
 import pandas as pd
 import os
 import joblib
@@ -47,19 +39,6 @@ def load_fisher_non_lab_data():
 
 
 def load_fisher_chemical_data(seed_automaton=None):
-    """Load the Fisher chemicals catalog as non-lab training data.
-
-    The catalog (~37k chemicals Fisher sells) is mostly bulk chemistry the
-    taxonomy treats as `irrelevant chemicals - *`, but it overlaps with
-    life-sci essentials labs do use (ethanol, tris, edta, glycerol, ...).
-    To avoid teaching the model "all chemicals = non-lab", we drop any row
-    whose description matches the existing seed keyword automaton — i.e.,
-    rows that look like life-sci consumables in our taxonomy.
-
-    Even after the guard, the dedup + conflict-resolution stage in main()
-    is a second safety net: any row that collides with a fisher_lab item
-    gets forced to label=0 (downgrades win).
-    """
     df = pd.read_csv(config.FISHER_CHEMICAL)
     df['cleaned_description'] = df[config.CLEAN_DESC_COL].fillna('')
     df['label'] = 0
@@ -86,13 +65,6 @@ def _batched_transform(vectorizer, descriptions, batch_size=5000, desc=""):
 def prepare_and_save_tfidf_category_vectors(df_lab_only, word_vectorizer,
                                             char_vectorizer, output_path,
                                             supplier_vectorizer=None):
-    """Build category centroids in the combined, contrastively-weighted space.
-
-    The stacked feature space is [word_tfidf | char_tfidf].  Chi-square against
-    the category label gives per-feature contrastive weights (sqrt of chi2,
-    normalized to mean 1), which are persisted alongside the vectorizers and
-    applied element-wise to both item vectors and centroids.
-    """
     print("Preparing and saving TF-IDF category vectors...")
     descriptions = df_lab_only[config.CLEAN_DESC_COL].fillna('').astype(str)
     categories = pd.Categorical(df_lab_only[config.UT_CAT_COL])
@@ -121,11 +93,6 @@ def prepare_and_save_tfidf_category_vectors(df_lab_only, word_vectorizer,
         print(f"    Feature weights: word={n_word}, char={n_char}, "
               f"weight mean={feature_weights.mean():.3f}, max={feature_weights.max():.2f}")
 
-    # If a supplier vectorizer is available, add a supplier block to the item
-    # vectors (L2-normalized desc + L2-normalized supplier, weighted by
-    # config.DESC_WEIGHT / SUPPLIER_WEIGHT).  Mirrors the gatekeeper's
-    # combined representation in classifier.py so the expert sees the same
-    # signal structure at training and inference.
     if supplier_vectorizer is not None and 'supplier_token' in df_lab_only.columns:
         supp_tokens = df_lab_only['supplier_token'].fillna('').astype(str).tolist()
         X_supp = supplier_vectorizer.transform(supp_tokens)
@@ -162,9 +129,6 @@ def main():
     try:
         df_combined_raw = pd.read_parquet(config.COMBINED_MERGED_CLEAN_PATH)
         df_combined_raw['cleaned_description'] = df_combined_raw[config.CLEAN_DESC_COL].fillna('')
-        # data_source keeps the legacy naming used across the rest of the
-        # pipeline ('ut_dallas' / 'umich') even though the source column is
-        # now `uni` ('utdallas' / 'umich') after the step-0 append.
         df_combined_raw['data_source'] = df_combined_raw['uni'].map(
             {'utdallas': 'ut_dallas', 'umich': 'umich'}
         )
@@ -183,10 +147,6 @@ def main():
         df_ca_non_lab = load_ca_data()
         df_fisher_lab = load_fisher_lab_data()
         df_fisher_non_lab = load_fisher_non_lab_data()
-        # fisher_chemical needs the seed automaton to drop life-sci essential
-        # chemicals before labeling the rest as non-lab.  Build it now so
-        # load_fisher_chemical_data can use it.  The other automatons are
-        # rebuilt below at the labeling step.
         _seed_for_chem = load_keywords_and_build_automaton(config.SEED_KEYWORD_YAML)
         df_fisher_chemical = load_fisher_chemical_data(seed_automaton=_seed_for_chem)
     except Exception as e:
@@ -199,8 +159,6 @@ def main():
         ignore_index=True,
     )
 
-    # Drop rows with empty/whitespace-only descriptions — useless as training
-    # examples and they drive a huge block of spurious "conflicts" at dedup.
     n_before_empty = len(df_combined)
     empty_mask = df_combined['cleaned_description'].fillna('').str.strip() == ''
     n_empty = int(empty_mask.sum())
@@ -209,14 +167,12 @@ def main():
         print(f"  - Dropped {n_empty} rows with empty cleaned_description "
               f"({n_before_empty} -> {len(df_combined)})")
 
-    # Ensure supplier column exists (some sources may not carry it)
     if config.USE_SUPPLIER:
         if 'supplier' not in df_combined.columns:
             df_combined['supplier'] = ''
         else:
             df_combined['supplier'] = df_combined['supplier'].fillna('')
 
-    # --- Build Aho-Corasick automatons (same matching as classifier.py at inference) ---
     seed_automaton = load_keywords_and_build_automaton(config.SEED_KEYWORD_YAML)
     anti_seed_automaton = load_keywords_and_build_automaton(config.ANTI_SEED_KEYWORD_YAML)
     market_rule_automaton = extract_market_keywords_and_build_automaton(config.MARKET_RULES_YAML)
@@ -225,7 +181,6 @@ def main():
     print("  Order (downgrades win): seed (not CA) -> market (UTD/UMich) -> "
           "anti-seed (all) -> non-lab category (UTD/UMich)")
 
-    # 1. Apply general seed keywords, EXCLUDING ca_non_lab data
     if seed_automaton:
         matches = batch_has_match(df_combined['cleaned_description'], seed_automaton)
         not_ca_non_lab_mask = df_combined['data_source'] != 'ca_non_lab'
@@ -233,7 +188,6 @@ def main():
         df_combined.loc[final_mask, 'label'] = 1
         print(f"  - Seed keywords: {final_mask.sum()} items labeled as lab")
 
-    # 2. Apply market rule keywords to labeled data (UT Dallas + UMich if enabled)
     if market_rule_automaton:
         labeled_sources = ['ut_dallas'] + (['umich'] if config.USE_UMICH else [])
         is_labeled_mask = df_combined['data_source'].isin(labeled_sources)
@@ -247,15 +201,11 @@ def main():
             df_combined.loc[matched_indices, 'label'] = 1
             print(f"  - Market rule keywords: {len(matched_indices)} labeled-data items labeled as lab")
 
-    # 3. Apply anti-seed keywords — ALWAYS overrides, even market rule matches
     if anti_seed_automaton:
         matches = batch_has_match(df_combined['cleaned_description'], anti_seed_automaton)
         df_combined.loc[matches, 'label'] = 0
         print(f"  - Anti-seed keywords: {matches.sum()} items labeled as non-lab (overrides all)")
 
-    # 4. Apply definitive non-lab category override for labeled sources.
-    #    Runs BEFORE dedup so rows like ("freight charge", "fees - shipping")
-    #    are flipped to 0 and no longer conflict with the ca_non_lab copy.
     if config.UT_CAT_COL in df_combined.columns:
         labeled_sources = ['ut_dallas'] + (['umich'] if config.USE_UMICH else [])
         is_labeled = df_combined['data_source'].isin(labeled_sources)
@@ -265,10 +215,6 @@ def main():
         df_combined.loc[final_nonlab_mask, 'label'] = 0
         print(f"  - Non-lab category override: {final_nonlab_mask.sum()} labeled-data items set to non-lab")
 
-    # --- Deduplication with logging ---
-    # Conflict resolution: if the same description appears across sources with
-    # different labels, force the final label to 0 (non-lab).  Consistent with
-    # the "downgrades win" principle — a single non-lab vote is enough.
     n_before = len(df_combined)
     dupes = df_combined[df_combined.duplicated(subset=['cleaned_description'], keep=False)]
     if len(dupes) > 0:
@@ -286,19 +232,14 @@ def main():
              .sort_values(['cleaned_description', 'data_source'])
              .to_csv(conflicts_path, index=False))
             print(f"  - Conflicting rows saved to: {conflicts_path}")
-            # Force every row whose description is in a conflict cluster to 0.
             conflict_descs = set(conflicting['cleaned_description'].unique())
             df_combined.loc[df_combined['cleaned_description'].isin(conflict_descs), 'label'] = 0
 
     df_combined.drop_duplicates(subset=['cleaned_description'], keep='first', inplace=True)
     print(f"  - Dropped {n_before - len(df_combined)} duplicate rows, {len(df_combined)} remaining")
 
-    # prepared_description is always the clean text (no supplier token).
-    # Supplier weighting is handled in step 1b via separate vectorizers.
     df_combined['prepared_description'] = df_combined['cleaned_description']
     if config.USE_SUPPLIER:
-        # Dedupe: normalize_supplier is deterministic and there are typically
-        # a few hundred unique suppliers across millions of rows.
         supplier_map = {
             s: config.normalize_supplier(s)
             for s in df_combined['supplier'].unique()
@@ -309,8 +250,6 @@ def main():
     print("\nFinal label distribution for training data:")
     print(df_prepared['label'].value_counts(normalize=True))
 
-    # Fit category vectorizer on clean descriptions (no supplier token)
-    # so category similarity matching stays content-based
     print("\nFitting a TF-IDF category vectorizer...")
     category_stops = list(ENGLISH_STOP_WORDS) + config.DOMAIN_STOP_WORDS + config.CATEGORY_STOP_WORDS
     category_vectorizer = TfidfVectorizer(
@@ -319,15 +258,12 @@ def main():
         stop_words=category_stops,
         sublinear_tf=True,
     )
-    # Use clean_desc (without supplier token) for category vectors
     cat_fit_col = config.CLEAN_DESC_COL if config.CLEAN_DESC_COL in df_prepared.columns else 'prepared_description'
     cat_fit_text = df_prepared[cat_fit_col].fillna('')
     category_vectorizer.fit(cat_fit_text)
     joblib.dump(category_vectorizer, config.CATEGORY_VECTORIZER_PATH)
     print(f"Category vectorizer saved to: {config.CATEGORY_VECTORIZER_PATH}")
 
-    # Optional char n-gram vectorizer (catches morphological variants like
-    # "rack"/"racks"/"racking" that word-level tokens split apart).
     char_vectorizer = None
     if config.USE_CHAR_NGRAMS:
         print("Fitting a char-level TF-IDF vectorizer...")
@@ -343,10 +279,6 @@ def main():
     elif os.path.exists(config.CATEGORY_CHAR_VECTORIZER_PATH):
         os.remove(config.CATEGORY_CHAR_VECTORIZER_PATH)
 
-    # Supplier vectorizer -- same token-level vocabulary used by the gatekeeper
-    # in step 1b.  Fit once here on the full training set so both the expert's
-    # category vectors (built below) and the gatekeeper's combined embeddings
-    # (step 1b) index into the same supplier space.
     supplier_vectorizer = None
     supp_vec_path = os.path.join(config.OUTPUT_DIR, "vectorizer_supplier_tfidf.joblib")
     if config.USE_SUPPLIER and 'supplier_token' in df_prepared.columns:
@@ -358,7 +290,6 @@ def main():
     elif os.path.exists(supp_vec_path):
         os.remove(supp_vec_path)
 
-    # Filter labeled data to lab-only categories for category vectors
     lab_frames = []
     is_nonlab_ut = df_ut_dallas[config.UT_CAT_COL].astype(str).str.contains(config.NONLAB_REGEX, na=False)
     lab_frames.append(df_ut_dallas[~is_nonlab_ut])
@@ -367,9 +298,6 @@ def main():
         lab_frames.append(df_umich[~is_nonlab_um])
     df_lab_only = pd.concat(lab_frames, ignore_index=True)
 
-    # Compute supplier_token on the lab-only frame so the category vectors can
-    # include a supplier block.  df_lab_only is built from raw parquet slices
-    # that predate supplier_token's computation in df_prepared.
     if config.USE_SUPPLIER and 'supplier' in df_lab_only.columns:
         unique_supp = df_lab_only['supplier'].fillna('').unique()
         supp_map = {s: config.normalize_supplier(str(s)) for s in unique_supp}
@@ -391,9 +319,6 @@ def main():
     df_to_save.to_parquet(config.PREPARED_DATA_PATH, index=False)
     print(f"\nFinal prepared training data saved to: {config.PREPARED_DATA_PATH}")
 
-    # Under baseline, UMich is never in training.  Produce a labeled UMich
-    # dataset (using the same keyword hierarchy as training) so script 2 can
-    # evaluate the baseline model on the full, out-of-sample UMich corpus.
     if not config.USE_UMICH and os.path.exists(config.COMBINED_MERGED_CLEAN_PATH):
         build_umich_eval_dataset(seed_automaton, anti_seed_automaton, market_rule_automaton)
 
@@ -401,15 +326,12 @@ def main():
 
 
 def build_umich_eval_dataset(seed_automaton, anti_seed_automaton, market_rule_automaton):
-    """Label the UMich corpus with the same keyword hierarchy used for training
-    and save it to config.UMICH_EVAL_DATA_PATH.  Only called under baseline.
-    """
     print("\n--- Building UMich evaluation dataset (baseline out-of-sample) ---")
     df = pd.read_parquet(config.COMBINED_MERGED_CLEAN_PATH)
     df = df[df['uni'] == 'umich'].copy()
     df['cleaned_description'] = df[config.CLEAN_DESC_COL].fillna('')
     df['data_source'] = 'umich'
-    df['label'] = 1  # labeled source default (same as training)
+    df['label'] = 1
 
     if seed_automaton:
         m = batch_has_match(df['cleaned_description'], seed_automaton)

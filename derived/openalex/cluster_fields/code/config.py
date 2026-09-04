@@ -2,7 +2,6 @@ import re
 import nltk
 from nltk.corpus import stopwords
 
-# Ensure stopwords are downloaded
 nltk.download("stopwords", quiet=True)
 
 
@@ -106,19 +105,16 @@ unit_stopwords = [
     "https", "com", "org", "edu", "pdf", "suppl", "doi"
 ]
 
-# --- NEW ADDITIONS TO CLEAN CLUSTERS ---
 
-# 1. Chemical Artifacts (Removing the "fluorescein" clusters)
 chemical_stopwords = [
     "fluorescence", "fluorescent", "fluorescein", "fluorescamine", 
     "fluorenyl", "fluorenylmethyloxycarbonyl", "fmoc", "fluoresc", 
     "fluoresbrit", "fluorenylnitrenium", "fluorenylmethyl", 
     "fluorenylmethylchloroform", "fluorenylmethoxycarbonyl", 
     "fluorenylmethoxi", "fluorenylhydroxam", "fluorenyliden", 
-    "sub", "sup" # Common chemical formula subscripts/superscripts
+    "sub", "sup"
 ]
 
-# 2. Foreign Language & Nonsense Words (Removing the French/Spanish/German clusters)
 foreign_stopwords = [
     "pour", "dans", "avec", "etude", "chez", "une", "nous", "de", "le", "sur", 
     "ca", "tude", "est", "propo", "para", "por", "los", "las", "estudio", 
@@ -127,18 +123,12 @@ foreign_stopwords = [
     "ein", "zur", "ber", "auf", "nach", "den"
 ]
 
-# 3. XML/Formatting Artifacts (Removing the "Math" cluster)
 xml_stopwords = [
     "mml", "math", "mrow", "xmlns", "mathml", "mtext", "msub",
     "mathvariant", "msup", "inline", "fontstyle", "xmln", "mathvari",
     "fontstyl"
 ]
 
-# 4. Abstract-template / journal-chrome tokens that leak into cluster top-terms
-#    (jama, summary, altmetric/altmetrics, scp boilerplate, follow-up).
-#    Include both unstemmed and stemmed variants so the upstream
-#    `t not in stopwords_set` check in 0_combine_data.py and the
-#    TfidfVectorizer stop_words filter both catch them.
 template_stopwords = [
     "jama",
     "summary", "summaries", "summari",
@@ -147,20 +137,6 @@ template_stopwords = [
     "follow", "follows", "followed", "following",
 ]
 
-# 5. Publisher / scraped-page chrome. These formed whole clusters at K=100:
-#    C23 was "commun, urolog, public, onlin, american, date, advertis, inc,
-#    s0022, informationhttp, favoritesdownload, toolsadd, citationstrack,
-#    intwitteremail" -- 12,197 authors grouped on page furniture, which
-#    dropped real life scientists from the life-science filter. C72 mixed
-#    real pharmacology with "citat, crossref, text, updat, share, full".
-#
-#    These also create spurious FOIA similarity: two authors publishing in
-#    the same journal share chrome tokens without sharing a topic.
-#
-#    Deliberately NOT listed, because the Porter stem collides with real
-#    science vocabulary:
-#      supplement <- "dietary supplementation"    confer <- "confers resistance"
-#      reserv     <- "cardiac reserve"            press  <- "blood pressure" adjacent
 publisher_stopwords = [
     "onlin", "advertis", "inc", "date", "updat", "citat", "crossref",
     "share", "full", "text", "articl", "journal", "publish", "copyright",
@@ -169,36 +145,14 @@ publisher_stopwords = [
     "elsevier", "springer", "wilei", "cambridg", "oxford", "societi",
     "american", "annual", "meet", "symposium", "editor", "comment",
     "erratum", "retract", "appendix",
-    # observed concatenated nav artifacts from page scraping
     "informationhttp", "favoritesdownload", "toolsadd", "citationstrack",
     "intwitteremail", "s0022",
-    # short exact-match chrome. NOT eligible for CHROME_FRAGMENTS substring
-    # matching: "icon" would swallow "silicon", "cite" would swallow
-    # "excite"/"cited-adjacent" stems.
     "icon", "cite", "toview", "inissu", "inadd", "donut", "online1",
     "alert", "compliant", "get", "novemb", "januari", "februari", "april",
     "june", "juli", "august", "septemb", "octob", "decemb",
-    # cookie-consent banners and journal-title words. These formed a cluster
-    # of 9,568 clinicians grouped on "Archives of Pediatrics / Psychiatry /
-    # Neurology / Dermatology / Otolaryngology / Ophthalmology" rather than on
-    # what any of them study. The specialty names themselves stay -- they are
-    # real vocabulary; it is the title scaffolding that has to go.
-    #
-    # "sign" deliberately excluded: "signs and symptoms" is clinical content.
     "cooki", "archiv", "forum",
 ]
 
-# 6. Concatenated navigation strings from page scraping. These cannot be
-#    enumerated: the scraper mashes adjacent link text into one token, so the
-#    set is open-ended ("sharefacebooklink", "citationspermissionsreprint",
-#    "exportriscitationcit", "onfacebooktwitterwechatlink", "downloadload",
-#    "figuresreferencesrelateddetailscit", "metricsarticl"). At K=100 they
-#    still formed two clusters (C27, C93; 21,964 authors) after the flat
-#    publisher_stopwords list was applied.
-#
-#    Matched as substrings, so they catch novel concatenations. Every fragment
-#    here is long enough that no Porter-stemmed biomedical term contains it --
-#    checked against the 30k clustering vocabulary.
 CHROME_FRAGMENTS = [
     "facebook", "twitter", "wechat", "linkedin", "mendeley",
     "citation", "permission", "metricsarticl", "metricsauthor",
@@ -206,27 +160,13 @@ CHROME_FRAGMENTS = [
     "abstractcit", "referencesmor", "referenceadd", "relateddetail",
     "sharefacebook", "toolsadd", "favoritesdownload", "informationhttp",
     "intwitteremail", "citationstrack",
-    # "permission" (was "permissionsreprint") also catches permissionsarticl;
-    # "onlin" catches online1/onlinefirst without touching real vocabulary.
     "onlin",
 ]
 
-#    Fragment matching only -- no token-length rule. A length cutoff looks
-#    tempting but real biomedical vocabulary runs long: at 24+ characters the
-#    30k clustering vocabulary contains glycosylphosphatidylinositol,
-#    acetylgalactosaminyltransferas, esophagogastroduodenoscopi,
-#    methylenedioxymethamphetamin and uvulopalatopharyngoplasti. Every chrome
-#    token observed so far is caught by a fragment anyway.
-#
-#    Compiled to one alternation rather than looping the list per token: the
-#    tokenizer sees ~370M tokens per vectorize pass, so a Python-level loop
-#    over 25 fragments costs ~9 billion substring checks and roughly doubled
-#    the vectorize step.
 _CHROME_RE = re.compile("|".join(re.escape(f) for f in CHROME_FRAGMENTS))
 
 
 def is_chrome(token: str) -> bool:
-    """True if a token is scraped page furniture rather than science."""
     return _CHROME_RE.search(token) is not None
 
 
@@ -242,6 +182,5 @@ all_custom_stopwords = (
     template_stopwords +
     publisher_stopwords
 )
-# Export the final SET (for fast checking) and LIST (for sklearn)
 stopwords_set = set(stopwords.words("english")).union(set(all_custom_stopwords))
 stopwords_list = list(stopwords_set)

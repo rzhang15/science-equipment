@@ -6,30 +6,16 @@ library(haven)
 library(stringr)
 set.seed(8975)
 
-# Set working directory and create output folders
 setwd("~/sci_eq/derived/first_stage/match_control/code")
 dir.create("../output/figures", recursive = TRUE, showWarnings = FALSE)
 dir.create("../output/balance_plots", recursive = TRUE, showWarnings = FALSE)
 
-# ---------------------------
-# Configuration
-# ---------------------------
-# Matching covariates. Picked via explore_specs.R.
-#
-# v80 (current pick): avg_log_price_pre_mean + avg_log_price_slope.
-#   Pre-period price level (3-yr mean of 2011-2013) anchors the level, slope
-#   anchors the trend direction. Two-covariate price-focused spec.
 MATCH_COVARIATES <- c("avg_log_price_pre_mean", "avg_log_price_slope")
 #MATCH_COVARIATES <- c("avg_log_price_2012", "avg_log_price_2013")
 
-# Number of controls per treated unit
 MATCH_RATIO <- 2
-# Outcome variables to plot
 OUTCOME_VARS <- c("avg_log_price")
 
-# ---------------------------
-# Data Preparation
-# ---------------------------
 for (SUFFIX in c("", "_all3")) {
 cat("\n########## Running suffix:", ifelse(SUFFIX == "", "baseline", SUFFIX), "##########\n")
 cat("Loading data...\n")
@@ -42,7 +28,6 @@ cat("Total categories:", n_distinct(panel$category), "\n")
 cat("Treated categories:", n_distinct(panel$category[panel$treated == 1]), "\n")
 cat("Control categories:", n_distinct(panel$category[panel$treated == 0]), "\n\n")
 
-# Pivot pre-treatment data to wide format (one row per category)
 all_data_pre <- panel %>% filter(year <= 2013)
 
 data_wide <- all_data_pre %>%
@@ -54,12 +39,8 @@ data_wide <- all_data_pre %>%
                     raw_spend, raw_price, raw_qty, log_raw_price, log_raw_qty)
   ) %>%
   mutate(
-    # Log-transform spend to reduce skew — huge markets won't dominate distance
     log_spend_2013 = log(spend_2013 + 1)
   )
-# Pre-period regressions (slope/intercept, year centered at 2012) plus the
-# 3-year pre-period mean (2011-2013) used by v80. Computed for price/spend/qty
-# so multiple specs can be swapped in without code changes.
 pre_slopes <- panel %>%
   filter(year <= 2013) %>%
   mutate(year_c = year - 2012) %>%
@@ -87,10 +68,6 @@ data_wide <- data_wide %>%
   left_join(pre_means,  by = "category")
 cat("Wide data dimensions:", dim(data_wide), "\n")
 
-# ---------------------------
-# Handle missing covariates
-# ---------------------------
-# Check which categories have NA in matching covariates
 na_check <- data_wide %>%
   filter(if_any(all_of(MATCH_COVARIATES), is.na))
 
@@ -100,11 +77,9 @@ if (nrow(na_check) > 0) {
   cat("\n")
 }
 
-# Separate treated and controls
 all_treated <- data_wide %>% filter(treated == 1)
 all_controls <- data_wide %>% filter(treated == 0) %>% drop_na(all_of(MATCH_COVARIATES))
 
-# For treated units with NA covariates, we'll handle them with a fallback
 treated_has_na <- all_treated %>%
   filter(if_any(all_of(MATCH_COVARIATES), is.na)) %>%
   pull(category)
@@ -121,10 +96,6 @@ if (length(treated_has_na) > 0) {
 }
 cat("\n")
 
-# ---------------------------
-# Matching: all clean treated markets at once
-# ---------------------------
-# Combine clean treated + all clean controls for a single matchit call
 match_input <- bind_rows(treated_clean, all_controls)
 
 match_formula <- as.formula(paste("treated ~", paste(MATCH_COVARIATES, collapse = " + ")))
@@ -146,12 +117,10 @@ main_model <- tryCatch({
   stop("Main matching failed: ", e$message)
 })
 
-# Print overall balance summary
 cat("=== Overall Balance Summary ===\n")
 print(summary(main_model))
 cat("\n")
 
-# Save overall balance plot
 tryCatch({
   bal_plot <- love.plot(main_model, binary = "std", thresholds = c(m = .1),
                         title = "Overall Covariate Balance (Mahalanobis Matching)")
@@ -161,15 +130,10 @@ tryCatch({
   message("WARNING: Overall love.plot failed: ", e$message)
 })
 
-# ---------------------------
-# Extract matched pairs from the single matchit model
-# ---------------------------
 match_data <- match.data(main_model)
 
-# Get the match matrix to know which controls each treated got
-match_matrix <- main_model$match.matrix  # rows = treated, cols = matched controls
+match_matrix <- main_model$match.matrix
 
-# Build the pairs list
 match_pairs_list <- list()
 
 for (i in seq_len(nrow(match_matrix))) {
@@ -189,9 +153,6 @@ for (i in seq_len(nrow(match_matrix))) {
   )
 }
 
-# ---------------------------
-# Handle NA treated markets with fallback (match on available covariates only)
-# ---------------------------
 if (length(treated_has_na) > 0) {
   cat("\n--- Handling", length(treated_has_na), "treated markets with NA covariates ---\n")
   
@@ -200,11 +161,9 @@ if (length(treated_has_na) > 0) {
     
     treated_row <- all_treated %>% filter(category == category_id)
     
-    # Determine which covariates are available for this treated unit
     available_covs <- MATCH_COVARIATES[!is.na(treated_row[, MATCH_COVARIATES])]
     
     if (length(available_covs) == 0) {
-      # Absolute fallback: just match on avg_log_price_2013 if everything else is NA
       available_covs <- "avg_log_price_2013"
       if (is.na(treated_row$avg_log_price_2013)) {
         message("FATAL: No covariates available for ", category_id)
@@ -249,9 +208,6 @@ if (length(treated_has_na) > 0) {
   }
 }
 
-# ---------------------------
-# Combine all match pairs
-# ---------------------------
 if (length(match_pairs_list) == 0) {
   stop("No matches were made at all!")
 }
@@ -263,7 +219,6 @@ cat("\n====================================================\n")
 cat("Successfully matched", n_distinct(match_pairs$treated_market), "treated markets.\n")
 cat("====================================================\n\n")
 
-# Check completeness
 all_treated_cats <- unique(all_treated$category)
 matched_cats <- unique(match_pairs$treated_market)
 missing_cats <- setdiff(all_treated_cats, matched_cats)
@@ -278,15 +233,11 @@ if (length(missing_cats) > 0) {
 write_csv(match_pairs, paste0("../output/match_pairs", SUFFIX, ".csv"))
 cat("Saved match_pairs", SUFFIX, ".csv\n\n", sep = "")
 
-# ---------------------------
-# Generate trend plots for each treated market
-# ---------------------------
 cat("Generating trend plots...\n\n")
 
 unique_treated <- unique(match_pairs$treated_market)
 
 for (treated_cat in unique_treated) {
-  # Get this market's controls
   controls <- match_pairs %>%
     filter(treated_market == treated_cat) %>%
     pull(control_market) %>%
@@ -295,7 +246,6 @@ for (treated_cat in unique_treated) {
   for (outcome_var in OUTCOME_VARS) {
     relevant_categories <- c(treated_cat, controls)
     
-    # Prepare trend data
     outcome_trends <- panel %>%
       filter(category %in% relevant_categories) %>%
       select(category, year, treated, spend_2013, all_of(outcome_var)) %>%
@@ -303,12 +253,10 @@ for (treated_cat in unique_treated) {
       mutate(outcome_adj = .data[[outcome_var]] - .data[[outcome_var]][year == 2013]) %>%
       ungroup()
     
-    # Treated trend
     treated_plot_data <- outcome_trends %>%
       filter(category == treated_cat) %>%
       mutate(group_label = paste("Treated:", treated_cat))
     
-    # Weighted average control trend
     avg_control_plot_data <- outcome_trends %>%
       filter(category %in% controls) %>%
       group_by(year) %>%
@@ -343,7 +291,6 @@ for (treated_cat in unique_treated) {
       )
     
     tryCatch({
-      # Sanitize filename (replace special characters)
       safe_name <- str_replace_all(treated_cat, "[^a-zA-Z0-9_-]", "_")
       ggsave(paste0("../output/figures/", outcome_var, "_trends_", safe_name, SUFFIX, ".pdf"),
              plot = p, width = 10, height = 7)
@@ -356,9 +303,6 @@ for (treated_cat in unique_treated) {
   }
 }
 
-# ---------------------------
-# Summary statistics
-# ---------------------------
 cat("\n====================================================\n")
 cat("MATCHING SUMMARY\n")
 cat("====================================================\n")
@@ -369,7 +313,6 @@ cat("Matching ratio:", MATCH_RATIO, "controls per treated\n")
 cat("Replace: TRUE\n")
 cat("Covariates:", paste(MATCH_COVARIATES, collapse = ", "), "\n")
 
-# Per-market SMD diagnostics
 cat("\n--- Per-Market Match Quality ---\n")
 for (treated_cat in unique_treated) {
   controls <- match_pairs %>%
@@ -380,7 +323,6 @@ for (treated_cat in unique_treated) {
   t_row <- data_wide %>% filter(category == treated_cat)
   c_rows <- data_wide %>% filter(category %in% controls)
   
-  # Calculate mean abs difference in matching covariates (standardized by control SD)
   available_covs <- intersect(MATCH_COVARIATES, names(t_row))
   available_covs <- available_covs[!is.na(t_row[1, available_covs])]
   

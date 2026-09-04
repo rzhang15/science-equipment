@@ -1,8 +1,3 @@
-# categorize_items.py
-"""
-Defines the non-parametric categorizer classes used for predicting product markets.
-Returns both the category and the similarity score.
-"""
 import joblib
 import numpy as np
 import os
@@ -16,8 +11,6 @@ import config
 
 
 def _normalize_suppliers(suppliers):
-    """Return a list of normalized supplier tokens aligned with descriptions.
-    Missing / None entries become the empty string (same as training)."""
     if suppliers is None:
         return None
     if isinstance(suppliers, pd.Series):
@@ -26,11 +19,6 @@ def _normalize_suppliers(suppliers):
 
 
 class _WordCharVectorizer:
-    """Thin wrapper over the combined word + char TF-IDF space with
-    element-wise contrastive weights applied.  When a supplier vectorizer is
-    present, `.transform(X, suppliers)` additionally L2-normalizes desc and
-    supplier blocks and concats them with config.DESC_WEIGHT / SUPPLIER_WEIGHT
-    (mirroring the gatekeeper's treatment in classifier.py)."""
 
     def __init__(self, word_vec, char_vec=None, feature_weights=None,
                  supplier_vec=None):
@@ -48,10 +36,6 @@ class _WordCharVectorizer:
         X_desc = self._transform_desc(X)
         if self.supplier_vec is None:
             return X_desc
-        # Category vectors carry a supplier block, so item vectors must too --
-        # even if suppliers weren't passed (e.g. a file without a supplier
-        # column).  Fall back to empty strings so the supplier block is all
-        # zeros and cosine similarity reflects desc-only agreement.
         if suppliers is None:
             supp_tokens = [''] * X_desc.shape[0]
         else:
@@ -113,24 +97,11 @@ class TfidfItemCategorizer:
             return "Prediction Error", -1.0
 
     def predict_batch(self, descriptions: pd.Series, suppliers=None) -> tuple:
-        """Batch-predict categories for an entire Series at once.
-
-        One vectorizer.transform + one cosine_similarity matmul for all
-        items, instead of N separate calls via progress_apply.
-
-        Returns (predictions, scores, item_vectors).  item_vectors is the
-        combined desc+supplier matrix aligned to descriptions.index, so the
-        caller can reuse it downstream (e.g. to compute final similarity
-        scores against assigned category vectors) without re-transforming.
-        """
         descs = descriptions.astype(str)
         empty_mask = descs.str.strip() == ''
 
         item_vectors = self.vectorizer.transform(descs, suppliers=suppliers)
 
-        # Chunk the (N, K) dense similarity matrix so peak memory is
-        # (CHUNK, K) instead of (N, K).  Large-file predictions used to
-        # allocate ~1.3 GB at this step for 300k rows x ~550 categories.
         CHUNK_SIZE = 20_000
         n_items = item_vectors.shape[0]
         best_indices = np.empty(n_items, dtype=np.int64)
@@ -180,11 +151,6 @@ class EmbeddingItemCategorizer:
             raise
 
     def _encode_with_supplier(self, descs, suppliers):
-        """Encode descriptions with BERT, optionally concat supplier TF-IDF.
-        Mirrors the combined-vector layout built in 1b_create_text_embeddings.py.
-        If suppliers is None but the model was trained with a supplier block,
-        fall back to zero-vector supplier columns so shapes still match.
-        """
         desc_vectors = self.encoder_model.encode(
             descs, show_progress_bar=True, batch_size=128
         )
@@ -217,22 +183,11 @@ class EmbeddingItemCategorizer:
             return "Prediction Error", -1.0
 
     def predict_batch(self, descriptions: pd.Series, suppliers=None) -> tuple:
-        """Batch-predict categories for an entire Series at once.
-
-        One encoder.encode call (batched internally) + one cosine_similarity
-        matmul for all items, replacing N per-row encode calls.
-
-        Returns (predictions, scores, item_vectors).  item_vectors is the
-        combined desc+supplier matrix aligned to descriptions.index.
-        """
         descs = descriptions.astype(str)
         empty_mask = descs.str.strip() == ''
 
         item_vectors = self._encode_with_supplier(descs.tolist(), suppliers)
 
-        # Chunk the (N, K) dense similarity matrix so peak memory is
-        # (CHUNK, K) instead of (N, K).  Each chunk is still a single
-        # vectorized matmul; we just never hold the full thing at once.
         CHUNK_SIZE = 20_000
         n_items = item_vectors.shape[0]
         best_indices = np.empty(n_items, dtype=np.int64)

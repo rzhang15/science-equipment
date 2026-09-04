@@ -69,13 +69,6 @@ program apply_crosswalk
     label var year       "fiscal year of the grant-year record"
     label var start_year "project start year on THIS application row"
 
-    * start_year is not constant within grant_key, contrary to what this file
-    * used to claim: 14.3% of supplement rows carry a project_start that differs
-    * from their parent's inside the same award-year, against 0.9% of
-    * non-supplement rows, and the disagreement rate roughly quadrupled over
-    * 2012-2019. Award start is a property of the award, so take it from the
-    * non-supplement rows and fall back to all research rows only if an award
-    * has none.
     gen double _par_start = project_start if research & !supplement
     gen double _any_start = project_start if research
     gegen double award_start = min(_par_start), by(grant_key)
@@ -121,8 +114,6 @@ program classify_grants
     }
     replace activity = upper(strtrim(activity))
 
-    * Leading digit of full_project_num: 1 new, 2 competing renewal,
-    * 3 administrative supplement, 5 non-competing continuation.
     gen byte appl_type  = real(substr(strtrim(full_project_num), 1, 1))
     gen byte supplement = appl_type == 3
     label var appl_type  "NIH application type (leading digit of full_project_num)"
@@ -212,15 +203,11 @@ program collapse_athr_year
         save ../temp/nih_totals_by_athr, replace
     restore
 
-    * Regression guard on the assumption this file used to make silently.
     qui count if research
     local n_res = r(N)
     qui count if research & !mi(start_year) & start_year != award_start_year
     di as text "  `r(N)' of `n_res' research rows disagree with their award start"
 
-    * tag() marks whichever row sorts first within the group, with no preference
-    * for the parent application. That is fine for counting distinct awards but
-    * must never decide the value of a variable -- see new_grant below.
     egen byte tag_res   = tag(athr_id year grant_key) if research
     egen byte tag_train = tag(athr_id year grant_key) if training
     egen byte tag_r50   = tag(athr_id year grant_key) if r50
@@ -234,9 +221,6 @@ program collapse_athr_year
     gen byte train_grant = tag_train == 1
     gen byte r50_grant   = tag_r50   == 1
     gen byte any_grant   = res_grant | train_grant | r50_grant
-    * Keyed to the award, not to the tagged row. Under the old row-level rule a
-    * sort-order flip could book a continuing award as brand new in whichever
-    * year it happened to receive a supplement.
     gen byte new_grant   = res_grant & award_start_year == year
 
     gen double res_cost   = total_cost    if research
@@ -260,11 +244,6 @@ program collapse_athr_year
               by(athr_id year) fast
 
     format %td first_project_start last_project_end
-    * Counts include supplement rows on purpose: an award cannot be supplemented
-    * unless it is live, so a supplement row is evidence of activity in that FY,
-    * and it folds into the parent's grant_key rather than adding a second
-    * award. Dollars include them on purpose too -- supplement obligations are
-    * real money. n_grants_nosupp / nih_cost_nosupp are the robustness handles.
     label var n_new_grants       "research awards whose AWARD start year is this year"
     label var n_grants           "distinct research awards active this year (supplements incl.)"
     label var nih_total_cost     "total cost, research rows incl. supplements"
@@ -277,10 +256,6 @@ program collapse_athr_year
     label var n_supp_rows        "administrative supplement rows this year"
     save ../temp/nih_by_athr_year, replace
 
-    * Shipped to output as well: merge_one_panel joins these onto the
-    * publication panel with keep(1 3), so a PI-year with an active award but no
-    * paper row is lost there. Downstream code that needs the true author-year
-    * series must merge this file, not the *_with_nih panels.
     save ../output/nih_athr_year, replace
     use ../temp/nih_names_by_athr, clear
     save ../output/nih_names_by_athr, replace

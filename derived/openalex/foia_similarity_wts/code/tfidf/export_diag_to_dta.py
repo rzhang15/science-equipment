@@ -1,12 +1,3 @@
-"""
-Convert match_diagnostics_{tag}.parquet -> .dta so Stata can merge max_sim.
-
-Used by analysis/reduced_form/code/analysis.do to build confidence quartiles
-for the confidence-stratified pooled DiD.
-
-Usage:
-  python export_diag_to_dta.py --tag restricted
-"""
 import argparse
 import os
 import pandas as pd

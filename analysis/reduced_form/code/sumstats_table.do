@@ -3,21 +3,13 @@ clear all
 capture log close
 version 17
 
-* Numbers for tab:sumstats_pi: summary statistics for the PI research-output
-* panel, computed on the prepped sample from the last analysis.do run. Writes
-* the filled table to ../output/tables/<samp>/sumstats_pi<suf>.tex; the N
-* column and notes keep the paper's \NPIs / \RFObs / \CoauthObs /
-* \NNIHMatched / \GrantObs macros, whose current values are displayed below.
 local samp all_jrnls
 local suf  _r1_r2
 
 use ../output/prepped_samples/es_`samp'`suf', clear
 gen nih_cost_k = nih_total_cost / 1000
-* years since the PI's first last-author publication, as of 2014
 gen yrs_lab_2014 = 2014 - min_year
 
-* Panel B variables are PI-level and time-invariant: summarize them on one
-* observation per PI so the N column matches the moments' denominator
 local pi_vars yrs_lab_2014 exposure mkt_spend_shr
 foreach v of local pi_vars {
     qui gegen _chk = sd(`v'), by(athr_id)
@@ -80,8 +72,6 @@ matrix_to_txt, saving("../output/tables/`samp'/sumstats_pi`suf'.txt") ///
 matrix_to_txt, saving("../output/tables/`samp'/sumstats_pi_counts`suf'.txt") ///
     matrix(sumstats_counts) title(<tab:sumstats_pi_counts`suf'>) format(%20.0f) replace
 
-* two decimals everywhere except years as PI (one) and exposure/share (three);
-* NIH dollars get {,} separators past 1,000
 local d = char(36)
 forval r = 1/9 {
     local fmt %9.2f

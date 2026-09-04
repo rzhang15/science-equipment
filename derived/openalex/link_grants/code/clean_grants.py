@@ -1,20 +1,3 @@
-"""
-Clean PubMed grant_ids and deduplicate.
-
-NIH grant numbers have the structure:
-    [type 1d][activity 3c][IC 2L][serial 5-7d][-yy][suffix]
-e.g. 5R01HL088243-03A1. The "core" identifier (same grant across years,
-amendments, and application types) is IC + serial -> "HL088243".
-
-For each row we produce:
-    clean_grant_id  - dedup key: NIH core (IC + 6-digit serial) when parseable,
-                      otherwise an alnum-stripped uppercase form
-    activity_code   - R01, K23, P01, ... when present
-    nih_ic          - HL, CA, MH, ...
-    nih_serial      - 6-digit zero-padded serial
-
-We then collapse rows that only differed in formatting.
-"""
 import re
 import pandas as pd
 from pathlib import Path
@@ -32,9 +15,7 @@ JOBS = [
     },
 ]
 
-# pattern A: [opt 1-digit type][3-char activity, e.g. R01/U01/K23][2L IC][5-7 digit serial][rest]
 PAT_A = re.compile(r"^[0-9]?([A-Z][0-9A-Z]{2})([A-Z]{2})([0-9]{5,7})")
-# pattern B: bare [IC][serial] with optional support-year/suffix tail
 PAT_B = re.compile(r"^([A-Z]{2})([0-9]{5,7})(?:[0-9]{2}[A-Z]?[0-9]?)?$")
 
 PHS_TOKENS = ("NIH", "HHS", "CDC", "FDA", "AHRQ")
@@ -47,7 +28,6 @@ def is_us_phs(agency: str, country: str) -> bool:
 
 
 def parse_nih(norm: str):
-    """Return (activity_code, ic, serial) or ('', '', '')."""
     m = PAT_A.match(norm)
     if m:
         return m.group(1), m.group(2), m.group(3)
@@ -61,7 +41,6 @@ def clean_file(src: Path, out: Path, by: list):
     df = pd.read_stata(src, convert_categoricals=False)
     print(f"read {len(df):,} rows from {src}")
 
-    # normalize: upper, strip all non-alnum
     norm = (df["grant_id"].astype(str)
             .str.upper()
             .str.replace(r"[^A-Z0-9]", "", regex=True))

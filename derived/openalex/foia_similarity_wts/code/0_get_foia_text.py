@@ -1,37 +1,3 @@
-"""
-Build foia_author_text_final.csv and report each FOIA's cluster assignment
-+ top terms for diagnostic purposes.
-
-The script does four filtering passes, in order:
-
-  1. (Optional) Restrict FOIA list to authors present as athr_id rows in
-     the downstream analysis panel (default: all_jrnls_r1_r2_public).
-     Aligns the imputation training pool with the eventual reduced-form
-     sample so we don't fit similarity weights on FOIAs we can never
-     analyze. Pass --restrict-to-panel "" to disable.
-  2. Join with the cluster_fields K=100 assignment so we know which life-
-     science subfield each FOIA lives in.
-  3. Drop FOIA rows whose cluster was flagged non-life-science in the
-     filter worksheet (off by default; pass --drop-non-ls to apply).
-     FOIAs are by construction life-science PIs, so a FOIA landing in a
-     non-LS cluster usually points at a disambiguation problem rather
-     than a true social-scientist FOIA. Inspect before dropping.
-  4. Drop FOIA rows whose lifetime text is too short to be meaningful
-     (<50 chars). These can't be embedded; they pollute downstream LOOV.
-
-Inputs:
-  ../external/exposure_wts/athr_exposure_list.dta            (FOIA athr_ids)
-  ../external/athr_panel/athr_panel_full_year_last_{panel}.dta (analysis panel)
-  ../external/us_appended_text/cleaned_static_author_text_pre_us.parquet
-  ../external/appended_text/author_static_clusters_{K}.csv
-  ../external/appended_text/cluster_label_worksheet_{K}.csv  (keep + top_terms)
-
-Outputs:
-  ../output/foia_author_text_final.csv          (athr_id, processed_text,
-                                                 cluster_label, cluster_keep,
-                                                 cluster_top_terms)
-  ../output/foia_author_text_final_dropped.csv  athr_ids dropped + reason
-"""
 import argparse
 import os
 import pandas as pd
@@ -54,7 +20,6 @@ ap.add_argument("--restrict-to-panel", default="",
                      "'all_jrnls_r1_r2_public' to enforce panel membership.")
 args = ap.parse_args()
 
-# --- PATHS ---
 foia_path      = "../external/exposure_wts/athr_exposure_list.dta"
 text_data_path = "../external/us_appended_text/cleaned_static_author_text_pre_us.parquet"
 clusters_path  = f"../external/appended_text/author_static_clusters_{args.cluster_k}.csv"
@@ -69,9 +34,6 @@ df_foia = pd.read_stata(foia_path)
 df_foia["athr_id"] = df_foia["athr_id"].astype(str)
 print(f"  FOIA authors: {len(df_foia)}")
 
-# ----------------------------------------------------------------------
-# Filter pass 1 (optional): restrict to FOIAs present in the analysis panel
-# ----------------------------------------------------------------------
 if args.restrict_to_panel:
     panel_path = (f"../external/athr_panel/athr_panel_full_year_last_"
                   f"{args.restrict_to_panel}.dta")
@@ -81,7 +43,6 @@ if args.restrict_to_panel:
             f"{args.restrict_to_panel!r}: {panel_path}"
         )
     print(f"Restricting FOIA list to athr_ids in {panel_path}...")
-    # Stata .dta -> read only the athr_id column via pandas
     panel_set = set(
         pd.read_stata(panel_path, columns=["athr_id"])["athr_id"].astype(str).unique()
     )
@@ -103,9 +64,6 @@ if args.restrict_to_panel:
 
 foia_ids = df_foia["athr_id"].tolist()
 
-# ----------------------------------------------------------------------
-# Join cluster assignment + cluster metadata (optional)
-# ----------------------------------------------------------------------
 if args.cluster_k > 0:
     if not os.path.exists(clusters_path):
         raise FileNotFoundError(f"Missing cluster file: {clusters_path}. "
@@ -135,7 +93,6 @@ if args.cluster_k > 0:
     df_foia = df_foia.merge(df_clusters, on="athr_id", how="left")
     df_foia = df_foia.merge(df_ws, on="cluster_label", how="left")
 
-    # Per-cluster FOIA breakdown
     print("\n=== FOIA authors grouped by cluster ===")
     breakdown = (
         df_foia
@@ -169,7 +126,6 @@ if args.cluster_k > 0:
     print(f"  FOIAs in non-life-science clusters (keep=0): {n_in_drop}")
     print(f"  FOIAs missing from cluster file:             {n_no_cluster}")
 
-    # Filter pass 3: optional cluster-based drop (non-life-science cluster)
     if args.drop_non_ls and n_in_drop > 0:
         drop_mask = df_foia["cluster_keep"] == 0
         for _, r in df_foia.loc[drop_mask].iterrows():
@@ -189,9 +145,6 @@ else:
     print(f"Skipping cluster_fields validation (--cluster-k=0). "
           f"Build your own FOIA clusters with cluster_foias.py.")
 
-# ----------------------------------------------------------------------
-# Pull text
-# ----------------------------------------------------------------------
 if not os.path.exists(text_data_path):
     raise FileNotFoundError(f"Text parquet not found: {text_data_path}")
 
@@ -209,9 +162,6 @@ print(f"  matched text rows: {len(df_text)} / {len(remaining_ids)}")
 
 df_final = df_foia.merge(df_text, on="athr_id", how="left", validate="one_to_one")
 
-# ----------------------------------------------------------------------
-# Filter pass 4: drop empty/short text
-# ----------------------------------------------------------------------
 text_len = df_final["processed_text"].fillna("").str.len()
 drop_mask = text_len < 250
 if drop_mask.any():
@@ -231,9 +181,6 @@ if drop_mask.any():
         print(f"  {aid}   text_chars={chars}")
     df_final = df_final.loc[~drop_mask].reset_index(drop=True)
 
-# ----------------------------------------------------------------------
-# Save outputs
-# ----------------------------------------------------------------------
 if args.cluster_k > 0:
     keep_cols = ["athr_id", "processed_text", "cluster_label",
                  "cluster_keep", "cluster_top_terms"]

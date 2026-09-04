@@ -66,7 +66,6 @@ program clean_samps
     use id jrnl pmid using ../temp/openalex_`samp'_clean_titles, clear
     merge 1:m id using ../external/`fol'/openalex_`samp'_merged, assert(1 2 3) keep(3) nogen 
     merge m:1 id using ../external/patents/patent_ppr_cnt, assert(1 2 3) keep(1 3) nogen keepusing(patent_count front_only body_only)
-    // clean date variables
     gen date = date(pub_date, "YMD")
     format %td date
     drop pub_date
@@ -79,7 +78,6 @@ program clean_samps
     gen year = year(pub_date)
     gen qrtr = qofd(pub_date)
     drop if year < 1945
-    // fix some wrong institutions
     replace inst = "Johns Hopkins University" if strpos(raw_affl , "Bloomberg School of Public Health")>0 & inst == "Bloomberg (United States)"
     merge m:1 inst_id using ../external/inst_xw/all_inst_geo_chars, assert(1 2 3) keep(1 3) nogen 
     replace inst = new_inst if !mi(new_inst)
@@ -93,7 +91,6 @@ program clean_samps
                         inlist(inst, "National Institute of Biomedical Imaging and Bioengineering", "National Institute of Child Health and Human Development", "National Institute of Dental and Craniofacial Research") | ///
                                   inlist(inst, "National Institute of Diabetes and Digestive and Kidney Diseases", "National Institute on Drug Abuse", "National Institute of Environmental Health Sciences", "National Institute of General Medical Sciences", "National Institute of Mental Health", "National Institute on Minority Health and Health Disparities") | ///
                                             inlist(inst, "National Institute of Neurological Disorders and Stroke", "National Institute of Nursing Research", "National Library of Medicine", "National Heart Lung and Blood Institute", "National Institutes of Health")
-    // drop any authors that are journals - these are probably reviews 
     gen is_lancet = strpos(raw_affl, "The Lancet")>0
     gen is_london = raw_affl == "London, UK." |  raw_affl == "London."
     gen is_bmj = (strpos(raw_affl, "BMJ")>0 | strpos(raw_affl, "British Medical Journal")>0)
@@ -106,7 +103,6 @@ program clean_samps
     by pmid: gegen has_editor = max(is_jama)
     drop if has_lancet == 1 | has_london == 1 | has_bmj == 1 | has_jama == 1 | has_editor == 1
     drop is_lancet is_london is_bmj is_jama is_editor has_lancet has_london has_bmj has_jama has_editor
-    // add in cite_ct
 *    replace cite_count = cite_count + 1
 *    assert cite_count > 0 
 
@@ -131,7 +127,6 @@ program clean_samps
     save ../temp/cleaned_all_`samp'_prewt, replace
 
     use ../temp/cleaned_all_`samp'_prewt, clear
-    // wt_adjust articlesj
     qui hashsort pmid which_athr which_affl
     cap drop author_id
     bys pmid athr_id (which_athr which_affl): gen author_id = _n ==1
@@ -141,12 +136,11 @@ program clean_samps
     bys pmid which_athr: replace num_affls = _N
     assert num_affls == 1
     bys pmid: gegen num_athrs = max(which_athr)
-    gen affl_wt = 1/num_affls * 1/num_athrs // this just divides each paper by the # of authors on the paper
+    gen affl_wt = 1/num_affls * 1/num_athrs
     gen pat_affl_wt = patent_count * 1/num_affls * 1/num_athrs
     gen body_affl_wt = body_only * 1/num_affls * 1/num_athrs
     gen front_affl_wt = front_only * 1/num_affls * 1/num_athrs
 
-    // now give each article a weight based on their ciatation count 
     qui gen years_since_pub = 2025-year+1
     qui gen avg_cite_yr = cite_count/years_since_pub
     qui gen avg_pat_yr = patent_count/years_since_pub
@@ -157,7 +151,7 @@ program clean_samps
     qui bys pmid: replace avg_frnt_yr = . if _n != 1
     qui bys pmid: replace avg_body_yr = . if _n != 1
     qui sum avg_cite_yr
-    gen cite_wt = avg_cite_yr/r(sum) // each article is no longer weighted 1 
+    gen cite_wt = avg_cite_yr/r(sum)
     qui sum avg_pat_yr
     gen pat_wt = avg_pat_yr/r(sum) 
     qui sum avg_frnt_yr

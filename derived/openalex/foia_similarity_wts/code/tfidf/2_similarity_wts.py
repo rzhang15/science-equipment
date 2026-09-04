@@ -5,7 +5,6 @@ import pandas as pd
 import scipy.sparse
 from joblib import Parallel, delayed
 
-# --- CONFIGURATION ---
 OUT_DIR = "../../output"
 
 
@@ -26,27 +25,7 @@ def _paths(tag: str, out_tag: str = None) -> dict:
         "out_diag":        f"{OUT_DIR}/match_diagnostics{out_tag}.parquet",
     }
 
-# Each universe author gets weight on its top-K most-similar FOIA PIs. The weights
-# are then L1-normalized and used to impute spending shares: assumption is that
-# topical similarity ⇒ similar product-spending mix.
-#
-# Tuning rationale for the 200K→200 matching problem:
-#   - K=5: averages over a handful of nearest PIs to smooth idiosyncratic noise
-#     in any one PI's spending, but small enough that distant PIs do not dilute.
-#   - SIMILARITY_FLOOR=0.05: cosine < 0.05 means almost no shared discriminative
-#     vocab — those "matches" are noise; refuse to use them as weight.
-#   - SHARPEN_POWER>1 raises similarities to a power before normalization, so the
-#     #1 match dominates more than #5. Set to 1.0 to disable.
-#   - UNMATCHED_MAX_SIM_THRESHOLD: authors whose best FOIA match is below this
-#     are flagged unmatched (zero weights). Downstream imputation should drop or
-#     handle these separately rather than receive a spurious imputation.
 BATCH_SIZE = 25_000
-# Defaults below are overridable via CLI. Recipe presets:
-#   variance-preserving (nearest neighbor): --k 1
-#   sharp soft-NN:                          --k 3  --sharpen 5
-#   current default:                        --k 5  --sharpen 2
-#   confidence-scaled (with step 3):        --no-l1-normalize  (then step 3
-#                                                               scales by row-sum)
 K_NEIGHBORS = 5
 SIMILARITY_FLOOR = 0.05
 SHARPEN_POWER = 2.0
@@ -57,13 +36,10 @@ N_JOBS = int(os.environ.get("SLURM_CPUS_PER_TASK", os.cpu_count() or 1))
 
 
 def process_batch(start, end, X_univ, X_foia_T_dense, k, n_pis):
-    """Compute similarities for rows [start, end), extract top-K, build weight triplets."""
     batch = X_univ[start:end]
-    # Sparse @ dense returns dense — uses GEMM, much faster than sparse @ sparse.
     batch_sim = batch.dot(X_foia_T_dense)
     b = batch_sim.shape[0]
 
-    # Per-row top-K via argpartition (unsorted within top-K, fine since we re-normalize).
     if k < n_pis:
         topk_idx = np.argpartition(-batch_sim, k - 1, axis=1)[:, :k]
     else:
@@ -71,36 +47,25 @@ def process_batch(start, end, X_univ, X_foia_T_dense, k, n_pis):
     rows_local = np.repeat(np.arange(b), k)
     topk_vals = batch_sim[rows_local, topk_idx.ravel()].reshape(b, k).astype(np.float32)
 
-    # Pre-modification diagnostics.
     max_sim_b = batch_sim.max(axis=1).astype(np.float32)
     mean_topk_b = topk_vals.mean(axis=1)
     n_above_floor_b = (batch_sim >= SIMILARITY_FLOOR).sum(axis=1).astype(np.int32)
 
-    # Apply floor.
     topk_vals[topk_vals < SIMILARITY_FLOOR] = 0.0
 
-    # Sharpen so the closest PI dominates the weight.
     if SHARPEN_POWER != 1.0:
         topk_vals = np.power(topk_vals, SHARPEN_POWER, dtype=np.float32)
 
-    # Unmatched rows: zero out all weights.
     row_unmatched = max_sim_b < UNMATCHED_MAX_SIM_THRESHOLD
     topk_vals[row_unmatched, :] = 0.0
 
     if L1_NORMALIZE:
-        # Weighted-average form: row sums to 1, imputed exposure is a weighted
-        # avg of FOIA exposures. Compresses variance (Jensen-like shrinkage).
         row_sums = topk_vals.sum(axis=1, keepdims=True)
         row_sums[row_sums == 0] = 1.0
         topk_weights = topk_vals / row_sums
     else:
-        # Raw-sharpened-similarity form: rows do NOT sum to 1. Low-confidence
-        # universe authors get small weights (and thus small imputed values).
-        # Preserves more cross-PI variance at the cost of the "weighted-avg"
-        # interpretation. Use with --scale-by-confidence semantics in step 3.
         topk_weights = topk_vals
 
-    # Flatten non-zero triplets (with global row offset).
     nz_mask = (topk_weights > 0).ravel()
     flat_rows = (rows_local + start)[nz_mask]
     flat_cols = topk_idx.ravel()[nz_mask]
@@ -119,8 +84,6 @@ def process_batch(start, end, X_univ, X_foia_T_dense, k, n_pis):
 
 
 def main():
-    # Declare globals first — Python requires this before any read of the names
-    # in this function scope (including reading them as argparse defaults).
     global K_NEIGHBORS, SHARPEN_POWER, SIMILARITY_FLOOR
     global UNMATCHED_MAX_SIM_THRESHOLD, L1_NORMALIZE
 
@@ -156,7 +119,6 @@ def main():
     args = ap.parse_args()
     paths = _paths(args.tag, args.out_tag)
 
-    # Override module-level constants so process_batch sees the chosen recipe.
     K_NEIGHBORS = args.k
     SHARPEN_POWER = args.sharpen
     SIMILARITY_FLOOR = args.floor
@@ -170,7 +132,6 @@ def main():
     X_univ = scipy.sparse.load_npz(paths["universe_matrix"]).tocsr().astype(np.float32)
     X_foia = scipy.sparse.load_npz(paths["foia_matrix"]).tocsr().astype(np.float32)
 
-    # Densify the (n_pis × V) FOIA transpose once. Tiny: 200 × ~few-K features.
     X_foia_T_dense = X_foia.T.toarray().astype(np.float32)
 
     n_users = X_univ.shape[0]
@@ -183,8 +144,6 @@ def main():
     print(f"Computing top-{k} weights in parallel (batch={BATCH_SIZE:,})...")
 
     batches = [(i, min(i + BATCH_SIZE, n_users)) for i in range(0, n_users, BATCH_SIZE)]
-    # Threading backend: scipy sparse @ dense and numpy ops release the GIL, so
-    # threads scale well — and we avoid pickling huge sparse slices to subprocesses.
     results = Parallel(n_jobs=N_JOBS, backend="threading", verbose=5)(
         delayed(process_batch)(s, e, X_univ, X_foia_T_dense, k, n_pis) for s, e in batches
     )

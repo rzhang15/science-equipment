@@ -1,8 +1,3 @@
-# 1c_build_category_vectors.py
-"""
-Pre-computes and saves the average embedding vector for each LAB category
-from the UT Dallas data. This creates the knowledge base for the BERT expert model.
-"""
 import pandas as pd
 import joblib
 import os
@@ -69,13 +64,11 @@ def main(embedding_name):
     if rows_dropped > 0:
         print(f"  - Dropped {rows_dropped} rows due to missing descriptions or categories.")
 
-    # Filter data to ONLY lab categories using word-boundary matching
     print("\nFiltering data to include only lab categories...")
     is_nonlab = df_merged[config.UT_CAT_COL].str.contains(config.NONLAB_REGEX, na=False)
     df_lab_only = df_merged[~is_nonlab].copy()
     print(f"  - Kept {len(df_lab_only)} items from {df_lab_only[config.UT_CAT_COL].nunique()} unique lab categories.")
 
-    # Optional supplier block (mirrors the gatekeeper's combined representation).
     supplier_vectorizer = None
     supp_vec_path = os.path.join(config.OUTPUT_DIR, "vectorizer_supplier_tfidf.joblib")
     if config.USE_SUPPLIER and 'supplier' in df_lab_only.columns and os.path.exists(supp_vec_path):

@@ -1,12 +1,3 @@
-"""
-GPU cosine similarity: universe BERT embeddings x FOIA BERT embeddings.
-
-Mirrors tfidf/2_similarity_wts.py but operates on dense L2-normalized
-embeddings produced by bert/1_vectorize.py --universe. Cosine sim is just a
-torch matmul; we batch rows of the universe to bound peak GPU memory, apply
-top-K + threshold filters, row-normalize, and stream into a sparse COO matrix
-to keep the on-disk artifact small.
-"""
 import argparse
 import time
 import numpy as np
@@ -36,7 +27,6 @@ def main():
         print("WARNING: no GPU detected — this will be slow.")
     print(f"Device: {device}")
 
-    # mmap universe so we don't pay 4GB+ host RAM up front
     print(f"Loading {univ_emb_path}")
     X_univ = np.load(univ_emb_path, mmap_mode="r")
     print(f"Loading {foia_emb_path}")
@@ -46,7 +36,7 @@ def main():
     print(f"Universe: {n_univ:,} x {dim}   FOIA: {n_foia} x {dim}")
     assert X_foia.shape[1] == dim, "FOIA and universe embedding dims must match"
 
-    foia_t = torch.from_numpy(X_foia).to(device).half()  # (n_foia, dim) fp16
+    foia_t = torch.from_numpy(X_foia).to(device).half()
 
     row_ind: list[np.ndarray] = []
     col_ind: list[np.ndarray] = []
@@ -57,21 +47,18 @@ def main():
     for start in range(0, n_univ, args.batch_size):
         end = min(start + args.batch_size, n_univ)
         batch = torch.from_numpy(np.ascontiguousarray(X_univ[start:end])).to(device).half()
-        sim = batch @ foia_t.T  # (B, n_foia)
+        sim = batch @ foia_t.T
         del batch
 
-        # top-K per row
-        topk_vals, topk_idx = torch.topk(sim, k=k, dim=1)  # (B, k)
+        topk_vals, topk_idx = torch.topk(sim, k=k, dim=1)
         if args.threshold > 0:
             topk_vals = torch.where(topk_vals >= args.threshold,
                                     topk_vals, torch.zeros_like(topk_vals))
 
-        # row-normalize so weights sum to 1
         row_sums = topk_vals.sum(dim=1, keepdim=True)
         row_sums = torch.where(row_sums > 0, row_sums, torch.ones_like(row_sums))
         topk_vals = topk_vals / row_sums
 
-        # back to numpy COO triples
         vals = topk_vals.cpu().float().numpy()
         cols = topk_idx.cpu().numpy()
         rows = np.repeat(np.arange(start, end, dtype=np.int64), k).reshape(-1, k)

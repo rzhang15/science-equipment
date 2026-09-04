@@ -1,30 +1,3 @@
-"""
-Validation: do coauthors of FOIA authors land near their FOIA partner in
-BERT-embedding space, and does the imputed-exposure prediction track the
-FOIA author's true exposure?
-
-Pipeline:
-  1. Cosine sim of every coauthor embedding against every FOIA embedding.
-  2. Top-K + row-normalize -> per-coauthor weights over FOIA authors.
-  3. Impute coauthor exposure = W @ E_FOIA.
-  4. For each known (FOIA, coauthor) pair, compare imputed coauthor exposure
-     to the FOIA author's true exposure. Benchmark vs random FOIA pairings.
-  5. Also report the rank of the true FOIA partner in the coauthor's nearest-
-     neighbor list -- the cleanest twin test (random => mean rank ~ N_FOIA/2).
-
-Inputs (all in ../../output/):
-  bert_foia_{model_tag}.npy                       FOIA embeddings
-  bert_foia_ids_{model_tag}.csv                   FOIA athr_id order
-  bert_foia_{model_tag}_coauthors_unstemmed.npy   coauthor embeddings
-  bert_foia_ids_{model_tag}_coauthors_unstemmed.csv  coauthor athr_id order
-External:
-  ../../external/exposure_wts/athr_exposure.dta   FOIA scalar exposure
-  ../../external/coauthors/coauthors.dta          (athr_id, coauthor_id)
-
-Outputs:
-  ../../output/coauthor_validation_pairs.csv      per-pair diagnostics
-  ../../output/coauthor_validation_summary.txt    aggregate metrics
-"""
 import argparse
 import os
 import numpy as np
@@ -36,17 +9,13 @@ COAUTHORS_DTA = "../../external/coauthors/coauthors.dta"
 
 
 def cosine_topk_weights(sim: np.ndarray, k: int) -> np.ndarray:
-    """sim: (n_co, n_foia) cosine. Return (n_co, n_foia) row-stochastic weights
-    over the top-K FOIA partners (zero elsewhere)."""
     n_co, n_foia = sim.shape
     k = min(k, n_foia)
-    # argpartition is O(n) per row; argsort within top-K for stable ranks
     part = np.argpartition(-sim, kth=k - 1, axis=1)[:, :k]
     rows = np.arange(n_co)[:, None]
     top_vals = sim[rows, part]
     W = np.zeros_like(sim)
     W[rows, part] = top_vals
-    # clip negatives (cosine can be slightly < 0); row-normalize
     W = np.clip(W, 0, None)
     row_sums = W.sum(axis=1, keepdims=True)
     row_sums[row_sums == 0] = 1.0
@@ -94,18 +63,15 @@ def main():
     co_idx   = {a: i for i, a in enumerate(co_ids)}
     e_foia = pd.Series(df_exp.set_index("athr_id")["exposure"]).reindex(foia_ids).fillna(0).values
 
-    # Embeddings are L2-normalized by 1_vectorize.py, so dot product == cosine.
     print("Computing cosine sim (coauthor x FOIA)")
     norms_co   = np.linalg.norm(X_co,   axis=1, keepdims=True);   norms_co[norms_co == 0]   = 1
     norms_foia = np.linalg.norm(X_foia, axis=1, keepdims=True); norms_foia[norms_foia == 0] = 1
-    sim = (X_co / norms_co) @ (X_foia / norms_foia).T   # (n_co, n_foia)
+    sim = (X_co / norms_co) @ (X_foia / norms_foia).T
 
     print(f"Top-K weights (k={args.k}) and imputing exposure")
     W = cosine_topk_weights(sim, args.k)
     e_co_imputed = W @ e_foia
 
-    # Per-pair table: for every (FOIA, coauthor) edge that has embeddings on
-    # both sides, attach (true FOIA exposure, imputed coauthor exposure, rank).
     df = df_map.copy()
     df = df[df["coauthor_id"].isin(co_idx) & df["athr_id"].isin(foia_idx)].copy()
     df["foia_pos"] = df["athr_id"].map(foia_idx)
@@ -113,19 +79,16 @@ def main():
     df["e_foia_true"]    = e_foia[df["foia_pos"].values]
     df["e_co_imputed"]   = e_co_imputed[df["co_pos"].values]
     df["sim_to_partner"] = sim[df["co_pos"].values, df["foia_pos"].values]
-    # rank of the partner among all FOIA neighbors of this coauthor (0 = closest)
-    ranks = (-sim).argsort(axis=1).argsort(axis=1)   # (n_co, n_foia) rank matrix
+    ranks = (-sim).argsort(axis=1).argsort(axis=1)
     df["partner_rank"]   = ranks[df["co_pos"].values, df["foia_pos"].values]
     df["abs_err"]        = (df["e_foia_true"] - df["e_co_imputed"]).abs()
     print(f"  usable pairs: {len(df):,}  (out of {len(df_map):,})")
 
-    # Random benchmark: shuffle the FOIA-partner column within the coauthor set.
     rng = np.random.default_rng(args.seed)
     perm = rng.permutation(len(df))
     e_foia_random = df["e_foia_true"].values[perm]
     abs_err_rand  = np.abs(e_foia_random - df["e_co_imputed"].values)
 
-    # ------- aggregate metrics -------
     corr_pair = df[["e_foia_true", "e_co_imputed"]].corr().iloc[0, 1]
     mae_pair  = df["abs_err"].mean()
     mae_rand  = abs_err_rand.mean()

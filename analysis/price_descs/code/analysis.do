@@ -74,5 +74,4 @@ program price_dist
     }
 end
 
-**
 main

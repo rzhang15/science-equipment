@@ -125,7 +125,6 @@ end
 
 program did
     cap mat drop coef_price coef_spend
-    // naive did
     use ../external/samp/uni_category_yr_tfidf$suffix, clear
     gegen uni_mkt = group(uni_id mkt)
     bys uni_mkt : egen min_year = min(year)
@@ -139,7 +138,6 @@ program did
         reghdfe `var' posttreat [aw=spend_2013], cluster(mkt) absorb(year uni_id mkt)
     }
 
-    // pooled did
     use ../external/merged/matched_uni_category_panel$suffix, clear
     gegen uni_mkt = group(uni_id mkt)
     bys uni_mkt : egen min_year = min(year)
@@ -152,7 +150,6 @@ program did
         di "`name'"
         reghdfe `var' posttreat [aw=spend_2013], cluster(mkt) absorb(year uni_id mkt)
     }
-   // unexpanded panel pool version
     use ../external/merged/matched_category_panel$suffix, clear
     gen post = 0
     replace post = 1 if year >= 2014
@@ -161,7 +158,6 @@ program did
         di "`name'"
         reghdfe `var' posttreat [aw=spend_2013], cluster(mkt) absorb(year mkt)
     }
-    // indiv did -- run both avg_log_price and log_raw_spend per category
     use ../external/merged/matched_mkts$suffix, clear
     qui glevelsof category, local(categories)
     foreach c in `categories' {
@@ -201,7 +197,6 @@ program did
         restore
     }
 
-    // build per-outcome category-labeled tempfiles, then post-process each
     tempfile coefs_price coefs_spend
     foreach yvar in price spend {
         clear
@@ -268,18 +263,6 @@ program process_coefs
     binscatter2 b simulated_hhi [aw = spend_2013], mcolors(gs6) lcolors(ebblue) legend(on order(- "corr: `corr'") ring(0) pos(1)) xtitle("Simulated HHI") ytitle("Estimated Coefficient (log `outcome')")
     graph export ../output/figures/sim_hhi_corr_`outcome'$suffix.pdf, replace
 
-    // ============================================================
-    // Empirical Bayes shrinkage of per-market DiD coefficients
-    // ------------------------------------------------------------
-    //   b_i ~ N(theta_i, se_i^2)    (sampling distribution)
-    //   theta_i ~ N(mu, tau^2)      (cross-market prior)
-    // Posterior:
-    //   b_eb_i = w_i * b_i + (1 - w_i) * mu_hat,   w_i = tau^2 / (tau^2 + se_i^2)
-    //   se_eb_i = sqrt(w_i * se_i^2)
-    // mu_hat: precision-weighted mean of b
-    // tau^2 : method of moments, max(0, var(b) - mean(se^2))
-    // Markets with high SE (noisy/few obs) get pulled toward mu_hat.
-    // ============================================================
     gen var_se = se^2
     qui sum var_se
     local mean_var2 = r(mean)
@@ -366,7 +349,6 @@ program process_coefs
 end
 
 program robustness
-    // robustness: pooled DiD with uni#mkt and uni#year fixed effects
     use ../external/merged/matched_uni_category_panel$suffix, clear
     gegen uni_mkt = group(uni_id mkt)
     bys uni_mkt : egen min_year = min(year)
@@ -409,7 +391,6 @@ program robustness
     mat pooled_did = b_row \ se_row \ n_row
     mat colnames pooled_did = price_base price_unimkt price_uniyr qty_base qty_unimkt qty_uniyr spend_base spend_unimkt spend_uniyr
     mat rownames pooled_did = b se N
-    // event study: leads/lags under each FE spec, overlaid per outcome
     gen rel = year - 2014
     replace rel = . if treated == 0
     forval i = 1/5 {
@@ -468,8 +449,6 @@ program robustness
 end
 
 program balance_check
-    // Pre-treatment (2010-2013) balance on outcome levels for treated vs matched controls.
-    // Weighted mean_t, mean_c, diff, SE cluster(mkt) — matches main DiD spec weighting/clustering.
     use ../external/merged/matched_uni_category_panel$suffix, clear
     gegen uni_mkt = group(uni_id mkt)
     bys uni_mkt : egen min_year = min(year)
@@ -495,8 +474,6 @@ program balance_check
 end
 
 program placebo_timing
-    // Falsification: restrict to pre-period (2010-2013) and shift "treatment" to 2012.
-    // Same FE/weight/cluster structure as main DiD (baseline spec). Coef should be ~0.
     use ../external/merged/matched_uni_category_panel$suffix, clear
     gegen uni_mkt = group(uni_id mkt)
     bys uni_mkt : egen min_year = min(year)
@@ -524,34 +501,23 @@ program output_tables
 end
 
 program merger_validity_tex
-    // Merger-validity .tex table. Consolidates:
-    //   (a) pre-treatment balance (`balance' matrix from balance_check)
-    //   (b) placebo-timing DiD at fake 2012 (`placebo_timing' matrix)
-    //   (c) real 2014 DiD baseline (`pooled_did' matrix, cols 1/4/7 = price/qty/spend)
-    // Uses booktabs + threeparttable to match paper style. Reads matrices from
-    // memory — must run after balance_check + placebo_timing + robustness.
     local texfile "../output/tables/merger_validity$suffix.tex"
     cap file close mv
     file open mv using "`texfile'", write replace
 
-    // Column indices in pooled_did (rows 1=b, 2=se, 3=N):
-    //   price_base = 1, qty_base = 4, spend_base = 7
     local outs "avg_log_price log_raw_qty log_raw_spend"
     local lbl_avg_log_price "Avg.\ log price"
     local lbl_log_raw_qty   "Log quantity"
     local lbl_log_raw_spend "Log spending"
 
-    // Real 2014 (baseline pooled DiD)
     local i = 0
     foreach y of local outs {
         local ++i
         local col = cond("`y'" == "avg_log_price", 1, cond("`y'" == "log_raw_qty", 4, 7))
         local b_real_`y' = pooled_did[1, `col']
         local s_real_`y' = pooled_did[2, `col']
-        // Placebo 2012 (row = position in placebo_timing)
         local b_pl_`y' = placebo_timing[`i', 1]
         local s_pl_`y' = placebo_timing[`i', 2]
-        // Balance (pre-period diff)
         local m_t_`y'  = balance[`i', 1]
         local m_c_`y'  = balance[`i', 2]
         local d_`y'    = balance[`i', 3]
@@ -577,7 +543,6 @@ program merger_validity_tex
         if "`y'" == "log_raw_qty"   local lbl "Log quantity"
         if "`y'" == "log_raw_spend" local lbl "Log spending"
 
-        // Stars on balance diff (t-test from se)
         local t_bal = .
         if !mi(`d_`y'') & !mi(`sd_`y'') & `sd_`y'' > 0 {
             local t_bal = abs(`d_`y'') / `sd_`y''
@@ -587,7 +552,6 @@ program merger_validity_tex
         if !mi(`t_bal') & `t_bal' >= 1.96  local star_bal "\(^{**}\)"
         if !mi(`t_bal') & `t_bal' >= 2.576 local star_bal "\(^{***}\)"
 
-        // Stars on placebo
         local t_pl = .
         if !mi(`b_pl_`y'') & !mi(`s_pl_`y'') & `s_pl_`y'' > 0 {
             local t_pl = abs(`b_pl_`y'') / `s_pl_`y''
@@ -597,7 +561,6 @@ program merger_validity_tex
         if !mi(`t_pl') & `t_pl' >= 1.96  local star_pl "\(^{**}\)"
         if !mi(`t_pl') & `t_pl' >= 2.576 local star_pl "\(^{***}\)"
 
-        // Stars on real
         local t_real = .
         if !mi(`b_real_`y'') & !mi(`s_real_`y'') & `s_real_`y'' > 0 {
             local t_real = abs(`b_real_`y'') / `s_real_`y''
@@ -639,7 +602,6 @@ program merger_validity_tex
 end
 
 program event_study
-    // naive event study
     use ../external/samp/uni_category_yr_tfidf$suffix, clear
     merge m:1 category using ../external/samp/category_hhi_tfidf$suffix, assert(1 2 3) keep(3) nogen
     drop if delta_hhi <= -2000
@@ -669,7 +631,6 @@ program event_study
         restore
     }
 
-    // main pooled result
     use ../external/merged/matched_uni_category_panel$suffix ,clear 
     merge m:1 category using ../external/samp/category_hhi_tfidf$suffix, assert(1 2 3) keep(3) nogen
     drop if delta_hhi <= -2000
@@ -735,7 +696,6 @@ program event_study
         manual_event_study, lag(5) lead(-4) yvar(`yvar') ymin(-600) ymax(6000) ygap(750) trt_mean(`trt_mean') ctrl_mean(`ctrl_mean')  name(`yname') fes(`fes') wt_var(spend_2013) cluster_var(mkt) file_suf("pooled")
         restore
     }
-    // hhi
     /*
     sum delta_hhi if cat_id == 1, d
     local p25 = r(p25)
@@ -828,7 +788,6 @@ program event_study
           legend(on order(2 "Delta HHI Q1" 4 "Delta HHI Q2" 6 "Delta HHI Q3" 8 "Delta HHI Q4") pos(11) rows(2) ring(0) size(vsmall) region(fcolor(none))) xtitle("Relative Year", size(small)) ytitle("Avg. Log Price", size(small)) plotregion(margin(sides))
     graph export ../output/figures/es_estimates_hhi$suffix.pdf, replace
     */
-    // combined plots
     use "../temp/es_log_raw_spend_estimatespooled$suffix", clear
     gen group = "spend"
     replace rel = rel - 0.2 
@@ -1221,5 +1180,4 @@ program manual_event_study
         graph export "../output/figures/es/split_nodetrend_`suf'es_`yvar'_`file_suf'$suffix.pdf", replace
     restore
 end
-**
 main

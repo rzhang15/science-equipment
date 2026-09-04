@@ -5,7 +5,6 @@ from itertools import chain
 import sys
 import os
 
-# --- CONFIGURATION ---
 pyalex.config.api_key = "01bd3ab8d66ee5d53d209f63f2dea37d" 
 BATCH_SIZE = 10000  
 

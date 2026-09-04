@@ -1,36 +1,3 @@
-"""
-Sanity-check the US k-static-clustering from ../us_cluster_fields against
-the K-NN TF-IDF imputation.
-
-Four questions:
-  1. Who are the FOIA authors, in terms of the k=30 clusters? (Distribution +
-     cluster top-terms.)
-  2. Who are the non-FOIA (universe) authors, in the same clusters?
-  3. Do the TF-IDF nearest-neighbor imputation weights respect the k=30
-     clustering? For each universe author, the "own-cluster weight share"
-     is the fraction of their W-weight that goes to FOIAs in their own
-     k=30 cluster. If clustering and imputation see the same topical
-     signal, this fraction should be far above chance (1/k).
-  4. Aggregated to clusters, does mean imputed exposure across universe
-     authors track mean true exposure across FOIA anchors? This is the
-     paper-ready external validation: no holdout, one number.
-
-Reads the US-only clustering (../us_cluster_fields/output/) so the clustering
-universe and the tfidf pipeline universe are the same population — otherwise
-US universe authors show up as "unmapped" simply because they weren't in the
-worldwide cluster_fields corpus.
-
-Usage:
-  python cluster_sanity_check.py --tag restricted --version hc --k 30
-
-Outputs:
-  ../output/k{K}_cluster_sanity_{version}{tag}.csv
-  ../output/k{K}_cluster_sanity_overall_{version}{tag}.txt
-  ../output/figures/k{K}_cluster_sanity_{version}{tag}.png     bar plots + weight-share hist
-  ../output/figures/k{K}_max_sim_cutoff_{version}{tag}.png     max_sim tier diagnostic
-  ../output/figures/k{K}_cluster_field_scatter_{version}{tag}.png
-                                                                mean_true vs mean_imputed (K-NN)
-"""
 import argparse
 import os
 import re
@@ -47,8 +14,6 @@ EXPOSURE_DIR = "../external/exposure_wts"
 
 
 def load_cluster_descriptions(path):
-    """Parse 'Cluster N (n=X,XXX): term1, term2, ...' lines into
-    {cluster_id: (n_authors, top_terms)}."""
     descs = {}
     pat = re.compile(r"Cluster\s+(\d+)\s*\(n=([\d,]+)\)\s*:\s*(.+)")
     with open(path) as f:
@@ -69,7 +34,6 @@ def _tag(tag: str) -> str:
 
 
 def weighted_corr(x, y, w):
-    """Pearson correlation weighted by w (>0)."""
     x = np.asarray(x, dtype=np.float64); y = np.asarray(y, dtype=np.float64)
     w = np.asarray(w, dtype=np.float64)
     m = np.isfinite(x) & np.isfinite(y) & np.isfinite(w) & (w > 0)
@@ -134,7 +98,6 @@ def main():
 
     os.makedirs(FIG_DIR, exist_ok=True)
 
-    # ---- load cluster assignments + labels ----
     print(f"Loading k={args.k} cluster assignments...")
     df_clusters = pd.read_csv(cluster_csv,
                               dtype={"athr_id": str, "cluster_label": int})
@@ -144,7 +107,6 @@ def main():
     print("Loading cluster top-terms...")
     descs = load_cluster_descriptions(cluster_desc)
 
-    # ---- load pipeline IDs + weights + diagnostics ----
     print("Loading FOIA + universe IDs...")
     foia_ids = pd.read_csv(foia_ids_path, dtype={"athr_id": str})
     universe_ids = pd.read_parquet(universe_ids_path)
@@ -166,7 +128,6 @@ def main():
     df_exp = pd.read_stata(exposure_dta)[["athr_id", "exposure"]]
     df_exp["athr_id"] = df_exp["athr_id"].astype(str)
 
-    # ---- attach clusters ----
     df_foia = foia_ids.merge(df_clusters, on="athr_id", how="left")
     df_univ = universe_ids.merge(df_clusters, on="athr_id", how="left")
 
@@ -180,7 +141,6 @@ def main():
     df_foia["exposure"] = df_foia["exposure"].fillna(0)
     df_univ = df_univ.merge(diag, on="athr_id", how="left")
 
-    # ---- per-universe-author own-cluster W share (K-NN only) ----
     print("Computing own-cluster W share for each universe author (K-NN)...")
     foia_c = df_foia["cluster_label"].to_numpy()
     univ_c = df_univ["cluster_label"].to_numpy()
@@ -200,13 +160,10 @@ def main():
         own_share = np.where(W_row_sum > 0, W_own_sum / W_row_sum, np.nan)
     df_univ["own_cluster_weight_share"] = own_share
 
-    # ---- imputed exposure per universe author ----
-    # K-NN: from the fitted W matrix (production recipe, weighted-average form).
     print("Computing K-NN imputed exposure via W.dot(E_foia)...")
     E_foia = df_foia["exposure"].to_numpy(dtype=np.float32)
     df_univ["knn_imputed_exposure"] = W.dot(E_foia)
 
-    # ---- per-cluster summary ----
     print("\nPer-cluster summary:")
     all_c = sorted(set(cluster_ids) |
                    set(int(c) for c in df_univ["cluster_label"].dropna().unique()))
@@ -232,9 +189,6 @@ def main():
     print(df_summary.to_string(index=False))
     print(f"\nSaved per-cluster summary: {out_csv}")
 
-    # ---- cross-cluster correlation: mean_true_foia vs mean_imputed_universe ----
-    # Use clusters with n_foia >= min_foia_per_cluster to match the '_cfN' filter
-    # applied downstream in 3_impute_exposure.py / analysis.do.
     min_n = max(1, args.min_foia_per_cluster)
     d = df_summary[df_summary["n_foia"] >= min_n].copy()
     n_ok = len(d)
@@ -242,7 +196,6 @@ def main():
     corr_knn_w   = weighted_corr(d["mean_foia_exposure"], d["mean_knn_imputed_univ"], d["n_universe"])
     slope_knn    = _slope(d["mean_foia_exposure"], d["mean_knn_imputed_univ"])
 
-    # ---- headline figure: bar plots + weight-share histogram (K-NN specific) ----
     d_by_id = df_summary.sort_values("cluster")
     fig, axes = plt.subplots(2, 2, figsize=(16, 12))
 
@@ -292,7 +245,6 @@ def main():
     fig.savefig(out_fig, dpi=150)
     print(f"Saved figure: {out_fig}")
 
-    # ---- cluster field scatter (K-NN, paper-ready external validation) ----
     fig3, ax = plt.subplots(figsize=(8, 7))
     x = d["mean_foia_exposure"].to_numpy()
     y = d["mean_knn_imputed_univ"].to_numpy()
@@ -331,7 +283,6 @@ def main():
     fig3.savefig(out_scatter, dpi=150)
     print(f"Saved figure: {out_scatter}")
 
-    # ---- overall headline ----
     chance = 1.0 / args.k
     mapped_mask = ~np.isnan(own_share)
     mapped_share = own_share[mapped_mask]
@@ -350,7 +301,6 @@ def main():
     weak_mask   = df_univ["cluster_label"].isin(weak_clusters).to_numpy()   & mapped_mask
     empty_mask  = df_univ["cluster_label"].isin(empty_clusters).to_numpy()  & mapped_mask
 
-    # ---- max_sim cutoff diagnostic ----
     print("\nBuilding max_sim cutoff diagnostic...")
     mx = df_univ["max_sim"].to_numpy()
     mx_valid = ~np.isnan(mx)

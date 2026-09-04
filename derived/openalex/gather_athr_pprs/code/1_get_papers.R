@@ -10,36 +10,27 @@ library(data.table)
 
 set.seed(8975)
 
-# Load data
 athrs <- read_dta("../external/ids/list_of_athrs.dta")  %>% filter(athr_id != "A9999999999")
 nr <- nrow(athrs)
 
-# Split authors into chunks of 500
 split_athr <- split(athrs, rep(1:ceiling(nr/500), each = 500, length.out=nr))
 num_file <- length(split_athr)
 
-# --- SLURM ARRAY LOGIC STARTS HERE ---
 
-# 1. Get the Array Task ID from the system environment
-# If running locally (not on Slurm), this defaults to 1 for safety
 task_id <- as.numeric(Sys.getenv("SLURM_ARRAY_TASK_ID"))
 if (is.na(task_id)) task_id <- 1
 
-# 2. Define how many chunks 'q' each job should handle
 batch_size <- 500
 
-# 3. Calculate the start and end indices for THIS specific job
 start_q <- (task_id - 1) * batch_size + 1
-end_q   <- min(task_id * batch_size, num_file) # Use min() to ensure we don't go out of bounds
+end_q   <- min(task_id * batch_size, num_file)
 
 print(paste("Job ID:", task_id, "| Processing chunks:", start_q, "to", end_q))
 
-# --- MAIN LOOP ---
 
 for (q in start_q:end_q) {
     print(paste("Processing chunk:", q))
     
-    # Wrap in tryCatch to prevent one bad API call from crashing the whole job
     try({
         works <- oa_fetch(
             entity = "works", 
@@ -58,7 +49,6 @@ for (q in start_q:end_q) {
             })
             output <- output %>% bind_rows() %>% distinct() %>% data.frame
             
-            # Write the output file
             write_csv(output, paste0("../output/works", as.character(q), ".csv"))
         }
     })

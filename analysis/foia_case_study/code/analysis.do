@@ -23,14 +23,6 @@ program main
     }
 end
 
-* ---------------------------------------------------------------------------
-* Young-vs-old tests behind the kdensity overlays. Welch t-test on the means
-* plus a Kolmogorov-Smirnov test on the full distributions -- the t-test only
-* speaks to means, and these variables are skewed and zero-heavy, so the two
-* can disagree. Both run on the uncapped sample (matching the legend stats),
-* not the p95 plotting range. cluster() replaces the t-test with a clustered
-* mean difference where obs are PI-years rather than PIs.
-* ---------------------------------------------------------------------------
 program kd_tests, rclass
     syntax varname [, cluster(varname)]
     local v `varlist'
@@ -48,19 +40,11 @@ program kd_tests, rclass
     return scalar p_ks = cond(mi(r(p_exact)), r(p), r(p_exact))
 end
 
-* p-value as text for a graph note: 3 decimals, "<0.001" when smaller.
 program pfmt, rclass
     syntax anything(name=p)
     return local s = cond(`p' < 0.001, "<0.001", string(`p', "%5.3f"))
 end
 
-* ---------------------------------------------------------------------------
-* kdensity overlay, young vs old, rescaled to percent of obs per fixed bin
-* (raw densities over dollar amounts are unreadable 1e-5-scale numbers).
-* x capped at p95 of the pooled distribution (long right tail otherwise
-* flattens everything); kernel spills past the data boundary, so only the
-* [0, cap] range is drawn.
-* ---------------------------------------------------------------------------
 program kd_young_old
     syntax varname, xtitle(string) w(real) wlab(string) unit(string) ///
         out(string) [xcap(real -1) fmt(string) cluster(varname)]
@@ -90,17 +74,12 @@ program kd_young_old
     else                 local ptxt "Early-career - late-career = `diff'; t-test p = `pt_s'; K-S p = `pks_s'"
     di as text "`v': `ptxt'"
 
-    * both densities evaluated on one common x grid so rarea can shade the gap
     cap drop _kx _kd_y _kd_o _kp_y _kp_o _kp_c
     gen _kx = `xcap' * (_n - 1) / 199 if _n <= 200
     kdensity `v' if young == 1 & `v' <= `xcap', at(_kx) gen(_kd_y) nograph
     kdensity `v' if young == 0 & `v' <= `xcap', at(_kx) gen(_kd_o) nograph
     gen _kp_y = _kd_y * `w' * 100
     gen _kp_o = _kd_o * `w' * 100
-    * opaque lightened tints (*0.3), not %-opacity: translucent fills leave
-    * hairline seam artifacts in exported PDFs. Excess bands run from the
-    * common envelope up to each curve (zero-height where no excess), so no
-    * if-splits are needed.
     gen _kp_c = min(_kp_y, _kp_o)
     tw (rarea _kp_c _kp_y _kx, color(ebblue*0.3) lwidth(none)) ///
        (rarea _kp_c _kp_o _kx, color(dkorange*0.3) lwidth(none)) ///
@@ -116,15 +95,6 @@ program kd_young_old
     cap drop _kx _kd_y _kd_o _kp_y _kp_o _kp_c
 end
 
-* ---------------------------------------------------------------------------
-* NIH funding by athr-year from RePORTER (FY2010-2019, one row per
-* project-FY). fy is the funding year, so nih_amt is the dollar flow received
-* that year -- the right analogue of annual FOIA spend. n_grants in the
-* pi_descriptives panel instead counts project-FY records stamped to the
-* project's start year, so it is not a grant count; count distinct projects
-* here. A grant-PI pair can appear twice when the same name matches twice in
-* the pi_names string, hence the dedup on athr_id-grant_id.
-* ---------------------------------------------------------------------------
 program gather_nih
     use athr_id grant_id full_project_num fy total_cost project_start ///
         using ../external/nih/nih_grants_by_athr_id, clear
@@ -141,7 +111,6 @@ program gather_nih
     keep if inrange(year, 2010, 2013)
     preserve
         collapse (sum) nih_amt nih_active nih_new_grants, by(athr_id)
-        * annual averages over the 4 pre-merger years
         gen double nih_amt_yr    = nih_amt        / 4
         gen double nih_active_yr = nih_active     / 4
         gen double nih_new_yr    = nih_new_grants / 4
@@ -153,17 +122,6 @@ program gather_nih
     save ../temp/nih_pre_pis, replace
 end
 
-* ---------------------------------------------------------------------------
-* NIH grant counts and amounts for young vs old PIs, same split as
-* spend_by_age (median min_year = first last-author pub year; young = after).
-* samp(foia) = the FOIA PIs in the analysis sample; samp(all) = the full
-* analysis sample. Pre-merger only: per-PI annual averages over FY2010-2013,
-* always dividing by 4 so grantless years count as zeros.
-* Restricted to PIs matched to RePORTER AND holding at least one FY2010-2013
-* award. An unmatched PI's zero is a failed name match, not an absence of
-* funding; a matched PI whose grants all start post-2013 was not an NIH PI
-* pre-merger, so neither belongs in the funding distribution.
-* ---------------------------------------------------------------------------
 program nih_by_age
     syntax, samp(string) [suf(string)]
     cap mkdir ../output/tables
@@ -193,7 +151,6 @@ program nih_by_age
     gen young = min_year > `med_yr' if !mi(min_year)
     di as text "nih_by_age `samp'`suf': median min_year (first last-author yr) = `med_yr' (young = after median)"
 
-    * composition before the restriction: unmatched vs matched-but-unfunded
     foreach g in 1 0 {
         qui count if young == `g'
         local n_samp_`g' = r(N)
@@ -256,11 +213,6 @@ program nih_by_age
         out(../output/figures/bs_nih_active_by_age_`samp'`suf'.pdf)
 end
 
-* ---------------------------------------------------------------------------
-* Same young/old comparison at the PI-YEAR level: one obs per PI-year of NIH
-* funding over 2010-2013, rectangular so grantless years enter as zeros.
-* Young/old uses the same PI-level median min_year as nih_by_age.
-* ---------------------------------------------------------------------------
 program nih_by_age_piyr
     syntax, samp(string) [suf(string)]
 
@@ -324,14 +276,6 @@ program nih_by_age_piyr
         out(../output/figures/kd_nih_active_by_age_piyr_`samp'`suf'.pdf)
 end
 
-* ---------------------------------------------------------------------------
-* Pre-period publication output for young vs old PIs, same split as
-* nih_by_age (median min_year within the sample). Two measures: total pubs
-* over the pre-period and pubs per year. The panel is rectangular over
-* 2010-2019, so the per-year average always divides by the 4 pre-merger
-* years and non-publishing years enter as zeros. pre_ppr_cnt_* are
-* last-author counts; the any-position analogues are built here.
-* ---------------------------------------------------------------------------
 program gather_pubs
     syntax [, suf(string)]
     use athr_id year min_year athr_indicator foia_athr nih_pi_name ppr_cnt_any ///
@@ -414,28 +358,6 @@ program pubs_by_age
     }
 end
 
-* ---------------------------------------------------------------------------
-* Productivity per research dollar in the pre-period: pubs per year divided
-* by dollars per year, both averaged over 2010-2013.
-* samp(all)  = analysis-sample PIs matched to RePORTER with pre-period
-*              funding; the denominator is NIH dollars.
-* samp(foia) = the FOIA PIs among them, which also have observed consumables
-*              spend, so the denominator can be FOIA spend or NIH + FOIA
-*              combined.
-* Ratios are scaled to pubs per $100k (NIH, combined) and per $10k (FOIA
-* spend, an order of magnitude smaller); the dollars-per-pub inverse is
-* reported alongside since it reads more naturally. The inverse requires a
-* nonzero pub count.
-* Small denominators are the hazard here: a PI whose RePORTER cost is a few
-* dollars over four years produces a ratio in the millions and single-handedly
-* sets the group mean. Three guards, in order: PIs below $10k/yr of NIH
-* funding (or $1k/yr of FOIA spend) are dropped, the PI-level ratios are
-* winsorized at p99 for the table and plots, and the table also reports the
-* aggregate ratio (group total pubs / group total dollars), which is the
-* summary to quote. The saved PI-level .dta keeps the raw ratios.
-* Young/old uses the median min_year of the sample before these restrictions,
-* matching nih_by_age.
-* ---------------------------------------------------------------------------
 program prod_per_dollar
     syntax, samp(string) [suf(string)]
     cap mkdir ../output/tables
@@ -461,10 +383,6 @@ program prod_per_dollar
     qui count
     local n_pos = r(N)
 
-    * A handful of PIs carry a RePORTER total_cost of a few dollars across the
-    * four pre-period years (nih_amt_yr as low as $0.25). Dividing by those
-    * yields ratios in the millions that swamp every mean, so require a
-    * denominator large enough to represent an actually funded lab.
     keep if nih_amt_yr >= 10000
     qui count
     local n_floor = r(N)
@@ -497,10 +415,6 @@ program prod_per_dollar
 
     save ../output/prod_per_dollar_pis_`samp'`suf', replace
 
-    * Aggregate ratio (total pubs / total dollars within the age group) from
-    * the untrimmed data. Unlike the mean of the PI-level ratio it is not
-    * driven by small denominators, so it is the summary to quote. The
-    * dollars-per-pub aggregates are just its reciprocal and are not repeated.
     local aggnm  ppr_per_100k_nih ppr_any_per_100k_nih
     local aggnum pre_ppr_avg      pre_ppr_any_avg
     local aggden nih_amt_yr       nih_amt_yr
@@ -525,8 +439,6 @@ program prod_per_dollar
         }
     }
 
-    * The PI-level ratios stay heavily right-skewed even above the floor, so
-    * winsorize at p99 for the table and the plots. ../output holds raw values.
     foreach v of local vars {
         qui sum `v', d
         qui replace `v' = r(p99) if `v' > r(p99) & !mi(`v')
@@ -593,9 +505,6 @@ program prod_per_dollar
     }
 end
 
-* ---------------------------------------------------------------------------
-* Binscatter with slope + correlation stamped in the legend
-* ---------------------------------------------------------------------------
 program bs_stats
     syntax, y(string) x(string) ytitle(string) xtitle(string) out(string)
     qui reg `y' `x'
@@ -612,12 +521,6 @@ program bs_stats
     graph export `out', replace
 end
 
-* ---------------------------------------------------------------------------
-* FOIA PI spending by young vs old. Split on min_year (first last-author pub
-* year) from the pi_descriptives analysis sample, at the median among matched
-* FOIA PIs; young = after the median. Pre-period spend only (year <= 2013),
-* same cleaning as boe.
-* ---------------------------------------------------------------------------
 program spend_by_age
     syntax [, suf(string)]
     cap mkdir ../output/tables
@@ -662,7 +565,6 @@ program spend_by_age
     gen young = min_year > `med_yr' if !mi(min_year)
     di as text "spend_by_age`suf': median min_year = `med_yr' (young = after median)"
 
-    * PI-level dataset behind the table/plots (incl. young/old flag)
     preserve
         keep athr_id min_year lab_age_2014 young tot_spend lab_spend nonlab_spend ///
              hq_labspend perc_lab_spend n_yrs
@@ -691,10 +593,6 @@ program spend_by_age
     qui matrix_to_txt, saving("../output/tables/spend_by_age`suf'.txt") ///
         matrix(spend_age) title(<tab:spend_by_age`suf'>) format(%14.2f) replace
 
-    * kdensity overlays young vs old; x capped at p95 of the pooled
-    * distribution — the long right tail otherwise flattens everything.
-    * Density is rescaled to percent of PIs per fixed bin (raw densities
-    * over dollar amounts are unreadable 1e-5-scale numbers).
     foreach v in tot_spend lab_spend hq_labspend nonlab_spend perc_lab_spend {
         if "`v'" == "tot_spend"      local xtitle "Avg annual total spend ($)"
         if "`v'" == "lab_spend"      local xtitle "Avg annual lab spend ($)"
@@ -729,8 +627,6 @@ program spend_by_age
         local ptxt "Early-career - late-career = `diff'; t-test p = `pt_s'; K-S p = `pks_s'"
         di as text "`v': `ptxt'"
 
-        * both densities on one common x grid so rarea can shade the gap;
-        * grid starts at 0 so the kernel spill into negative spend isn't drawn
         cap drop _kx _kd_y _kd_o _kp_y _kp_o _kp_c
         gen _kx = `xcap' * (_n - 1) / 199 if _n <= 200
         kdensity `v' if young == 1 & `v' <= `xcap', at(_kx) gen(_kd_y) nograph
@@ -752,7 +648,6 @@ program spend_by_age
         cap drop _kx _kd_y _kd_o _kp_y _kp_o _kp_c
     }
 
-    * logs drop PIs with no lab spend; N in the legend shows how many
     gen double ln_lab_spend = ln(lab_spend) if lab_spend > 0
     gen double ln_tot_spend = ln(tot_spend) if tot_spend > 0
     foreach v in lab_spend hq_labspend tot_spend ln_lab_spend ln_tot_spend {
@@ -768,11 +663,6 @@ program spend_by_age
     }
 end
 
-* ---------------------------------------------------------------------------
-* Same young/old comparison at the PI-YEAR level: each obs is one PI-year of
-* spending (no averaging across years). Young/old split uses the same
-* PI-level median min_year as spend_by_age.
-* ---------------------------------------------------------------------------
 program spend_by_age_piyr
     syntax [, suf(string)]
     use ../temp/spend_athr_yr, clear
@@ -841,8 +731,6 @@ program spend_by_age_piyr
         local mean_o = strtrim("`: di %9.0fc r(mean)'")
         local n_o    = r(N)
 
-        * PI-years are clustered within PI, so the mean difference is tested
-        * with PI-clustered SEs rather than an iid t-test
         kd_tests `v', cluster(athr_id)
         local diff = strtrim("`: di %9.0fc r(diff)'")
         local p_t  = r(p_t)
@@ -854,7 +742,6 @@ program spend_by_age_piyr
         local ptxt "Early-career - late-career = `diff'; t-test p = `pt_s' (PI-clustered); K-S p = `pks_s'"
         di as text "`v': `ptxt'"
 
-        * both densities on one common x grid
         cap drop _kx _kd_y _kd_o _kp_y _kp_o
         gen _kx = `xcap' * (_n - 1) / 199 if _n <= 200
         kdensity `v' if young == 1 & `v' <= `xcap', at(_kx) gen(_kd_y) nograph

@@ -8,14 +8,12 @@ import nltk
 from nltk.corpus import stopwords
 from nltk.stem import PorterStemmer
 
-# --- SETUP ---
 nltk.download("stopwords", quiet=True)
 SEED = 42
 random.seed(SEED)
 np.random.seed(SEED)
 stemmer = PorterStemmer()
 
-# --- CONFIGURATION ---
 REGEX_CLEAN = r"[^a-z0-9\s]" 
 REGEX_SPACES = r"\s+"
 CUTOFF_YEAR = 2013
@@ -129,7 +127,6 @@ all_custom_stopwords = (
 custom_stopwords_set = set(stopwords.words("english")).union(set(all_custom_stopwords))
 custom_stopwords_list = list(custom_stopwords_set)
 
-# --- LOAD DATA ---
 print("Loading Master ID List...")
 pd_samp = pd.read_stata("../external/appended/openalex_all_jrnls_merged.dta")
 
@@ -140,12 +137,12 @@ q_master_list = (
     .select(["id", "athr_id", "pub_date"])
     .with_columns(
         pl.col("pub_date")
-        .str.slice(0, 4)                 # Take "1991" from "1991-09-23"
-        .cast(pl.Int32, strict=False)    # Convert to Number
-        .alias("publication_year")       # Rename to your target column
+        .str.slice(0, 4)
+        .cast(pl.Int32, strict=False)
+        .alias("publication_year")
     )
     .filter(pl.col("publication_year") <= CUTOFF_YEAR)
-    .select(["id", "athr_id"])           # Keep only what we need for the join
+    .select(["id", "athr_id"])
     .unique()
 )
 

@@ -5,12 +5,8 @@ library(ggplot2)
 library(haven)
 library(stringr)
 
-# ---------------------------
-# Configuration
-# ---------------------------
 PLACEBO_SEED      <- 8975
 N_PLACEBO_ITERS   <- 100
-# v80 spec: pre-period 3-yr mean (2011-2013) + slope of avg_log_price.
 MATCH_COVARIATES  <- c("avg_log_price_pre_mean", "avg_log_price_slope")
 MATCH_RATIO       <- 2
 
@@ -18,9 +14,6 @@ setwd("~/sci_eq/derived/first_stage/placebo_dist/code")
 dir.create("../output/figures", recursive = TRUE, showWarnings = FALSE)
 dir.create("../output/balance_plots", recursive = TRUE, showWarnings = FALSE)
 
-# ---------------------------
-# Static data prep (shared across iterations)
-# ---------------------------
 for (SUFFIX in c("", "_all3")) {
 cat("\n########## Running suffix:", ifelse(SUFFIX == "", "baseline", SUFFIX), "##########\n")
 cat("Loading data...\n")
@@ -76,9 +69,6 @@ data_wide_base <- data_wide_base %>%
   left_join(pre_slopes, by = "category") %>%
   left_join(pre_means,  by = "category")
 
-# ---------------------------
-# Placebo iterations
-# ---------------------------
 all_pairs       <- vector("list", N_PLACEBO_ITERS)
 all_assignments <- vector("list", N_PLACEBO_ITERS)
 
@@ -184,9 +174,6 @@ for (iter in seq_len(N_PLACEBO_ITERS)) {
       " of ", nrow(all_treated), " placebo treated markets.\n", sep = "")
 }
 
-# ---------------------------
-# Write consolidated outputs
-# ---------------------------
 final_pairs       <- do.call(rbind, all_pairs)
 final_assignments <- do.call(rbind, all_assignments)
 

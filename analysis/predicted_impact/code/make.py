@@ -1,6 +1,3 @@
-#****************************************************
-# make.py  --  analysis/predicted_impact
-#****************************************************
 import os
 
 from gslab_make.move_sources import *

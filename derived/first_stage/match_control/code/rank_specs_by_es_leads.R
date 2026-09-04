@@ -1,7 +1,3 @@
-#  Rank specs by actual event-study pretrend coefficients in price + spend.
-#  Mirrors evaluate_spec() in explore_specs.R for matching + event study, but
-#  skips all the plotting and just extracts the lead/lag coefficient table.
-#  Writes one combined CSV of lead coefs across all (spec, ratio) combos.
 
 suppressPackageStartupMessages({
   library(tidyverse)
@@ -23,7 +19,6 @@ uni_panel <- read_dta("../external/samp/uni_category_yr_tfidf.dta") %>%
          avg_log_price, log_raw_qty, log_raw_spend) %>%
   filter(!is.na(spend_2013))
 
-# Pre-period trends + year-specific levels (same as explore_specs.R)
 pre_panel <- panel %>% filter(year <= 2013) %>% mutate(year_c = year - 2012)
 
 get_trend <- function(df, var) {
@@ -172,8 +167,6 @@ coefs <- bind_rows(all_rows)
 dir.create("../output/spec_search", recursive = TRUE, showWarnings = FALSE)
 write_csv(coefs, "../output/spec_search/es_leads_all_specs.csv")
 
-# Pretrend score: sum of |b| at rel = -4, -3, -2 (i.e., year 2010, 2011, 2012).
-# rel = -1 (year 2013) is the reference, so it's 0 by construction.
 pretrend <- coefs %>%
   filter(rel %in% c(-4, -3, -2)) %>%
   group_by(spec, match_ratio, outcome) %>%

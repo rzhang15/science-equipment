@@ -6,12 +6,6 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from nltk.stem import PorterStemmer
 from config import stopwords_list
 
-# --- LOAD PRE-SAVED DATA ---
-# Reads the cleaned US corpus (v2) written by 0b_clean_us_corpus.py:
-#   - scraper-boilerplate authors dropped
-#   - authors with <200 chars of text dropped
-# The tfidf pipeline in foia_similarity_wts reads the same v2 file so the
-# clustering universe and the tfidf universe are identical.
 print("Loading Parquet data...")
 pdf = pd.read_parquet("../output/cleaned_static_author_text_pre_us_v2.parquet")
 pdf = pdf.reset_index(drop=True)
@@ -21,10 +15,6 @@ stemmer = PorterStemmer()
 stemmed_stopwords = [stemmer.stem(word) for word in stopwords_list]
 
 print("Vectorizing...")
-# Text is already whitespace-tokenized, lowercased, and Porter-stemmed by
-# cluster_fields/0_combine_data.py. Skipping sklearn's default regex
-# tokenizer (via tokenizer=str.split + token_pattern=None + lowercase=False)
-# cuts this step ~2-3x. Mirrors cluster_fields/1_vectorize.py.
 tfidf = TfidfVectorizer(
     tokenizer=str.split,
     token_pattern=None,

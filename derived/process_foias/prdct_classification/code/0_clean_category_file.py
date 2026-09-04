@@ -1,22 +1,8 @@
-# 0_clean_category_file.py (UPDATED with Robust Category Standardization)
-"""
-Central script for cleaning and merging the UT Dallas data.
-This script creates the single source of truth for all downstream processes
-and includes logic to:
-  1. Normalize unicode characters and strip special characters from categories
-  2. Correct known typos/misspellings in category names
-  3. Automatically consolidate plural/singular categories (handles -s, -es, -ies, irregulars)
-  4. Consolidate sparse antibody categories
-"""
 import pandas as pd
 import os
 import re
 import config
 
-# ==============================================================================
-# Known typo corrections (source category -> corrected category)
-# Built from manual audit of combined_nochem.xlsx
-# ==============================================================================
 TYPO_CORRECTIONS = {
     "anitmony": "antimony",
     "animal - would clip": "animal - wound clip",
@@ -74,7 +60,6 @@ TYPO_CORRECTIONS = {
     "nonlab - bundle of producs": "nonlab - bundle of products",
 }
 
-# Known irregular plural mappings (singular -> plural form to keep)
 IRREGULAR_PLURALS = {
     "medium": "media",
     "matrix": "matrices",
@@ -86,22 +71,21 @@ IRREGULAR_PLURALS = {
 
 
 _UNICODE_NORMALIZE_MAP = {
-    '\u2013': '-',    # en-dash
-    '\u2014': '-',    # em-dash
-    '\u2011': '-',    # non-breaking hyphen
-    '\u2010': '-',    # hyphen (unicode)
-    '\u00ad': '-',    # soft hyphen
-    '\xa0': ' ',      # non-breaking space
-    '\u2018': "'",    # left single quote
-    '\u2019': "'",    # right single quote
-    '\u201c': '"',    # left double quote
-    '\u201d': '"',    # right double quote
-    '\u2026': '...',  # ellipsis (Excel auto-corrects "..." -> \u2026)
+    '\u2013': '-',
+    '\u2014': '-',
+    '\u2011': '-',
+    '\u2010': '-',
+    '\u00ad': '-',
+    '\xa0': ' ',
+    '\u2018': "'",
+    '\u2019': "'",
+    '\u201c': '"',
+    '\u201d': '"',
+    '\u2026': '...',
 }
 
 
 def normalize_unicode(text):
-    """Normalize unicode characters in category names to ASCII equivalents."""
     if not isinstance(text, str):
         return text
     for src, dst in _UNICODE_NORMALIZE_MAP.items():
@@ -111,12 +95,6 @@ def normalize_unicode(text):
 
 
 def normalize_unicode_series(s):
-    """Vectorized normalize_unicode over a pandas Series.
-
-    Applies the same char->replacement table as normalize_unicode using
-    str.replace (runs in C).  NaN values pass through unchanged, matching
-    the per-row function's non-string guard.
-    """
     out = s
     for src, dst in _UNICODE_NORMALIZE_MAP.items():
         out = out.str.replace(src, dst, regex=False)
@@ -124,22 +102,17 @@ def normalize_unicode_series(s):
 
 
 def clean_category_string(text):
-    """Clean a single category string: normalize, strip, collapse whitespace."""
     if not isinstance(text, str):
         return text
     text = normalize_unicode(text)
     text = text.lower().strip()
-    # Remove leading # or ## characters (stray markdown artifacts)
     text = re.sub(r'^#+\s*', '', text)
-    # Collapse multiple spaces to single space
     text = re.sub(r'\s{2,}', ' ', text)
-    # Strip again after all transformations
     text = text.strip()
     return text
 
 
 def clean_category_series(s):
-    """Vectorized clean_category_string over a pandas Series (C-level str ops)."""
     out = normalize_unicode_series(s.astype(str))
     out = out.str.lower().str.strip()
     out = out.str.replace(r'^#+\s*', '', regex=True)
@@ -149,13 +122,6 @@ def clean_category_series(s):
 
 
 def save_nonlab_bucket_assignments(category_counts, output_path):
-    """Map each non-lab category to its coarse spending bucket and save as CSV.
-
-    Reads from a `category, count` DataFrame, applies
-    config.assign_nonlab_bucket_series to assign each category to a bucket,
-    drops lab categories (empty bucket), and writes a `bucket, category,
-    count` CSV sorted by bucket then count desc.
-    """
     df = category_counts.copy()
     df['bucket'] = config.assign_nonlab_bucket_series(df['category'])
     df = df[df['bucket'] != ''][['bucket', 'category', 'count']]
@@ -170,11 +136,6 @@ def save_nonlab_bucket_assignments(category_counts, output_path):
 
 
 def apply_sibling_consolidation(df, cat_col):
-    """Apply config.CATEGORY_CONSOLIDATION in-place: rename sibling categories
-    whose distinction isn't reliably carried by the description (e.g. centrifuge
-    conical vs. centrifuge tubes).  Runs at step 0 so every downstream artifact
-    -- training labels, category vectors, validation reports -- sees the
-    merged taxonomy."""
     cons_map = getattr(config, 'CATEGORY_CONSOLIDATION', None)
     if not cons_map:
         return
@@ -190,37 +151,24 @@ def apply_sibling_consolidation(df, cat_col):
 
 
 def build_plural_map(unique_categories):
-    """
-    Build a comprehensive mapping from singular to plural forms.
-    Handles: +s, +es, y->ies, and known irregular plurals.
-    Strategy: when both forms exist, keep the PLURAL form (more items typically use it).
-    """
     cat_set = set(unique_categories)
-    plural_map = {}  # maps the form to REMOVE -> form to KEEP
+    plural_map = {}
 
-    # 1. Simple +s plurals (e.g., "tube" -> "tubes")
     for cat in cat_set:
         if cat + 's' in cat_set:
             plural_map[cat] = cat + 's'
 
-    # 2. +es plurals (e.g., "dish" -> "dishes", "box" -> "boxes")
     for cat in cat_set:
         if cat + 'es' in cat_set:
-            # Avoid double-mapping if already caught by +s rule
             if cat not in plural_map:
                 plural_map[cat] = cat + 'es'
 
-    # 3. y -> ies plurals (e.g., "antibody" -> "antibodies", "assay" does NOT become "assaies")
     for cat in cat_set:
         if cat.endswith('y') and cat[:-1] + 'ies' in cat_set:
             plural_map[cat] = cat[:-1] + 'ies'
 
-    # 4. Known irregular plurals
     for singular, plural in IRREGULAR_PLURALS.items():
-        # Find categories containing the singular/plural word
-        # Match whole words within multi-word category names
         for cat in cat_set:
-            # Check if category has the singular form and the corresponding plural exists
             candidate_plural = cat.replace(singular, plural)
             if candidate_plural != cat and candidate_plural in cat_set:
                 plural_map[cat] = candidate_plural
@@ -230,11 +178,6 @@ def build_plural_map(unique_categories):
 
 def report_unmatched_cat_keys(df_raw, df_cat, merge_keys, unmatched_csv=None,
                               max_print=50):
-    """List rows in the category file whose merge keys don't appear in the raw data.
-
-    Prints a count, a preview of up to `max_print` rows, and (if provided)
-    dumps the full list of unmatched category rows to `unmatched_csv`.
-    """
     print("\nChecking that every combined_XXX merge key matches the raw data...")
     missing_cols = [k for k in merge_keys if k not in df_raw.columns or k not in df_cat.columns]
     if missing_cols:
@@ -255,13 +198,6 @@ def report_unmatched_cat_keys(df_raw, df_cat, merge_keys, unmatched_csv=None,
         print("  - All category keys matched the raw data.")
         return
 
-    # For each unmatched combined row, surface the raw values of each merge
-    # key when the OTHER keys match.  For each key K we add two columns:
-    #   raw_<K>_n_candidates: how many distinct raw values of K exist when
-    #                         the other keys match this combined row
-    #   raw_<K>_example:      one example of those raw values
-    # If raw_<K>_n_candidates > 0 and raw_<K>_example differs from the
-    # combined row's value of K, then K is the key causing the mismatch.
     raw_keys_unique = df_raw[merge_keys].drop_duplicates().copy()
     for k in merge_keys:
         raw_keys_unique[k] = raw_keys_unique[k].astype(str)
@@ -307,10 +243,8 @@ def report_unmatched_cat_keys(df_raw, df_cat, merge_keys, unmatched_csv=None,
 def main():
     print("--- Starting Step 0: Cleaning and Merging UT Dallas Data ---")
 
-    # 1. Create the temporary directory if it doesn't exist
     os.makedirs(config.TEMP_DIR, exist_ok=True)
 
-    # 2. Load the raw UT Dallas data and the category mapping file
     print("Loading raw data files...")
     try:
         df_ut = pd.read_csv(config.UT_DALLAS_CLEAN_CSV, low_memory=False)
@@ -321,12 +255,8 @@ def main():
         print(f"Error loading data files: {e}. Make sure paths in config.py are correct.")
         return
 
-    # =========================================================================
-    # 3. CATEGORY STANDARDIZATION PIPELINE
-    # =========================================================================
     print("\n--- Category Standardization Pipeline ---")
 
-    # 3a. Basic normalization: unicode, lowercase, strip, collapse whitespace
     print("  Step 3a: Normalizing unicode, lowercase, stripping whitespace...")
     if config.UT_CAT_COL in df_cat.columns:
         df_cat[config.UT_CAT_COL] = clean_category_series(df_cat[config.UT_CAT_COL])
@@ -338,7 +268,6 @@ def main():
     n_categories_before = df_cat[config.UT_CAT_COL].nunique()
     print(f"  Unique categories after normalization: {n_categories_before}")
 
-    # 3b. Apply known typo corrections
     print("  Step 3b: Applying known typo corrections...")
     n_typos_fixed = 0
     if config.UT_CAT_COL in df_cat.columns:
@@ -347,7 +276,6 @@ def main():
         df_cat[config.UT_CAT_COL] = df_cat[config.UT_CAT_COL].replace(TYPO_CORRECTIONS)
     print(f"  Fixed {n_typos_fixed} rows with known typos ({len(TYPO_CORRECTIONS)} correction rules)")
 
-    # 3c. Smart plural/singular merging
     print("  Step 3c: Detecting and merging singular/plural category pairs...")
     if config.UT_CAT_COL in df_cat.columns:
         unique_categories = set(df_cat[config.UT_CAT_COL].dropna().unique())
@@ -356,7 +284,6 @@ def main():
         if plural_map:
             df_cat[config.UT_CAT_COL] = df_cat[config.UT_CAT_COL].replace(plural_map)
             print(f"  Merged {len(plural_map)} singular/plural pairs")
-            # Show a sample of merges for transparency
             sample_merges = list(plural_map.items())[:10]
             for singular, plural in sample_merges:
                 print(f"    '{singular}' -> '{plural}'")
@@ -369,9 +296,6 @@ def main():
     print(f"\n  Category count: {n_categories_before} -> {n_categories_after} "
           f"(reduced by {n_categories_before - n_categories_after})")
 
-    # =========================================================================
-    # 4. Prepare keys for merging
-    # =========================================================================
     for key in config.UT_DALLAS_MERGE_KEYS:
         if key in df_ut.columns and key in df_cat.columns:
             df_ut[key] = df_ut[key].astype(str)
@@ -383,24 +307,20 @@ def main():
     if rows_dropped > 0:
         print(f"  - Dropped {rows_dropped} duplicate rows from the category file.")
 
-    # 4b. Verify every combined_XXX key is present in the raw data
     report_unmatched_cat_keys(df_ut, df_cat, config.UT_DALLAS_MERGE_KEYS,
                               unmatched_csv=os.path.join(config.OUTPUT_DIR,
                                                          'utdallas_unmatched_category_keys.csv'))
 
-    # 5. Perform an inner merge to keep only matched rows
     print("\nMerging files (inner merge to keep only matched rows)...")
     df_merged = pd.merge(df_ut, df_cat, on=config.UT_DALLAS_MERGE_KEYS, how='inner', validate="many_to_one")
     print(f"  - Merge complete. Resulting dataset has {len(df_merged)} rows.")
 
-    # 6. Data Hygiene Step: Drop rows with missing crucial data
     initial_rows = len(df_merged)
     df_merged.dropna(subset=[config.CLEAN_DESC_COL, config.UT_CAT_COL], inplace=True)
     rows_dropped = initial_rows - len(df_merged)
     if rows_dropped > 0:
         print(f"  - Dropped {rows_dropped} rows due to missing descriptions or categories.")
 
-    # --- Consolidate antibody + pipette tip categories (shared lowercase pass) ---
     cat_col_lower = df_merged[config.UT_CAT_COL].astype(str).str.lower()
 
     print("\nConsolidating antibody categories...")
@@ -430,11 +350,9 @@ def main():
     df_merged.loc[is_elisa, config.UT_CAT_COL] = "elisa kits"
     print(f"  Merged {n_elisa_before} elisa subcategories ({is_elisa.sum()} rows) -> 'elisa kits'")
 
-    # --- Sibling consolidation from config.CATEGORY_CONSOLIDATION ---
     print("\nApplying sibling consolidation from config.CATEGORY_CONSOLIDATION...")
     apply_sibling_consolidation(df_merged, config.UT_CAT_COL)
 
-    # 7. Generate and save category counts for review
     print("\nGenerating and saving category counts...")
     category_counts = df_merged[config.UT_CAT_COL].value_counts().reset_index()
     category_counts.columns = ['category', 'count']
@@ -448,7 +366,6 @@ def main():
         os.path.join(config.OUTPUT_DIR, 'nonlab_bucket_assignments.csv'),
     )
 
-    # 8. Save the final, clean, merged file
     df_merged.to_parquet(config.UT_DALLAS_MERGED_CLEAN_PATH, index=False)
     print(f"\nFinal clean and merged data saved to: {config.UT_DALLAS_MERGED_CLEAN_PATH}")
     print("--- Step 0: Complete ---")
@@ -468,9 +385,6 @@ def main_umich():
         print(f"Error loading data files: {e}. Make sure paths in config.py are correct.")
         return
 
-    # =========================================================================
-    # Category Standardization Pipeline (same as UT Dallas)
-    # =========================================================================
     print("\n--- Category Standardization Pipeline ---")
 
     print("  Step 3a: Normalizing unicode, lowercase, stripping whitespace...")
@@ -512,23 +426,15 @@ def main_umich():
     print(f"\n  Category count: {n_categories_before} -> {n_categories_after} "
           f"(reduced by {n_categories_before - n_categories_after})")
 
-    # Prepare keys for merging
     for key in config.UMICH_MERGE_KEYS:
         if key in df_um.columns and key in df_cat.columns:
             df_um[key] = df_um[key].astype(str)
             df_cat[key] = df_cat[key].astype(str)
 
-    # Raw UMich CSV zero-pads supplier_id to 10 chars ("0000063960");
-    # the categories file stores it as a plain int ("63960").  Strip the
-    # leading zeros on both sides so the merge lines up.
     for df_ in (df_um, df_cat):
         if 'supplier_id' in df_.columns:
             df_['supplier_id'] = df_['supplier_id'].str.lstrip('0')
 
-    # Excel auto-corrects characters like "..." -> "\u2026" and straight
-    # quotes -> smart quotes when cells are edited.  The raw CSV keeps the
-    # original ASCII, so product_desc must be unicode-normalized on both
-    # sides before the merge or otherwise-identical strings will not match.
     for df_ in (df_um, df_cat):
         if 'product_desc' in df_.columns:
             df_['product_desc'] = normalize_unicode_series(df_['product_desc'])
@@ -540,7 +446,6 @@ def main_umich():
     if rows_dropped > 0:
         print(f"  - Dropped {rows_dropped} duplicate rows from the category file.")
 
-    # Verify every combined_XXX key is present in the raw data
     report_unmatched_cat_keys(df_um, df_cat, config.UMICH_MERGE_KEYS,
                               unmatched_csv=os.path.join(config.OUTPUT_DIR,
                                                          'umich_unmatched_category_keys.csv'))
@@ -555,7 +460,6 @@ def main_umich():
     if rows_dropped > 0:
         print(f"  - Dropped {rows_dropped} rows due to missing descriptions or categories.")
 
-    # --- Consolidate antibody + pipette tip categories (shared lowercase pass) ---
     cat_col_lower = df_merged[config.UT_CAT_COL].astype(str).str.lower()
 
     print("\nConsolidating antibody categories...")
@@ -585,11 +489,9 @@ def main_umich():
     df_merged.loc[is_elisa, config.UT_CAT_COL] = "elisa kits"
     print(f"  Merged {n_elisa_before} elisa subcategories ({is_elisa.sum()} rows) -> 'elisa kits'")
 
-    # --- Sibling consolidation from config.CATEGORY_CONSOLIDATION ---
     print("\nApplying sibling consolidation from config.CATEGORY_CONSOLIDATION...")
     apply_sibling_consolidation(df_merged, config.UT_CAT_COL)
 
-    # Generate and save category counts for review
     print("\nGenerating and saving category counts...")
     category_counts = df_merged[config.UT_CAT_COL].value_counts().reset_index()
     category_counts.columns = ['category', 'count']
@@ -609,13 +511,6 @@ def main_umich():
 
 
 def main_combined():
-    """Append UT Dallas + UMich raw data, tag each row with `uni`, and merge
-    against combined_umich_utdallas.xlsx with a single inner merge on
-    COMBINED_MERGE_KEYS = [supplier_id, sku, product_desc, supplier, uni].
-    Emits the combined parquet plus per-university back-compat parquets.
-    Legacy main() / main_umich() remain in this file but are no longer invoked
-    from __main__.
-    """
     print("--- Starting Step 0: Combined Dallas + UMich cleaning/merging ---")
     os.makedirs(config.TEMP_DIR, exist_ok=True)
 
@@ -632,21 +527,14 @@ def main_combined():
         print(f"Error loading data files: {e}. Check paths in config.py.")
         return
 
-    # --- Raw-data hygiene: apply the same normalization both sources need
-    # before they can be aligned on merge keys.
-    # UMich raw CSV zero-pads supplier_id to 10 chars ("0000063960"); the
-    # category file stores the plain int.  Strip leading zeros on both sides.
     for df_ in (df_ut, df_um, df_cat):
         if 'supplier_id' in df_.columns:
             df_['supplier_id'] = df_['supplier_id'].astype(str).str.lstrip('0')
 
-    # Unicode-normalize product_desc so Excel smart-quote / ellipsis rewrites
-    # don't break the merge.
     for df_ in (df_ut, df_um, df_cat):
         if 'product_desc' in df_.columns:
             df_['product_desc'] = normalize_unicode_series(df_['product_desc'])
 
-    # Tag each source with `uni` and align schemas (UMich has no `sku`).
     df_ut['uni'] = 'utdallas'
     df_um['uni'] = 'umich'
     if 'sku' not in df_um.columns:
@@ -657,9 +545,6 @@ def main_combined():
           f"(utdallas={(df_all['uni']=='utdallas').sum()}, "
           f"umich={(df_all['uni']=='umich').sum()})")
 
-    # =========================================================================
-    # Category Standardization Pipeline (shared with main/main_umich)
-    # =========================================================================
     print("\n--- Category Standardization Pipeline ---")
 
     print("  Step 3a: Normalizing unicode, lowercase, stripping whitespace...")
@@ -700,7 +585,6 @@ def main_combined():
     print(f"\n  Category count: {n_categories_before} -> {n_categories_after} "
           f"(reduced by {n_categories_before - n_categories_after})")
 
-    # --- Single 5-key merge on COMBINED_MERGE_KEYS ---
     for key in config.COMBINED_MERGE_KEYS:
         if key in df_all.columns and key in df_cat.columns:
             df_all[key] = df_all[key].astype(str)
@@ -729,7 +613,6 @@ def main_combined():
     if rows_dropped > 0:
         print(f"  - Dropped {rows_dropped} rows due to missing descriptions or categories.")
 
-    # --- Consolidate antibody + pipette tip categories (shared lowercase pass) ---
     cat_col_lower = df_merged[config.UT_CAT_COL].astype(str).str.lower()
 
     print("\nConsolidating antibody categories...")
@@ -759,7 +642,6 @@ def main_combined():
     df_merged.loc[is_elisa, config.UT_CAT_COL] = "elisa kits"
     print(f"  Merged {n_elisa_before} elisa subcategories ({is_elisa.sum()} rows) -> 'elisa kits'")
 
-    # --- Sibling consolidation from config.CATEGORY_CONSOLIDATION ---
     print("\nApplying sibling consolidation from config.CATEGORY_CONSOLIDATION...")
     apply_sibling_consolidation(df_merged, config.UT_CAT_COL)
 
@@ -779,10 +661,6 @@ def main_combined():
         os.path.join(config.OUTPUT_DIR, 'nonlab_bucket_assignments.csv'),
     )
 
-    # UT Dallas and UMich CSVs load some shared columns (e.g. purchase_id) with
-    # different dtypes — one as int, one as str — which pandas keeps as object
-    # through concat.  pyarrow's parquet writer rejects mixed-type objects, so
-    # cast any object-dtype column with mixed Python types to str first.
     for col in df_merged.columns:
         if df_merged[col].dtype == object:
             types = df_merged[col].dropna().map(type).unique()
@@ -792,9 +670,6 @@ def main_combined():
     df_merged.to_parquet(config.COMBINED_MERGED_CLEAN_PATH, index=False)
     print(f"\nFinal clean and merged data saved to: {config.COMBINED_MERGED_CLEAN_PATH}")
 
-    # Back-compat: derive the per-university parquets that downstream scripts
-    # (1c_build_category_vectors.py, 3_predict_product_markets.py,
-    # 5_validate_utdallas.py) still read by legacy path.
     utd_slice = df_merged[df_merged['uni'] == 'utdallas']
     um_slice = df_merged[df_merged['uni'] == 'umich']
     utd_slice.to_parquet(config.UT_DALLAS_MERGED_CLEAN_PATH, index=False)

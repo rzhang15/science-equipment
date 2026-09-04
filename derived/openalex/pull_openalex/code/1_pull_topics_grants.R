@@ -53,7 +53,6 @@ fetch_batch_all <- function(pmids_vector) {
   return(results_list)
 }
 
-# --- MAIN LOOP ---
 for (q in batches) {
   message(paste("Processing batch:", q, "/", length(split_pmid)))
   raw_pmids <- split_pmid[[q]] %>% pull(pmid)

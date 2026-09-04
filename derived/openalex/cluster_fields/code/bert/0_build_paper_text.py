@@ -1,16 +1,3 @@
-"""
-Build per-paper text for SPECTER embedding.
-
-Avoids OOM by:
-  - Reading the per-shard .dta files (not the 58GB appended file).
-  - Streaming each shard via pd.read_stata(..., chunksize=...) into parquet.
-  - Lazy-scanning parquet for the join/dedupe step.
-
-Output:
-  ../../output/bert/papers_text.parquet         (id, paper_text)
-  ../../output/bert/author_paper_edges.parquet  (athr_id, id, publication_year)
-  ../../output/bert/_tmp/<shard>.parquet        (intermediate converted shards)
-"""
 import os
 import glob
 import pandas as pd
@@ -35,7 +22,6 @@ REGEX_SPACES = r"\s+"
 
 
 def convert_dta_shards(pattern: str, cols: list[str], tag: str) -> list[str]:
-    """Convert each .dta shard to a parquet file, streaming in chunks. Idempotent."""
     out_paths = []
     for src in sorted(glob.glob(pattern)):
         base = os.path.basename(src).replace(".dta", "")
@@ -64,7 +50,6 @@ works_paths = convert_dta_shards(WORKS_SHARDS, WORKS_COLS, "works")
 print("Converting mesh shards (id, qualifier_name, gen_mesh)...")
 mesh_paths = convert_dta_shards(MESH_SHARDS, MESH_COLS, "mesh")
 
-# ---------------- assemble paper text ----------------
 
 print("Scanning converted works parquet...")
 q_works = (

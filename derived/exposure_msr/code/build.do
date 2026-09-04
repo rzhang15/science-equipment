@@ -64,11 +64,6 @@ program build_exposure_suffix
     save ../output/athr_spend`suffix', replace
     restore
 
-    // Three definitions of the market spend share denominator:
-    //   hc         : sum over high-confidence markets (keep == 1)
-    //   all        : sum over all consumables (no keep restriction)
-    //   treated_hc : sum over treated high-confidence markets (keep == 1 & treated == 1)
-    //                → mkt_spend_shr sums to 1 per author by construction
     foreach v in hc all treated_hc {
         preserve
         build_exposure_version `v' `suffix'
@@ -89,7 +84,6 @@ program build_exposure_version
     bys athr_id: egen tot_hc_spend = total(spend * (keep == 1))
     gen hc_spend_shr = tot_hc_spend / tot_lab_spend
 
-    // align slash → hyphen so the two betas in did_coefs merge
     replace category = "acrylamide-bis solution" if category == "acrylamide/bis solution"
     replace category = "dmem-f-12" if category == "dmem/f-12"
     merge m:1 category using ../external/betas/did_coefs_eb_price`suffix', assert(1 3) keep(1 3)
@@ -98,14 +92,12 @@ program build_exposure_version
     replace has_beta = 1 if has_beta == 3
     bys athr_id: egen tot_treated_hc_spend = total(spend * (keep == 1 & treated == 1))
 
-    // version-specific sample restriction (defines which markets enter the denominator)
     if "`version'" == "hc" {
         keep if keep == 1
     }
     else if "`version'" == "treated_hc" {
         keep if keep == 1 & treated == 1
     }
-    // "all": no restriction — denominator spans all consumables
 
     bys athr_id: egen tot_shr_spend = total(spend)
     gen mkt_spend_shr = spend / tot_shr_spend

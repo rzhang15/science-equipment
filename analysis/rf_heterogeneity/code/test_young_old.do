@@ -6,14 +6,6 @@ set scheme modern
 version 17
 log using test_young_old.log, replace
 
-* Early- vs late-career differential from the joint pooled-DiD PPML that
-* event_study_het fits (split_type med_pi). Three tests per outcome:
-*   (1) median split, lincom Z_young - Z_old off the joint VCE
-*   (2) continuous Z x lab-age interaction (one coefficient, no binning)
-*   (3) both again with PI age redefined off the first last-author paper that
-*       was NOT solo-authored (min_year_nonsolo, built here from the
-*       untruncated last-author panel)
-* Reads the panels analysis.do already wrote to ../temp/, so no rebuild.
 
 local fes athr_id year
 local vce_cl athr_id
@@ -25,26 +17,18 @@ foreach suf in _r1_r2 {
         continue
     }
 
-    * n_solo_ppr is degenerate in the last-author panel (num_athrs == 1 by
-    * construction, so it equals ppr_cnt); avg_team_size = mean coauthors is
-    * genuine, so >0 flags a year with a non-solo last-author paper.
     use athr_id year avg_team_size using ///
         ../external/samp/athr_panel_full_year_last_all_jrnls`suf', clear
     gen _nonsolo_yr = year if avg_team_size > 0.001 & !mi(avg_team_size)
     gcollapse (min) min_year_nonsolo = _nonsolo_yr, by(athr_id)
     save ../temp/min_year_nonsolo`suf', replace
 
-    * Career clock excluding solo papers: first year with a non-solo paper in
-    * any author position.
     use athr_id year ppr_cnt n_solo_ppr using ///
         ../external/samp/athr_panel_full_year_all_jrnls`suf', clear
     gen _ns_any_yr = year if ppr_cnt - n_solo_ppr > 0.001
     gcollapse (min) min_year_any_ns = _ns_any_yr, by(athr_id)
     save ../temp/min_year_any_ns`suf', replace
 
-    * Last-author papers excluding solo ones. n_solo_ppr is genuine in the
-    * all-position panel (num_athrs is real there), where n_last_ppr is the
-    * same count as ppr_cnt in the analysis panel.
     use athr_id year n_last_ppr n_solo_ppr using ///
         ../external/samp/athr_panel_full_year_all_jrnls`suf', clear
     gen ppr_cnt_nonsolo = n_last_ppr - n_solo_ppr
@@ -60,8 +44,6 @@ foreach suf in _r1_r2 {
     foreach v in n_last_ppr ppr_cnt_nonsolo {
         replace `v' = 0 if mi(`v')
     }
-    * Nonzero only if the panel was built with reduced_form's DROP_SOLO on, in
-    * which case ppr_cnt is already the non-solo count and the two are the same.
     qui count if ppr_cnt != n_last_ppr
     di as text "  rows where ppr_cnt != n_last_ppr (all-position panel): " r(N)
     qui sum ppr_cnt_nonsolo
@@ -106,8 +88,6 @@ foreach suf in _r1_r2 {
     gen lab_age_ns  = 2014 - min_year_nonsolo
     gen career_age  = 2014 - min_year_any
 
-    * Lab-age split dropping PIs whose first indexed paper was already
-    * last-authored (gap <= 0), for whom min_year cannot measure independence.
     gen gap = min_year - min_year_any
     qui count if athr_indicator == 1 & gap <= 0
     local n_nogap = r(N)
@@ -118,8 +98,6 @@ foreach suf in _r1_r2 {
     gen byte young_g = min_year >  `gapmed' if !mi(min_year) & gap >= 1 & !mi(gap)
     gen byte old_g   = min_year <= `gapmed' if !mi(min_year) & gap >= 1 & !mi(gap)
 
-    * Young on both the lab-age and career-age clocks vs old on both; PIs the
-    * two clocks disagree on are missing and drop out of the fit.
     gen byte young_both = young == 1 & young_any == 1 ///
         if young == young_any & !mi(young) & !mi(young_any)
     gen byte old_both   = young == 0 & young_any == 0 ///
@@ -129,7 +107,6 @@ foreach suf in _r1_r2 {
     gen Z_it       = exposure      * post
     gen Z_share_it = mkt_spend_shr * post
 
-    * ---- (1)/(3a) median splits
     cap matrix drop SPLITS
     local split_rows
     local pairs `" "young old" "young_ns old_ns" "young_g old_g" "young_any old_any" "young_anyns old_anyns" "young_both old_both" "young_nih old_nih" "'
@@ -186,7 +163,6 @@ foreach suf in _r1_r2 {
         }
     }
 
-    * ---- (2)/(3b) continuous age gradient: one coefficient, all PIs
     foreach agevar in lab_age lab_age_ns career_age {
         cap confirm variable `agevar'
         if _rc {
@@ -226,9 +202,6 @@ foreach suf in _r1_r2 {
         }
     }
 
-    * ---- (5) 2x2 career age x lab age. The two switcher cells disagree about
-    * which clock a PI is young on, so they identify which clock the effect
-    * actually follows.
     cap drop yc_yl oc_ol oc_yl yc_ol
     gen byte yc_yl = (young_any == 1 & young == 1) if !mi(young_any) & !mi(young)
     gen byte oc_ol = (young_any == 0 & young == 0) if !mi(young_any) & !mi(young)
@@ -275,7 +248,6 @@ foreach suf in _r1_r2 {
         }
     }
 
-    * ---- (4) horse race: both age measures in one fit
     foreach yvar in ppr_cnt {
         cap drop lab_c car_c Z_lab Z_car S_lab S_car PT_lab PT_car
         qui sum lab_age if athr_indicator == 1, d
@@ -309,9 +281,6 @@ foreach suf in _r1_r2 {
         local b_hr  = r(estimate)
         local se_hr = r(se)
         local p_hr  = r(p)
-        * Reparametrised: lab_age = career_age - gap, so the fit is equivalent to
-        * (b_lab+b_car) on career age holding the apprenticeship gap fixed, and
-        * (-b_lab) on the gap itself.
         lincom Z_lab + Z_car
         local b_cg  = r(estimate)
         local se_cg = r(se)

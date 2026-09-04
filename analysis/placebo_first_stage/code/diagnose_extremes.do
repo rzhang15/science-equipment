@@ -11,14 +11,10 @@ program main
 end
 
 program build_diagnostics
-    // Build per-category diagnostics for the 20 most extreme placebo coefficients.
-    // Output: ../output/extreme_placebo_diagnostics.csv
 
-    // 1. Collapse placebo coefs to one row per category (mean, sd, n_iters)
     use ../output/did_coefs_placebo, clear
     gcollapse (mean) mean_b = b (sd) sd_b = b (count) n_iters_treated = b, by(category)
 
-    // 2. Tag the 20 categories of interest (top 10 + bottom 10 by mean_b)
     gsort -mean_b
     gen rank_high = _n
     gsort mean_b
@@ -30,11 +26,8 @@ program build_diagnostics
     tempfile coefs
     save `coefs'
 
-    // 3. Compute pre-trend slope and post-trend delta from the AGGREGATE panel
-    //    (category × year, weighted across unis). Mirrors match_placebo.R:49-59.
     use ../../../derived/first_stage/make_mkt_panel/output/category_yr_tfidf.dta, clear
 
-    // Pre-trend slope: regression of avg_log_price on year, 2010-2013
     preserve
     keep if year <= 2013
     gen year_c = year - 2012
@@ -43,7 +36,6 @@ program build_diagnostics
     save `slopes'
     restore
 
-    // Post-2014 delta: mean log_raw_price 2015-2017 minus mean 2011-2013
     preserve
     gen pre_block  = inrange(year, 2011, 2013)
     gen post_block = inrange(year, 2015, 2017)
@@ -59,14 +51,12 @@ program build_diagnostics
     save `deltas'
     restore
 
-    // Category-level metadata: support/precision/recall, total spend, treated, bad_control
     use ../../../derived/first_stage/make_mkt_panel/output/category_yr_tfidf.dta, clear
     gcollapse (firstnm) support precision recall treated tier1 tier2 tier3 spend_2013 ///
               (sum) total_spend = raw_spend total_obs_cnt = obs_cnt, by(category)
     merge 1:1 category using `slopes',  nogen
     merge 1:1 category using `deltas',  nogen
 
-    // 4. Per-category n_unis from the uni panel
     preserve
     use ../../../derived/first_stage/make_mkt_panel/output/uni_category_yr_tfidf.dta, clear
     gcollapse (firstnm) anything = treated, by(category uni_id)
@@ -76,7 +66,6 @@ program build_diagnostics
     restore
     merge 1:1 category using `unicount', nogen
 
-    // 5. Bad-control flag from the documentation CSV
     preserve
     import delimited using ../../../derived/first_stage/select_categories/output/bad_control_documentation.csv, clear stringcols(_all) varnames(1)
     keep category bad_control bad_control_reason
@@ -86,7 +75,6 @@ program build_diagnostics
     merge 1:1 category using `bc', nogen keep(1 3)
     replace bad_control = "0" if bad_control == ""
 
-    // 6. Sibling flag: count of OTHER categories sharing same " - " prefix
     gen has_dash = strpos(category, " - ") > 0
     gen prefix = ""
     qui replace prefix = substr(category, 1, strpos(category, " - ") - 1) if has_dash == 1
@@ -95,11 +83,9 @@ program build_diagnostics
     replace sibling_within_pool = 0 if mi(sibling_within_pool)
     drop has_dash n_in_prefix prefix
 
-    // 7. Merge placebo coefs back
     merge 1:1 category using `coefs', keep(2 3) nogen
     keep if flagged == 1
 
-    // 8. Format and export
     gsort -mean_b
     order category mean_b sd_b n_iters_treated total_spend total_obs_cnt n_unis ///
           support precision recall treated bad_control bad_control_reason ///

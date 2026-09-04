@@ -7,41 +7,10 @@ set scheme modern
 set linesize 200
 set maxvar 20000
 
-* ============================================================================
-* Institution-level heterogeneity in the 2014 procurement shock.
-*
-* PI i sits in institution j(i); institution LEVELS are collinear with the
-* author FE (no movers), so only post-2014 objects are identified.
-*
-*   SPEC 1  E[Y_it] = exp(a_i + d_t + b*Z_it + g*Zs_it + pi_j * Post_t)
-*   SPEC 2  E[Y_it] = exp(a_i + d_t + b*Z_it + g*Zs_it + pi_j * Post_t
-*                         + beta_j * Z_it)
-*
-* Z_it = exposure x Post, Zs_it = mkt_spend_shr x Post (pooled control).
-* pi_j   = institution-specific post shift at zero exposure.
-* beta_j = institution-specific exposure slope; spec 2's response line is
-*          Delta_j(E) = pi_j + beta_j * E, so pi_j stays in spec 2 to stop
-*          beta_j from absorbing level shifts.
-*
-* Only relative effects are identified (sum_j PD_j = Post is absorbed by the
-* year FE; sum_j PX_j = Z_it), so one institution is omitted. inst_ord is
-* built so level 1 IS the median institution by pre-2014 research output, and
-* the PD_/PX_ dummies simply skip level 1 -- so every pi_j / beta_j reads as
-* a deviation from the median-output institution, b[Z_it] is that
-* institution's own slope, and slope_j = b + beta_j is institution j's
-* exposure response in levels.
-*
-* The dummies are built by hand rather than as i.inst_ord#i.post: factor
-* expansion puts the base at the single (inst 1, post 0) CELL, keeps a term
-* for every post level, and the author FE then makes the post==1 branch
-* collinear -- ppmlhdfe estimates the PRE dummies and omits every post shift.
-* ============================================================================
-
 global YVAR    ppr_cnt
 global SAMPLE  es_all_jrnls_r1_r2
 global MIN_PI  10
-* 1 = reuse ../temp/panel.dta + inst_xw.dta from a previous run instead of
-* rebuilding them. Only valid while prep_panel is unchanged.
+* REUSE_PANEL 1 = reuse ../temp/panel.dta + inst_xw.dta instead of rebuilding
 global REUSE_PANEL 1
 * `do analysis.do figures' redraws the figures from saved estimates only.
 global FIGURES_ONLY 0
@@ -53,9 +22,6 @@ program main
     cap mkdir ../output/figures
     cap mkdir ../temp
 
-    * `do analysis.do figures' replots from ../temp/inst_effects_all.dta
-    * without re-estimating, and writes its own log so the estimation log
-    * survives.
     if "$FIGURES_ONLY" == "1" {
         log using ../output/replot.log, replace text
         di as text "FIGURES_ONLY: replotting from ../temp/inst_effects_all.dta"
@@ -76,7 +42,6 @@ program main
     log close
 end
 
-* ---------------------------------------------------------------- panel prep
 program load_panel_meta
     confirm file ../temp/panel.dta
     use ../temp/inst_xw.dta, clear
@@ -123,8 +88,6 @@ program prep_panel
     qui count
     di as text "input panel: N = " r(N)
 
-    * inst_ord: median-output institution first, then the rest by ascending
-    * pre-2014 output. Level 1 is the omitted reference.
     preserve
         keep inst_base n_pi pre_out mean_exp
         duplicates drop inst_base, force
@@ -154,7 +117,6 @@ program prep_panel
     save ../temp/panel.dta, replace
 end
 
-* ------------------------------------------------------------------ estimate
 program estimate_spec
     syntax, spec(int)
     use ../temp/panel.dta, clear
@@ -207,9 +169,6 @@ program estimate_spec
         save ../temp/aux_es`spec'.dta, replace
     restore
 
-    * Institutions dropped by ppmlhdfe come back either absent from e(b) or
-    * as an exact 0 with se 0; the se > 0 screen in report() separates those
-    * from real estimates. inst_ord 1 is the reference, hence a structural 0.
     tempname pf
     postfile `pf' int inst_ord double pi_j double se_pi double beta_j double se_beta ///
         double slope double se_slope byte base using ../temp/inst_spec`spec'.dta, replace
@@ -268,7 +227,6 @@ program estimate_spec
     mat colnames pooled`spec' = spec`spec'
 end
 
-* -------------------------------------------------------------------- report
 program report
     use ../temp/inst_spec1.dta, clear
     rename (pi_j se_pi) (pi1 se_pi1)
@@ -287,8 +245,6 @@ program report
     restore
     merge m:1 inst_base using ../temp/inst_names.dta, keep(1 3) nogen
 
-    * base is the reference (structural 0), so it is excluded from the
-    * dispersion stats and the plots but kept in the exported table.
     gen byte report = !mi(n_pi_es) & n_pi_es >= $MIN_PI & !base ///
         & se_pi1 > 0 & !mi(se_pi1)
     qui count if report
@@ -323,8 +279,6 @@ program report
 end
 
 program figures
-    * Common x span for the caterpillars = the largest number of institution
-    * effects any one of them plots, so the three are read on the same axis.
     global XMAX = 0
     foreach p in pi1 pi_j beta_j {
         local s = cond("`p'" == "pi1", "se_pi1", cond("`p'" == "pi_j", "se_pi", "se_beta"))
@@ -333,16 +287,12 @@ program figures
     }
     di as text "caterpillar x span = 1/$XMAX institution effects"
 
-    * Ticks must stop at XMAX: xlab(#10) picks a round tick past it and the
-    * axis then stretches to cover the label, which is where the trailing
-    * white space came from.
     global XLAB 1
     forval t = 20(20)$XMAX {
         if ($XMAX - `t') > 8 global XLAB $XLAB `t'
     }
     global XLAB $XLAB $XMAX
 
-    * --- caterpillars: coefficient on y, institutions ranked by it on x
     caterpillar, y(pi1) lo(pi1_lo) hi(pi1_hi) se(se_pi1) ///
         ytitle("Post x Institution") name(caterpillar_pi_spec1)
     caterpillar, y(pi_j) lo(pi2_lo) hi(pi2_hi) se(se_pi) ///
@@ -350,7 +300,6 @@ program figures
     caterpillar, y(beta_j) lo(beta_j_lo) hi(beta_j_hi) se(se_beta) ///
         ytitle("Post x Exposure x Institution") name(caterpillar_beta_spec2)
 
-    * --- both specs on one panel, each ranked by its own magnitude
     preserve
         keep if report
         sort pi1
@@ -370,8 +319,6 @@ program figures
     restore
 
     preserve
-        * beta_j dropped for collinearity comes back as an exact 0; it would
-        * anchor the fit at the origin, so screen it out here too.
         keep if report & se_beta > 0 & !mi(se_beta)
         qui regress beta_j pi_j
         local fsl : di %7.3f _b[pi_j]

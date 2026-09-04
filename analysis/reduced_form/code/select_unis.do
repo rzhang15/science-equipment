@@ -1,4 +1,3 @@
-* Selects the 50 largest R1s and 10 largest R2s in the RF analysis sample.
 set more off
 clear all
 capture log close

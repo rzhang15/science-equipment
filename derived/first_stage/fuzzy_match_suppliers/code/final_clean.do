@@ -51,13 +51,6 @@ program clean_names
            "vascular" {
             drop if strpos(new_suppliername, "`k'") > 0
         }
-        * Additional non-life-science keywords found in supplier_mapping_final.csv:
-        * news/print media, food/beverage, personal services, trades, real estate,
-        * legal/finance, government/civic, religious, fraternal/civic orgs, hospitality.
-        * Skipped (false-positive risk): "harbor" (Cold Spring Harbor), "rotary"
-        * (rotary evaporator), "isd" (wisdom), "tire" (entire/retire), "title" (titley
-        * scientific), "taxi" (taxidermy), "academy" (academy of sciences), "sigma"/
-        * "alpha"/"delta"/etc. (would hit milliporesigma and product names).
         foreach k in "advertising" "magazine" "newspaper" "gazette" "tribune" "herald" "chronicle" ///
             "restaurant" "pizza" "cafe" "bakery" "grill" "donuts" "ice cream" ///
             "florist" "barber" "salon" "boutique" "jewelry" "jeweler" "funeral" ///
@@ -79,14 +72,6 @@ program clean_names
             "boy scout" "girl scout" {
             drop if strpos(new_suppliername, "`k'") > 0
         }
-        * More non-life-science vendors found in supplier_mapping_final.csv:
-        * big-box retail, restaurants/beverages, telecom, IT resellers/printers,
-        * MRO/industrial, office furniture, music/theatre/AV, library/publishing,
-        * apparel/promo, statistical software, sanitation/janitorial.
-        * Skipped (FP risk): "yard"/"tree" (backyard brains, braintree scientific),
-        * "dance" (bioimpedance), "monogram" (monogram biosciences), "wireless"
-        * (lotek animal tracking), "ortho" (ortholog/orthogonal), "limo" (person
-        * names), " seeds" (research seed companies like lehle).
         foreach k in "walmart" "costco" "sams club" "publix" "panera" "chickfila" ///
             "crystal springs" "ds waters" "nuco2" "pepsi" "coca cola" "cocacola" ///
             "oriental trading" "newegg" "barnes and noble" "starbucks" "sodexo" "aramark" ///
@@ -112,11 +97,6 @@ program clean_names
             "wells fargo" "bobcat" "aacsb" "sas institute" "statacorp" {
             drop if strpos(new_suppliername, "`k'") > 0
         }
-        * Civic/membership orgs, hotels/hospitality, construction/trades,
-        * promo/print/services, transit, retail/hobby, medical-services.
-        * These are professional societies/associations (sell journal subs/dues,
-        * not lab supplies), hotel chains, construction trades, signage/promo,
-        * and other clearly non-LS vendors caught from the long tail.
         foreach k in "society of" " society" "association" " assn" "council" " club" ///
             "ministries" "diocese" "habitat for" "scouting" "youth" ///
             "holiday inn" "hampton inn" "comfort inn" "quality inn" "fairfield inn" ///

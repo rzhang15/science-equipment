@@ -1,47 +1,3 @@
-"""
-K-sweep evidence for the K-NN imputation choice of K=3.
-
-For each K in a sweep, evaluate the same K-NN recipe used in
-2_similarity_wts.py (top-K + floor + sharpen + L1 normalize) against three
-independent validation targets, holding everything else at production values
-(sharpen=2.0, floor=0.05):
-
-  (1) Holdout stress  (mirrors 5_holdout_stress.py)
-        20-fold random 80/20 splits of the 208 FOIAs.  Predict held-out FOIA
-        exposure from remaining FOIAs.  Report overall corr / MAE / slope /
-        R2, plus corr in the Q1 (weakest max_sim) and Q5 (strongest max_sim)
-        quintiles so the reader sees whether K matters more for hard cases.
-
-  (2) Coauthor validation  (mirrors validate_coauthors.py)
-        For every (FOIA PI, coauthor) pair with copubs count, predict the
-        coauthor's imputed exposure using their TF-IDF vector, compare to the
-        partner FOIA's true exposure.  Report corr overall and at
-        copubs >= {5, 10, 20}, plus the twin-test metrics
-        (median partner rank, %% top-5).
-
-  (3) Cross-cluster validation  (mirrors cluster_sanity_check.py, K-NN arm)
-        Build W on the full universe at this K, impute exposure for every
-        universe author, aggregate to k=30 US clusters.  Report the
-        cross-cluster correlation (universe-size-weighted) of mean_imputed vs
-        mean_true FOIA-anchor exposure.
-
-Same random seed for holdout folds across K values so the sweep is a fair
-head-to-head.  Same coauthor pair set, same cluster labels.
-
-The universe TF-IDF matrix is the memory-heavy piece.  We compute the
-universe-FOIA cosine matrix once (dense, ~2.2 GB), then for each K just do
-argpartition on that matrix -- no re-matmul.
-
-Usage:
-  python k_sweep.py --tag restricted --version hc --ks 1 2 3 5 10 20 \
-                    --k-cluster 30 --skip-cluster    # if universe fit is too big
-
-Outputs (all under ../../output):
-  k_sweep_holdout_{version}{tag}.csv
-  k_sweep_coauthor_{version}{tag}.csv
-  k_sweep_cluster_{version}{tag}.csv
-  figures/k_sweep_evidence_{version}{tag}.png
-"""
 import argparse
 import os
 import pickle
@@ -61,12 +17,7 @@ EDGES = "/n/home02/cxu75/sci_eq/derived/openalex/cluster_fields/output/bert/auth
 CLUSTER_DIR = "../../external/us_appended_text"
 
 
-# --------------------------------------------------------------------------
-# Core prediction primitive: mirrors 2_similarity_wts.process_batch exactly.
-# --------------------------------------------------------------------------
 def knn_predict_from_sim(sim, e_train, k, sharpen, floor):
-    """Top-K, floor, sharpen^power, L1-normalize, weighted average.
-    sim: (n_test, n_train) dense cosine.  Returns (pred, max_sim_row)."""
     n_test, n_train = sim.shape
     k = min(k, n_train)
     topk_idx = np.argpartition(-sim, k - 1, axis=1)[:, :k]
@@ -116,13 +67,7 @@ def _weighted_corr(x, y, w):
     return float(cov / np.sqrt(vx * vy)) if vx > 0 and vy > 0 else float("nan")
 
 
-# --------------------------------------------------------------------------
-# (1) Holdout stress across K
-# --------------------------------------------------------------------------
 def sweep_holdout(X, e_foia, foia_ids, ks, folds, holdout_frac, sharpen, floor, seed):
-    """K-fold random 80/20 stress test at each K.  Uses the SAME fold
-    partition across K values so the comparison is not confounded by fold
-    variance."""
     n = X.shape[0]
     n_test = int(round(holdout_frac * n))
     rng = np.random.default_rng(seed)
@@ -134,9 +79,6 @@ def sweep_holdout(X, e_foia, foia_ids, ks, folds, holdout_frac, sharpen, floor, 
         train_idx = np.sort(perm[n_test:])
         X_test = X[test_idx]; X_train = X[train_idx]
         sim = (X_test @ X_train.T).toarray().astype(np.float32)
-        # Row-quintile assignment uses the row max_sim WITHIN THIS FOLD, and it
-        # is K-independent (it's the max cosine to the train pool, not any
-        # weighted quantity).  So quintile assignment is fixed across K.
         max_sim = sim.max(axis=1)
 
         for k in ks:
@@ -153,8 +95,6 @@ def sweep_holdout(X, e_foia, foia_ids, ks, folds, holdout_frac, sharpen, floor, 
 
     df = pd.DataFrame(rows)
 
-    # Assign quintile using the pooled max_sim distribution WITHIN THE
-    # k=ks[0] slice (identical to any other k since it's K-independent).
     ref = df[df["k"] == ks[0]]["max_sim_to_train"].to_numpy()
     q = np.quantile(ref, [0.2, 0.4, 0.6, 0.8])
     df["sim_bin"] = np.digitize(df["max_sim_to_train"].to_numpy(), q)
@@ -164,19 +104,14 @@ def sweep_holdout(X, e_foia, foia_ids, ks, folds, holdout_frac, sharpen, floor, 
         sub = df[df["k"] == k]
         m_all = _metrics(sub["true"].to_numpy(), sub["pred"].to_numpy())
         out_rows.append({"k": k, "slice": "ALL", **m_all})
-        for b in (0, 4):  # Q1 (weakest) and Q5 (strongest)
+        for b in (0, 4):
             g = sub[sub["sim_bin"] == b]
             m = _metrics(g["true"].to_numpy(), g["pred"].to_numpy())
             out_rows.append({"k": k, "slice": f"Q{b+1}", **m})
     return df, pd.DataFrame(out_rows)
 
 
-# --------------------------------------------------------------------------
-# (2) Coauthor validation across K -- K-NN arm only
-# --------------------------------------------------------------------------
 def _vectorize_in_foia_space(texts, vocab, idf_values):
-    """Replicate 1_vectorize.py's TF-IDF transform on coauthor text using the
-    saved production vocab + idf."""
     cv = CountVectorizer(vocabulary=vocab, tokenizer=str.split,
                          token_pattern=None, ngram_range=(1, 2),
                          dtype=np.float32)
@@ -218,8 +153,6 @@ def _compute_copubs(pairs):
 
 def sweep_coauthor(X_foia, foia_ids, e_foia, tag, ks, sharpen, floor,
                    copub_thresholds):
-    """For each K, run the K-NN coauthor validation.  The sim matrix is
-    computed ONCE (coauthors × FOIAs) then top-K is taken per K."""
     tag_s = tag if tag.startswith("_") or not tag else "_" + tag
     feat_names_path = f"{OUT_DIR}/feature_names{tag_s}.pkl"
     feat_diag_path  = f"{OUT_DIR}/feature_diagnostics{tag_s}.parquet"
@@ -236,7 +169,6 @@ def sweep_coauthor(X_foia, foia_ids, e_foia, tag, ks, sharpen, floor,
     X_co = _vectorize_in_foia_space(df_co["processed_text"].tolist(),
                                     feature_names, idf_values).astype(np.float64)
 
-    # Coauthor -> FOIA cosine similarity (dense, one-shot).
     sim = (X_co @ X_foia.T.astype(np.float64)).toarray().astype(np.float64)
 
     df_map = pd.read_stata(COAUTHORS_DTA)
@@ -250,7 +182,6 @@ def sweep_coauthor(X_foia, foia_ids, e_foia, tag, ks, sharpen, floor,
     df["co_pos"]   = df["coauthor_id"].map(co_idx_by_id)
     df["e_foia_true"] = e_foia[df["foia_pos"].values]
 
-    # Twin-test rank (K-independent).
     ranks = (-sim).argsort(axis=1).argsort(axis=1)
     df["partner_rank"] = ranks[df["co_pos"].values, df["foia_pos"].values]
 
@@ -266,7 +197,6 @@ def sweep_coauthor(X_foia, foia_ids, e_foia, tag, ks, sharpen, floor,
         d["pred_knn"] = preds_pair
         pairs_all.append(d[["k", "athr_id", "coauthor_id", "e_foia_true",
                             "pred_knn", "partner_rank", "copubs"]])
-        # Overall + copub cuts.
         for lo in [0] + copub_thresholds:
             sub = d if lo == 0 else d[d["copubs"] >= lo]
             m = _metrics(sub["e_foia_true"].to_numpy(),
@@ -281,15 +211,8 @@ def sweep_coauthor(X_foia, foia_ids, e_foia, tag, ks, sharpen, floor,
     return pd.concat(pairs_all, ignore_index=True), pd.DataFrame(rows)
 
 
-# --------------------------------------------------------------------------
-# (3) Cross-cluster validation across K -- builds W on universe per K
-# --------------------------------------------------------------------------
 def sweep_cluster(X_univ, X_foia, universe_ids, foia_ids, e_foia,
                   ks, sharpen, floor, k_cluster, tag, version):
-    """For each K, build the top-K weight vector on the full universe
-    (imputed exposure per author, no need to store W), then aggregate to
-    the k_cluster US clusters and report cross-cluster corr against
-    mean FOIA-anchor exposure."""
     cluster_csv = f"{CLUSTER_DIR}/author_static_clusters_{k_cluster}.csv"
     if not os.path.exists(cluster_csv):
         raise SystemExit(f"missing cluster labels: {cluster_csv}")
@@ -303,23 +226,20 @@ def sweep_cluster(X_univ, X_foia, universe_ids, foia_ids, e_foia,
           f"univ no-cluster={int(univ_labels['cluster_label'].isna().sum()):,}"
           f"/{len(univ_labels):,}")
 
-    # Precompute universe × FOIA cosine ONCE (heavy).
     print(f"  computing universe -> FOIA cosine (once, "
           f"{X_univ.shape[0]:,} x {X_foia.shape[0]})...")
-    X_foia_T = X_foia.T.toarray().astype(np.float32)   # tiny
+    X_foia_T = X_foia.T.toarray().astype(np.float32)
     n_univ = X_univ.shape[0]
     n_foia = X_foia.shape[0]
-    # Batch to avoid a single 2.2 GB allocation peak on top of X_univ.
     BATCH = 50_000
-    sim_top = None       # will hold the top-max(ks) per row: (n_univ, k_max)
+    sim_top = None
     sim_top_idx = None
     k_max = max(ks)
     sim_top = np.zeros((n_univ, k_max), dtype=np.float32)
     sim_top_idx = np.zeros((n_univ, k_max), dtype=np.int32)
     for s in range(0, n_univ, BATCH):
         e = min(s + BATCH, n_univ)
-        batch_sim = X_univ[s:e].dot(X_foia_T)          # (b, n_foia) dense
-        # Argpartition to top k_max, then only keep those K columns.
+        batch_sim = X_univ[s:e].dot(X_foia_T)
         b = batch_sim.shape[0]
         if k_max < n_foia:
             topk_idx = np.argpartition(-batch_sim, k_max - 1, axis=1)[:, :k_max]
@@ -332,16 +252,12 @@ def sweep_cluster(X_univ, X_foia, universe_ids, foia_ids, e_foia,
         del batch_sim, topk_vals, topk_idx
     print(f"  done, sim_top: {sim_top.nbytes/1e6:.0f} MB")
 
-    # Precompute per-cluster FOIA mean exposure.
     foia_ok = foia_labels.dropna(subset=["cluster_label"]).copy()
     foia_mean = foia_ok.groupby("cluster_label")["e_true"].mean()
     foia_n = foia_ok.groupby("cluster_label").size()
 
     rows = []
     for k in ks:
-        # For this K, take the top-k columns of sim_top (subset of top-k_max).
-        # We need the top-k of the RANKED top-k_max, so partition again on the
-        # k_max-size row.
         if k < k_max:
             rank_idx = np.argpartition(-sim_top, k - 1, axis=1)[:, :k]
             rows_local = np.arange(n_univ)[:, None]
@@ -384,14 +300,9 @@ def sweep_cluster(X_univ, X_foia, universe_ids, foia_ids, e_foia,
     return pd.DataFrame(rows)
 
 
-# --------------------------------------------------------------------------
-# Plotting
-# --------------------------------------------------------------------------
 def plot_evidence(df_h, df_c, df_x, out_png, ks, version, tag, k_star=3):
-    """Build the 4-panel k-sweep evidence figure."""
     fig, axes = plt.subplots(2, 2, figsize=(14, 10))
 
-    # (0,0) Holdout: corr overall / Q1 / Q5 vs K, slope on twin.
     ax = axes[0, 0]
     for slc, style, lbl in [
         ("ALL", "o-", "overall"),
@@ -409,7 +320,6 @@ def plot_evidence(df_h, df_c, df_x, out_png, ks, version, tag, k_star=3):
     ax.legend(fontsize=8)
     ax.grid(alpha=0.3)
 
-    # (0,1) Coauthor: corr at multiple copub thresholds.
     ax = axes[0, 1]
     cuts = sorted({c for c in df_c["copub_cut"].unique() if c != "ALL"},
                   key=lambda x: int(x.replace(">=", "")))
@@ -425,7 +335,6 @@ def plot_evidence(df_h, df_c, df_x, out_png, ks, version, tag, k_star=3):
     ax.legend(fontsize=8)
     ax.grid(alpha=0.3)
 
-    # (1,0) Cross-cluster: weighted r vs K.
     ax = axes[1, 0]
     df_x_s = df_x.sort_values("k")
     ax.plot(df_x_s["k"], df_x_s["corr_weighted"], "o-", label="weighted r (by n_univ)")
@@ -439,7 +348,6 @@ def plot_evidence(df_h, df_c, df_x, out_png, ks, version, tag, k_star=3):
     ax.legend(fontsize=8)
     ax.grid(alpha=0.3)
 
-    # (1,1) MAE overall (holdout) + slope (cross-cluster) as a "cost of shrinkage" view.
     ax = axes[1, 1]
     h_all = df_h[df_h["slice"] == "ALL"].sort_values("k")
     ax.plot(h_all["k"], h_all["mae"], "o-", color="C0", label="Holdout MAE")
@@ -465,7 +373,6 @@ def plot_evidence(df_h, df_c, df_x, out_png, ks, version, tag, k_star=3):
     print(f"Saved figure: {out_png}")
 
 
-# --------------------------------------------------------------------------
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--tag", default="restricted",
@@ -512,7 +419,6 @@ def main():
           f"folds={args.folds}  holdout_frac={args.holdout_frac}  "
           f"version={args.version}  tag={args.tag}")
 
-    # Shared inputs.
     print("Loading FOIA matrix + exposures...")
     X_foia = scipy.sparse.load_npz(foia_matrix_path).tocsr().astype(np.float32)
     foia_ids = pd.read_csv(foia_ids_path, dtype={"athr_id": str})["athr_id"].tolist()
@@ -524,7 +430,6 @@ def main():
 
     out_stem = f"{args.version}{tag_s}"
 
-    # (1) Holdout
     if not args.skip_holdout:
         print("\n=== (1) Holdout stress sweep ===")
         _, df_h = sweep_holdout(X_foia, e_foia, foia_ids,
@@ -536,7 +441,6 @@ def main():
     else:
         df_h = pd.read_csv(f"{OUT_DIR}/k_sweep_holdout_{out_stem}.csv")
 
-    # (2) Coauthor
     if not args.skip_coauthor:
         print("\n=== (2) Coauthor validation sweep ===")
         _, df_c = sweep_coauthor(X_foia, foia_ids, e_foia, args.tag,
@@ -548,7 +452,6 @@ def main():
     else:
         df_c = pd.read_csv(f"{OUT_DIR}/k_sweep_coauthor_{out_stem}.csv")
 
-    # (3) Cluster
     if not args.skip_cluster:
         print("\n=== (3) Cross-cluster sweep (loads full universe TF-IDF) ===")
         if not os.path.exists(univ_matrix_path) or not os.path.exists(univ_ids_path):

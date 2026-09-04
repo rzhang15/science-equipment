@@ -22,7 +22,6 @@ program main
     keep agencyname product_desc clean_desc supplier price qty spend purchase_id date prediction_source similarity_score category  nonlab_bucket
     save ../temp/govspend_`embed', replace
     
-    // dallas+oregon+michigan
     import delimited  ../external/samp/umich_merged_clean_classified_with_`embed'.csv,clear 
     drop predicted_market
     keep product_desc clean_desc supplier price qty spend purchase_id date prediction_source similarity_score category nonlab_bucket

@@ -6,12 +6,10 @@ library(stringr)
 library(purrr)
 library(tidyverse)
 
-# --- CONFIGURATION ---
-slurm_batch_size <- 250  # How many missing files to process per Slurm Task
+slurm_batch_size <- 250
 output_path <- "../output/works/"
 id_file_path <- "../external/ids/list_of_works_all.dta"
 
-# --- SLURM SETUP ---
 task_id_env <- Sys.getenv("SLURM_ARRAY_TASK_ID")
 if (task_id_env == "") {
   message("No SLURM_ARRAY_TASK_ID found. Defaulting to Task 1 (Local Test).")
@@ -20,31 +18,25 @@ if (task_id_env == "") {
   task_id <- as.numeric(task_id_env)
 }
 
-# --- DATA PREP ---
 message("Loading ID file...")
 id_file <- read_dta(id_file_path)
 nr <- nrow(id_file)
 
-# Maintain EXACT split logic as previous runs to ensure file numbering matches
-# Batches of 5000 IDs per file/batch
 split_id <- split(id_file, rep(1:ceiling(nr/5000), each = 5000, length.out=nr))
 total_batches <- length(split_id)
 all_batch_nums <- 1:total_batches
 
-# --- IDENTIFY MISSING FILES ---
 message("Scanning output directory for existing files...")
 existing_files <- list.files(output_path, pattern = "openalex_authors\\d+\\.csv")
 
-# Extract the numbers from filenames like "openalex_authors100.csv"
 if(length(existing_files) > 0) {
   existing_nums <- as.numeric(str_extract(existing_files, "\\d+"))
 } else {
   existing_nums <- c()
 }
 
-# Determine which batches have not been done yet
 missing_indices <- setdiff(all_batch_nums, existing_nums)
-missing_indices <- sort(missing_indices) # Sort to ensure consistent processing order
+missing_indices <- sort(missing_indices)
 
 total_missing <- length(missing_indices)
 message(paste("Total batches defined:", total_batches))
@@ -56,12 +48,9 @@ if (total_missing == 0) {
   quit(save = "no")
 }
 
-# --- ASSIGN BATCHES TO THIS SLURM TASK ---
-# Calculate which subset of the 'missing_indices' vector this task should handle
 start_idx <- ((task_id - 1) * slurm_batch_size) + 1
 end_idx   <- task_id * slurm_batch_size
 
-# Handle edge case where the last batch is smaller
 if (start_idx > total_missing) {
   message("Task ID is outside the range of missing files. Exiting.")
   quit(save = "no")
@@ -70,14 +59,12 @@ if (end_idx > total_missing) {
   end_idx <- total_missing
 }
 
-# These are the actual batch numbers (q) this task will run
 current_job_batches <- missing_indices[start_idx:end_idx]
 
 message(paste("--- SLURM TASK:", task_id, "---"))
 message(paste("Processing", length(current_job_batches), "batches."))
 message(paste("Batch IDs range from:", min(current_job_batches), "to", max(current_job_batches)))
 
-# --- FUNCTIONS ---
 extract_article_meta <- function(works_list) {
   tibble(
     id = map_chr(works_list, "id"),
@@ -123,11 +110,8 @@ extract_authors_long <- function(works_list) {
   }) %>% list_rbind()
 }
 
-# --- MAIN LOOP ---
-# Loop only through the specific batches assigned to this task
 for (q in c(1005, 1060,1109,1621,2049,2108,2642,10524,13023,15540)) {
   
-  # Double check file existence to avoid race conditions (optional but safe)
   outfile <- paste0(output_path, "openalex_authors", as.character(q), ".csv")
   if(file.exists(outfile)) {
     message(paste("Skipping batch", q, "- file already exists"))
@@ -159,7 +143,6 @@ for (q in c(1005, 1060,1109,1621,2049,2108,2642,10524,13023,15540)) {
   
   if (is.null(authors_df) || nrow(authors_df) == 0) {
     message(paste("Skipping batch", q, "- no authorship data found"))
-    # Optionally write an empty file or log so it doesn't get picked up as "missing" again
     next
   }
   

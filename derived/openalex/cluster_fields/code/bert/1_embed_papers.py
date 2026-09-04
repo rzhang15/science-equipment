@@ -1,14 +1,3 @@
-"""
-SPECTER embeddings, one per paper.
-
-Streams the parquet so memory stays bounded. Each paper's text is truncated
-inside the SentenceTransformer tokenizer (max_seq_length); papers in OpenAlex
-are title + abstract + a few MeSH terms, so one forward pass per paper is fine.
-
-Output:
-  ../../output/bert/paper_embeddings.npy    (float16, shape [N, D])
-  ../../output/bert/papers_aligned.parquet  (id column in the same order)
-"""
 import argparse
 import os
 import time
@@ -17,14 +6,14 @@ import polars as pl
 import torch
 from sentence_transformers import SentenceTransformer
 
-MODEL_NAME = "allenai-specter"  # matches existing pipelines in foia_similarity_wts / us_cluster_fields
+MODEL_NAME = "allenai-specter"
 INPUT_PARQUET = "../../output/bert/papers_text.parquet"
 OUT_DIR = "../../output/bert"
 OUT_EMB = f"{OUT_DIR}/paper_embeddings.npy"
 OUT_IDS = f"{OUT_DIR}/papers_aligned.parquet"
 
-ROW_BATCH = 16384          # papers per parquet slice
-ENCODE_BATCH = 256         # papers per GPU forward pass
+ROW_BATCH = 16384
+ENCODE_BATCH = 256
 
 
 def main():
@@ -52,7 +41,6 @@ def main():
     print(f"Papers to embed: {n_total:,}")
 
     os.makedirs(OUT_DIR, exist_ok=True)
-    # Pre-allocate as float16 to halve disk and RAM.
     embeddings = np.zeros((n_total, dim), dtype=np.float16)
     paper_ids: list[str] = []
 

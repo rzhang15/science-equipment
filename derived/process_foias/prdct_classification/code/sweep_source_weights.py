@@ -1,25 +1,3 @@
-"""
-Grid sweep over per-source sample weights, holding LR hyperparameters fixed
-at the current production values (C=10, class_weight='balanced',
-threshold=config.PREDICTION_THRESHOLD).  Each config is a dict of
-SOURCE_WEIGHTS-style entries (str or (str, int) keys -> float).
-
-Reuses cached embeddings on disk (no 1b refit) and the same stratified
-hold-out split as 2_train_binary_classifier.py (random_state=42,
-test_size=0.2).
-
-Reports overall macro F1 plus a precision/recall breakdown per data_source
-slice so you can see *which* slice each weighting moves.
-
-Usage:
-    python sweep_source_weights.py tfidf
-    PIPELINE_VARIANT=umich_supplier python sweep_source_weights.py tfidf
-
-Caveat: same as sweep_params.py — this evaluates the raw LR head, not the
-full HybridClassifier.  Seed/anti-seed/supplier-prior overrides aren't
-applied here, so the absolute numbers will differ from script 2.  But
-relative deltas between weight configs transfer through.
-"""
 import os
 import argparse
 import joblib
@@ -32,12 +10,9 @@ from sklearn.metrics import precision_recall_fscore_support
 import config
 
 
-# ---- Weight grid -------------------------------------------------------------
-# Each entry: (name, {source_or_(source,label): weight}).  Anything unlisted
-# defaults to 1.0 inside get_sample_weights.
 WEIGHT_CONFIGS = [
     ('all_1',
-        {}),  # everything at 1.0 — control
+        {}),
     ('starter',
         {'ca_non_lab': 0.5, 'fisher_non_lab': 3.0, 'ut_dallas': 2.0,
          'umich': 2.0, 'fisher_lab': 1.0}),
@@ -53,21 +28,16 @@ WEIGHT_CONFIGS = [
         {'ca_non_lab': 0.1, 'fisher_non_lab': 5.0, 'ut_dallas': 5.0,
          'umich': 5.0, 'fisher_lab': 1.0}),
     ('equalize_lab_classes',
-        # Same as starter but additionally equalize fisher_lab vs ut_dallas
-        # at label=1 (57894/21985 ~= 2.63).
         {'ca_non_lab': 0.5, 'fisher_non_lab': 3.0, 'ut_dallas': 2.0,
          'umich': 2.0, 'fisher_lab': 1.0, ('ut_dallas', 1): 2.63,
          ('umich', 1): 2.63}),
     ('fisher_lab_down',
-        # Starter but downweight fisher_lab so it doesn't dominate label=1.
         {'ca_non_lab': 0.5, 'fisher_non_lab': 3.0, 'ut_dallas': 2.0,
          'umich': 2.0, 'fisher_lab': 0.5}),
 ]
 
 
 def sample_weights_from_dict(weight_dict, data_sources, labels):
-    """Same logic as config.get_sample_weights but takes the dict directly
-    (lets us iterate without mutating config.SOURCE_WEIGHTS)."""
     src = pd.Series(data_sources).astype(str).reset_index(drop=True)
     lab = pd.Series(labels).astype(int).reset_index(drop=True)
     src_only = {k: float(v) for k, v in weight_dict.items() if isinstance(k, str)}
@@ -123,7 +93,6 @@ def main(embedding_name):
         proba = clf.predict_proba(X_test)[:, 1]
         y_pred = (proba >= threshold).astype(int)
 
-        # Overall metrics (pooled across all sources).
         p, r, f, _ = precision_recall_fscore_support(
             y_test, y_pred, labels=[0, 1], zero_division=0
         )
@@ -135,7 +104,6 @@ def main(embedding_name):
             'n_test':   len(y_test),
         })
 
-        # Per-source slice metrics (only sources actually present in test).
         for s in train_sources:
             mask = src_test == s
             n = int(mask.sum())
@@ -143,7 +111,6 @@ def main(embedding_name):
                 continue
             yt = y_test[mask]
             yp = y_pred[mask]
-            # Skip slices that don't contain both labels — sklearn would warn.
             labels_present = sorted(set(yt))
             p_s, r_s, f_s, _ = precision_recall_fscore_support(
                 yt, yp, labels=[0, 1], zero_division=0
@@ -174,7 +141,6 @@ def main(embedding_name):
     print()
     print("=== Per-source slice (precision/recall by data_source) ===")
     if not df_slice.empty:
-        # Show a compact pivot: rows = config x source, columns = key metrics.
         for s in train_sources:
             sub = df_slice[df_slice['data_source'] == s]
             if sub.empty:

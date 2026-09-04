@@ -1,7 +1,4 @@
 #!/bin/bash
-# pull_grants.sh — pull PubMed GrantList for every PMID in temp/pmids.txt
-# Uses direct HTTP to efetch.fcgi (much faster than EDirect's epost+efetch)
-# Parallel + resumable + retry. Skips batches whose final .tsv already exists.
 
 set -o pipefail
 export NCBI_API_KEY="2b1c3a5df0660f2619650b433dab47735808"
@@ -65,7 +62,6 @@ export -f process_batch
 export BATCH_DIR
 export WORKER_PARSER="$PWD/parse_grants.py"
 
-# Background progress reporter
 (
     while true; do
         sleep 120

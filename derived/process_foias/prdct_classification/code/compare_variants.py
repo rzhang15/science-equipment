@@ -1,34 +1,3 @@
-"""
-Compare pipeline variants side-by-side.
-
-Usage:
-    python compare_variants.py <variant_a> <variant_b>
-
-Example:
-    python compare_variants.py baseline umich_supplier
-
-Fixed report wiring:
-  - Variant A ({variant_a})   -> utdallas_full_report_... (verified on UT Dallas)
-  - Variant B ({variant_b})   -> combined_full_report_... (verified on UT Dallas + UMich)
-
-Comparison is direct:
-  variant_a's UT Dallas report   vs.   variant_b's combined report.
-
-Category universe plotted:
-  - Filter:  support > MIN_SUPPORT in variant_b's combined report (so every
-    point has reliable statistics on the B side).
-  - "shared": also appears in variant_a's UT Dallas report (any support).
-  - "new-in-Michigan": not present in variant_a's UT Dallas report at all
-    (the category was introduced once UMich data was added).  Plotted in
-    purple with precision=recall=0 on the baseline axis.
-
-Scatter colors: shared categories in dark blue, new-in-Michigan in purple.
-Position relative to the 45-degree line shows better/worse mechanically --
-above the line = improved on that metric, below = regressed.
-Dot sizes are log-scaled by max(support_a, support_b).
-
-"Good" categories: precision > 0.8, recall > 0.8, support > MIN_SUPPORT.
-"""
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
@@ -42,22 +11,19 @@ import config
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 MIN_SUPPORT = 20
 GOOD_THRESHOLD = 0.8
-F1_DELTA_THRESHOLD = 0.05  # used only for CSV status labeling
+F1_DELTA_THRESHOLD = 0.05
 
-COLOR_SHARED = '#7fb8e6'   # light blue
-COLOR_NEW = '#9467bd'      # purple
-COLOR_LOST = '#C44E52'     # crimson ring for categories that were good in
-                           # variant_a but dropped below threshold in variant_b
+COLOR_SHARED = '#7fb8e6'
+COLOR_NEW = '#9467bd'
+COLOR_LOST = '#C44E52'
 
 UTDALLAS_REPORT = 'utdallas_full_report_gatekeeper_tfidf_expert_tfidf.csv'
 COMBINED_REPORT = 'combined_full_report_gatekeeper_tfidf_expert_tfidf.csv'
-
 
 def load_report(variant, report_file):
     path = os.path.join(BASE_DIR, "output", variant, report_file)
     df = pd.read_csv(path, index_col=0)
     return df
-
 
 def main():
     parser = argparse.ArgumentParser(description="Compare pipeline variants side-by-side.")
@@ -67,27 +33,18 @@ def main():
 
     va, vb = args.variant_a, args.variant_b
 
-    # A (baseline) is always verified against UT Dallas;
-    # B (umich_supplier) is always verified against combined.
     ra = load_report(va, UTDALLAS_REPORT)
     rb = load_report(vb, COMBINED_REPORT)
 
-    # Drop summary rows, keep only per-category rows.
     summary_rows = ['accuracy', 'macro avg', 'weighted avg']
     cats_a = ra.drop(summary_rows, errors='ignore')
     cats_b = rb.drop(summary_rows, errors='ignore')
 
-    # Universe: every category reported by variant_b with support > MIN_SUPPORT
-    # (gives us reliable test-set statistics on the comparison side).
     all_cats = cats_b.index[cats_b['support'] > MIN_SUPPORT]
 
-    # Shared vs. new is decided by *presence* in variant_a's UT Dallas report,
-    # not by support there -- a category with sup_a = 5 was still a baseline
-    # category, just one with few test instances.
     shared = all_cats.intersection(cats_a.index)
     umich_only = all_cats.difference(cats_a.index)
 
-    # Baseline metrics: real values for shared, zeros for Michigan-only.
     prec_a = pd.Series(0.0, index=all_cats)
     rec_a = pd.Series(0.0, index=all_cats)
     f1_a = pd.Series(0.0, index=all_cats)
@@ -105,23 +62,16 @@ def main():
     is_new = pd.Series(False, index=all_cats)
     is_new.loc[umich_only] = True
 
-    # Treated vs. control classification (source: first_stage/select_categories
-    # /code/build.do).  Any category in tier1 | tier2 | tier3 is treated.
     treated_set = config.TREATED_CATEGORIES
     is_treated = pd.Series(
         [cat in treated_set for cat in all_cats], index=all_cats)
 
-    # "Good" requires support > MIN_SUPPORT on each side; cats_b is already
-    # filtered so good_b doesn't need an explicit sup_b check.
     good_a = (sup_a > MIN_SUPPORT) & (prec_a > GOOD_THRESHOLD) & (rec_a > GOOD_THRESHOLD)
     good_b = (prec_b > GOOD_THRESHOLD) & (rec_b > GOOD_THRESHOLD)
 
     f1_delta = f1_b - f1_a
-    # Shared points in dark blue, new-in-Michigan in purple.  Better/worse
-    # is read mechanically from the 45-degree line on each scatter.
     point_colors = np.where(is_new.values, COLOR_NEW, COLOR_SHARED)
 
-    # --- Print summary ---
     print("=" * 70)
     print(f"  VARIANT COMPARISON: {va} (utdallas) vs {vb} (combined)")
     print(f"  Shared categories (present in {va} UT Dallas report, any support): "
@@ -132,7 +82,6 @@ def main():
           f"(treated={int(is_treated.sum())}, control={int((~is_treated).sum())})")
     print("=" * 70)
 
-    # Macro/weighted averages
     for label in ['macro avg', 'weighted avg']:
         if label in ra.index and label in rb.index:
             print(f"\n  {label.upper()}:")
@@ -153,7 +102,6 @@ def main():
     print(f"    {vb}: {good_b_count} / {len(all_cats)}  "
           f"({good_b_shared} shared, {good_b_new} new-in-Michigan)")
 
-    # Gained/lost on shared categories only (umich_only is reported separately).
     gained = good_b & ~good_a & ~is_new
     lost = good_a & ~good_b
     if gained.any():
@@ -173,10 +121,6 @@ def main():
             print(f"      * {cat}  (prec {prec_b[cat]:.2f}, rec {rec_b[cat]:.2f}, "
                   f"support {int(sup_b[cat])})")
 
-    # --- Lift attribution: why is each good_b category good? ---
-    # Partition the good_b set by which baseline criterion was blocking.
-    # Criteria: support > MIN_SUPPORT, precision > GOOD_THRESHOLD,
-    # recall > GOOD_THRESHOLD.  is_new categories had no baseline at all.
     a_low_sup = sup_a <= MIN_SUPPORT
     a_low_prec = prec_a <= GOOD_THRESHOLD
     a_low_rec = rec_a <= GOOD_THRESHOLD
@@ -204,9 +148,6 @@ def main():
     print(f"    lifted (all three blocking):           {int(all_three.sum())}")
     print(f"    new-in-Michigan (no baseline):         {int(new_and_good.sum())}")
 
-    # --- Plots: 2x3 GridSpec.  Left 2x2 block = scatter grid split by
-    # treated/control x precision/recall.  Right column spans both rows with
-    # the stacked attribution bar chart. ---
     out_dir = os.path.join(BASE_DIR, "output")
     fig = plt.figure(figsize=(20, 11))
     gs = GridSpec(2, 3, figure=fig, width_ratios=[1, 1, 1.1], wspace=0.25,
@@ -217,19 +158,14 @@ def main():
     ax_cr = fig.add_subplot(gs[1, 1])
     ax_bar = fig.add_subplot(gs[:, 2])
 
-    # Size points by max(support_a, support_b) so Michigan-only points (where
-    # sup_a = 0) still get sized by their actual support.
     sizes_all = np.clip(np.log1p(np.maximum(sup_a.values, sup_b.values)) * 8,
                         15, 120)
 
-    # Boolean mask of categories that were good in baseline but fell below
-    # threshold under variant_b -- overlaid as a red ring on the scatter plots.
     lost_mask = (good_a & ~good_b).values
     treated_mask = is_treated.values
     control_mask = ~treated_mask
 
     def draw_scatter(ax, x, y, group_mask, xlabel, ylabel, title_metric):
-        """Scatter one metric for one group (treated or control)."""
         x_g = x.values[group_mask]
         y_g = y.values[group_mask]
         colors_g = point_colors[group_mask]
@@ -257,7 +193,6 @@ def main():
         ax.set_ylim(-0.05, 1.05)
         ax.set_aspect('equal')
 
-        # Per-panel legend with counts scoped to this group.
         handles = [
             Line2D([0], [0], marker='o', linestyle='', color='w',
                    markerfacecolor=COLOR_SHARED, markeredgecolor='k',
@@ -273,7 +208,6 @@ def main():
         ax.legend(handles=handles, loc='lower right', fontsize=7, framealpha=0.9)
         return n_group, better, worse
 
-    # Row 1: treated
     n_t_prec, t_pb, t_pw = draw_scatter(ax_tp, prec_a, prec_b, treated_mask,
                                          va, vb, 'Precision')
     ax_tp.set_title(f'TREATED  Precision\n'
@@ -283,7 +217,6 @@ def main():
     ax_tr.set_title(f'TREATED  Recall\n'
                     f'N = {n_t_rec}  (above 45° = {t_rb}, below = {t_rw})')
 
-    # Row 2: control
     n_c_prec, c_pb, c_pw = draw_scatter(ax_cp, prec_a, prec_b, control_mask,
                                          va, vb, 'Precision')
     ax_cp.set_title(f'CONTROL  Precision\n'
@@ -293,7 +226,6 @@ def main():
     ax_cr.set_title(f'CONTROL  Recall\n'
                     f'N = {n_c_rec}  (above 45° = {c_rb}, below = {c_rw})')
 
-    # --- Stacked attribution bar (right column, spans both rows). ---
     still_good = int(already_good.sum())
     lost_count = int(lost.sum())
     lift_support = int((only_support | support_and_precision
@@ -303,13 +235,11 @@ def main():
     lift_prec_rec = int(precision_and_recall.sum())
     new_good_ct = int(new_and_good.sum())
 
-    # Cohesive palette: deep slate-blue anchor (shared in both bars), warmer
-    # tones for lifted segments, separate accent hues for "new" and "lost".
-    C_STILL = '#3D5A6C'    # deep slate blue (anchor — shared between bars)
-    C_SUPP = '#7BA7BC'     # soft sky blue (close to anchor — "same family")
-    C_PREC = '#E8B04B'     # warm gold
-    C_REC = '#D97757'      # terracotta
-    C_PR = '#A56B8B'       # dusty rose
+    C_STILL = '#3D5A6C'
+    C_SUPP = '#7BA7BC'
+    C_PREC = '#E8B04B'
+    C_REC = '#D97757'
+    C_PR = '#A56B8B'
 
     y_max_bar = max(good_a_count, good_b_count)
 
@@ -319,7 +249,6 @@ def main():
                         va='center', fontweight='bold', color='white',
                         fontsize=9)
 
-    # Bar A (baseline)
     ax_bar.bar([va], [still_good], color=C_STILL, edgecolor='k', linewidth=0.5,
                label='still good in both')
     annotate_segment(0, 0, still_good)
@@ -329,7 +258,6 @@ def main():
                    label=f'lost (good in {va} only)')
         annotate_segment(0, still_good, lost_count)
 
-    # Bar B
     b_segments = [
         (still_good, C_STILL, None),
         (lift_support, C_SUPP, 'lifted: support was blocking'),
@@ -376,7 +304,6 @@ def main():
     print(f"\n  Plot saved to: {plot_path}")
     plt.close()
 
-    # --- Save full category-level comparison CSV ---
     def status_row(row):
         if row['is_new']:
             return 'new_good' if row[f'good_{vb}'] else 'new_not_good'
@@ -414,7 +341,6 @@ def main():
     for s in ['gained_good', 'better', 'stable', 'worse', 'lost_good',
               'new_good', 'new_not_good']:
         print(f"    {s:14s}: {status_counts.get(s, 0)}")
-
 
 if __name__ == "__main__":
     main()

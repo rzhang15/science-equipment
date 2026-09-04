@@ -1,19 +1,3 @@
-"""
-One-figure coauthor validation exhibit.
-
-Story: coauthors that are most similar to their FOIA partner — measured
-either by topic (cosine of TF-IDF vectors) or by co-publication count —
-should have imputed exposure values closest to the FOIA partner's true
-exposure. Two-panel figure:
-
-  LEFT   quintiles of sim_to_partner  ->  corr(imputed, true) with 95% CI
-  RIGHT  copubs bins                  ->  corr(imputed, true) with 95% CI
-
-Reads the pair CSV produced by validate_coauthors.py.
-
-Run:
-  python plot_coauthor_single.py --pairs ../../output/coauthor_validation_pairs_hc_cf_k3.csv
-"""
 import argparse
 import os
 import numpy as np
@@ -25,7 +9,6 @@ FIG_DIR = f"{OUT_DIR}/figures"
 
 
 def _corr_ci(y, p):
-    """Pearson r + Fisher-z 95% CI, for a plotted subgroup."""
     n = len(y)
     if n < 4 or np.std(y) == 0 or np.std(p) == 0:
         return np.nan, np.nan, np.nan
@@ -40,7 +23,6 @@ def _corr_ci(y, p):
 
 
 def bin_by_quintile(df, x_col):
-    """Return per-quintile summary: mean x, n, r, r_lo, r_hi."""
     q = np.quantile(df[x_col].to_numpy(), np.linspace(0, 1, 6))
     q[-1] += 1e-12
     df = df.copy()
@@ -62,8 +44,6 @@ def bin_by_quintile(df, x_col):
 
 
 def bin_by_copubs(df, edges):
-    """Copubs bins (right-inclusive). Same output schema as bin_by_quintile
-    but rows keyed on the bin label."""
     rows = []
     for lo, hi in zip(edges[:-1], edges[1:]):
         mask = (df["copubs"] > lo) & (df["copubs"] <= hi)
@@ -102,21 +82,17 @@ def main():
             raise SystemExit(f"missing column {col!r} in {args.pairs}")
     print(f"Loaded {len(df):,} coauthor–FOIA pairs from {args.pairs}")
 
-    # ---- data prep ----
     sim_tab = bin_by_quintile(df, "sim_to_partner")
     edges = [int(x) for x in args.copub_edges.split(",")]
     copub_tab = bin_by_copubs(df, edges)
     copub_tab_plot = copub_tab[copub_tab["n"] >= args.min_n_per_bin].copy()
 
-    # overall reference line
     r_all, _, _ = _corr_ci(df["e_foia_true"].to_numpy(),
                            df["pred_knn"].to_numpy())
 
-    # ---- figure ----
     fig, (axL, axR) = plt.subplots(1, 2, figsize=(11, 4.6),
                                    gridspec_kw={"width_ratios": [1, 1]})
 
-    # LEFT: quintiles of topical similarity
     x = sim_tab["quintile"].to_numpy()
     y = sim_tab["r"].to_numpy()
     err = np.vstack([y - sim_tab["r_lo"].to_numpy(),
@@ -139,7 +115,6 @@ def main():
     axL.legend(loc="upper left", fontsize=8)
     axL.grid(alpha=0.3)
 
-    # RIGHT: copub bins
     xr = np.arange(len(copub_tab_plot))
     yr = copub_tab_plot["r"].to_numpy()
     errr = np.vstack([yr - copub_tab_plot["r_lo"].to_numpy(),

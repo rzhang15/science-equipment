@@ -1,17 +1,3 @@
-"""
-Clean cleaned_static_author_text_pre_us.parquet by dropping:
-
-1. Scraper boilerplate authors — text contains unmistakable HTML chrome from
-   Google Scholar / Oxford Academic page scraping.
-2. Authors with <MIN_CHARS chars of text — too little content to form a
-   meaningful TF-IDF direction; end up in degenerate dump clusters.
-
-Mirrors cluster_fields/00_clean_corpus.py but runs on the US-only subset
-so the same population feeds both the clustering (2_cluster.py) and the
-foia_similarity_wts tfidf pipeline universe.
-
-Output: cleaned_static_author_text_pre_us_v2.parquet
-"""
 import sys
 import polars as pl
 

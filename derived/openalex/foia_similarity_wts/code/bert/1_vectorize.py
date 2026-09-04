@@ -1,15 +1,3 @@
-"""
-Dense BERT/SciBERT/SPECTER embeddings for the FOIA validation pipeline.
-
-For LOOV validation we only need the 188 FOIA authors (FOIA-vs-FOIA similarity).
-A `--universe` flag adds embeddings for the full ~2.66M-author universe, which
-is needed for the production imputation step but not for validation.
-
-NOTE on text quality: the input parquet contains Porter-stemmed text. Subword
-tokenizers expect real words, so embedding quality is degraded. To run on
-un-stemmed text, modify cluster_fields/code/0_combine_data.py to also save
-`full_text_lifetime` and point this script at that column.
-"""
 import argparse
 import os
 import time
@@ -19,7 +7,7 @@ import polars as pl
 import torch
 from sentence_transformers import SentenceTransformer
 
-DEFAULT_MODEL = "allenai-specter"  # other options:
+DEFAULT_MODEL = "allenai-specter"
 # "pritamdeka/S-Scibert-snli-multinli-stsb"
 # "allenai/scibert_scivocab_uncased"
 
@@ -65,7 +53,6 @@ def encode_authors(model, ids: list[str], texts: list[str]) -> np.ndarray:
     out = np.zeros((len(boundaries), chunk_embs.shape[1]), dtype=np.float32)
     for i, (s, e) in enumerate(boundaries):
         out[i] = chunk_embs[s:e].mean(axis=0)
-    # re-normalize after mean pooling so cosine == dot
     norms = np.linalg.norm(out, axis=1, keepdims=True)
     norms[norms == 0] = 1.0
     out = out / norms
@@ -76,8 +63,6 @@ def embed_foia(model, out_emb: str, out_ids: str, foia_csv: str = FOIA_CSV) -> N
     print(f"Loading FOIA texts from {foia_csv}...")
     df = pd.read_csv(foia_csv)
     df[TEXT_COL] = df[TEXT_COL].fillna("").astype(str)
-    # Defensive: empty-text rows would embed as the model's blank-CLS
-    # token, then poison cosine sims and any LOOV-style validation.
     text_len = df[TEXT_COL].str.len()
     if (text_len < 50).any():
         dropped = df.loc[text_len < 50, 'athr_id'].tolist()

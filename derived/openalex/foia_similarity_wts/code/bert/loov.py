@@ -1,10 +1,3 @@
-"""
-Leave-one-out validation for BERT-based FOIA similarity weights.
-
-Mirrors loov.py but: (a) reads dense BERT validation weights produced by
-gen_validation_wts_bert.py, and (b) reports the *best-K* correlation/R2/plot
-rather than whichever K happened to be last in the loop.
-"""
 import argparse
 import numpy as np
 import pandas as pd
@@ -31,7 +24,7 @@ def main():
     plot_file = f"../../output/validation_plot_bert_{tag}.png"
 
     print("--- BERT LOOV ---")
-    W = scipy.sparse.load_npz(weights_file).toarray()  # (n_foia, n_foia)
+    W = scipy.sparse.load_npz(weights_file).toarray()
     df_foia = pd.read_csv(foia_ids_file)
     df_exp = pd.read_stata(exposure_file)
 
@@ -41,7 +34,6 @@ def main():
     n = len(E_actual)
     print(f"Aligned {n} authors. Weight shape: {W.shape}")
 
-    # K sweep — cap at min(source_k, n-1) since gen_validation_wts_bert pre-filters.
     k_values = [k for k in [3, 5, 7, 10, 15, 20, 50, 100, n - 1] if k <= min(args.source_k, n - 1)]
     k_values = sorted(set(k_values))
     print(f"K sweep: {k_values}")
@@ -51,7 +43,7 @@ def main():
         E_pred = np.zeros(n)
         for i in range(n):
             w = W[i].copy()
-            w[i] = 0.0  # leave-one-out: zero self
+            w[i] = 0.0
             if k < n - 1:
                 top_k = np.argpartition(w, -k)[-k:]
                 mask = np.zeros_like(w, dtype=bool)

@@ -69,7 +69,6 @@ program main
 end
 
 program upload_files
-    // work details
     forval i =1/5473 {
         di "`i'"
         qui {
@@ -82,7 +81,6 @@ program upload_files
                 }
             }
     }
-    // mesh terms
     forval i = 1/5473 {
         di "`i'"
         qui {

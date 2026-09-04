@@ -22,16 +22,6 @@ end
 program overlay_hist
     syntax, real_file(str) placebo_file(str) outcome(str) [suf(str)]
 
-    // ============================================================
-    // Empirical Bayes shrinkage (applied separately to the real
-    // cross-section and to each placebo iter). Recipe from
-    // analysis/first_stage/code/analysis.do:
-    //   b_i ~ N(theta_i, se_i^2), theta_i ~ N(mu, tau^2)
-    //   b_eb = w*b + (1-w)*mu_hat, w = tau^2 / (tau^2 + se_i^2)
-    //   mu_hat = precision-weighted mean of b within group
-    //   tau^2  = max(0, var(b) - mean(se^2)) within group
-    // The real sample is one group; each placebo iter is its own group.
-    // ============================================================
     use `real_file', clear
     keep b se spend_2013
     gen sample = 1
@@ -44,7 +34,6 @@ program overlay_hist
     gen sample = 2
     append using `real_raw'
 
-    // group key: real = 0, placebo iters = 1..N
     egen grp = group(sample iter)
 
     gen var_se = se^2
@@ -59,11 +48,9 @@ program overlay_hist
     gen w_eb = tau2 / (tau2 + var_se)
     gen b_eb = w_eb * b + (1 - w_eb) * mu_hat
 
-    // replace b with the EB-shrunk version for all downstream stats/plots
     replace b = b_eb
     drop b_eb var_se mean_var_se sample_var tau2 prec sum_prec sum_prec_b mu_hat w_eb grp
 
-    // unweighted summaries
     sum b if sample == 1, d
     local N_r        = r(N)
     local mean_r_raw = r(mean)
@@ -74,18 +61,11 @@ program overlay_hist
     local mean_p : di %6.3f r(mean)
     local sd_p   : di %6.3f r(sd)
 
-    // Two-sample Kolmogorov-Smirnov test on pooled betas.
-    // Note: placebo obs are clustered within iter, so this p-value treats
-    // all placebo draws as independent and is anti-conservative.
     ksmirnov b, by(sample)
     local ks_d  : di %6.3f r(D)
     if r(p) < 0.001 local ks_p "< 0.001"
     else local ks_p : di "= " %5.3f r(p)
 
-    // Fisher randomization-style p-value: test stat = mean of real betas.
-    // Build the null distribution of iteration means from the placebo runs
-    // (one mean per iter, so within-iter correlation is baked in), then
-    // p = share of placebo iter means at least as extreme as the observed mean.
     preserve
         keep if sample == 2
         collapse (mean) iter_mean = b, by(iter)
@@ -101,9 +81,6 @@ program overlay_hist
         local sd_imean   : di %6.3f r(sd)
     restore
 
-    // Evaluate both densities on a common grid so the gap between them can be
-    // shaded with rarea: blue where the real density exceeds the placebo,
-    // gray where the placebo exceeds the real.
     preserve
         qui sum b
         local gmin  = r(min)
@@ -148,9 +125,6 @@ program overlay_hist
         }
     restore
 
-    // Companion figure: histogram of the placebo iteration means with the
-    // observed mean overlaid -- this is the actual reference distribution for
-    // the RI p-value above.
     preserve
         keep if sample == 2
         collapse (mean) iter_mean = b, by(iter)

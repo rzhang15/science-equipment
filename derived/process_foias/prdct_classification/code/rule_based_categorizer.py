@@ -1,9 +1,3 @@
-# rule_based_categorizer.py (UPGRADED LOGIC V3)
-"""
-A pattern-based categorizer that applies three types of rules from a YAML file.
-This version has corrected logic to handle nested conditions and a more robust
-regex builder, now with support for exact-string matching.
-"""
 import warnings
 import yaml
 import re
@@ -24,13 +18,6 @@ class RuleBasedCategorizer:
                 raw_rules = yaml.safe_load(f)
             self.aliases = {f"${k}": v for k, v in raw_rules.get('keyword_groups', {}).items()}
 
-            # Enzyme aliases used to be auto-wrapped in `*...*` here.  That
-            # made a bare "BamHI" match inside unrelated tokens like
-            # "F_BamHI_primer" or "BamHI site", misclassifying synthetic DNA
-            # oligos (which routinely carry restriction-site names in their
-            # descriptions) as restriction enzymes.  Keeping enzyme names
-            # word-bounded is the correct default; list any punctuation
-            # variants (e.g. `Nb.BsmI`, `BsaI-HFv2`) explicitly in the YAML.
             self.override_rules = raw_rules.get('market_rules', [])
             self.veto_rules = raw_rules.get('required_keywords', {})
             self.hierarchical_veto_rules = raw_rules.get('hierarchical_veto_rules', [])
@@ -38,12 +25,6 @@ class RuleBasedCategorizer:
             self._compiled_regexes = {}
             self._compiled_raw_regexes = {}
 
-            # Flexible-separator enzyme regex (same one the gatekeeper uses)
-            # — applied as an IMPLICIT tail rule in get_market_overrides_batch
-            # so "Spe I", "Spe-I", "Spe1", "HindIII-HF" all resolve to
-            # `restriction enzymes` even if the YAML's case-sensitive enzyme
-            # rule misses the spacing variant.  Uses raw_series when
-            # available (enzyme names are case-distinctive).
             try:
                 from classifier import build_enzyme_regex
                 self._enzyme_regex = build_enzyme_regex(rules_filepath)
@@ -71,13 +52,6 @@ class RuleBasedCategorizer:
             )
 
     def _precompile_override_rules(self):
-        """Precompile each override rule's combined regexes once so
-        get_market_overrides_batch doesn't rebuild them on every call.
-        Mirrors the clause logic of the per-row get_market_override exactly
-        (none_of / regex_none_of / all_of / any_of / regex_any_of /
-        exact_any_of), just with the regex construction lifted out of the
-        hot loop.
-        """
         self._rule_compiled = []
         for rule in self.override_rules:
             case_sensitive = rule.get('case_sensitive', False)
@@ -105,7 +79,7 @@ class RuleBasedCategorizer:
                     keywords = self.aliases.get(condition, [condition])
                     conds.append(self._combine_keywords_regex(
                         keywords, ignore_case=ignore_case))
-                comp['all_of'] = conds  # entries may be None -> abort signal
+                comp['all_of'] = conds
             if 'any_of' in rule:
                 comp['any_of'] = self._combine_keywords_regex(
                     self._expand_aliases(rule['any_of']),
@@ -119,8 +93,6 @@ class RuleBasedCategorizer:
                     exact_match=True, ignore_case=ignore_case)
             self._rule_compiled.append(comp)
 
-        # Tube/vial sibling guard regexes -- precompile once instead of on
-        # every batch call.
         self._tube_vial_cat_re = re.compile(r'(?:tube|vial)', re.IGNORECASE)
         self._tube_vial_accessory_re = re.compile(
             r'\b(?:rack|racks|plate|plates|plt|dish|dishes|dsh|'
@@ -129,14 +101,6 @@ class RuleBasedCategorizer:
         )
 
     def _build_pattern_string(self, keyword, exact_match=False):
-        """Translate a wildcard/plain keyword into its raw regex pattern
-        string (without flags / anchors).  Shared between the per-keyword
-        `_get_regex` path and the batch keyword-combiner below.
-        """
-        # YAML auto-casts unquoted numeric entries (e.g. Cytiva SKUs like
-        # `17104301`) to int/float.  Coerce here so the pattern builder
-        # tolerates them without forcing every YAML author to remember to
-        # quote numeric keywords.
         if not isinstance(keyword, str):
             keyword = str(keyword)
         is_substring = keyword.startswith('*') and keyword.endswith('*')
@@ -165,9 +129,6 @@ class RuleBasedCategorizer:
         return compiled_regex
 
     def _combine_keywords_regex(self, keywords, exact_match=False, ignore_case=True):
-        """Combine a list of wildcard/plain keywords into one alternation
-        regex so a rule's entire clause can be evaluated with a single
-        `Series.str.contains` call.  Returns None if the list is empty."""
         if not keywords:
             return None
         parts = ['(?:' + self._build_pattern_string(kw, exact_match) + ')'
@@ -176,18 +137,12 @@ class RuleBasedCategorizer:
         return re.compile('|'.join(parts), flags)
 
     def _combine_raw_regex(self, patterns, ignore_case=True):
-        """Combine a list of raw regex patterns (regex_any_of / regex_none_of)
-        into one alternation regex.  Returns None if the list is empty."""
         if not patterns:
             return None
         flags = re.IGNORECASE if ignore_case else 0
         return re.compile('|'.join(f'(?:{p})' for p in patterns), flags)
 
     def _get_raw_regex(self, pattern, ignore_case=True):
-        """Compile & cache a raw-regex keyword (used by regex_any_of /
-        regex_none_of).  Unlike _get_regex, the pattern string is treated as
-        a real regex — no escaping, no wildcard translation, no automatic
-        word boundaries.  Caller is responsible for anchors."""
         cache_key = (pattern, ignore_case)
         hit = self._compiled_raw_regexes.get(cache_key)
         if hit is not None:
@@ -202,24 +157,20 @@ class RuleBasedCategorizer:
             return None
 
         for rule in self.override_rules:
-            # Toggle source text and case-sensitivity based on the rule flag
             case_sensitive = rule.get('case_sensitive', False)
             text_to_search = raw_description if (case_sensitive and raw_description) else clean_description
             ignore_case = not case_sensitive
 
-            # 1. Check 'none_of' (Veto, fixed-string keywords)
             if 'none_of' in rule:
                 expanded_none_of = [kw for alias in rule['none_of'] for kw in self.aliases.get(alias, [alias])]
                 if any(self._get_regex(kw, ignore_case=ignore_case).search(text_to_search) for kw in expanded_none_of):
                     continue
 
-            # 1b. Check 'regex_none_of' (Veto, raw regex)
             if 'regex_none_of' in rule:
                 if any(self._get_raw_regex(p, ignore_case=ignore_case).search(text_to_search)
                        for p in rule['regex_none_of']):
                     continue
 
-            # 2. All_of check (Requirement)
             if 'all_of' in rule:
                 all_conditions_met = True
                 for condition in rule['all_of']:
@@ -229,26 +180,19 @@ class RuleBasedCategorizer:
                         break
                 if not all_conditions_met:
                     continue
-                # If all_of is the only condition and it's met, we can return
                 if 'any_of' not in rule and 'exact_any_of' not in rule and 'regex_any_of' not in rule:
                     return rule['name']
 
-            # 3. Any_of check (Match anywhere)
             if 'any_of' in rule:
                 expanded = [kw for alias in rule['any_of'] for kw in self.aliases.get(alias, [alias])]
                 if any(self._get_regex(kw, ignore_case=ignore_case).search(text_to_search) for kw in expanded):
                     return rule['name']
 
-            # 3b. Regex_any_of check (raw-regex match, unescaped).  Lets rules
-            # express structural primer / oligo patterns (e.g. _F/_R token
-            # suffixes) that bare substring matches can't capture without
-            # massive false positives.
             if 'regex_any_of' in rule:
                 if any(self._get_raw_regex(p, ignore_case=ignore_case).search(text_to_search)
                        for p in rule['regex_any_of']):
                     return rule['name']
 
-            # 4. Exact_any_of check (Must match full string)
             if 'exact_any_of' in rule:
                 expanded_exact_any = [kw for alias in rule['exact_any_of'] for kw in self.aliases.get(alias, [alias])]
                 if any(self._get_regex(kw, exact_match=True, ignore_case=ignore_case).search(text_to_search) for kw in expanded_exact_any):
@@ -257,7 +201,6 @@ class RuleBasedCategorizer:
         return None
 
     def validate_prediction(self, prediction, description):
-        # This function remains unchanged
         if not prediction or not isinstance(prediction, str):
             return prediction
             
@@ -281,18 +224,15 @@ class RuleBasedCategorizer:
 
         if pred_lower in self.veto_rules:
             rule_conditions = self.veto_rules[pred_lower]
-            # Veto if description is missing ALL required keywords
             if 'any_of' in rule_conditions:
                 expanded_any_of = [kw for alias in rule_conditions['any_of'] for kw in self.aliases.get(alias, [alias])]
                 if not any(self._get_regex(kw).search(description) for kw in expanded_any_of):
                     return None
-            # Veto if description is missing ANY of the required keyword groups
             if 'all_of' in rule_conditions:
                 for condition in rule_conditions['all_of']:
                     keywords = self.aliases.get(condition, [condition])
                     if not any(self._get_regex(kw).search(description) for kw in keywords):
                         return None
-            # Veto if description contains ANY excluded keyword
             if 'none_of' in rule_conditions:
                 expanded_none_of = [kw for alias in rule_conditions['none_of'] for kw in self.aliases.get(alias, [alias])]
                 if any(self._get_regex(kw).search(description) for kw in expanded_none_of):
@@ -300,44 +240,16 @@ class RuleBasedCategorizer:
 
         return prediction
 
-    # ------------------------------------------------------------------
-    # Batch / vectorized paths.  Replace per-row Python loops with a few
-    # pandas `str.contains` calls per rule -- each rule's keyword clause is
-    # combined into a single alternation regex and evaluated against the
-    # whole Series at once.  First-match-wins semantics are preserved by
-    # marking rows unassigned after each rule fires.
-    # ------------------------------------------------------------------
 
     def _expand_aliases(self, clause):
-        """Return a flat list of keywords after expanding alias references
-        ($NAME -> keyword_groups[NAME])."""
         return [kw for alias in clause for kw in self.aliases.get(alias, [alias])]
 
     def get_market_overrides_batch(self, clean_series, raw_series=None):
-        """Vectorized equivalent of iterating `get_market_override` over a
-        Series.  Returns a pd.Series of override names (or None) aligned
-        with clean_series.index.  Preserves first-match-wins semantics and
-        all clause logic of the per-row path.
-
-        Perf notes:
-        - Per-rule regexes are precompiled at init (`_rule_compiled`) so
-          the hot loop does one `str.contains` per clause, no `re.compile`.
-        - The still-unassigned set is a numpy bool mask (`still_open`) with
-          O(1) updates, instead of a pandas Index rebuilt with .difference
-          after every match (that was O(N) * 786 rules).
-        - Each rule evaluates only on the still-unassigned slice; early
-          rules claim most rows so later rules run on a much shorter array.
-        - Tube/vial sibling guard is vectorized (single str.contains pass
-          over assigned category names, no per-row apply(lambda)).
-        """
         n = len(clean_series)
         out_index = clean_series.index
         if not self._rule_compiled or n == 0:
             return pd.Series([None] * n, index=out_index, dtype='object')
 
-        # Underlying string arrays -- we do pandas str.contains on freshly
-        # sliced views of these, but track the unassigned set with a numpy
-        # bool mask so we don't pay Index.difference on every rule.
         clean_arr = clean_series.astype(str).to_numpy()
         raw_arr = (raw_series.astype(str).to_numpy()
                    if raw_series is not None else None)
@@ -357,7 +269,6 @@ class RuleBasedCategorizer:
 
             survivors = np.ones(len(sub_pos), dtype=bool)
 
-            # none_of / regex_none_of exclusions
             rgx = comp['none_of']
             if rgx is not None:
                 survivors &= ~sub_text.str.contains(rgx, na=False).to_numpy()
@@ -369,9 +280,6 @@ class RuleBasedCategorizer:
                 if not survivors.any():
                     continue
 
-            # all_of: each condition must match >=1 keyword.  A None entry
-            # means the condition resolved to an empty keyword list at init
-            # time -- preserve original abort-on-None semantics.
             if comp['all_of'] is not None:
                 aborted = False
                 for rgx in comp['all_of']:
@@ -385,8 +293,6 @@ class RuleBasedCategorizer:
                 if aborted:
                     continue
 
-            # any_of / regex_any_of / exact_any_of -- union, at least one
-            # required for the rule to fire.
             any_rgx = comp['any_of']
             rxany_rgx = comp['regex_any_of']
             exact_rgx = comp['exact_any_of']
@@ -403,7 +309,6 @@ class RuleBasedCategorizer:
                     any_mask |= sub_text.str.contains(exact_rgx, na=False).to_numpy()
                 survivors &= any_mask
             elif comp['all_of'] is None:
-                # No positive clause -- rule cannot fire.
                 continue
 
             if not survivors.any():
@@ -413,13 +318,6 @@ class RuleBasedCategorizer:
             overrides_np[matched_pos] = comp['name']
             still_open[matched_pos] = False
 
-        # --- Implicit enzyme-regex fallback --------------------------------
-        # The YAML `restriction enzymes` rules are case-sensitive, word-
-        # bounded substring matches.  They miss spaced / hyphenated / Arabic-
-        # numeral variants ("Spe I", "Spe-I", "Spe1").  Run the shared
-        # flexible-separator regex on any rows still unassigned after the
-        # YAML pass.  Matches the raw description when available (case-
-        # distinctive); clean array is used otherwise.
         if self._enzyme_regex is not None and still_open.any():
             src_arr = raw_arr if raw_arr is not None else clean_arr
             sub_pos = np.flatnonzero(still_open)
@@ -428,12 +326,6 @@ class RuleBasedCategorizer:
             if enzyme_hits.any():
                 overrides_np[sub_pos[enzyme_hits]] = 'restriction enzymes'
 
-        # --- Tube / vial sibling guard (fully vectorized) ------------------
-        # Applies to any rule that emitted a tube- or vial-named category.
-        # If the description also contains rack / plate / dish / tray / box /
-        # holder (likely a sibling accessory), clear the override so the row
-        # falls through to the expert model.  Replaces the old
-        # assigned.apply(lambda v: ...) with a single str.contains pass.
         assigned_mask = pd.notna(overrides_np)
         if assigned_mask.any():
             assigned_pos = np.flatnonzero(assigned_mask)
@@ -451,10 +343,6 @@ class RuleBasedCategorizer:
         return pd.Series(overrides_np, index=out_index, dtype='object')
 
     def validate_predictions_batch(self, predictions, descriptions):
-        """Vectorized equivalent of iterating `validate_prediction` over a
-        Series.  Returns an object Series aligned with predictions.index;
-        vetoed entries are None, others pass through unchanged.
-        """
         predictions = pd.Series(predictions).copy()
         descriptions = pd.Series(descriptions).astype(str)
         if len(predictions) != len(descriptions):
@@ -464,11 +352,8 @@ class RuleBasedCategorizer:
 
         preds_lower = predictions.fillna('').astype(str).str.lower()
         descs_lower = descriptions.str.lower()
-        # Align descs_lower to predictions.index so .loc lookups work.
         descs_lower.index = predictions.index
 
-        # Track rows that matched a hierarchical prefix so they skip the
-        # flat-veto pass (mirrors the early `return` in the per-row path).
         hierarchical_hit = pd.Series(False, index=predictions.index)
 
         for rule in self.hierarchical_veto_rules:
@@ -477,8 +362,6 @@ class RuleBasedCategorizer:
             mask = preds_lower.str.startswith(prefix) & ~hierarchical_hit
             if not mask.any():
                 continue
-            # Per-row substring check: cannot be vectorized with str.contains
-            # because the needle varies per row.
             for idx in mask[mask].index:
                 specific = preds_lower.loc[idx][len(prefix):]
                 d = descs_lower.loc[idx]

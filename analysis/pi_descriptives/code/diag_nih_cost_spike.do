@@ -18,7 +18,6 @@ table year, stat(mean nih_cost_raw) stat(mean cost_w) stat(mean cost_trim) ///
     stat(mean pos) stat(mean cost_pos) stat(p50 cost_pos) stat(p90 cost_pos) ///
     stat(mean n_grants_raw) stat(mean cost_per_grant) nformat(%12.0f) nototals
 
-* top-tail share of the total each year
 bys year: egen double tot = total(nih_cost_raw)
 gsort year -nih_cost_raw
 by year: gen rk = _n
@@ -27,7 +26,6 @@ gen double shr_top10 = top10 / tot if rk == 10
 gen double top50 = top10 if rk == 50
 table year, stat(max shr_top10) stat(max tot) nformat(%14.4f) nototals
 
-* grant-level: where do the dollars come from
 use athr_id year grant_key row_key research total_cost start_year activity ///
     using ../external/nih_panel/nih_grants_by_athr_id, clear
 drop if mi(year)

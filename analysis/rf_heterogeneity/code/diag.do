@@ -5,26 +5,15 @@ set scheme modern
 program drop _all
 log using diag.log, replace
 
-* Combined heterogeneity diagnostics. Two parts:
-*   Part A: PI-level (LPM, R1/R2 composition, baseline productivity kdensity,
-*           age dist by hi/lo institutional characteristic)
-*   Part B: panel-level joint 2x2 pooled-DiD PPML (young x hi_char) across
-*           the reduced ic-char set, plus figures.
-*
-* PI-weighted median cutoffs by default. Set DIAG_INSTWTD 1 to also emit the
-* inst-weighted variants alongside for comparison.
+* DIAG_INSTWTD : 1 also emits inst-weighted median cutoffs
 global DIAG_INSTWTD 0
 
-* Reduced ic set (matches IC_ALIASES in analysis.do; keep in sync).
 local ic_aliases tfnd lsf endow
 
-* IC display labels (match `ic_lbl_*' in analysis.do; keep in sync).
 local lbl_tfnd  "Total R&D Funding"
 local lbl_lsf   "Life-Sci Funding"
 local lbl_endow "Endowment"
 
-* Loop over both samples: R1+R2 (public+private) and R1-only (public+private).
-* All output PDFs and tempfile paths get the sample suffix appended.
 foreach samp_suf in _r1_r2 _r1 {
 di as text _n(3) "============================================================" ///
     _n "=== SAMPLE: `samp_suf'"                                                 ///
@@ -34,9 +23,6 @@ use ../temp/es_all_jrnls`samp_suf', clear
 qui gunique athr_id
 di as text "Unique PIs in panel = " r(unique)
 
-* Baseline grants-per-paper: pre-period NIH grants active per year (pre_nihg,
-* built in add_het_splits) over pre-period papers per year. Dropped from the
-* LPMs when either input is unavailable.
 local gppv
 cap drop pre_gpp
 cap confirm variable pre_nihg
@@ -49,15 +35,11 @@ if `rc_g' == 0 & `rc_p' == 0 {
 }
 else di as error "diag `samp_suf': pre_nihg or pre_ppr_cnt_avg missing -- pre_gpp SKIPPED in tabstat/LPMs."
 
-* ============================================================
-* Part A: PI-level diagnostics (preserve for the joint 2x2 in Part B)
-* ============================================================
 preserve
 keep if athr_indicator == 1
 qui count
 di as text _n "Unique PIs after athr_indicator filter = " r(N)
 
-* --- A1: R1 x young cross-tab + bar chart + age histogram by R1 ---
 di as text _n(2) "=== R1 x young cross-tab ==="
 tabulate r1 young, row col
 
@@ -80,8 +62,6 @@ tw histogram age_2014 if r1 == 1, freq lcolor(ebblue) fcolor(ebblue%30) width(2)
      plotregion(margin(sides))
 graph export ../output/figures/all_jrnls/diag_age_hist_by_r1`samp_suf'.pdf, replace
 
-* --- A2: baseline productivity kdensity (young vs old) ---
-* Total pre-period papers and papers per pre-period year.
 qui count if young == 1
 local n_y = r(N)
 qui count if young == 0
@@ -111,7 +91,6 @@ forvalues i = 1/2 {
     di as text "A2 `a': young mean=`mu_y' p50=`md_y' N=`n_y' | old mean=`mu_o' p50=`md_o' N=`n_o'"
     cap drop ln_pre_`a'
     gen double ln_pre_`a' = ln(1 + `src')
-    * both densities on one common x grid so rarea can shade the gap
     qui sum ln_pre_`a'
     cap drop _kx _kd_y _kd_o _kd_c
     gen _kx = r(min) + (r(max) - r(min)) * (_n - 1) / 199 if _n <= 200
@@ -132,15 +111,11 @@ forvalues i = 1/2 {
     cap drop _kx _kd_y _kd_o _kd_c
 }
 
-* --- A3: LPM of young on characteristics ---
 di as text _n(2) "=== Characteristic means by young / old ==="
 tabstat pre_ppr_cnt_sum `gppv' pre_team_avg pre_coauth_avg ///
         age_2014 msa_size_at r1 ic_tfnd ic_fedf ic_endow, ///
         by(young) stats(mean sd n) col(stats)
 
-* Direct test: are young PIs different on baseline productivity / coauthors /
-* team size / grants-per-paper? Regress each char on the young dummy. Positive
-* young coef = young PIs have MORE of that char; negative = LESS.
 di as text _n(2) "=== Char ~ young (per-char reversed regression, cluster inst_id) ==="
 foreach c in pre_ppr_cnt_sum pre_coauth_avg pre_team_avg `gppv' msa_size_at {
     di as text _n "--- reg `c' young, vce(cluster inst_id) ---"
@@ -153,7 +128,6 @@ foreach a of local ic_aliases {
     reg ic_`a' young, vce(cluster inst_id)
 }
 
-* Standardize PI-level and ic vars so coefficients are directly comparable.
 foreach v of varlist pre_ppr_cnt_sum `gppv' pre_team_avg pre_coauth_avg ///
                      msa_size_at {
     qui sum `v'
@@ -167,8 +141,6 @@ foreach a of local ic_aliases {
     gen double z_ic_`a' = (ic_`a' - r(mean)) / r(sd)
 }
 
-* Per-char LPMs: one regression per ic char so each uses its own max sample
-* (PIs missing that specific ic char drop; PIs with other missing chars stay).
 di as text _n "--- Per-char LPMs of young on standardized chars ---"
 foreach a of local ic_aliases {
     cap confirm variable z_ic_`a'
@@ -182,7 +154,6 @@ foreach a of local ic_aliases {
               z_msa_size_at z_ic_`a' if r1 == 1, vce(cluster inst_id)
 }
 
-* Kitchen-sink LPM using all standardized ic chars (subset with all non-missing).
 di as text _n "--- Kitchen-sink LPM: all 8 ic chars simultaneously (common sample) ---"
 local all_z
 foreach a of local ic_aliases {
@@ -192,8 +163,6 @@ foreach a of local ic_aliases {
 reg young z_pre_ppr_cnt_sum `z_gppv' z_pre_team_avg z_pre_coauth_avg ///
           z_msa_size_at r1 `all_z', vce(cluster inst_id)
 
-* --- A4a: Age distribution by hi/lo baseline productivity ---
-* Tests whether "high_pre_ppr" is secretly an age proxy.
 local pi_split_specs `" "high_pre_ppr Baseline_Productivity" "'
 foreach spec of local pi_split_specs {
     tokenize `"`spec'"'
@@ -228,7 +197,6 @@ foreach spec of local pi_split_specs {
         _n "  Low  `dlbl': N=`n_lo' mean_age=`mu_lo' share_young=`sh_yl'"
 }
 
-* --- A4: Age distribution by hi/lo institutions (per char) ---
 local wt_list piwtd
 if "$DIAG_INSTWTD" == "1" local wt_list instwtd piwtd
 foreach wt of local wt_list {
@@ -263,9 +231,6 @@ foreach wt of local wt_list {
     }
 }
 
-* --- A4b: Baseline-productivity distribution by hi/lo institutions (per char) ---
-* Are HP PIs concentrated at hi-resource institutions? If so, "HP x hi" isn't
-* a distinct cell -- it's mostly a relabeling of the HP margin.
 foreach wt of local wt_list {
     if "`wt'" == "instwtd" {
         local hi hi
@@ -305,10 +270,6 @@ foreach wt of local wt_list {
     }
 }
 
-* --- A5: Exposure distribution across the 4 productivity × inst-char cells ---
-* Tests whether HP × hi_char PIs simply live at higher exposure than the other
-* three cells (confound with capacity × input-class story). One kdensity + one
-* summary log-block per inst char. PI-wtd hiw_<a> cutoff.
 cap confirm variable exposure
 if !_rc {
     di as text _n(2) "=== Exposure distribution by high_pre_ppr x hiw_<char> ==="
@@ -356,11 +317,6 @@ else di as error "diag A5: exposure variable not found; skipping."
 
 restore
 
-* --- A6: Institution-level distribution of AVG papers PER YEAR, split by hiw_tfnd ---
-* For each institution, sum ppr_cnt across PIs by year, then average across
-* years so we get one number per institution (avg annual paper output),
-* independent of how many years each inst is observed. Compare log(1+.) across
-* hi_tfnd vs lo_tfnd institutions.
 preserve
 cap confirm variable hiw_tfnd
 if !_rc {
@@ -393,9 +349,6 @@ if !_rc {
 else di as error "diag A6: hiw_tfnd not found; skipping."
 restore
 
-* ============================================================
-* Part B: Joint 2x2 pooled-DiD PPML across ic chars
-* ============================================================
 gen post       = year >= 2014
 gen Z_it       = exposure      * post
 gen Z_share_it = mkt_spend_shr * post
@@ -493,7 +446,6 @@ foreach wt of local wt_list {
     }
     postclose `res'
 
-    * ---- Figures for this weighting scheme ----
     preserve
     use ../temp/joint_split_`wt'_ppr_cnt`samp_suf'.dta, clear
     gen ub_yhi = b_yhi + 1.96*se_yhi
@@ -516,7 +468,6 @@ foreach wt of local wt_list {
     }
     local nrow = _N
 
-    * Cross-char coefplot: Young x Hi vs Old x Hi
     tw rcap ub_yhi lb_yhi y_pos, horizontal lcolor(ebblue%60) msize(vsmall)     || ///
        scatter y_pos b_yhi, mcolor(ebblue) msize(small)                          || ///
        rcap ub_ohi lb_ohi y_pos_off, horizontal lcolor(dkorange%60) msize(vsmall)|| ///
@@ -529,7 +480,6 @@ foreach wt of local wt_list {
          plotregion(margin(sides))
     graph export ../output/figures/all_jrnls/diag_joint_`wt'_yhi_vs_ohi`samp_suf'.pdf, replace
 
-    * All 4 cells overlaid, one row per char
     gen y_yhi = y_pos + 0.30
     gen y_ylo = y_pos + 0.10
     gen y_ohi = y_pos - 0.10
@@ -551,8 +501,6 @@ foreach wt of local wt_list {
          plotregion(margin(sides))
     graph export ../output/figures/all_jrnls/diag_joint_`wt'_4cells`samp_suf'.pdf, replace
 
-    * Per-char 4-cell coefplot (paper-ready, one PDF per char).
-    * Reloading results .dta each iteration to avoid nested preserve.
     foreach a of local ic_aliases {
         qui use ../temp/joint_split_`wt'_ppr_cnt`samp_suf'.dta, clear
         qui keep if alias == "`a'"
@@ -605,18 +553,6 @@ foreach wt of local wt_list {
     restore
 }
 
-* ============================================================
-* Part C: prppr x inst-char joint 2x2 -- hypothesis tests for
-* the "crossover" (LP x lo) cell.
-*   1. Is LP x lo_char coefficient significantly < 0 alone?
-*      If not, the crossover claim is not established.
-*   2. Blue-vs-orange at Lo row: HP x Lo - LP x Lo = 0 ?
-*      Tests whether HP differs from LP at low-intensity institutions.
-*   3. Blue-vs-orange at Hi row: HP x Hi - LP x Hi = 0 ?
-*   4. Triple interaction: (HP-LP)_Hi - (HP-LP)_Lo = 0 ?
-* Uses analytical cluster-robust SEs on athr_id via lincom. If these p-values
-* are non-significant, the wild-cluster bootstrap will not save them.
-* ============================================================
 
 di as text _n(2) "=== Part C: crossover-test lincoms per inst char (PI-wtd cutoff) ==="
 
@@ -673,12 +609,6 @@ foreach a of local ic_aliases {
     di as text "    b=" %8.4f `b4' "  se=" %6.4f `se4' "  t=" %6.2f `t4' "  p=" %5.3f `p4'
 }
 
-* ============================================================
-* Part D: prppr x age x inst-char joint 8-cell pooled-DiD PPML.
-* y-axis has Hi/Lo <char> rows (as in the joint_ae_prppr paired
-* coefplot); each row carries 4 dots -- LP x young, LP x old,
-* HP x young, HP x old -- from a single 8-way interaction fit.
-* ============================================================
 di as text _n(2) "=== Part D: prppr x age x inst-char 8-cell PPML (PI-wtd cutoff) ==="
 
 tempname resD
@@ -776,9 +706,6 @@ else {
     gen double y_plot  = .
     gen str3   series  = ""
 
-    * Two side-by-side panels split by baseline productivity (HP left, LP right);
-    * within each panel Young is blue and Old is orange, offset ±0.25 within
-    * each Hi/Lo row (young above, old below).
     replace b_plot = b_yhphi   if combo_idx == 1
     replace se_plot = se_yhphi if combo_idx == 1
     replace y_plot = y_group + 1.2 + 0.25 if combo_idx == 1
@@ -840,7 +767,6 @@ else {
     qui sum ub
     local xmax = ceil(r(max)/0.5)*0.5
 
-    * Left panel: High Baseline Productivity PIs (Young blue, Old orange).
     tw rcap ub lb y_plot if series == "yHP", horizontal lcolor(ebblue%50) msize(vsmall)   || ///
        scatter y_plot b_plot if series == "yHP", mcolor(ebblue) msymbol(O) msize(small)   || ///
        rcap ub lb y_plot if series == "oHP", horizontal lcolor(dkorange%50) msize(vsmall) || ///
@@ -856,10 +782,7 @@ else {
          graphregion(margin(r=0)) ///
          name(g_hp, replace) nodraw
 
-    * Right panel: Low Baseline Productivity PIs (Young blue, Old orange).
-    * Invisible (white) y-labels reserve the same horizontal space as the left
-    * panel so plot widths match; graphregion(margin(l=0)) pulls the reserved
-    * strip flush to the cell edge to minimise the visible gap between panels.
+    * white y-labels keep the right panel the same width as the left
     tw rcap ub lb y_plot if series == "yLP", horizontal lcolor(ebblue%50) msize(vsmall)   || ///
        scatter y_plot b_plot if series == "yLP", mcolor(ebblue) msymbol(O) msize(small)   || ///
        rcap ub lb y_plot if series == "oLP", horizontal lcolor(dkorange%50) msize(vsmall) || ///
@@ -885,6 +808,6 @@ else {
 }
 restore
 
-}  // close foreach samp_suf
+}
 
 log close

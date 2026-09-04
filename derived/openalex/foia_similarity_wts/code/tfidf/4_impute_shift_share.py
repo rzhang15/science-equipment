@@ -1,58 +1,3 @@
-"""
-KNN shift-share imputation with optional row-sum-preserving EB denoising.
-
-Core object:
-    s_ik = PI i's pre-period share in treated market k
-
-EB denoises the composition of s_i across treated markets while preserving:
-
-    sum_k s_ik^EB = sum_k s_ik^raw
-
-for every FOIA PI.
-
-After EB:
-    S_hat = W @ S
-    exposure_ss = S_hat @ g
-    sum_imputed_shares = rowsum(S_hat)
-
-There is no separate imputation of total treated-market share.
-
-EB priors
----------
-peer:
-    Shrink toward the similarity-weighted basket of the top K most similar
-    OTHER FOIA PIs.
-
-cluster:
-    Shrink toward the equal-weighted basket of the OTHER FOIA PIs in the same
-    cluster.
-
-There is NO global prior.
-
-If a PI has no usable peer/cluster prior, its row is left unchanged.
-
-Recommended:
-    --eb-own-weight 0.90
-    --eb-prior peer
-    --eb-peer-k 5
-
-Filters / suffixes retained:
-    --cluster-filter + --min-foia-per-cluster
-        -> _cf, _cf2, _cf5
-
-    --ls-filter + --ls-sfx
-        -> _ls, _lsa, ...
-
-    --min-max-sim .25
-        -> _ms025
-
-    --k 3
-        -> _k3
-
-    --all3
-        -> _{version}_all3 (reads *_all3 betas / spend / share inputs)
-"""
-
 import argparse
 import os
 
@@ -79,10 +24,6 @@ CATEGORY_RENAMES = {
     "dmem/f-12": "dmem-f-12",
 }
 
-
-# =============================================================================
-# Loading
-# =============================================================================
 
 def load_shocks(path):
     df = pd.read_stata(path)
@@ -128,10 +69,6 @@ def build_share_matrix(path, foia_ids, markets):
     coverage = np.asarray((S != 0).sum(axis=0)).ravel()
     return S, coverage
 
-
-# =============================================================================
-# PI characteristics / BHJ balance
-# =============================================================================
 
 def compute_pi_characteristics(path, foia_ids):
     df = pd.read_stata(
@@ -210,15 +147,7 @@ def shock_balance(S, g, chars):
     )
 
 
-# =============================================================================
-# EB
-# =============================================================================
-
 def normalize_rows(S):
-    """
-    Normalize each positive row only as an internal device for denoising its
-    composition. Original row sums are returned and restored exactly.
-    """
     X = S.toarray().astype(float)
     row_sum = X.sum(axis=1)
 
@@ -230,14 +159,6 @@ def normalize_rows(S):
 
 
 def build_peer_prior(P, X_foia, foia_ids, peer_k, min_sim=0.0):
-    """
-    For each FOIA PI, use the top K most similar OTHER FOIA PIs.
-
-    Prior:
-        mu_i = sum_j sim_ij * P_j / sum_j sim_ij
-
-    No global fallback. If no usable peers exist, prior_available=False.
-    """
     if peer_k < 1:
         raise SystemExit("--eb-peer-k must be >= 1.")
 
@@ -294,12 +215,6 @@ def build_peer_prior(P, X_foia, foia_ids, peer_k, min_sim=0.0):
 
 
 def build_cluster_prior(P, foia_ids, cluster_file):
-    """
-    Equal-weight leave-one-out cluster prior.
-
-    No global fallback. If PI i has no other FOIA PI with positive treated
-    shares in its cluster, prior_available=False and i will not be shrunk.
-    """
     if not cluster_file or not os.path.exists(cluster_file):
         raise SystemExit("--eb-prior cluster requires --eb-cluster-file.")
 
@@ -352,17 +267,6 @@ def build_cluster_prior(P, foia_ids, cluster_file):
 
 
 def eb_shrink_shares(S, prior, prior_available, own_weight):
-    """
-    Row-sum-preserving EB:
-
-        P_i^EB = lambda P_i + (1-lambda) prior_i
-        S_i^EB = rowsum(S_i) * P_i^EB
-
-    where lambda = --eb-own-weight.
-
-    If no prior is available for PI i, leave its row unchanged.
-    Zero rows always remain zero.
-    """
     if not 0 < own_weight <= 1:
         raise SystemExit("--eb-own-weight must be in (0,1].")
 
@@ -371,7 +275,6 @@ def eb_shrink_shares(S, prior, prior_available, own_weight):
 
     prior = np.asarray(prior, float).copy()
 
-    # Normalize priors defensively.
     prior_sum = prior.sum(axis=1)
     good_prior = prior_available & (prior_sum > 0)
     prior[good_prior] /= prior_sum[good_prior, None]
@@ -387,7 +290,6 @@ def eb_shrink_shares(S, prior, prior_available, own_weight):
     S_eb = raw_sum[:, None] * P_eb
     S_eb[~positive] = 0
 
-    # Hard invariant.
     err = np.max(np.abs(S_eb.sum(axis=1) - raw_sum))
 
     if err > 1e-10:
@@ -436,10 +338,6 @@ def eb_diagnostics(S_raw, S_eb, g):
     }
 
 
-# =============================================================================
-# KNN diagnostics
-# =============================================================================
-
 def report_W_health(W):
     rs = np.asarray(W.sum(axis=1)).ravel()
     good = rs > 0
@@ -458,9 +356,6 @@ def report_W_health(W):
 
 
 def knn_loo_influence(W, S, g, foia_ids):
-    """
-    Leave-one-FOIA-anchor-out diagnostic only.
-    """
     Wc = W.tocsc()
 
     anchor_z = np.asarray(S @ g).ravel()
@@ -506,19 +401,7 @@ def knn_loo_influence(W, S, g, foia_ids):
     return pd.DataFrame(rows)
 
 
-# =============================================================================
-# Universe filters
-# =============================================================================
-
 def apply_filters(df_univ, S_hat, args, df_foia):
-    """
-    Post-imputation filters.
-
-    Suffixes:
-        _cf / _cf2 / _cf5
-        _ls / _lsa / ...
-        _msNNN
-    """
 
     if args.min_max_sim > 0:
         diag_file = f"{OUT_DIR}/match_diagnostics.parquet"
@@ -602,10 +485,6 @@ def apply_filters(df_univ, S_hat, args, df_foia):
     return df_univ, S_hat
 
 
-# =============================================================================
-# Suffixes
-# =============================================================================
-
 def build_suffixes(args):
     k_sfx = "" if args.k == 5 else f"_k{args.k}"
 
@@ -642,14 +521,9 @@ def build_suffixes(args):
     return eb_sfx, filter_sfx, k_sfx
 
 
-# =============================================================================
-# Main
-# =============================================================================
-
 def main():
     ap = argparse.ArgumentParser()
 
-    # Core
     ap.add_argument("--versions", nargs="+", choices=VERSIONS, default=VERSIONS)
     ap.add_argument("--betas-path", default="")
     ap.add_argument(
@@ -672,9 +546,6 @@ def main():
         ),
     )
 
-    # -------------------------------------------------------------------------
-    # EB
-    # -------------------------------------------------------------------------
 
     ap.add_argument(
         "--eb-own-weight",
@@ -723,9 +594,6 @@ def main():
         ),
     )
 
-    # -------------------------------------------------------------------------
-    # Existing post-imputation filters
-    # -------------------------------------------------------------------------
 
     ap.add_argument(
         "--cluster-filter",
@@ -762,7 +630,6 @@ def main():
         help="Drop universe authors below this max FOIA similarity.",
     )
 
-    # Diagnostics
     ap.add_argument(
         "--loo-influence",
         action="store_true",
@@ -781,9 +648,6 @@ def main():
     if args.eb_peer_k < 1:
         raise SystemExit("--eb-peer-k must be >= 1.")
 
-    # -------------------------------------------------------------------------
-    # IDs / shocks
-    # -------------------------------------------------------------------------
 
     universe_file = f"{OUT_DIR}/universe_ids.parquet"
     foia_file = f"{OUT_DIR}/foia_ids_ordered.csv"
@@ -804,9 +668,6 @@ def main():
     print(f"FOIA anchors: {len(foia_ids):,}")
     print(f"Treated markets: {len(markets)}")
 
-    # -------------------------------------------------------------------------
-    # KNN matrix
-    # -------------------------------------------------------------------------
 
     k_sfx = "" if args.k == 5 else f"_k{args.k}"
     weights_file = f"{OUT_DIR}/weight_matrix{k_sfx}.npz"
@@ -824,9 +685,6 @@ def main():
 
     report_W_health(W)
 
-    # -------------------------------------------------------------------------
-    # FOIA TF-IDF only needed for peer EB
-    # -------------------------------------------------------------------------
 
     X_foia = None
 
@@ -851,9 +709,6 @@ def main():
     eb_sfx, filter_sfx, k_sfx = build_suffixes(args)
     summaries = []
 
-    # =========================================================================
-    # Version loop
-    # =========================================================================
 
     for version in args.versions:
         print("\n" + "=" * 78)
@@ -892,9 +747,6 @@ def main():
         prior_diag = None
         shrink_mask = np.zeros(len(foia_ids), dtype=bool)
 
-        # ---------------------------------------------------------------------
-        # EB
-        # ---------------------------------------------------------------------
 
         if args.eb_own_weight < 1:
             P, _ = normalize_rows(S_raw)
@@ -912,8 +764,6 @@ def main():
                 cluster_file = args.eb_cluster_file
 
                 if not cluster_file:
-                    # Convenience: use the same cluster file as the
-                    # post-imputation filter if supplied.
                     cluster_file = args.cluster_filter
 
                 prior, available, prior_diag = build_cluster_prior(
@@ -958,9 +808,6 @@ def main():
                 f"{np.max(np.abs(eb_sum - raw_sum)):.3e}"
             )
 
-        # ---------------------------------------------------------------------
-        # LOO
-        # ---------------------------------------------------------------------
 
         loo = None
 
@@ -994,9 +841,6 @@ def main():
                     f"{r['loo_rmse_eb']:.5f}"
                 )
 
-        # ---------------------------------------------------------------------
-        # Universe imputation
-        # ---------------------------------------------------------------------
 
         S_hat = (W @ S).tocsr()
 
@@ -1028,9 +872,6 @@ def main():
             f"{sum_imputed_shares.mean():.5f}"
         )
 
-        # ---------------------------------------------------------------------
-        # Universe filtering
-        # ---------------------------------------------------------------------
 
         df_univ = df_univ_master.copy()
         df_univ["exposure_ss"] = z_hat
@@ -1043,9 +884,6 @@ def main():
             df_foia,
         )
 
-        # ---------------------------------------------------------------------
-        # Outputs
-        # ---------------------------------------------------------------------
 
         stem = f"_{version}{sample_sfx}{eb_sfx}{filter_sfx}{k_sfx}"
 
@@ -1070,9 +908,6 @@ def main():
 
         markets_df.to_csv(out_markets, index=False)
 
-        # ---------------------------------------------------------------------
-        # FOIA diagnostics
-        # ---------------------------------------------------------------------
 
         foia_diag = pd.DataFrame({
             "athr_id": foia_ids,
@@ -1109,9 +944,6 @@ def main():
                 index=False,
             )
 
-        # ---------------------------------------------------------------------
-        # Summary
-        # ---------------------------------------------------------------------
 
         self_raw = np.asarray(S_raw @ g).ravel()
         self_eb = np.asarray(S @ g).ravel()
@@ -1143,9 +975,6 @@ def main():
         print(f"Saved {out_npz}")
         print(f"Saved {out_markets}")
 
-    # =========================================================================
-    # Summary
-    # =========================================================================
 
     summary = pd.DataFrame(summaries)
 

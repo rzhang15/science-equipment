@@ -7,10 +7,10 @@ preliminaries
 version 17
 set maxvar 20000
 
-global EXPOSURE_VERSION "hc"
+global EXPOSURE_VERSION "hc_all3"
 global EXPOSURE_FILTER  "_cf_k3"
 global FE_MODE "author"
-* pres = event studies with stats legend (slides); paper = legend-free copies under <figdir>/paper/
+* FIG_MODES : pres | paper
 global FIG_MODES "pres"
 global HET_RUN_OLS 0
 global DEBUG_YVAR "ppr_cnt"
@@ -18,13 +18,8 @@ global HET_INCLUDE_INSTWTD 0
 global HET_RUN_QUARTILES 0
 global HET_IC_FULL 0
 global HET_AGE_NBINS 10
-* Lab clock for every lab-age split (young/old, lab_age_2014, lab bins/quartiles):
-* "athr_age" = min(first last-author article in the raw OpenAlex pull, corpus
-* min_year_nonsolo) -- earliest solo-free last-authorship observed in either
-* source; "panel" = corpus min_year.
+* LAB_CLOCK : athr_age | panel
 global LAB_CLOCK "panel"
-* `do analysis.do horserace` runs only horse_race_nih on the existing
-* ../temp/es_* panels (no rebuild of splits / event studies).
 global HET_HORSERACE_ONLY 0
 if "`1'" == "horserace" global HET_HORSERACE_ONLY 1
 
@@ -117,8 +112,6 @@ program gather_inst_chars
     save ../temp/inst_chars_pre, replace
 end
 
-* Reduced set: total R&D + total federal + institutional + life-sci + federal life-sci
-* (funding); endowment + basic + applied (expenditures).
 global IC_ALIASES tfnd lsf endow
 if $HET_IC_FULL == 1 {
     global IC_ALIASES contr fdlsb fdls fdlsh gntsf hhlsb hhls hhlsh nflsb nfls nflsh subrf busf fedf tfnd instf nonpf statf lsf hsf biof applx apfx basx bfx clinx devx lscx medx endow
@@ -227,7 +220,6 @@ program define_group_labels
     foreach b of global PI_Q_BASES {
         global PI_PAIRS_Q `"${PI_PAIRS_Q} "q4_`b' q1_`b'" "'
     }
-    * PI-level pairs shown on the main het coefplot and in the split-diff table.
     global COEFPLOT_PI_PAIRS `" "young old" "r1 r2" "high_pre_ppr low_pre_ppr" "high_nihd low_nihd" "big_msa small_msa" "'
 end
 
@@ -244,9 +236,6 @@ program add_het_splits
     cap drop athr_indicator
     bys athr_id : gen athr_indicator = _n == 1
 
-    * Neither source alone is complete: the raw pull misses works OpenAlex has
-    * reassigned to other author ids since the corpus snapshot, and the corpus
-    * is journal- and US-R1/R2-truncated. Earliest observation in either wins.
     if "$LAB_CLOCK" == "athr_age" {
         merge m:1 athr_id using ../external/athr_age/athr_age, ///
             keep(1 3) keepusing(first_last) nogen
@@ -267,14 +256,12 @@ program add_het_splits
     gen high_pre_ppr = pre_ppr_cnt_sum >= `ppr_cut' if !mi(pre_ppr_cnt_sum)
     gen low_pre_ppr  = pre_ppr_cnt_sum <  `ppr_cut' if !mi(pre_ppr_cnt_sum)
 
-    * young/old split on first last-author year (min_year), not career age
     qui sum min_year if athr_indicator == 1, d
     local lastyr_med = r(p50)
     di as text "add_het_splits `samp'`suf' min_year (first last-author yr) median = `lastyr_med'"
     gen young = min_year >  `lastyr_med' if !mi(min_year)
     gen old   = min_year <= `lastyr_med' if !mi(min_year)
 
-    * Same split on the first last-author year that excludes solo-author papers.
     cap confirm variable min_year_nonsolo
     if !_rc {
         qui sum min_year_nonsolo if athr_indicator == 1, d
@@ -287,7 +274,6 @@ program add_het_splits
     }
     else di as error "add_het_splits `samp'`suf': min_year_nonsolo not in panel -- young_ns/old_ns SKIPPED (rerun reduced_form/code/analysis.do)."
 
-    * Same split on the first publication ever, any author position (min_year_any).
     cap confirm variable min_year_any
     if !_rc {
         qui sum min_year_any if athr_indicator == 1, d
@@ -301,9 +287,6 @@ program add_het_splits
     gen r1 = type == "r1" if !mi(type)
     gen r2 = type == "r2" if !mi(type)
 
-    * Baseline NIH scale: pre-2014 means of the derived author-year measures
-    * (n_grants, nih_total_cost from derived/nih/match_pi_athr). Both are missing
-    * for PIs excluded upstream, so the NIH splits estimate on the NIH sample.
     local nih_src   n_grants nih_total_cost
     local nih_alias nihg     nihd
     forvalues i = 1/2 {
@@ -326,9 +309,6 @@ program add_het_splits
         gen byte low_`alias'  = `src' <  `nih_p50' if !mi(`src')
     }
 
-    * Young-only NIH funding split: pre_nihd median re-cut WITHIN young
-    * NIH-matched PIs. Dummies stay missing for old PIs, so every fit using
-    * the pair estimates on the young sample only.
     cap confirm variable pre_nihd
     if !_rc {
         qui sum pre_nihd if athr_indicator == 1 & young == 1, d
@@ -339,18 +319,11 @@ program add_het_splits
         di as text "add_het_splits `samp'`suf' young-only nihd N_pi=`ynih_n' p25=`ynih_p25' p50=`ynih_med' p75=`ynih_p75'"
         gen byte yhigh_nihd = pre_nihd >= `ynih_med' if !mi(pre_nihd) & young == 1
         gen byte ylow_nihd  = pre_nihd <  `ynih_med' if !mi(pre_nihd) & young == 1
-        * Q1-vs-Q4 tails of the same young-only distribution; middle 50%
-        * left missing so pair fits compare tails only.
         gen byte yq4_nihd = pre_nihd >= `ynih_p75' if !mi(pre_nihd) & young == 1 ///
                             & (pre_nihd >= `ynih_p75' | pre_nihd <= `ynih_p25')
         gen byte yq1_nihd = 1 - yq4_nihd
     }
 
-    * Age split restricted to PIs matched to RePORTER (n_grants non-missing).
-    * Dummies stay missing off the NIH sample, so every fit using them drops
-    * unmatched PIs rather than pooling them into the base category.
-    * nih_matched comes from reduced_form (RePORTER PI-name match). Fall back to
-    * an n_grants-based proxy only if the panel predates it.
     cap drop nih_pi
     cap confirm variable nih_matched
     if !_rc {
@@ -382,7 +355,6 @@ program add_het_splits
     foreach a of global IC_ALIASES {
         cap confirm variable ic_`a'
         if _rc continue
-        * Inst-weighted cutoffs (each institution counts once).
         qui sum ic_`a' if inst_indicator == 1, d
         local ic_n = r(N)
         local ic_p50 = r(p50)
@@ -394,7 +366,6 @@ program add_het_splits
         gen byte q1_`a'  = ic_`a' <= `ic_p25' if !mi(ic_`a')
         gen byte q4_`a'  = ic_`a' >= `ic_p75' if !mi(ic_`a')
         gen byte mid_`a' = (ic_`a' > `ic_p25' & ic_`a' < `ic_p75') if !mi(ic_`a')
-        * PI-weighted cutoffs (each PI counts once; big institutions dominate).
         qui sum ic_`a' if athr_indicator == 1, d
         local ic_p25w = r(p25)
         local ic_p50w = r(p50)
@@ -427,7 +398,6 @@ program add_het_splits
         gen byte mid_`alias' = (`src' > `p25' & `src' < `p75') if !mi(`src')
     }
 
-    * Joint young x hiw_<char> 2x2 for every ic char (PI-weighted median cutoff).
     foreach a of global IC_ALIASES {
         cap confirm variable hiw_`a'
         if _rc continue
@@ -437,10 +407,6 @@ program add_het_splits
         gen byte o_lo_`a' = (young == 0 & hiw_`a' == 0) if !mi(young) & !mi(hiw_`a')
     }
 
-    * Non-funding mechanism splits for the young result.
-    * (1) Lab age: years since first last-authored paper (min_year), distinct
-    * from career age (min_year_any, which age_2014 is built on) -- lab
-    * capital vintage: recently-started labs have not accumulated equipment.
     cap confirm variable min_year
     if !_rc {
         gen lab_age_2014 = 2014 - min_year
@@ -461,8 +427,6 @@ program add_het_splits
         }
         drop _labq_pi _labq
     }
-    * (2) MSA size -- thick local equipment / core-facility market. NOTE
-    * msa_size_at is missing for ~27% of PIs (no 2014 MSA row).
     cap confirm variable msa_size_at
     if !_rc {
         qui sum msa_size_at if athr_indicator == 1, d
@@ -476,8 +440,6 @@ program add_het_splits
 end
 
 program event_study_het
-    * Split-interaction PPML het regressions (+ OLS if HET_RUN_OLS=1).
-    * Writes ../temp/phet_results_<samp><suf>.dta.
     syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0)]
     local fes athr_id year
     local vce_cl athr_id
@@ -500,7 +462,6 @@ program event_study_het
     qui sum rel, d
     local abs_lag = abs(r(max))
     local abs_lead = abs(r(min))
-    * [H8] only the observed window; unused time dummies removed
     forval i = 1/`abs_lead' {
         gen int_lead`i'  = exposure      if rel == -`i'
         gen mshr_lead`i' = mkt_spend_shr if rel == -`i'
@@ -529,15 +490,12 @@ program event_study_het
         gen ln_`v' = ln(1+`v')
     }
 
-    * Skip dummies that are missing or degenerate (all 0 / all 1) so
-    * downstream loops don't try to fit collinear specs.
     local het_groups young old young_ns old_ns young_any old_any r1 r2 ///
                      high_pre_ppr low_pre_ppr high_nihg low_nihg high_nihd low_nihd ///
                      young_nih old_nih new_lab est_lab big_msa small_msa ///
                      yhigh_nihd ylow_nihd yq4_nihd yq1_nihd ///
                      lab_lt10 lab_10_20 lab_20p ///
                      q1_labage q2_labage q3_labage q4_labage
-    * Only groups the active config actually fits get lead/lag interactions.
     foreach a of global IC_ALIASES {
         local het_groups `het_groups' hiw_`a' low_`a'
         if "$HET_INCLUDE_INSTWTD" == "1" local het_groups `het_groups' hi_`a' lo_`a'
@@ -604,7 +562,6 @@ program event_study_het
         local position_outcomes n_middle_ppr avg_position avg_team_size_last avg_team_size_notlast
     }
 
-    * Pooled DiD building blocks (used by the coefplot-feeding fits below).
     cap drop post Z_it Z_share_it
     gen post       = year >= 2014
     gen Z_it       = exposure      * post
@@ -612,16 +569,11 @@ program event_study_het
 
     local pi_pairs `" "young old" "young_ns old_ns" "young_any old_any" "young_nih old_nih" "r1 r2" "high_pre_ppr low_pre_ppr" "high_nihg low_nihg" "high_nihd low_nihd" "new_lab est_lab" "big_msa small_msa" "yhigh_nihd ylow_nihd" "yq4_nihd yq1_nihd" "'
     global DUMMY_PAIRS_MED    `" `pi_pairs' ${IC_PAIRS_MED} "'
-    * PI-level splits included in both med and med_pi so PI-char coefplots
-    * still emit when HET_INCLUDE_INSTWTD=0 (only PI-weighted median runs).
     global DUMMY_PAIRS_MED_PW `" `pi_pairs' ${IC_PAIRS_MED_PW} "'
 
-    * Skip PPML on avg_* outcomes (conditional means, not counts).
     local ppml_het_skip avg_position avg_team_size_last avg_team_size_notlast
 
     mat drop _all
-    * Write per-yvar phet_results files (postfile has no append option); combine into
-    * master ../temp/phet_results_<samp><suf>.dta after the loop.
     local yvar_list ppr_cnt ppr_cnt_nonsolo cite_affl_wt avg_num_coathrs ///
                     n_grants n_new_grants nih_total_cost ///
                     `position_outcomes'
@@ -642,9 +594,6 @@ program event_study_het
         if "`yvar'" == "n_new_grants"   local ppml_ytit "{&Delta} Log Expected New NIH Research Grants"
         if "`yvar'" == "nih_total_cost" local ppml_ytit "{&Delta} Log Expected NIH Award Dollars"
 
-        * ---- OLS median het (gated by $HET_RUN_OLS, headline outcomes only)
-        * leads_g1/lags_g1 are the differential vs the dummy=0 (`g2') group
-        * absorbed by un-interacted int_lead/int_lag.
         if "$HET_RUN_OLS" == "1" & inlist("`yvar'", "ppr_cnt", "cite_affl_wt") {
             foreach pair of global DUMMY_PAIRS_MED {
                 local g1: word 1 of `pair'
@@ -726,12 +675,8 @@ program event_study_het
 
         }
 
-        * ---- PPML heterogeneity ----
-        * Posts "mshrctrl": joint pooled DiD with fully-interacted Z_it and Z_share_it
-        * on the full sample. grp coefficient = _b[Z_grp]; matches ppml_pdid_het_binscatter.
         if strpos(" `ppml_het_skip' ", " `yvar' ") == 0 {
             cap mkdir "../output/figures/`samp'/es_ppml"
-            * ---- PPML median split (inst-weighted + PI-weighted variants) ----
             local mmethods pw
             if "$HET_INCLUDE_INSTWTD" == "1" local mmethods inst pw
             foreach mmethod of local mmethods {
@@ -756,8 +701,6 @@ program event_study_het
                 if strpos(" ${HET_GROUPS_ACTIVE} ", " `g1' ") == 0 continue
                 if strpos(" ${HET_GROUPS_ACTIVE} ", " `g2' ") == 0 continue
 
-                * --- Pooled-DiD PPML with fully-interacted Z and share; posted as "mshrctrl" ---
-                * [H11] PT_`g1' absorbs the group-level post shift; `g2' x post is the base
                 cap drop Z_`g1' Z_`g2' S_`g1' S_`g2' PT_`g1'
                 gen Z_`g1' = Z_it       * `g1'
                 gen Z_`g2' = Z_it       * `g2'
@@ -797,7 +740,6 @@ program event_study_het
                         (`b_diff') (`se_diff') (`p_diff') (.) (`Nppml') (`r2ppml')
                 }
 
-                * --- Joint event-study PPML for per-group ES PDFs only (not posted) ---
                 local mshr_ctrls `mleads_`g1'' `mlags_`g1'' `mleads_`g2'' `mlags_`g2''
                 local plot_suf "`mplot_suf'"
                 cap noi ppmlhdfe `yvar' `leads_`g1'' `lags_`g1'' `leads_`g2'' `lags_`g2'' ///
@@ -866,9 +808,8 @@ program event_study_het
                     restore
                 }
             }
-            }  // close foreach mmethod
+            }
 
-            * ---- Multi-group lab-age splits: 3-way (<10/10-19/20+) and quartiles ----
             foreach aspec in age3 ageq4 {
                 if "`aspec'" == "age3"  local agrps lab_lt10 lab_10_20 lab_20p
                 if "`aspec'" == "ageq4" local agrps q1_labage q2_labage q3_labage q4_labage
@@ -877,7 +818,6 @@ program event_study_het
                     if strpos(" ${HET_GROUPS_ACTIVE} ", " `grp' ") == 0 local aok 0
                 }
                 if `aok' {
-                * [H11] the last (most senior) group x post is the omitted base
                 local nb : word count `agrps'
                 local abase : word `nb' of `agrps'
                 local Zs
@@ -918,7 +858,6 @@ program event_study_het
                             (`b_post') (`se_post') (.) (.) (`Nppml') (`r2ppml')
                     }
 
-                    * --- Joint event-study PPML for per-group ES PDFs only (not posted) ---
                     local all_leads
                     local all_lags
                     local all_mshr
@@ -1000,8 +939,6 @@ program event_study_het
                 }
             }
 
-            * ---- PPML quartile split (inst-weighted + PI-weighted variants) ----
-            * Gated by HET_RUN_QUARTILES; off by default per user request.
             local qmethods
             if "$HET_RUN_QUARTILES" == "1" local qmethods pw
             if "$HET_RUN_QUARTILES" == "1" & "$HET_INCLUDE_INSTWTD" == "1" local qmethods inst pw
@@ -1021,16 +958,12 @@ program event_study_het
                 local st_tag "quart_pi"
                 local qplot_suf "_ppml_qpi_mshrctrl"
             }
-            * PI-continuous quartiles run under BOTH methods (same dummies
-            * either way) so quart and quart_pi coefplots each fill their
-            * pi panel — mirrors pi_pairs in DUMMY_PAIRS_MED / _MED_PW.
             foreach pair of global PI_PAIRS_Q {
                 local quart_all `"`quart_all' `"`pair'"' "'
             }
             foreach pair of local quart_all {
                 local g1: word 1 of `pair'
                 local g2: word 2 of `pair'
-                * mid-group name: q4w_<char> -> midw_<char>; q4_<base> -> mid_<base>
                 if substr("`g1'", 1, 4) == "q4w_" {
                     local base = substr("`g1'", 5, .)
                     local gm "midw_`base'"
@@ -1043,8 +976,6 @@ program event_study_het
                 if strpos(" ${HET_GROUPS_ACTIVE} ", " `g2' ") == 0 continue
                 if strpos(" ${HET_GROUPS_ACTIVE} ", " `gm' ") == 0 continue
 
-                * --- Pooled-DiD PPML with fully-interacted Z and share (Q4/Mid/Q1); posted as "mshrctrl" ---
-                * [H11] Q1 x post is the omitted base
                 cap drop Z_`g1' Z_`g2' Z_`gm' S_`g1' S_`g2' S_`gm' PT_`g1' PT_`gm'
                 gen Z_`g1' = Z_it       * `g1'
                 gen Z_`g2' = Z_it       * `g2'
@@ -1076,7 +1007,6 @@ program event_study_het
                         (`b_post') (`se_post') (.) (.) (`Nppml') (`r2ppml')
                 }
 
-                * --- Joint event-study PPML for per-group ES PDFs only (not posted) ---
                 local mshr_ctrls `mleads_`g1'' `mlags_`g1'' ///
                                  `mleads_`g2'' `mlags_`g2'' ///
                                  `mleads_`gm'' `mlags_`gm''
@@ -1151,10 +1081,8 @@ program event_study_het
                     restore
                 }
             }
-            }  // close foreach qmethod
+            }
 
-            * ---- PPML young x hiw_<char> joint 2x2 for every ic char.
-            * One pooled-DiD interaction fit per char; posts 4 rows per char.
             foreach a of global IC_ALIASES {
                 cap confirm variable y_hi_`a'
                 if _rc continue
@@ -1164,7 +1092,6 @@ program event_study_het
                     gen S_`grp' = Z_share_it * `grp'
                     gen PT_`grp' = post * `grp'
                 }
-                * [H11] o_lo x post is the omitted base (the four PTs sum to post)
                 cap noi ppmlhdfe `yvar' Z_y_hi_`a' Z_y_lo_`a' Z_o_hi_`a' Z_o_lo_`a' ///
                                         S_y_hi_`a' S_y_lo_`a' S_o_hi_`a' S_o_lo_`a' ///
                                         PT_y_hi_`a' PT_y_lo_`a' PT_o_hi_`a', ///
@@ -1187,7 +1114,6 @@ program event_study_het
                     post `ph_handle' ("`yvar'") ("`grp'") ("mshrctrl") ("joint_ae") ///
                         (`b_post') (`se_post') (.) (.) (`Nppml') (`r2ppml')
                 }
-                * Hi-vs-Lo differential per age; SEs via lincom use full VCE.
                 foreach age in y o {
                     cap noi lincom Z_`age'_hi_`a' - Z_`age'_lo_`a'
                     if _rc continue
@@ -1204,14 +1130,12 @@ program event_study_het
         }
         postclose `ph_handle'
 
-        * pdid binscatter + coefplot for this yvar, so PDFs land continuously
         if strpos(" `ppml_het_skip' ", " `yvar' ") == 0 {
             cap noi ppml_pdid_het_binscatter, samp(`samp') r1r2(`r1r2') public(`public') r1_only(`r1_only') yvar(`yvar')
         }
         cap noi ppml_het_coefplot, samp(`samp') r1r2(`r1r2') public(`public') r1_only(`r1_only') yvar(`yvar')
     }
 
-    * Combine per-yvar phet_results files into master (consumed by output_het_tables).
     preserve
     clear
     foreach yvar of local yvar_list {
@@ -1222,13 +1146,6 @@ program event_study_het
 end
 
 program ppml_pdid_het_binscatter
-    * Joint PPML pooled-DiD FWL binscatter of `yvar' on Z_it, mshr partialled.
-    * Fit ppmlhdfe on FULL sample with fully-interacted Z and share, then
-    * residualize _z_work and Z_grp against the sibling group + shares + FEs.
-    * On grp==1 rows the sibling interactions are 0 so FWL slope = _b[Z_grp].
-    * NOTE: residualization runs on the full sample while the plot keeps
-    * grp==1 rows, so the binned slope approximates the (exactly displayed)
-    * joint-fit coefficient.
     syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0) yvar(string)]
     if "`yvar'" == "" local yvar ppr_cnt
     local fes athr_id year
@@ -1248,7 +1165,6 @@ program ppml_pdid_het_binscatter
     if (`r1_only' == 1 & `public' == 1) local suf "_r1_public"
     cap mkdir "../output/figures/`samp'/ppml_pdid_het_bs"
 
-    * [H9] y-axis label per outcome (was hard-coded "Publications")
     local bs_lbl "`yvar'"
     if "`yvar'" == "ppr_cnt"           local bs_lbl "Publications"
     if "`yvar'" == "cite_affl_wt"      local bs_lbl "Citation-Weighted Output"
@@ -1262,7 +1178,6 @@ program ppml_pdid_het_binscatter
     local dummy_pairs `" "young old" "young_ns old_ns" "young_any old_any" "young_nih old_nih" "r1 r2" "high_pre_ppr low_pre_ppr" "high_nihg low_nihg" "high_nihd low_nihd" "new_lab est_lab" "big_msa small_msa" "yhigh_nihd ylow_nihd" "yq4_nihd yq1_nihd" ${IC_PAIRS_MED_PW} "'
     if "$HET_INCLUDE_INSTWTD" == "1" local dummy_pairs `" `dummy_pairs' ${IC_PAIRS_MED} "'
 
-    * Load panel once; per-pair vars are cap-dropped and rebuilt in place.
     preserve
         use ../temp/es_`samp'`suf', clear
         gen post       = year >= 2014
@@ -1273,14 +1188,9 @@ program ppml_pdid_het_binscatter
             local g1 : word 1 of `pair'
             local g2 : word 2 of `pair'
 
-            * HET_GROUPS_ACTIVE (set by event_study_het before this is called)
-            * screens missing AND degenerate dummies — a no-obs group would
-            * crash binscatter and abort the remaining pairs.
             if strpos(" ${HET_GROUPS_ACTIVE} ", " `g1' ") == 0 continue
             if strpos(" ${HET_GROUPS_ACTIVE} ", " `g2' ") == 0 continue
 
-            * one at a time — a `drop' list is all-or-nothing, and a missing
-            * Z_<grp> would leave _mu/_dvar alive to crash d() below
             foreach v in Z_`g1' Z_`g2' S_`g1' S_`g2' PT_`g1' _mu _z_work _dvar _fwlw _y_r _Z_r {
                 cap drop `v'
             }
@@ -1290,7 +1200,6 @@ program ppml_pdid_het_binscatter
             gen S_`g2' = Z_share_it * `g2'
             gen PT_`g1' = post * `g1'
 
-            * [H11] PT matches the posted pooled-DiD spec so displayed beta agrees
             cap noi ppmlhdfe `yvar' Z_`g1' Z_`g2' S_`g1' S_`g2' PT_`g1', ///
                     absorb(`fes') vce(cluster `vce_cl') d(_dvar)
             local rc = _rc
@@ -1303,7 +1212,6 @@ program ppml_pdid_het_binscatter
             local b_`g2'  = _b[Z_`g2']
             local se_`g2' = _se[Z_`g2']
 
-            * IRLS working response + FWL weight from the joint fit.
             predict double _mu, mu
             gen double _z_work = ln(_mu) + (`yvar' - _mu)/_mu if !mi(_mu) & _mu > 0
             gen double _fwlw = _mu if !mi(_mu) & _mu > 0
@@ -1350,7 +1258,6 @@ program ppml_pdid_het_binscatter
             }
         }
 
-        * ---- Multi-group lab-age splits: joint fit, per-group FWL binscatter ----
         foreach aspec in age3 ageq4 {
             if "`aspec'" == "age3"  local agrps lab_lt10 lab_10_20 lab_20p
             if "`aspec'" == "ageq4" local agrps q1_labage q2_labage q3_labage q4_labage
@@ -1381,7 +1288,6 @@ program ppml_pdid_het_binscatter
                 }
             }
 
-            * [H11] PT matches the posted `aspec' pooled-DiD spec (most senior group x post is the base)
             cap noi ppmlhdfe `yvar' `Zs' `Ss' `PTs', ///
                     absorb(`fes') vce(cluster `vce_cl') d(_dvar)
             local rc = _rc
@@ -1447,11 +1353,6 @@ program ppml_pdid_het_binscatter
 end
 
 program ppml_age_gradient
-    * Age gradient of the pooled-DiD beta: one joint PPML with Z_it and the
-    * share control fully interacted with career-age bins (HET_AGE_NBINS
-    * PI-level quantiles of age_2014), plotted as each bin's beta vs the bin's
-    * mean age. Same spec as the posted "mshrctrl" median splits, K bins
-    * instead of 2.
     syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0)]
     local fes athr_id year
     local vce_cl athr_id
@@ -1480,8 +1381,6 @@ program ppml_age_gradient
     gen Z_share_it = mkt_spend_shr * post
 
     local K = $HET_AGE_NBINS
-    * Two age bases: career age (first any-position pub, +30) writes agegrad_*;
-    * lab age (years since first last-author pub) writes labgrad_*.
     foreach agevar in age_2014 lab_age_2014 lab_age_ns_2014 {
     cap confirm variable `agevar'
     if _rc {
@@ -1523,8 +1422,6 @@ program ppml_age_gradient
         local svars `svars' S_a`k'
         local bins_used `bins_used' `k'
     }
-    * post x bin shifts for all but the last bin: the full set sums to post,
-    * collinear with year FE (last bin's post shift is the absorbed base).
     local ptvars
     local nb : word count `bins_used'
     forval i = 1/`=`nb'-1' {
@@ -1594,8 +1491,6 @@ program ppml_age_gradient
 end
 
 program desc_pre_output_by_age
-    * PI-level pre-period research-output densities, young vs old.
-    * Log-scale and raw (x capped at pooled p95) overlays per outcome.
     syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0)]
     local suf ""
     if (`r1r2' == 1 & `public' == 0 & `r1_only' == 0) local suf "_r1_r2"
@@ -1610,8 +1505,6 @@ program desc_pre_output_by_age
     local y0 = r(min)
     local y1 = r(max)
 
-    * Productivity: total pre-period papers and papers per pre-period year.
-    * Citations and authorship-position counts ride along as totals.
     local sum_src   ppr_cnt cite_affl_wt n_first_ppr n_last_ppr
     local sum_alias ppr_tot cite         first       last
     local mean_src   ppr_cnt
@@ -1677,7 +1570,6 @@ program desc_pre_output_by_age
         di as text "  `a': young-old diff = " %8.3f _b[young] " (se " %8.3f _se[young] ")"
 
         gen double ln_pre_`a' = ln(1 + pre_`a')
-        * both densities on one common x grid so rarea can shade the gap
         qui sum ln_pre_`a'
         cap drop _kx _kd_y _kd_o _kd_c
         gen _kx = r(min) + (r(max) - r(min)) * (_n - 1) / 199 if _n <= 200
@@ -1733,11 +1625,6 @@ program desc_pre_output_by_age
 end
 
 program horse_race_nih
-    * Experience-vs-money horse race on the NIH-matched sample: one PPML with
-    * Z_it interacted with young (early-career) AND low_nihd (below-median
-    * baseline NIH funding) jointly, plus the post x dummy shifts and the
-    * uninteracted share control. Base Z_it = late-career, above-median-NIH.
-    * Reports both triple-interaction betas and the Wald test of equality.
     syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0)]
     local fes athr_id year
     local vce_cl athr_id
@@ -1872,9 +1759,6 @@ program output_het_tables
 end
 
 program output_split_diff_tables
-    * Group-difference test for every split on the main het coefplot: b, se for
-    * each group and lincom g1 - g2 off the joint pooled-DiD PPML VCE (the
-    * med_pi_diff rows event_study_het posts).
     syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0)]
     local suf ""
     if (`r1r2' == 1 & `public' == 0 & `r1_only' == 0) local suf "_r1_r2"
@@ -1935,8 +1819,6 @@ program output_split_diff_tables
 end
 
 program ppml_het_coefplot
-    * Three panels per yvar (pi / ic_fund / ic_expx).
-    * If yvar() is supplied, plot only that outcome; otherwise loop all.
     syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0) yvar(string)]
     local suf ""
     if (`r1r2' == 1 & `public' == 0 & `r1_only' == 0) local suf "_r1_r2"
@@ -1944,7 +1826,6 @@ program ppml_het_coefplot
     if (`r1_only' == 1 & `public' == 0) local suf "_r1"
     if (`r1_only' == 1 & `public' == 1) local suf "_r1_public"
 
-    * When called inline per-yvar, read the per-yvar postfile; otherwise the combined master.
     if "`yvar'" != "" {
         local resfile "../temp/phet_results_`samp'`suf'_`yvar'.dta"
     }
@@ -1977,8 +1858,6 @@ program ppml_het_coefplot
     }
     foreach st of local st_list {
         if strpos("`st'", "joint_") == 1 {
-            * Custom paired rendering used instead of the standard panel loop.
-            * Leaving all groups empty causes the standard loop to skip.
             local groups_pi
             local groups_ic_fund
             local groups_ic_expx
@@ -1998,8 +1877,6 @@ program ppml_het_coefplot
             }
         }
         else if "`st'" == "med_pi" {
-            * PI-weighted inst-char medians. PI-level splits are the same
-            * variables as under med so they render in the pi panel too.
             local groups_pi
             foreach pair of global COEFPLOT_PI_PAIRS {
                 local groups_pi `groups_pi' `pair'
@@ -2028,8 +1905,6 @@ program ppml_het_coefplot
             }
         }
         else {
-            * quart_pi -- PI-weighted quartiles for inst chars, PI-continuous
-            * quartiles for PI bases.
             local groups_pi
             foreach b of global PI_Q_BASES {
                 local groups_pi `groups_pi' q4_`b' q1_`b'
@@ -2048,8 +1923,6 @@ program ppml_het_coefplot
             local spec_folder = cond($HET_IC_FULL == 1, "coefplot_evavg_full", "coefplot_evavg")
             cap mkdir "../output/figures/`samp'/`spec_folder'"
 
-        * Combined panel stacks pi + ic_fund + ic_expx so the paper can show
-        * one coefplot per (yvar, spec, st) instead of three per-panel PDFs.
         local groups_all `groups_pi' `groups_ic_fund' `groups_ic_expx'
         foreach panel in pi ic_fund ic_expx all {
             local groups `groups_`panel''
@@ -2065,8 +1938,6 @@ program ppml_het_coefplot
                     continue
                 }
 
-                * Splits not yet rebuilt upstream have no rows here; drop them
-                * so they leave no blank labelled row on the axis.
                 local groups_present
                 foreach g of local groups {
                     qui count if grp == "`g'" & !mi(post_b)
@@ -2079,8 +1950,6 @@ program ppml_het_coefplot
                     continue
                 }
 
-                * Groups come in high/low pairs; add a gap between pairs so
-                * each pair reads as one block.
                 local pair_gap 0.7
                 local npairs = ceil(`n_groups'/2)
                 gen double y = .
@@ -2109,11 +1978,9 @@ program ppml_het_coefplot
                 qui sum ub
                 local xmax = ceil(r(max)/0.5)*0.5
 
-                * Adaptive canvas: bigger for more rows. Matches old reduced_form format.
                 local ysize 6
                 if `n_groups' > 20 local ysize 10
                 if `n_groups' > 40 local ysize 14
-                * Grow the canvas by the added inter-pair whitespace.
                 local ysize = round(`ysize' * (`n_groups' + (`npairs'-1)*`pair_gap')/`n_groups', 0.1)
                 local labsize small
                 if `n_groups' > 20 local labsize vsmall
@@ -2136,9 +2003,6 @@ program ppml_het_coefplot
             }
         }
 
-        * ----- Custom paired coefplot: inst chars on y-axis (High/Low rows),
-        *       one blue + one orange marker per row; age is the splitting
-        *       axis (1-char y/o prefix).
         if "`st'" == "joint_ae" {
             local pfx_len   1
             local hi_pfx    y
@@ -2173,9 +2037,6 @@ program ppml_het_coefplot
                 }
                 qui sum char_idx
                 local nchars = r(max)
-                * Row layout: within-pair (blue+orange same hi/lo) 0.6;
-                * between hi-row and lo-row of same char = 0.8; between
-                * chars = 1.2. Base spacing 3.2 per char.
                 gen double y_group = (`nchars' + 1 - char_idx) * 3.2
                 gen double y_pos   = y_group ///
                     + cond(hilo_c == "hi" & is_hi_side == 1,  1.0, ///
@@ -2221,9 +2082,8 @@ program ppml_het_coefplot
             }
         }
 
-        }  // close foreach spec_tag
+        }
     }
 end
 
-**
 main

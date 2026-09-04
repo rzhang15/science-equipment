@@ -1,17 +1,3 @@
-"""
-Aggregate paper-cluster labels into per-author field distributions.
-
-Output:
-  ../../output/bert/author_field_dist_K{K}.parquet
-    columns: athr_id, n_papers, modal_cluster, modal_share, entropy,
-             top1_cluster, top1_share, top2_cluster, top2_share, top3_cluster, top3_share
-
-  ../../output/bert/author_field_shares_K{K}_long.parquet
-    columns: athr_id, cluster_label, share        (only nonzero rows)
-
-  ../../output/bert/cluster_descriptions_K{K}.txt
-    Top TF-IDF terms over the per-cluster pooled paper text + 5 example titles.
-"""
 import argparse
 import numpy as np
 import polars as pl
@@ -34,7 +20,6 @@ clusters = pl.read_parquet(f"{OUT_DIR}/paper_clusters_K{K}.parquet")
 joined = edges.join(clusters, on="id", how="inner")
 print(f"  author-paper rows with cluster: {len(joined):,}")
 
-# Per-(author, cluster) counts.
 counts = (
     joined.group_by(["athr_id", "cluster_label"])
     .agg(pl.len().alias("n"))
@@ -71,7 +56,6 @@ summary = pdf.groupby("athr_id").apply(per_author).reset_index()
 pl.from_pandas(summary).write_parquet(f"{OUT_DIR}/author_field_dist_K{K}.parquet")
 print(f"  authors: {len(summary):,}")
 
-# --- Cluster descriptions ---
 print("Building cluster descriptions...")
 papers_text = pl.read_parquet(f"{OUT_DIR}/papers_text.parquet")
 title_proxy = (
@@ -79,7 +63,6 @@ title_proxy = (
     .join(clusters, on="id", how="inner")
 )
 
-# Top TF-IDF terms per cluster (pooled paper_text per cluster).
 pooled = (
     papers_text.join(clusters, on="id", how="inner")
     .group_by("cluster_label")
@@ -92,7 +75,6 @@ vec = TfidfVectorizer(stop_words="english", min_df=2, max_df=0.6,
 M = vec.fit_transform(pooled["blob"])
 features = np.array(vec.get_feature_names_out())
 
-# Example titles per cluster (first 5 papers, by id order).
 ex = (
     title_proxy.group_by("cluster_label")
     .agg(pl.col("snippet").head(5).alias("examples"))

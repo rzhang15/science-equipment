@@ -1,16 +1,3 @@
-"""
-Cluster US authors into K subfields from the TF-IDF matrix built on
-cleaned_static_author_text_pre_us.parquet.
-
-Applies TruncatedSVD + L2-normalize BEFORE K-means. MiniBatchKMeans on the
-raw 30k-dim sparse TF-IDF collapses ~all authors into a single mega-cluster
-(curse of dimensionality on Euclidean distance). Reducing to ~256 dense
-dims and L2-normalizing makes Euclidean K-means approximate spherical
-(cosine) K-means, which is what we want for text.
-
-Mirrors cluster_fields/2_cluster.py exactly so US-only vs worldwide
-clusterings stay comparable.
-"""
 import argparse
 import numpy as np
 import pandas as pd
@@ -69,7 +56,6 @@ row_nnz = np.asarray((matrix != 0).sum(axis=1)).ravel()
 print(f"  rows with 0 nonzero features:  {(row_nnz == 0).sum():,}")
 print(f"  rows with <5 nonzero features: {(row_nnz < 5).sum():,}")
 
-# ---- SVD reduction ----
 if args.svd_dim and args.svd_dim > 0:
     print(f"\nReducing to {args.svd_dim} dims via TruncatedSVD...")
     svd = TruncatedSVD(
@@ -87,7 +73,6 @@ else:
     print("\nSkipping SVD (--svd-dim 0). Running K-means on raw sparse TF-IDF.")
     X = matrix
 
-# ---- K-means ----
 print(f"\nClustering into {NUM_CLUSTERS} clusters with MiniBatchKMeans...")
 kmeans = MiniBatchKMeans(
     n_clusters=NUM_CLUSTERS,
@@ -101,7 +86,6 @@ kmeans = MiniBatchKMeans(
 kmeans.fit(X)
 labels = kmeans.labels_
 
-# ---- diagnostic: cluster size distribution ----
 sizes = pd.Series(labels).value_counts().sort_values(ascending=False)
 top_share = sizes.iloc[0] / len(labels)
 print(f"\n--- CLUSTER SIZE DISTRIBUTION ---")
@@ -115,15 +99,10 @@ if top_share > 0.5:
     print(f"  WARNING: largest cluster holds {top_share*100:.1f}% of the pool -- "
           f"the clustering looks degenerate. Try increasing --svd-dim or K.")
 
-# ---- save labels ----
 print("\nSaving Results...")
 pdf_ids['cluster_label'] = labels
 pdf_ids.to_csv(f"../output/author_static_clusters_{NUM_CLUSTERS}{args.out_sfx}.csv", index=False)
 
-# ---- top-term descriptions ----
-# With SVD on, kmeans.cluster_centers_ is in the SVD-reduced space, so we
-# can't read top terms off it directly. Recompute per-cluster centroids in
-# the original TF-IDF space.
 print("Writing cluster top-term descriptions...")
 if args.svd_dim and args.svd_dim > 0:
     centers = np.zeros((NUM_CLUSTERS, matrix.shape[1]), dtype=np.float32)

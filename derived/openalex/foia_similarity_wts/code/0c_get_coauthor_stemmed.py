@@ -1,23 +1,3 @@
-"""
-Build STEMMED lifetime text for each FOIA-author coauthor, EXCLUDING papers
-they coauthored with any FOIA author. TF-IDF input variant of
-bert/0c_build_coauthor_unstemmed.py.
-
-The unstemmed text is assembled from paper-level data, then the same Porter-
-stem + custom-stopword cleaning used in cluster_fields/code/0_combine_data.py
-is applied so the coauthor vectors live in the same vocabulary space as the
-FOIA TF-IDF matrix saved by tfidf/1_vectorize.py.
-
-Inputs:
-  /n/home02/cxu75/sci_eq/derived/openalex/get_coauthors/temp/relevant_pprs.dta
-  /n/home02/cxu75/sci_eq/derived/openalex/cluster_fields/output/bert/
-      author_paper_edges.parquet  (athr_id, id, publication_year; <=2013)
-      papers_text.parquet         (id, paper_text)
-  ../external/coauthors/coauthors.dta
-
-Output:
-  ../output/coauthor_text_stemmed.csv  (athr_id [=coauthor], processed_text)
-"""
 import os
 import re
 import sys
@@ -27,8 +7,6 @@ import pandas as pd
 import polars as pl
 from nltk.stem import PorterStemmer
 
-# Reuse the project-wide stopword set (NLTK english + ~hundreds of academic
-# scaffolding terms). Imported rather than duplicated to stay in sync.
 sys.path.insert(0, "/n/home02/cxu75/sci_eq/derived/openalex/cluster_fields/code")
 from config import stopwords_set  # noqa: E402
 
@@ -41,17 +19,13 @@ OUT_CSV = "../output/coauthor_text_stemmed.csv"
 REGEX_SPACES = re.compile(r"\s+")
 _stemmer = PorterStemmer()
 
-
 def clean_and_stem(text: str) -> str:
-    """Match cluster_fields/code/0_combine_data.py:clean_and_stem so the
-    coauthor vocabulary aligns with the FOIA TF-IDF vocabulary."""
     if not text or len(text) < 5:
         return ""
     return " ".join(
         _stemmer.stem(t) for t in text.split()
         if len(t) > 2 and not t.isdigit() and t not in stopwords_set
     )
-
 
 def main():
     t0 = time.time()
@@ -117,7 +91,6 @@ def main():
 
     df[["athr_id", "processed_text"]].to_csv(OUT_CSV, index=False)
     print(f"\nSaved {OUT_CSV}  ({time.time() - t0:.1f}s)")
-
 
 if __name__ == "__main__":
     main()

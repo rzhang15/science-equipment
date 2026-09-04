@@ -30,7 +30,6 @@ end_batch   <- base_end
 
 message(paste("Processing Chunk:", chunk_id, "(Upper Half)"))
 message(paste("Batch Range:", start_batch, "to", end_batch))
-# --- SETUP ---
 set.seed(8975)
 
 id_file <- read_dta('../external/ids/list_of_works_all.dta')

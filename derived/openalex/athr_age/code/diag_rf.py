@@ -1,8 +1,3 @@
-"""One-off: every raw-pull row for the RF-sample PIs, no type filter.
-
-Reads ../temp/rf_ids.csv (written by hand from the RF prepped sample), writes
-../temp/rf_raw_works.parquet. Run via run_diag.sbatch.
-"""
 import glob
 import os
 import polars as pl

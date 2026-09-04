@@ -1,69 +1,3 @@
-"""
-Author-level life-science lab mask.
-
-Applies the four lexicon classes defined in 3_filter_life_science.py to each
-author's full TF-IDF vector:
-
-    BENCH_CORE
-    BIO_CONTEXT
-    CLINICAL_PRACTICE
-    ANTI_LEXICON
-
-Cluster membership plays no role.
-
-Why author-level scoring differs from cluster scoring
------------------------------------------------------
-Cluster centroids summarize tens of thousands of authors, so generic bench
-vocabulary can surface among the cluster's top terms. Individual author TF-IDF
-vectors instead emphasize rare/discriminating stems, and many ubiquitous bench
-terms (e.g. cell, dna, protein, enzym, antibodi, antigen) are absent from the
-vocabulary entirely because 1_vectorize.py drops terms appearing in >10% of
-documents.
-
-Therefore the cluster rule should NOT be transplanted verbatim to authors.
-
-At author level:
-
-  * evidence is measured as TF-IDF MASS over the author's full vector;
-  * any BENCH_CORE mass counts as positive bench evidence;
-  * BIO_CONTEXT mass >= --min-bio-shr can carry an author when direct bench
-    evidence is absent;
-  * clinical + anti mass cannot dominate positive biological evidence.
-
-Default keep rule
------------------
-evidence:
-    BENCH_CORE mass > 0
-    OR BIO_CONTEXT mass >= --min-bio-shr
-
-dominance:
-    (CLINICAL_PRACTICE + ANTI_LEXICON) mass
-        <= --dominance-ratio * (BENCH_CORE + BIO_CONTEXT) mass
-
-keep:
-    evidence AND not dominated AND non-empty TF-IDF row
-
-The default rule is calibrated for identifying authors plausibly doing
-life-science research in a lab while compensating for the upstream max_df
-vocabulary truncation.
-
---require-bench removes the BIO_CONTEXT rescue and requires observed
-BENCH_CORE mass in the retained TF-IDF vocabulary. This is a stricter
-lab-evidence specification, but it mechanically misses some known lab
-researchers because common bench terms are removed upstream.
-
-Inputs
-------
-../output/tfidf_matrix.npz
-../output/feature_names.pkl
-../output/author_ids_aligned.parquet
-
-Outputs
--------
-../output/author_ls_scores_indiv{suffix}.csv
-../output/author_ls_authors_indiv{suffix}.csv
-"""
-
 import argparse
 import importlib.util
 import os
@@ -75,11 +9,6 @@ import scipy.sparse as sp
 
 
 OUT_DIR = "../output"
-
-
-# ---------------------------------------------------------------------
-# Load taxonomy from cluster filter
-# ---------------------------------------------------------------------
 
 spec = importlib.util.spec_from_file_location(
     "ls_filter",
@@ -113,19 +42,7 @@ if missing:
         + ", ".join(sorted(missing))
     )
 
-
-# ---------------------------------------------------------------------
-# Vocabulary classification
-# ---------------------------------------------------------------------
-
 def classify_vocab(feature_names):
-    """
-    Flag each TF-IDF feature under the four lexicons.
-
-    Classes are evaluated independently, matching the taxonomy used in
-    3_filter_life_science.py.
-    """
-
     def flag(lexicon):
         return np.array(
             [
@@ -147,12 +64,6 @@ def classify_vocab(feature_names):
 
 
 def top_term_hits(M, flags, k_top):
-    """
-    Count class matches among each author's top-k TF-IDF features.
-
-    These columns are diagnostic only. The keep rule uses full-vector mass.
-    """
-
     n = M.shape[0]
 
     out = [
@@ -194,11 +105,6 @@ def top_term_hits(M, flags, k_top):
             )
 
     return out
-
-
-# ---------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------
 
 def main():
 
@@ -269,11 +175,6 @@ def main():
 
     args = ap.parse_args()
 
-
-    # ------------------------------------------------------------------
-    # Validate arguments
-    # ------------------------------------------------------------------
-
     if args.top_terms <= 0:
         raise ValueError("--top-terms must be > 0")
 
@@ -282,11 +183,6 @@ def main():
 
     if args.dominance_ratio < 0:
         raise ValueError("--dominance-ratio must be >= 0")
-
-
-    # ------------------------------------------------------------------
-    # Load TF-IDF artifacts
-    # ------------------------------------------------------------------
 
     matrix_path = f"{OUT_DIR}/tfidf_matrix.npz"
     features_path = f"{OUT_DIR}/feature_names.pkl"
@@ -345,11 +241,6 @@ def main():
         f"  nnz {M.nnz:,}"
     )
 
-
-    # ------------------------------------------------------------------
-    # Classify vocabulary
-    # ------------------------------------------------------------------
-
     (
         is_bench,
         is_bio,
@@ -367,11 +258,6 @@ def main():
         f"  anti={is_anti.sum():,}"
         f"  of {len(feature_names):,}"
     )
-
-
-    # ------------------------------------------------------------------
-    # Full-vector TF-IDF mass shares
-    # ------------------------------------------------------------------
 
     tot_mass = np.asarray(
         M.sum(axis=1)
@@ -429,11 +315,6 @@ def main():
         - nonlab_shr
     )
 
-
-    # ------------------------------------------------------------------
-    # Diagnostic top-term hits
-    # ------------------------------------------------------------------
-
     print(
         f"Counting top {args.top_terms} "
         "terms per author ..."
@@ -454,11 +335,6 @@ def main():
         ],
         args.top_terms,
     )
-
-
-    # ------------------------------------------------------------------
-    # Evidence rule
-    # ------------------------------------------------------------------
 
     has_bench = (
         bench_shr > 0
@@ -496,21 +372,11 @@ def main():
             | has_bio
         )
 
-
-    # ------------------------------------------------------------------
-    # Dominance rule
-    # ------------------------------------------------------------------
-
     dominated = (
         nonlab_shr
         > args.dominance_ratio
         * positive_shr
     )
-
-
-    # ------------------------------------------------------------------
-    # Automatic classification
-    # ------------------------------------------------------------------
 
     auto_keep = (
         evidence
@@ -521,11 +387,6 @@ def main():
     keep = (
         auto_keep.copy()
     )
-
-
-    # ------------------------------------------------------------------
-    # Diagnostics
-    # ------------------------------------------------------------------
 
     print(
         f"  evidence: bench mass "
@@ -544,11 +405,6 @@ def main():
         "  nonlab dominance cut "
         f"{(evidence & dominated & ~empty).sum():,}"
     )
-
-
-    # ------------------------------------------------------------------
-    # Classification reason
-    # ------------------------------------------------------------------
 
     route = np.full(
         len(ids),
@@ -576,11 +432,6 @@ def main():
         & ~has_bench
         & has_bio
     ] = "KEEP_BIO_CONTEXT"
-
-
-    # ------------------------------------------------------------------
-    # Optional always-keep roster
-    # ------------------------------------------------------------------
 
     forced = np.zeros(
         len(ids),
@@ -632,11 +483,6 @@ def main():
             f"{forced.sum():,} force-kept beyond the rule"
         )
 
-
-    # ------------------------------------------------------------------
-    # Final summary
-    # ------------------------------------------------------------------
-
     print(
         f"  kept {keep.sum():,}/{len(ids):,} authors "
         f"({keep.mean():.1%})"
@@ -654,17 +500,11 @@ def main():
             f"{(auto_keep & bio_only).sum():,}"
         )
 
-
-    # ------------------------------------------------------------------
-    # Save scores
-    # ------------------------------------------------------------------
-
     scores = pd.DataFrame({
 
         "athr_id":
             ids["athr_id"],
 
-        # Top-term diagnostics
         "bench_hits":
             bench_hits,
 
@@ -677,7 +517,6 @@ def main():
         "anti_hits":
             anti_hits,
 
-        # Continuous TF-IDF mass shares
         "bench_shr":
             bench_shr,
 
@@ -699,7 +538,6 @@ def main():
         "lab_margin":
             lab_margin,
 
-        # Rule components
         "has_bench":
             has_bench.astype(int),
 
@@ -724,11 +562,6 @@ def main():
         "route":
             route,
     })
-
-
-    # ------------------------------------------------------------------
-    # Write outputs
-    # ------------------------------------------------------------------
 
     sfx = args.out_sfx
 
@@ -763,11 +596,6 @@ def main():
         f"Saved {authors_path}"
     )
 
-
-    # ------------------------------------------------------------------
-    # Classification-route summary
-    # ------------------------------------------------------------------
-
     print(
         "\nClassification routes:"
     )
@@ -794,11 +622,6 @@ def main():
         )
         .to_string()
     )
-
-
-    # ------------------------------------------------------------------
-    # Cluster diagnostics
-    # ------------------------------------------------------------------
 
     cl_path = (
         f"{OUT_DIR}/"
@@ -885,11 +708,6 @@ def main():
             .round(4)
             .to_string()
         )
-
-
-    # ------------------------------------------------------------------
-    # Agreement with cluster mask
-    # ------------------------------------------------------------------
 
     if os.path.exists(
         ls_path

@@ -3,10 +3,6 @@ clear all
 capture log close
 version 17
 
-* Balance across more- and less-exposed PIs (split at the PI-level median of
-* the exposure measure) on the prepped sample from the last analysis.do run.
-* Panel A: pre-period (2010-13) PI averages of the outcomes in tab:sumstats_pi.
-* Panel B: PI characteristics. Writes ../output/tables/<samp>/balance_pi<suf>.tex
 local samp all_jrnls
 local suf  _r1_r2
 
@@ -70,8 +66,6 @@ cap mkdir ../output/tables/`samp'
 matrix_to_txt, saving("../output/tables/`samp'/balance_pi`suf'.txt") ///
     matrix(balance) title(<tab:balance_pi`suf'>) format(%20.4f) replace
 
-* decimals: 2 by default; NIH dollars 2 with {,} separators; years 1;
-* exposure and share 3; p-values and normalized differences 3
 local d = char(36)
 forval r = 1/`nr' {
     local fmt %9.2f

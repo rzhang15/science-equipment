@@ -1,4 +1,3 @@
-* Quick pass: event study only, no_clin sample (all_jrnls, R1+R2, unweighted)
 cap mkdir ../temp
 shell sed 's/^main$//' analysis.do > ../temp/analysis_programs.do
 do ../temp/analysis_programs.do

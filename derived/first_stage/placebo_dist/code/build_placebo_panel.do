@@ -16,7 +16,6 @@ end
 
 program build_pairs_xw
     syntax, [suffix(string)]
-    // pairs xw built from placebo match output (now keyed on iter)
     import delimited ../output/placebo_match_pairs`suffix'.csv, clear varn(1)
     rename treated_market category
     save ../output/placebo_matched_pairs`suffix', replace

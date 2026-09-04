@@ -7,7 +7,7 @@ out.parent.mkdir(parents=True, exist_ok=True)
 
 cols = ["pmid", "grant_id", "acronym", "agency", "country"]
 
-# quoting=3 = csv.QUOTE_NONE: treat " as a literal char (our TSV uses no quoting)
+# quoting=3 is csv.QUOTE_NONE
 df = pd.read_csv(src, sep="\t", names=cols, dtype=str,
                  quoting=3, na_filter=False, engine="c", low_memory=False)
 print(f"read {len(df):,} rows from {src}")

@@ -12,8 +12,6 @@ program main
     missing_cost_raw
 end
 
-* Separates PI-years that are truly grantless from PI-years that have active
-* grants but sum to $0 because total_cost is missing on every record.
 program zeros_vs_grants
     foreach s in foia all {
         use ../output/nih_by_age_piyrs_`s', clear

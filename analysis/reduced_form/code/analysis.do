@@ -8,23 +8,13 @@ version 17
 
 * EXPOSURE_VERSION : hc | all | treated_hc
 * EXPOSURE_FILTER  : "" | _cf | _cf2 | _cf5
-* EXPOSURE_FILE    : "" = final_imputed_shift_share_${EXPOSURE_VERSION}${EXPOSURE_FILTER}
-*                    else a literal filename under external/exposure/ (e.g. "ok")
+* EXPOSURE_FILE    : "" = final_imputed_shift_share_${EXPOSURE_VERSION}${EXPOSURE_FILTER}, else a filename under external/exposure/
 * FE_MODE          : author | athr_clyr | inst_cluster | inst_cluster_fldyr
-*                    (athr_clyr and inst_cluster modes absorb cluster_30: PIs
-*                    unmatched to the cluster file have cluster_30 missing and
-*                    are silently dropped by reghdfe/ppmlhdfe under those modes.)
-* QUICK_TOPJRNL    : 1 = top_jrnls sample, ppr_cnt only, single pass (pub=0, unweighted)
+* QUICK_TOPJRNL    : 1 = top_jrnls sample, ppr_cnt only, single pass
 * HISIM_PCT        : 0 = off; N = keep top N% of imputed PIs by max_sim
-*                    (all_jrnls, r1_r2, public=0 only; outputs under all_jrnls_hisimN)
-* FIG_MODES        : pres = event studies with stats legend (slides);
-*                    paper = legend-free copies under figures/<samp>/paper/
-* NO_SOLO          : 1 = read the athr_panel_full_year[_last]_no_solo_* panels
-*                    (paper-level solo drop in make_athr_yr_panel, nosolo(1)),
-*                    so every outcome and age measure is solo-free. Writes to
-*                    the same filenames as the baseline: flip back and rerun
-*                    to restore.
-global EXPOSURE_VERSION "hc"
+* FIG_MODES        : pres | paper
+* NO_SOLO          : 1 = read the no_solo panels
+global EXPOSURE_VERSION "hc_all3"
 global EXPOSURE_FILTER  "_cf_k3"
 global FE_MODE "author"
 global WEIGHT_MSIM 0
@@ -121,7 +111,6 @@ program gather_external_data
         import delimited "../external/exposure/final_imputed_shift_share_${EXPOSURE_VERSION}${EXPOSURE_FILTER}.csv", clear
     }
     else {
-        // extensionless files: copy first, import delimited assumes .csv
         copy ../external/exposure/$EXPOSURE_FILE ../temp/exposure_override.csv, replace
         import delimited ../temp/exposure_override.csv, clear
     }
@@ -129,10 +118,6 @@ program gather_external_data
     rename sum_imputed_shares imputed_mkt_spend_shr
     save ../temp/exposure, replace
 
-    * Author-year NIH measures straight from the grant-level build. The
-    * *_with_nih panels merge these onto the last-author publication panel with
-    * keep(1 3), so a funded PI-year with no last-author paper is dropped there
-    * and would be zero-filled downstream (see derived/nih/match_pi_athr).
     cap use athr_id year n_grants n_new_grants nih_total_cost ///
             using ../external/nih_grants/nih_athr_year, clear
     if _rc {
@@ -143,7 +128,6 @@ program gather_external_data
         duplicates drop athr_id year, force
         save ../temp/nih_athr_yr, replace
 
-        * nih_pi_name is left blank without a RePORTER match: that is the flag.
         use athr_id nih_pi_name using ../external/nih_grants/nih_names_by_athr, clear
         gen byte nih_matched = !mi(nih_pi_name)
         drop nih_pi_name
@@ -160,10 +144,6 @@ program gather_external_data
     use athr_id max_sim using ../external/exposure/match_diagnostics, clear
     save ../temp/match_diag, replace
 
-    * Observed FOIA exposure, roster fixed by athr_exposure_${EXPOSURE_VERSION}.
-    * Under an _eb EXPOSURE_FILTER the matching foia_self_exposure csv (the same
-    * shrunk share rows the imputation used) replaces the raw values; PIs outside
-    * the similarity corpus have no shrunk row and keep raw values.
     use athr_id exposure mkt_spend_shr using ../external/real_exposure/athr_exposure_${EXPOSURE_VERSION}, clear
     cap confirm file ../external/exposure/foia_self_exposure_${EXPOSURE_VERSION}${EXPOSURE_FILTER}.csv
     if _rc == 0 {
@@ -195,14 +175,13 @@ program restrict_samp
     if (`r1_only' == 1 & `public' == 1) local suf "_r1_public"
     if (`no_clin' == 1) local suf "_no_clin`suf'"
 
-    // No "_r1" panel — R1-only reads the R1+R2 file then filters type=="r1"
+    // no "_r1" panel: R1-only reads the R1+R2 file then filters type=="r1"
     local input_suf ""
     if (`r1r2' == 1 & `public' == 0) local input_suf "_r1_r2"
     if (`r1r2' == 1 & `public' == 1) local input_suf "_r1_r2_public"
     if (`r1_only' == 1 & `public' == 0) local input_suf "_r1_r2"
     if (`r1_only' == 1 & `public' == 1) local input_suf "_r1_r2_public"
     if (`no_clin' == 1) local input_suf "_no_clin`input_suf'"
-    // build.do puts the no_solo tag before samp: athr_panel_full_year[_last]_no_solo_<samp>
     local ns ""
     if ($NO_SOLO == 1) local ns "_no_solo"
 
@@ -222,7 +201,6 @@ program restrict_samp
         rename (ppr_cnt cite_affl_wt affl_wt) (ppr_cnt_any cite_affl_wt_any affl_wt_any)
         save ../temp/athr_any_`samp'`ns'`input_suf', replace
 
-        // Use all-position min_year for age_2014 — last-only would count a PI as spuriously young
         bys athr_id: egen min_year_any = min(year)
         keep athr_id min_year_any
         duplicates drop
@@ -236,10 +214,6 @@ program restrict_samp
     }
     bys athr_id: egen max_year = max(year)
     bys athr_id: egen min_year = min(year)
-    * min_year counts solo-author papers as last-authored. n_solo_ppr is unusable
-    * here -- num_athrs is 1 by construction in the last-author panel, so it
-    * equals ppr_cnt on every row. avg_team_size (mean coauthors per paper) is
-    * genuine: >0 means the year had a last-author paper with a coauthor.
     cap confirm variable avg_team_size
     if !_rc {
         gen _nonsolo_yr = year if avg_team_size > 0.001 & !mi(avg_team_size)
@@ -258,11 +232,7 @@ program restrict_samp
     keep if min_year <= 2013
     keep if max_year >= 2015
     keep if inrange(year, 2010, 2019)
-    * keep(1 3), not keep(3): 13 FOIA PIs have observed exposure but no imputed
-    * row (they are not in the cleaned US life-science corpus, so they never
-    * enter universe_ids). keep(3) dropped them here, before the
-    * "replace imputed = exposure" below would have used their observed value
-    * anyway. They skew high -- mean 0.0403 vs 0.0260 for the 195 survivors.
+    * keep(1 3) so FOIA PIs without an imputed row survive
     merge m:1 athr_id using ../temp/exposure, keep(1 3) nogen
     merge m:1 athr_id using ../temp/observed_exposure, keep(1 3) nogen
     keep if !mi(imputed) | !mi(exposure)
@@ -270,15 +240,10 @@ program restrict_samp
     merge m:1 athr_id using ../temp/athr_min_year_any_`samp'`ns'`input_suf', keep(1 3) nogen
     replace min_year_any = min_year if mi(min_year_any)
     gen foia_athr = 1 if !mi(exposure)
-    // Real FOIA PIs anchor themselves (max_sim=1); unmatched (rare) get 0 so they drop from pw regs
     merge m:1 athr_id using ../temp/match_diag, keep(1 3) nogen
     replace max_sim = 1 if foia_athr == 1
     replace max_sim = 0 if mi(max_sim)
     bys athr_id : gen athr_indicator = _n == 1
-    * Observed curve comes from ../temp/foia_observed_exposure (all 213 PIs,
-    * pre-gate) so it is invariant across samp/suf; under an _eb
-    * EXPOSURE_FILTER it shows the shrunk observed values. The imputed
-    * curve is sample-specific by design -- that is the object being compared.
     preserve
         keep if athr_indicator == 1
         keep athr_id imputed imputed_mkt_spend_shr
@@ -327,7 +292,6 @@ program restrict_samp
     tsfill, full
     drop athr_id exposure inst_id inst msa_comb msa_c_world min_year min_year_nonsolo min_year_any max_year type public mkt_spend_shr cluster_30 max_sim foia_athr
     merge m:1 athr using ../temp/athr_xw, assert(3) keep(3) nogen
-    // Drop position vars from master before athr_any merge — Stata silently keeps master, and the last-only versions are degenerate
     foreach v in n_first_ppr n_middle_ppr n_last_ppr n_solo_ppr ///
                  avg_position avg_position_rat ///
                  avg_team_size_last avg_team_size_notlast {
@@ -341,10 +305,6 @@ program restrict_samp
         cap confirm variable `var'
         if !_rc replace `var' = 0 if mi(`var')
     }
-    * Last-author papers with at least one coauthor. n_last_ppr/n_solo_ppr come
-    * from the all-position panel, where num_athrs is genuine (the last-author
-    * panel's copies are degenerate); n_last_ppr there is the same count as
-    * ppr_cnt here, so the two must agree row by row.
     cap confirm variable n_solo_ppr
     if !_rc {
         qui count if ppr_cnt != n_last_ppr
@@ -361,7 +321,6 @@ program restrict_samp
     gen pre_ppr_cnt = ppr_cnt if year < 2014
     bys athr_id: egen pre_ppr_cnt_sum = sum(pre_ppr_cnt)
     bys athr_id: egen pre_ppr_cnt_avg = mean(pre_ppr_cnt)
-    // Both p5 cuts from the pre-trim distribution so the drops don't compound
     qui sum pre_ppr_cnt_avg if athr_indicator == 1, d
     local p5_avg = r(p5)
     qui sum pre_ppr_cnt_sum if athr_indicator == 1, d
@@ -371,22 +330,13 @@ program restrict_samp
     gen age_2014 = 2014 - min_year_any + 30
     drop if mi(exposure)
     drop if mi(mkt_spend_shr) | mkt_spend_shr <= 0
-    // avg_num_coathrs is computed over last-author papers only: missing when
-    // the PI has no last-author paper that year, matching avg_team_size_last.
     merge 1:1 athr_id year using ../external/coathrs/avg_coathrs, keep(1 3) nogen
-    * NIH outcomes are estimated only on PIs who match RePORTER AND hold at
-    * least one research award 2010-19. A PI who never matches, or whose measure
-    * is zero in every year, carries no NIH information: set the measures
-    * missing so those PIs drop from the NIH regressions only. Within a retained
-    * PI, zero years are real and are kept.
     cap confirm file ../temp/nih_athr_yr.dta
     if _rc di as error "restrict_samp `samp'`suf': ../temp/nih_athr_yr missing -- NIH outcomes unavailable this run."
     else {
         merge 1:1 athr_id year using ../temp/nih_athr_yr, keep(1 3) nogen
         merge m:1 athr_id using ../temp/nih_athr_level, keep(1 3) nogen
         replace nih_matched = 0 if mi(nih_matched)
-        * The source file has no publication filter, so a non-merging year for
-        * a matched PI really is a year with no award record.
         foreach v in n_grants n_new_grants nih_total_cost has_nih {
             replace `v' = 0 if mi(`v') & nih_matched == 1
         }
@@ -400,7 +350,6 @@ program restrict_samp
         di as text "restrict_samp `samp'`suf': " r(unique) " PIs in the NIH award-amount sample"
     }
 
-    * PI-level flag for the RePORTER-matched, grant-holding sample
     cap confirm variable n_grants
     if _rc {
         gen byte nih_athr = 0
@@ -417,7 +366,6 @@ program restrict_samp
     }
     foreach v in cite_affl_wt affl_wt cite_affl_wt_any affl_wt_any ///
                  cite_affl_wt_notlast affl_wt_notlast {
-        // p99 cut from pre-period only so the truncation point is unaffected by treatment
         qui sum `v' if year < 2014, d
         local p99_`v' = r(p99)
         replace `v' = `p99_`v'' if `v' > `p99_`v'' & !mi(`v')
@@ -430,7 +378,6 @@ program restrict_samp
     cap mkdir ../output/prepped_samples
     compress
     if `hisim' > 0 {
-        * cutoff from imputed (non-FOIA) PIs; FOIA anchors sit at max_sim=1 and always survive
         bys athr_id: gen byte _hs_one = _n == 1
         qui _pctile max_sim if _hs_one == 1 & foia_athr != 1, p(`=100 - `hisim'')
         local hs_cut = r(r1)
@@ -575,9 +522,6 @@ program event_study
         if inlist("`yvar'", "n_grants", "n_new_grants", "nih_total_cost") ///
             local ppml_ytit "{&Delta} Log Expected `poisson_name'"
 
-        // PPML is the reported estimator everywhere; OLS runs only for the
-        // ppr_cnt OLS-vs-Poisson comparison and for outcomes PPML can't take
-        // (logs and conditional-mean outcomes).
         local ppml_ok = !regexm("`yvar'", "^ln_") & (!regexm("`yvar'", "^avg_") | "`yvar'" == "avg_num_coathrs")
         local ols_ok  = inlist("`yvar'", "ppr_cnt", "ln_ppr_cnt") | !`ppml_ok'
 
@@ -717,7 +661,6 @@ program event_study
             }
         }
 
-        // FOIA PIs only (observed, non-imputed exposure), PPML with share controls
         if "`yvar'" == "ppr_cnt" {
             preserve
             keep if foia_athr == 1
@@ -742,7 +685,6 @@ program event_study
                     mat row = 0,0
                 }
                 else {
-                    // small FOIA-only sample: a collinear term can drop out of e(b)
                     cap mat row = _b[`var'], _se[`var']
                     if _rc mat row = ., .
                 }
@@ -789,7 +731,6 @@ program event_study
             }
         }
 
-        // NIH-matched PIs only (RePORTER match with >=1 research award), PPML with share controls
         if inlist("`yvar'", "ppr_cnt", "cite_affl_wt") {
             preserve
             keep if nih_athr == 1
@@ -880,7 +821,7 @@ program pooled_did
     local wt ""
     local wsuf ""
     if "$WEIGHT_MSIM" == "1" {
-        // ppmlhdfe rejects aw, binscatter rejects pw — mixing is fine, β identical
+        // ppmlhdfe rejects aw, binscatter rejects pw
         local wt "[pw=max_sim]"
         local wt_bin "[aw=max_sim]"
         local wsuf "_msimwt"
@@ -916,10 +857,7 @@ program pooled_did
     cap mkdir ../output/tables/`samp'
 
     cap mat drop results
-    * [F1] label bookkeeping: rows and labels now appended together
     local kept_outcomes
-    // OLS is reported only for the ppr_cnt OLS-vs-Poisson comparison; every
-    // other outcome ppml_specs covers is Poisson-only.
     local ppml_covered cite_affl_wt cite_affl_wt_any ppr_cnt_any ///
                        cite_affl_wt_notlast ppr_cnt_notlast ///
                        avg_num_coathrs n_grants nih_total_cost n_middle_ppr
@@ -939,7 +877,6 @@ program pooled_did
         local s_N = .
         local s_r2 = .
 
-        // Base (no share) only for ppr_cnt — the with/without-share comparison
         if "`yvar'" == "ppr_cnt" {
             cap noi qui reghdfe `yvar' Z_it `wt', absorb(`fes') vce(cluster `vce_cl')
             local rc = _rc
@@ -1019,7 +956,6 @@ program pooled_did
         if "`yvar'" == "avg_team_size_last"      local var_name "Team Size (last-author papers)"
         if "`yvar'" == "avg_team_size_notlast"   local var_name "Team Size (non-last papers)"
 
-        // pdid FWL binscatter figures commented out; uncomment to reproduce.
         /*
         preserve
             cap noi qui reghdfe `yvar' Z_share_it `wt', absorb(`fes') residuals(_y_r)
@@ -1058,7 +994,6 @@ program pooled_did
 end
 
 program ppml_specs
-    // ppmlhdfe analog of pooled_did; may drop separated obs or fail to converge (hence cap noi)
     syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0) no_clin(int 0)]
     local fes athr_id year
     local vce_cl athr_id
@@ -1076,7 +1011,7 @@ program ppml_specs
     local wt ""
     local wsuf ""
     if "$WEIGHT_MSIM" == "1" {
-        // ppmlhdfe rejects aw, binscatter rejects pw — mixing is fine, β identical
+        // ppmlhdfe rejects aw, binscatter rejects pw
         local wt "[pw=max_sim]"
         local wt_bin "[aw=max_sim]"
         local wsuf "_msimwt"
@@ -1093,9 +1028,6 @@ program ppml_specs
     gen Z_it       = exposure      * post
     gen Z_share_it = mkt_spend_shr * post
 
-    // Mean-based POSITION metrics (avg_position, avg_team_size_*) excluded.
-    // avg_num_coathrs is deliberately kept: PPML is a valid pseudo-likelihood
-    // for any nonnegative outcome, and this mirrors the headline coauthor spec.
     local position_outcomes ""
     if "$POSITION_OUTCOMES_AVAIL" == "1" {
         local position_outcomes n_middle_ppr
@@ -1123,9 +1055,6 @@ program ppml_specs
         local s_N = .
         local s_r2 = .
         local s_pmn = .
-        // Base (no share) only for ppr_cnt — feeds the rf_main "no share" column.
-        // d() + predict mu here so the FWL binscatters below reuse the fit
-        // instead of re-estimating.
         if "`yvar'" == "ppr_cnt" {
             cap noi ppmlhdfe `yvar' Z_it            `wt', absorb(`fes') vce(cluster `vce_cl') d(_dvarb)
             local rc = _rc
@@ -1204,7 +1133,6 @@ program ppml_specs
         if "`yvar'" == "n_grants"             local poisson_name "Active NIH Research Grants"
         if "`yvar'" == "nih_total_cost"       local poisson_name "NIH Award Dollars"
 
-        // Base FWL binscatter only for ppr_cnt (mirrors the base ppmlhdfe gate above)
         if "`yvar'" == "ppr_cnt" {
         preserve
             cap confirm variable _mu_b
@@ -1261,8 +1189,6 @@ program ppml_specs
             }
         restore
 
-        // NIH-matched PIs only (RePORTER match with >=1 research award).
-        // n_grants / nih_total_cost already estimate on this sample by construction.
         if !inlist("`yvar'", "n_grants", "nih_total_cost") {
         preserve
             keep if nih_athr == 1
@@ -1293,7 +1219,6 @@ program ppml_specs
             foreach v in _mu_ns _dvarns {
                 cap drop `v'
             }
-            // d() so the NIH-only FWL binscatter below can predict mu
             cap noi ppmlhdfe `yvar' Z_it Z_share_it `wt', absorb(`fes') vce(cluster `vce_cl') d(_dvarns)
             if _rc == 0 {
                 local ns_bx  = _b[Z_it]
@@ -1357,7 +1282,6 @@ program ppml_specs
         restore
         }
 
-        // FOIA PIs only (observed, non-imputed exposure); ppr_cnt only, matching the es_ foia gate
         if "`yvar'" == "ppr_cnt" {
         preserve
             keep if foia_athr == 1
@@ -1452,7 +1376,6 @@ program ppml_specs
 end
 
 program placebo_treatment
-    // Fake-treatment placebo on year<=2013 subsample: β on Z_placebo should be ~0 if parallel trends hold
     syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0) no_clin(int 0)]
     local fes athr_id year
     local vce_cl athr_id
@@ -1482,7 +1405,7 @@ program placebo_treatment
 
     foreach placebo_yr in 2011 2012 {
         use ../output/prepped_samples/es_`samp'`suf', clear
-        keep if year <= 2013     // strictly pre-treatment window
+        keep if year <= 2013
 
         gen placebo_post   = year >= `placebo_yr'
         gen Z_placebo      = exposure      * placebo_post
@@ -1531,7 +1454,6 @@ program placebo_treatment
         }
     }
 
-    // Full-panel placebo ES: fake treatment year as omitted reference; real effect should still start at 2014 (dashed line)
     foreach placebo_yr in 2011 2012 {
         foreach yvar in ppr_cnt {
             local poisson_name "Publications"
@@ -1568,7 +1490,6 @@ program placebo_treatment
                 local pl_mshr_lags `pl_mshr_lags' pl_mshr_lag`i'
             }
 
-            // pl_int_lead1 / pl_mshr_lead1 are the omitted reference — excluded so rel=-1 stays the reference year
             cap noi ppmlhdfe `yvar' `pl_int_leads' `pl_int_lags' ///
                                     `pl_mshr_leads' `pl_mshr_lags', ///
                     absorb(`fes') vce(cluster `vce_cl')
@@ -1623,8 +1544,6 @@ program placebo_treatment
 end
 
 program trim_top
-    // Composition check: drop top {1,5,10,25}% of PIs by pre_ppr_cnt_sum, re-estimate.
-    // with-share spec, so the sensitivity figures have a comparable baseline.
     syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0) no_clin(int 0)]
     local fes athr_id year
     local vce_cl athr_id
@@ -1729,8 +1648,6 @@ program trim_top
         local poisson_name "Publications"
         local ppml_ytit "Output-Cost Elasticity"
 
-        * [F3] both figures read trim`t' matrices only — baseline (trim=0) is
-        * now the same with-share spec as every trimmed point.
         preserve
         clear
         set obs 5
@@ -1792,7 +1709,6 @@ program trim_top
 end
 
 program joint_outcome_test
-    // H0: β_ppr = β_cite, tested three ways (log, y/pre-mean, ppml semi-elasticity)
     syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0) no_clin(int 0)]
     local suf ""
     if (`r1r2' == 1 & `public' == 0 & `r1_only' == 0) local suf "_r1_r2"
@@ -1951,7 +1867,6 @@ program robustness
     cap mkdir "../output/tables/`samp'"
     cap mkdir "../output/tables/`samp'/robustness"
 
-    // Stress tests on the main mshrctrl ES: +age×year controls / drop PIs without a real pub after 2018
     local outcomes ppr_cnt cite_affl_wt ppr_cnt_any cite_affl_wt_any ///
                    ppr_cnt_notlast cite_affl_wt_notlast
     if "$QUICK_TOPJRNL" == "1" local outcomes ppr_cnt
@@ -2001,9 +1916,6 @@ program robustness
                 replace `var' = 0 if mi(`var')
             }
             if "`spec'" == "noattrit" {
-                * max_year is the last last-author pub year over the full raw
-                * panel (through 2025), the same object restrict_samp gates on
-                * -- not the last in-window pub year
                 keep if max_year >= 2019
             }
             qui sum rel
@@ -2024,7 +1936,6 @@ program robustness
             local addctrl
             if "`spec'" == "ageCtrl" local addctrl c.age_2014#i.year
 
-            // Poisson is the reported estimator; OLS runs only for ppr_cnt
             local ests ppmlhdfe
             if "`yvar'" == "ppr_cnt" local ests reghdfe ppmlhdfe
 
@@ -2096,7 +2007,6 @@ program robustness
 end
 
 program output_tables
-    // Dumps pdid / ppml_pdid / placebo / trim matrices to txt via matrix_to_txt
     syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0) no_clin(int 0)]
     local wsuf ""
     if "$WEIGHT_MSIM" == "1" local wsuf "_msimwt"
@@ -2118,7 +2028,6 @@ program output_tables
                    avg_num_coathrs n_grants nih_total_cost ///
                    `position_outcomes'
     if "$QUICK_TOPJRNL" == "1" local outcomes ppr_cnt ln_ppr_cnt
-    // main() clears matrices between wmodes, so cap confirm silently skips missing ones
     foreach prog in pdid ppml_pdid nih_ppml foia_ppml placebo2011 placebo2012 trim0 trim1 trim5 trim10 trim25 {
         foreach yvar of local outcomes {
             cap confirm matrix `prog'_`yvar'
@@ -2133,7 +2042,6 @@ program output_tables
 end
 
 program write_rf_main_tex
-    // Fills rf_main.tex from ppml_pdid_ppr_cnt (needs base + mshrctrl cols populated by ppml_specs)
     syntax, samp(string) [suf(string) wsuf(string)]
     cap confirm matrix ppml_pdid_ppr_cnt
     if _rc {
@@ -2157,7 +2065,6 @@ program write_rf_main_tex
         exit 0
     }
 
-    // Star helpers via absolute t-stat (normal approx)
     local t_ms   = abs(`b_ms'   / `se_ms')
     local t_base = abs(`b_base' / `se_base')
     local t_sh   = abs(`b_sh'   / `se_sh')
@@ -2173,7 +2080,6 @@ program write_rf_main_tex
     local se_sh_s  : dis %6.3f `se_sh'
     local pmn_s    : dis %6.2f `pmn'
     local pmn_b_s  : dis %6.2f `pmn_b'
-    * [F9] per-column N (base and with-share samples can differ)
     local n_ms_s   : dis %12.0fc `n_ms'
     local n_base_s : dis %12.0fc `n_base'
 
@@ -2204,5 +2110,4 @@ program write_rf_main_tex
     di as text "wrote `out'"
 end
 
-**
 main

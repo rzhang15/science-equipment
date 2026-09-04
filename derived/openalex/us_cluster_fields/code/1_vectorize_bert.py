@@ -1,17 +1,3 @@
-"""
-Generate dense BERT/SciBERT-style embeddings for each US author's lifetime text.
-
-NOTE on text quality: the input parquet contains Porter-stemmed text
-(`processed_text`). Transformer tokenizers expect real words, so embedding
-quality will be degraded relative to running on un-stemmed text. To get the
-best results, regenerate cleaned_static_author_text_pre_us.parquet from
-0_combine_data.py without the stemming step and point this script at the
-un-stemmed column.
-
-Streams the parquet in row batches so memory stays bounded even with 2.66M
-authors. Long author corpora are split into ~CHUNK_WORDS-word chunks; chunk
-embeddings are mean-pooled per author.
-"""
 import argparse
 import os
 import time
@@ -20,18 +6,18 @@ import polars as pl
 import torch
 from sentence_transformers import SentenceTransformer
 
-MODEL_NAME = "allenai-specter"  # sci-tuned sentence model. Alternatives:
-# "pritamdeka/S-Scibert-snli-multinli-stsb"  # SciBERT fine-tuned for similarity
-# "allenai/scibert_scivocab_uncased"         # raw SciBERT (worse for similarity)
+MODEL_NAME = "allenai-specter"
+# "pritamdeka/S-Scibert-snli-multinli-stsb"
+# "allenai/scibert_scivocab_uncased"
 
 INPUT_PARQUET = "../output/cleaned_static_author_text_pre_us.parquet"
 OUT_EMB = "../output/scibert_embeddings.npy"
 OUT_IDS = "../output/author_ids_aligned.parquet"
 
-ROW_BATCH = 4096          # authors per parquet read batch
-ENCODE_BATCH = 256        # chunks per GPU forward pass
-CHUNK_WORDS = 200         # ~ fits in 512 BERT tokens after subword expansion
-MAX_CHUNKS_PER_AUTHOR = 20  # cap per-author work; 20 * 200 = 4000 words covered
+ROW_BATCH = 4096
+ENCODE_BATCH = 256
+CHUNK_WORDS = 200
+MAX_CHUNKS_PER_AUTHOR = 20
 
 
 def chunk_text(text: str, chunk_words: int, max_chunks: int) -> list[str]:
@@ -59,7 +45,7 @@ def main():
     print(f"Loading model: {MODEL_NAME}")
     model = SentenceTransformer(MODEL_NAME, device=device)
     if device == "cuda":
-        model = model.half()  # fp16 for ~2x throughput on A100/H100/H200
+        model = model.half()
     dim = model.get_sentence_embedding_dimension()
     print(f"Embedding dim: {dim}")
 
@@ -85,9 +71,8 @@ def main():
         ids = batch_df["athr_id"].to_list()
         texts = batch_df["processed_text"].fill_null("").to_list()
 
-        # Build flat chunk list with author boundaries.
         flat_chunks: list[str] = []
-        boundaries: list[tuple[int, int]] = []  # (start, end) per author in flat_chunks
+        boundaries: list[tuple[int, int]] = []
         for t in texts:
             chunks = chunk_text(t, CHUNK_WORDS, MAX_CHUNKS_PER_AUTHOR)
             start = len(flat_chunks)

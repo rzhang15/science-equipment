@@ -1,13 +1,4 @@
 #!/usr/bin/env python
-"""
-standardize_foia_data.py ― standardizes raw FOIA purchase-order workbooks
-==========================================================================
-* Reads raw Excel workbooks from multiple directories.
-* Maps university-specific column names to a standard format.
-* Converts price, qty, and spend to numeric types.
-* Parses dates into a standard YYYY-MM-DD format.
-* Creates standardized CSV files as output.
-"""
 from __future__ import annotations
 
 import argparse
@@ -16,13 +7,11 @@ from typing import Dict, List, Mapping
 
 import pandas as pd
 
-# ────────────────────────────── Path Setup ────────────────────────────────── #
 CODE_DIR = Path(__file__).resolve().parent
 ROOT_DIR = CODE_DIR.parent
 DEFAULT_RAW_DIRS = f"{ROOT_DIR / 'external' / 'samp1'}"
 DEFAULT_OUT_DIR = ROOT_DIR / "output" / "standardized"
 
-# ───────────────── Column Maps ────────────────────────────────────────────── #
 COLUMN_SPECS: Dict[str, Mapping[str, str]] = {
     "ecu_2006_2024.xlsx": {"product_desc": "DESC", "supplier": "VENDOR_NAME", "supplier_id": "VENDOR_ID", "price": "UNIT_PRICE", "qty": "QTY", "spend": "PO_ITEM_TOTAL", "fund_id": "FED_ID", "purchase_id": "PO", "date": "PO_DATE", "funder": "AGENCY"},
     "ukansas_2010_2019.xlsx": {"product_desc": "Transaction Description", "supplier": "Supplier Name", "supplier_id": "Supplier ID", "spend": "Expense Amount", "purchaser": "PI", "fund_id": "Sponsor Award Number", "purchase_id": "Transaction ID", "date": "Transaction Date"},
@@ -37,11 +26,7 @@ COLUMN_SPECS: Dict[str, Mapping[str, str]] = {
 }
 STANDARD_COLS: List[str] = ["product_desc", "supplier", "supplier_id", "sku", "price", "qty", "spend", "unit", "purchaser", "fund_id", "purchase_id", "date", "funder"]
 
-# ───────────────── Processing Loop ────────────────────────
 def _process_workbook(path: Path, out_dir: Path) -> None:
-    """
-    Reads a raw workbook, standardizes its columns and data types, and saves it as a CSV.
-    """
     mapping = COLUMN_SPECS.get(path.name)
     if not mapping:
         print(f"  ⚠️ No column mapping found for {path.name}. Skipping.")
@@ -57,25 +42,17 @@ def _process_workbook(path: Path, out_dir: Path) -> None:
     standard_df = pd.DataFrame()
     for col in STANDARD_COLS:
         raw = mapping.get(col)
-        # Use None for missing columns to make type conversion more reliable
         standard_df[col] = df[raw] if raw and raw in df.columns else None
 
-    # --- NEW: Data Type Conversion & Date Formatting ---
     print(f"  → Standardizing data types and formats...")
     numeric_cols = ['price', 'qty', 'spend']
 
     for col in standard_df.columns:
         if col in numeric_cols:
-            # Convert to numeric, turning errors into blank/null (NaN)
             standard_df[col] = pd.to_numeric(standard_df[col], errors='coerce')
         elif col == 'date':
-            # Use pandas' powerful to_datetime to smartly detect format
-            # Coerce errors to NaT (Not a Time), then extract just the date part
-            # This strips away hours/minutes/seconds
             standard_df[col] = pd.to_datetime(standard_df[col], errors='coerce').dt.date
         else:
-            # For all other columns, ensure they are strings
-            # Fill any blank/null values with an empty string
             standard_df[col] = standard_df[col].astype(str).fillna('')
 
 
@@ -83,11 +60,7 @@ def _process_workbook(path: Path, out_dir: Path) -> None:
     standard_df.to_csv(out_path, index=False)
     print(f"  → Saved {out_path.relative_to(ROOT_DIR.parent)}")
 
-# ───────────────────────── Main Execution ──────────────────────────
 def main() -> None:
-    """
-    Main function to run the script.
-    """
     parser = argparse.ArgumentParser(description="Standardize FOIA purchase-order data from one or more directories.")
     parser.add_argument("--raw-dirs", default=str(DEFAULT_RAW_DIRS), help="Comma-separated list of directories containing raw Excel files.")
     parser.add_argument("--out-dir", default=str(DEFAULT_OUT_DIR), help="Directory to save standardized CSV files.")

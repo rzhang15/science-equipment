@@ -1,35 +1,3 @@
-"""
-TF-IDF analog of bert/test_coauthor_similarity.py.
-
-Coauthor vectors are computed in the SAME TF-IDF space as the saved FOIA
-matrix (vocab + IDF reconstructed from feature_names.pkl and
-feature_diagnostics.parquet). Cosine sim is a sparse matmul; downstream
-top-K / impute / per-pair diagnostics mirror the BERT version exactly so
-the two methods are directly comparable.
-
-Pipeline:
-  1. Load saved FOIA TF-IDF artifacts (matrix, ids, vocab, idf).
-  2. Reconstruct the TF-IDF transformer (CountVectorizer + sublinear_tf + idf
-     + L2-norm) and vectorize the stemmed coauthor texts.
-  3. Sparse cosine sim (n_co x n_foia).
-  4. Top-K, row-normalize -> per-coauthor weights over FOIA authors.
-  5. Impute coauthor exposure = W @ E_FOIA.
-  6. Per-pair: imputed-vs-true exposure, partner rank, random benchmark.
-
-Inputs (all in ../../output/):
-  tfidf_foia.npz                 FOIA tfidf matrix (n_foia, V)
-  foia_ids_ordered.csv           FOIA athr_id order
-  feature_names.pkl              vocab (V,)
-  feature_diagnostics.parquet    feature, foia_df, idf
-  coauthor_text_stemmed.csv      built by ../0c_get_coauthor_stemmed.py
-External:
-  ../../external/exposure_wts/athr_exposure.dta
-  ../../external/coauthors/coauthors.dta
-
-Outputs:
-  ../../output/coauthor_validation_pairs_tfidf.csv
-  ../../output/coauthor_validation_summary_tfidf.txt
-"""
 import argparse
 import os
 import pickle
@@ -45,7 +13,6 @@ COAUTHORS_DTA = "../../external/coauthors/coauthors.dta"
 
 
 def _paths(tag: str) -> dict:
-    """Resolve tag-suffixed input/output paths. tag='' uses baseline names."""
     if tag and not tag.startswith("_"):
         tag = "_" + tag
     return {
@@ -60,14 +27,6 @@ def _paths(tag: str) -> dict:
 
 def vectorize_in_foia_space(texts: list[str], vocab: list[str],
                             idf_values: np.ndarray) -> scipy.sparse.csr_matrix:
-    """Transform texts using the saved vocab + idf. Mirrors what
-    tfidf/1_vectorize.py applied to the FOIA rows:
-      - tokenizer = str.split, ngram_range = (1, 2)  (matches sklearn fit step;
-        bigrams in vocab need ngram_range=(1,2) or they're never matched)
-      - sublinear_tf: log(tf) + 1 on nonzero entries
-      - tfidf = counts * idf
-      - L2 normalize rows
-    """
     cv = CountVectorizer(
         vocabulary=vocab,
         tokenizer=str.split,
@@ -77,7 +36,7 @@ def vectorize_in_foia_space(texts: list[str], vocab: list[str],
     )
     counts = cv.transform(texts).tocsr().astype(np.float32)
     if counts.nnz > 0:
-        counts.data = np.log(counts.data) + 1.0   # sublinear_tf
+        counts.data = np.log(counts.data) + 1.0
     tfidf = counts @ scipy.sparse.diags(idf_values.astype(np.float32))
     norms = np.sqrt(np.asarray(tfidf.multiply(tfidf).sum(axis=1)).ravel())
     inv = 1.0 / np.maximum(norms, 1e-12)
@@ -120,9 +79,6 @@ def main():
     with open(paths["feature_names"], "rb") as f:
         feature_names = list(pickle.load(f))
     diag = pd.read_parquet(paths["feature_diag"])
-    # feature_diagnostics rows are written in the same order as feature_names
-    # (both indexed by keep_idx in tfidf/1_vectorize.py), so this assert is
-    # really just a sanity check on file pairing.
     assert list(diag["feature"]) == feature_names, "feature ordering mismatch"
     idf_values = diag["idf"].to_numpy().astype(np.float32)
     print(f"  FOIA matrix: {X_foia.shape}   vocab: {len(feature_names):,}")
@@ -151,7 +107,7 @@ def main():
     e_foia = pd.Series(df_exp.set_index("athr_id")["exposure"]).reindex(foia_ids).fillna(0).values
 
     print("Cosine sim (sparse matmul)")
-    sim = (X_co @ X_foia.T).toarray()   # (n_co, n_foia); 32k x 208 fits trivially
+    sim = (X_co @ X_foia.T).toarray()
     print(f"  sim shape: {sim.shape}   nonzero rows: {(sim.sum(axis=1) > 0).sum():,}")
 
     print(f"Top-K weights (k={args.k}) and imputing exposure")

@@ -12,9 +12,6 @@ program main
     author_side
 end
 
-* Of the PIs we fail to place, how many were blocked by the institution bridge
-* rather than by the name test? That sizes how much is left to win by widening
-* the bridge versus by loosening the name comparison.
 program pi_side
     use ../temp/pi_grant_long, clear
     keep pi_name org_ipf_code
@@ -39,8 +36,6 @@ program pi_side
     di as text _n "{hline 60}"
     di as text "match rate by whether the grantee org bridged to OpenAlex"
     tab org_bridged matched, row
-    * inst  = string-bridged institution   name  = globally unique name
-    * inst2 = institution bridge learned from the name-unique matches
     di as text _n "match route"
     tab match_src, missing
     di as text _n "route x whether the org bridged by string match"
@@ -54,8 +49,6 @@ program pi_side
     restore
 end
 
-* The reduced-form denominator: most panel authors are not NIH PIs at all, so
-* read the rate on last authors before reading it on everyone.
 program author_side
     foreach s in athr_panel_full_year_all_jrnls_r1_r2_public ///
                  athr_panel_full_year_last_all_jrnls_r1_r2_public {

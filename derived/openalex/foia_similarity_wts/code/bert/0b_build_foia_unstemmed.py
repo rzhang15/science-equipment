@@ -1,15 +1,3 @@
-"""
-Build an UN-STEMMED FOIA author corpus for BERT validation.
-
-Reads the pre-stem parquet dumped by cluster_fields/code/0_combine_data.py
-(written at the q_static_corpus collect step, before Porter stemming) and
-filters it to the 188 FOIA authors. SPECTER/SciBERT tokenize real words, so
-we need the unstemmed text.
-
-Input:  ../../../cluster_fields/output/author_text_unstemmed.parquet
-        ../../output/foia_author_text_final.csv   (FOIA athr_id list)
-Output: ../../output/foia_author_text_unstemmed.csv  (athr_id, processed_text)
-"""
 import re
 import sys
 import time

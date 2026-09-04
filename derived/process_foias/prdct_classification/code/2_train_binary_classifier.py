@@ -1,9 +1,3 @@
-# 2_train_binary_classifier.py (Updated to include UT Dallas hold-out evaluation)
-"""
-Trains the ML model, builds the HybridClassifier, saves a hold-out set,
-and then immediately evaluates the HybridClassifier's performance on both
-the full blended hold-out set and the UT Dallas-specific portion of it.
-"""
 import pandas as pd
 import joblib
 import os
@@ -29,37 +23,23 @@ def main(embedding_name: str):
 
     print("  - Loading data...")
     X = joblib.load(embedding_path)
-    # 1b previously saved supplier-combined embeddings as scipy COO matrices,
-    # which don't support row indexing.  Convert to CSR defensively so older
-    # on-disk artifacts still work.
     if hasattr(X, 'tocsr'):
         X = X.tocsr()
     df_labels = pd.read_parquet(config.PREPARED_DATA_PATH)
 
-    # Split the main DataFrame to preserve all columns for the hold-out set
     df_train, df_test = train_test_split(
         df_labels, test_size=0.2, random_state=42, stratify=df_labels['label']
     )
 
-    # Save the 20% hold-out DataFrame for potential use in later scripts.
-    # Per-model filename keeps tfidf/minilm/specter2 runs from clobbering
-    # each other (the split itself is identical — same random_state — but
-    # downstream tools shouldn't have to assume that).
     holdout_path = os.path.join(config.OUTPUT_DIR, f"holdout_data_for_validation_{embedding_name}.parquet")
     df_test.to_parquet(holdout_path, index=False)
     print(f"Hold-out data for validation saved to: {holdout_path}")
 
-    # Create the corresponding embedding and label arrays for training
     X_train = X[df_train.index]
     y_train = df_train['label']
 
-    # Compute supplier priors from the training split so the HybridClassifier
-    # can apply them as a post-hoc overlay at inference.  Only meaningful when
-    # supplier data is available.
     supplier_priors = None
     if getattr(config, 'USE_SUPPLIER_PRIOR', False) and 'supplier' in df_train.columns:
-        # Dedupe before running normalize_supplier — few hundred unique
-        # suppliers across the whole training split.
         suppliers = df_train['supplier'].fillna('')
         tok_map = {s: config.normalize_supplier(s) for s in suppliers.unique()}
         tok_train = suppliers.map(tok_map)
@@ -71,22 +51,13 @@ def main(embedding_name: str):
         print(f"  - Supplier priors: {len(supplier_priors)} suppliers computed "
               f"(training-split lab rates)")
 
-    # 1. Train the ML model component
     print("  - Training the LogisticRegression component...")
     from sklearn.linear_model import LogisticRegression
-    # C=10 from sweep_params.py grid search (strong signal across the
-    # leaderboard).  class_weight kept as 'balanced' because the UMich
-    # hold-out slice is ~5:1 lab-heavy — without class re-weighting the
-    # LR drifts toward predicting "lab" and non-lab recall craters.  The
-    # sweep didn't see this because it pools UTD+UMich together; the
-    # imbalance only bites on the UMich slice alone.
     clf = LogisticRegression(
         C=10.0, class_weight='balanced', max_iter=1000,
         solver='liblinear', random_state=42, n_jobs=None,
     )
 
-    # Per-source sample weights (composes multiplicatively with
-    # class_weight='balanced').  Tune config.SOURCE_WEIGHTS to experiment.
     sample_weight = None
     if (getattr(config, 'SOURCE_WEIGHTS', None)
             and 'data_source' in df_train.columns
@@ -95,7 +66,6 @@ def main(embedding_name: str):
         sample_weight = config.get_sample_weights(
             df_train['data_source'].values, y_train.values
         )
-        # Diagnostic: show raw vs. weighted mass per (source, label).
         import numpy as np
         ds = df_train['data_source'].astype(str).values
         lab = y_train.astype(int).values
@@ -114,15 +84,11 @@ def main(embedding_name: str):
     clf.fit(X_train, y_train, sample_weight=sample_weight)
     print("  - ML component training complete.")
 
-    # 2. Build the complete HybridClassifier
     print("\n  - Building the full HybridClassifier...")
     if embedding_name == 'tfidf':
         vectorizer_path = os.path.join(config.OUTPUT_DIR, "vectorizer_tfidf.joblib")
         vectorizer = joblib.load(vectorizer_path)
     elif embedding_name in config.BERT_MODELS:
-        # Re-instantiate the encoder from HuggingFace cache rather than
-        # loading a pickled SentenceTransformer.  The HybridClassifier holds
-        # a reference to this encoder for inference-time gatekeeping.
         from sentence_transformers import SentenceTransformer
         import torch
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -133,7 +99,6 @@ def main(embedding_name: str):
             f"Expected 'tfidf' or one of: {list(config.BERT_MODELS)}"
         )
 
-    # Load supplier vectorizer if available
     supplier_vectorizer = None
     if config.USE_SUPPLIER:
         supp_vec_path = os.path.join(config.OUTPUT_DIR, "vectorizer_supplier_tfidf.joblib")
@@ -146,8 +111,6 @@ def main(embedding_name: str):
     market_rule_automaton = extract_market_keywords_and_build_automaton(config.MARKET_RULES_YAML)
     enzyme_regex = build_enzyme_regex(config.MARKET_RULES_YAML, min_keyword_len=4)
 
-    # Load second-stage bulk-chemical filter if available.  Trained separately
-    # by 2b_train_chemical_filter.py — absence is non-fatal.
     bulk_filter = None
     bulk_filter_vectorizer = None
     if getattr(config, 'USE_BULK_FILTER', False):
@@ -177,10 +140,6 @@ def main(embedding_name: str):
     joblib.dump(hybrid_model, model_path)
     print(f"HybridClassifier saved to: {model_path}")
 
-    # --- 3. Evaluate the HYBRID MODEL on hold-out slices ---
-    # Predict once on the full hold-out set, then slice by data_source for
-    # each report.  The three evaluate_holdout calls previously ran predict
-    # on overlapping subsets (UT Dallas, UMich, and their union).
     print("\n--- Predicting on full hold-out set ---")
     df_test = df_test.copy()
     holdout_descs = df_test[config.CLEAN_DESC_COL].fillna('')
@@ -192,7 +151,6 @@ def main(embedding_name: str):
     )
 
     def evaluate_holdout(df_slice, label, fp_suffix="", fn_suffix=""):
-        """Report metrics + write FP/FN CSVs for a pre-predicted slice."""
         if df_slice.empty:
             print(f"  - No {label} items found in the hold-out set.")
             return
@@ -221,17 +179,11 @@ def main(embedding_name: str):
         df_fn.to_csv(fn_path, index=False)
         print(f"  - Saved {len(df_fn)} False Negatives to: {fn_path}")
 
-    # Always evaluate on UT Dallas hold-out
     evaluate_holdout(
         df_test[df_test['data_source'] == 'ut_dallas'],
         label="UT Dallas", fp_suffix="_utdallas", fn_suffix="_utdallas",
     )
 
-    # UMich evaluation — source depends on variant:
-    #   - umich_supplier: UMich is in training, so only the 20% hold-out slice
-    #     is fair game (plus a combined UT Dallas + UMich hold-out report)
-    #   - baseline:       UMich is not in training, so the entire UMich corpus
-    #                     is out-of-sample and evaluated end-to-end
     if config.USE_UMICH:
         evaluate_holdout(
             df_test[df_test['data_source'] == 'umich'],

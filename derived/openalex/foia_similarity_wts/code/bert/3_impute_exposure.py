@@ -1,10 +1,3 @@
-"""
-Impute exposure for every universe author via BERT similarity weights.
-
-Mirror of tfidf/3_impute_exposure.py: loads the sparse weight matrix produced
-by 2_similarity_wts.py, aligns the FOIA exposure vector to the column order
-that 1_vectorize.py wrote, and saves (universe_athr_id, exposure).
-"""
 import argparse
 import os
 import numpy as np

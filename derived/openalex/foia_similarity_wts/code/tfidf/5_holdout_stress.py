@@ -1,30 +1,3 @@
-"""
-K-fold holdout-FOIA stress test.
-
-Simulates "what if my anchor set were smaller than 207?" by repeatedly:
-  - dropping a random `--holdout-frac` of FOIAs (test)
-  - predicting the held-out FOIAs' exposure from the remaining (train) FOIAs
-    using the SAME recipe as production (top-K, sharpen, floor, L1-norm)
-  - recording (athr_id, fold, max_sim_to_train, true, pred)
-
-This is a stronger generalization test than the LOO sweep because each test
-FOIA only has ~165 anchors (not 206) to match against, mimicking the universe
-author's situation when their nearest FOIAs are sparse. Reporting metrics
-stratified by max_sim_to_train tells you the prediction error curve as a
-function of "how close is my nearest anchor".
-
-Note: this re-uses the production-fitted FOIA matrix (so vocab + FOIA-aware
-pruning are held fixed). Refitting step 1 per fold is possible but would
-change essentially nothing — the universe contribution to vocab fit
-dominates 207 FOIA docs; the only fold-dependent piece is FOIA-aware
-pruning, which drops features below foia_min_df=2 after holding 20% out.
-A separate full-pipeline-refit script can be added if a referee asks.
-
-Output:
-  ../../output/holdout_stress_pairs{tag}.csv     per (fold, FOIA) row
-  ../../output/holdout_stress_summary{tag}.csv   per max_sim_to_train bin
-  ../../output/holdout_stress_overall{tag}.txt   one-line headline numbers
-"""
 import argparse
 import os
 import numpy as np
@@ -50,9 +23,6 @@ def _paths(tag: str, out_suffix: str = "") -> dict:
 
 
 def predict_holdout(sim_test_train, E_train, k, sharpen, floor):
-    """Top-K weighted-average prediction. sim is (n_test, n_train), already
-    L2-cosine. Mirrors 2_similarity_wts.process_batch exactly so this test
-    speaks to the production recipe."""
     n_test, n_train = sim_test_train.shape
     k = min(k, n_train)
     topk_idx = np.argpartition(-sim_test_train, k - 1, axis=1)[:, :k]
@@ -142,7 +112,6 @@ def main():
         X_test = X[test_idx]
         X_train = X[train_idx]
 
-        # cosine sim (rows already L2-normalized by 1_vectorize)
         sim = (X_test @ X_train.T).toarray().astype(np.float32)
         pred, max_sim = predict_holdout(sim, E[train_idx], args.k, args.sharpen, args.floor)
 
@@ -164,10 +133,6 @@ def main():
     df.to_csv(paths["out_pairs"], index=False)
     print(f"Saved per-(fold,FOIA) rows: {paths['out_pairs']}")
 
-    # ----- aggregate by max_sim_to_train bin -----
-    # Use quintiles of max_sim_to_train. The lowest quintile = FOIAs whose
-    # nearest train anchor is far away — these are the analog of universe
-    # authors with weak imputations.
     q = np.quantile(df["max_sim_to_train"].values, [0.2, 0.4, 0.6, 0.8])
     df["sim_bin"] = np.digitize(df["max_sim_to_train"].values, q)
     bin_names = {0: "Q1 (most isolated)", 1: "Q2", 2: "Q3", 3: "Q4",
@@ -199,7 +164,6 @@ def main():
             "corr", "slope", "r2"]
     print(df_summary[cols].to_string(index=False))
 
-    # ----- one-line headline -----
     n_unique_foia = df["athr_id"].nunique()
     n_obs = len(df)
     line = (

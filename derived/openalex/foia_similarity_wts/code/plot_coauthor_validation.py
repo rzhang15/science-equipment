@@ -1,20 +1,3 @@
-"""
-Plot the FOIA-author vs imputed-coauthor exposure relationship for the K-NN
-imputation, using the pair-level CSV written by
-tfidf/validate_coauthors.py:
-
-  ../output/coauthor_validation_pairs{tag}{k_sfx}_{version}.csv
-     columns: athr_id, coauthor_id, e_foia_true, pred_knn,
-              sim_to_partner, partner_rank, copubs
-
-Layout: a grid of binned scatters at increasing copubs thresholds, then two
-trend panels (corr vs threshold, twin-test metrics vs threshold), then a
-copubs histogram.
-
-Run:
-  python plot_coauthor_validation.py --version hc --k 3
-  python plot_coauthor_validation.py --version treated_hc --tag restricted --k 3
-"""
 import argparse
 import os
 import numpy as np
@@ -28,7 +11,6 @@ KNN_COLOR = "C0"
 
 
 def binned_scatter(ax, x, y, color, label, n_bins=20):
-    """Equal-count bins on x; plot mean y per bin with 95% CI bars."""
     if len(x) < n_bins * 5:
         n_bins = max(5, len(x) // 5)
     qs = np.linspace(0, 1, n_bins + 1)
@@ -47,7 +29,6 @@ def binned_scatter(ax, x, y, color, label, n_bins=20):
 
 
 def panel_knn(ax, df, title):
-    """One scatter panel showing the K-NN prediction vs true exposure."""
     x = df["e_foia_true"].values
     y = df["pred_knn"].values
     lo = float(np.nanmin(np.concatenate([x, y])))
@@ -123,7 +104,6 @@ def main():
     ]
     panels_specs = [(t, d) for (t, d) in panels_specs if len(d) >= 30]
 
-    # ---- figure layout: scatter grid + 3 diag panels ----
     n_scatter = len(panels_specs)
     n_diag = 3
     n_total = n_scatter + n_diag
@@ -135,7 +115,6 @@ def main():
     for ax, (title, sub) in zip(axes, panels_specs):
         panel_knn(ax, sub, title)
 
-    # ---- trend curves: sweep thresholds 1..sweep_max ----
     ts = list(range(1, args.sweep_max + 1))
     rows = []
     for t in ts:
@@ -156,7 +135,6 @@ def main():
         rows.append(row)
     trend = pd.DataFrame(rows)
 
-    # trend panel 1: corr and slope vs threshold
     ax = axes[n_scatter]
     ax.plot(trend["t"], trend["corr_knn"],  "o-", color=KNN_COLOR, label="corr(true, pred_knn)")
     ax2 = ax.twinx()
@@ -169,7 +147,6 @@ def main():
     ax.set_title("Trend: K-NN corr & slope vs copubs threshold")
     ax.grid(alpha=0.3)
 
-    # trend panel 2: twin-test (partner rank / top-5, method-independent)
     ax = axes[n_scatter + 1]
     ax.plot(trend["t"], trend["pct_top5"] * 100, "o-", color="C2", label="% partner top-5")
     ax2 = ax.twinx()
@@ -180,7 +157,6 @@ def main():
     ax.set_title("Trend: twin-test metrics vs copubs threshold\n(pure TF-IDF geometry)")
     ax.grid(alpha=0.3)
 
-    # trend panel 3: copubs histogram
     ax = axes[n_scatter + 2]
     hist_bins = np.arange(0, df["copubs"].max() + 2) - 0.5
     ax.hist(df["copubs"], bins=hist_bins, color=KNN_COLOR, edgecolor="white")
@@ -206,7 +182,6 @@ def main():
     fig.savefig(out_png, dpi=150)
     print(f"\nSaved {out_png}")
 
-    # ---- non-overlapping bin summary CSV ----
     bin_edges = [float(x.strip()) for x in args.bins.split(",")] + [np.inf]
     df["copub_bin"] = pd.cut(df["copubs"], bins=bin_edges, right=True, include_lowest=True)
 

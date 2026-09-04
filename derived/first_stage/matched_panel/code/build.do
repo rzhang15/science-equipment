@@ -14,7 +14,6 @@ end
 
 program merge_matched
     syntax, [suffix(string)]
-    // get xw of matched mkts
     import delimited ../external/matched/match_pairs`suffix'.csv, clear varn(1) 
     rename treated_market category
     save ../output/matched_pairs`suffix', replace
@@ -28,7 +27,6 @@ program merge_matched
     rename control_market category
     save ../output/matched_controls`suffix', replace
 
-    // create matched mkt-year panel
     use ../external/samp/category_yr_tfidf`suffix', clear
     merge m:1 category using ../output/matched_mkts`suffix', assert(1 3) keep(1 3)
     drop if treated == 1 & _merge == 1
@@ -46,7 +44,6 @@ program merge_matched
     drop _freq
     save ../output/spend_xw`suffix', replace
 
-    // create stacked mkt-year panel
     use ../external/samp/category_yr_tfidf`suffix', clear
     keep if treated == 1
     glevelsof category, local(treated_cats)
@@ -71,7 +68,6 @@ program merge_matched
     }
     save ../output/stacked_matched_category_panel`suffix', replace
     
-    // create matched uni-mkt-year panel
     use ../external/samp/uni_category_yr_tfidf`suffix', clear
     merge m:1 category using ../output/matched_mkts`suffix', assert(1  3) keep(1 3)
     drop if treated == 1 & _merge == 1
@@ -86,7 +82,6 @@ program merge_matched
     }
     save ../output/matched_uni_category_panel`suffix' , replace
 
-    // create stacked uni-mkt-year panel
     use ../external/samp/uni_category_yr_tfidf`suffix', clear
     keep if treated == 1
     glevelsof category, local(treated_cats)

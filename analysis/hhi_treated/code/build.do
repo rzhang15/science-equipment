@@ -10,7 +10,6 @@ program main
     comp_hhi, embed(tfidf)
 end
 
-
 program comp_hhi 
     syntax, embed(string)
     use ../external/samp/category_hhi_`embed', replace    
@@ -43,5 +42,4 @@ program comp_hhi
     graph export ../output/figures/delta_hhi_dist.pdf, replace
 end
 
-**
 main

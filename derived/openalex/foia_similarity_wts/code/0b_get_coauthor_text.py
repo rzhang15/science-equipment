@@ -2,7 +2,6 @@ import os
 import pandas as pd
 import polars as pl
 
-# --- PATHS ---
 coauthors_path = '../external/coauthors/coauthors.dta'
 text_data_path = '../external/us_appended_text/cleaned_static_author_text_pre_us.parquet'
 output_path = '../output/coauthor_text_final.csv'
@@ -21,8 +20,6 @@ coauthor_ids = set(df_map['coauthor_id'].tolist())
 if not os.path.exists(text_data_path):
     raise FileNotFoundError(f"Text parquet not found: {text_data_path}")
 
-# Predicate-pushdown via polars lazy scan: stream the parquet, filter to
-# coauthor IDs, then collect — avoids loading the full 3GB file into memory.
 print("Filtering text parquet to coauthor IDs (lazy scan)...")
 df_text = (
     pl.scan_parquet(text_data_path)
@@ -34,9 +31,6 @@ df_text = (
 )
 print(f"Matched text rows: {len(df_text)} / {len(coauthor_ids)} unique coauthor IDs")
 
-# Output 1: one row per unique coauthor with text — drop-in for the existing
-# vectorize/similarity algo (which keys on `athr_id`). Here `athr_id` holds
-# the coauthor's OpenAlex id.
 missing_ids = coauthor_ids - set(df_text['athr_id'].tolist())
 if missing_ids:
     print(f"WARNING: {len(missing_ids)} coauthors have no text data.")
@@ -46,7 +40,5 @@ if missing_ids:
 df_text.to_csv(output_path, index=False)
 print(f"Saved coauthor text to: {output_path}  ({len(df_text)} rows)")
 
-# Output 2: the FOIA-author <-> coauthor mapping carried forward so the
-# similarity-share aggregation can join on it after the algo runs.
 df_map.to_csv(mapping_path, index=False)
 print(f"Saved FOIA->coauthor map to: {mapping_path}  ({len(df_map)} rows)")

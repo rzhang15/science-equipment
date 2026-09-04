@@ -22,7 +22,6 @@ end_batch <-  2543
 
 message(paste("Processing Chunk:", chunk_id))
 message(paste("Batch Range:", start_batch, "to", end_batch))
-# --- SETUP ---
 set.seed(8975)
 setwd("~/sci_eq/derived/openalex/pull_openalex/code") 
 

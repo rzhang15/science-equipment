@@ -1,16 +1,3 @@
-"""
-Cross-denominator consistency check for the three imputed exposure measures:
-  - all         (denom = tot_spend)
-  - hc          (denom = tot_hc_spend, keep=1 categories)
-  - treated_hc  (denom = tot_treated_spend, categories with a beta)
-
-Reports:
-  1. Pearson + Spearman corr matrix over the imputed universe
-  2. Same corr matrix over observed FOIA PIs
-  3. Sign concordance (fraction of authors with same sign across all three)
-  4. Rank agreement in the top decile / bottom decile
-  5. Distribution overlap (mean, sd, quartiles) side-by-side
-"""
 import os
 import numpy as np
 import pandas as pd
@@ -76,28 +63,23 @@ def main():
         df_obs = df_obs.merge(d, on="athr_id", how="inner")
     obs_cols = [f"obs_{d}" for d in DENOMS]
 
-    # ---- 1-2: correlation matrices ----
     corr_block(df_imp, imp_cols, "IMPUTED (universe)")
     corr_block(df_obs, obs_cols, "OBSERVED (FOIA PIs)")
 
-    # ---- 3: sign concordance ----
     print("\n=== SIGN CONCORDANCE ===")
     print(f"  universe: {sign_concordance(df_imp, imp_cols):.3f} "
           f"of {len(df_imp):,} authors have same sign across all 3 denominators")
     print(f"  FOIA    : {sign_concordance(df_obs, obs_cols):.3f} "
           f"of {len(df_obs):,} PIs      have same sign across all 3 denominators")
 
-    # ---- 4: tail agreement ----
     print("\n=== TOP-10% / BOT-10% AGREEMENT (universe) ===")
     top_bot_overlap(df_imp, imp_cols, q=0.90)
 
-    # ---- 5: distributions side-by-side ----
     print("\n=== IMPUTED DISTRIBUTIONS (universe) ===")
     print(df_imp[imp_cols].describe(percentiles=[.1, .25, .5, .75, .9]).round(5).to_string())
     print("\n=== OBSERVED DISTRIBUTIONS (FOIA) ===")
     print(df_obs[obs_cols].describe(percentiles=[.1, .25, .5, .75, .9]).round(5).to_string())
 
-    # ---- 6: imputed vs observed for FOIA PIs (per denominator) ----
     print("\n=== IMPUTED vs OBSERVED for FOIA PIs ===")
     print("(Sanity check: FOIA PIs get their observed value replaced by imputed only")
     print(" via `replace imputed = exposure if !mi(exposure)` in analysis.do.")

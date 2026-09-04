@@ -1,15 +1,3 @@
-"""Career and lab start dates for every author in the scraped works.
-
-Reads the raw OpenAlex works pull (~146GB, 20k csv files): every paper each
-author ever published, with no journal, institution or country filter. OpenAlex
-codes solo papers as position "first", never "last", so first_last is the first
-multi-author last-authorship. Research articles only (pub_type "article").
-
-  first_pub    first publication year, any position
-  first_last   first year as last author
-
-Run: python build.py
-"""
 import glob
 import os
 import sys

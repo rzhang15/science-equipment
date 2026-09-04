@@ -1,9 +1,3 @@
-"""
-K-means cluster authors using dense BERT/SciBERT embeddings.
-
-Cluster descriptions are written as the 10 authors closest to each centroid.
-(Dense embeddings have no readable feature names, unlike TF-IDF.)
-"""
 import argparse
 import numpy as np
 import pandas as pd

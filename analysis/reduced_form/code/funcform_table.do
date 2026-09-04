@@ -3,11 +3,6 @@ clear all
 capture log close
 version 17
 
-* Numbers for tab:rf_funcform: {Poisson, OLS levels, OLS log(1+y)} x
-* {author+year FE, university+cluster-by-year FE}, with and without the S_i
-* control, on the prepped sample from the last analysis.do run. Writes the
-* filled table to ../output/tables/<samp>/robustness/rf_funcform<suf>.tex;
-* column (1) keeps the paper's \RFCoef / \RFObs / \OutputDecline macros.
 local samp all_jrnls
 local suf  _r1_r2
 
@@ -33,7 +28,6 @@ foreach est in ppml ols ols_ln {
         if "`fe'" == "inst" {
             local fes    inst_id i.cluster_30#i.year
             local vce_cl inst_id
-            * exposure/share levels are absorbed by athr_id but not by inst FEs
             local mainx  exposure
             local mains  exposure mkt_spend_shr
         }
@@ -46,7 +40,6 @@ foreach est in ppml ols ols_ln {
         local xbar = r(mean)
         qui sum ppr_cnt if year < 2014 & e(sample)
         local ymn = r(mean)
-        * decline for the average PI as a percent of the pre-period mean count
         if "`est'" == "ppml"   local decl = 100 * (1 - exp(`b'*`xbar'))
         if "`est'" == "ols"    local decl = -100 * `b' * `xbar' / `ymn'
         if "`est'" == "ols_ln" local decl = 100 * (1 - exp(`b'*`xbar')) * (1 + `ymn') / `ymn'

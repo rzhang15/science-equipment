@@ -1,7 +1,6 @@
 import nltk
 from nltk.corpus import stopwords
 
-# Ensure stopwords are downloaded
 nltk.download("stopwords", quiet=True)
 
 
@@ -105,19 +104,16 @@ unit_stopwords = [
     "https", "com", "org", "edu", "pdf", "suppl", "doi"
 ]
 
-# --- NEW ADDITIONS TO CLEAN CLUSTERS ---
 
-# 1. Chemical Artifacts (Removing the "fluorescein" clusters)
 chemical_stopwords = [
     "fluorescence", "fluorescent", "fluorescein", "fluorescamine", 
     "fluorenyl", "fluorenylmethyloxycarbonyl", "fmoc", "fluoresc", 
     "fluoresbrit", "fluorenylnitrenium", "fluorenylmethyl", 
     "fluorenylmethylchloroform", "fluorenylmethoxycarbonyl", 
     "fluorenylmethoxi", "fluorenylhydroxam", "fluorenyliden", 
-    "sub", "sup" # Common chemical formula subscripts/superscripts
+    "sub", "sup"
 ]
 
-# 2. Foreign Language & Nonsense Words (Removing the French/Spanish/German clusters)
 foreign_stopwords = [
     "pour", "dans", "avec", "etude", "chez", "une", "nous", "de", "le", "sur", 
     "ca", "tude", "est", "propo", "para", "por", "los", "las", "estudio", 
@@ -126,7 +122,6 @@ foreign_stopwords = [
     "ein", "zur", "ber", "auf", "nach", "den"
 ]
 
-# 3. XML/Formatting Artifacts (Removing the "Math" cluster)
 xml_stopwords = [
     "mml", "math", "mrow", "xmlns", "mathml", "mtext", "msub", 
     "mathvariant", "msup", "inline", "fontstyle", "xmln", "mathvari", 
@@ -143,6 +138,5 @@ all_custom_stopwords = (
     foreign_stopwords +
     xml_stopwords
 )
-# Export the final SET (for fast checking) and LIST (for sklearn)
 stopwords_set = set(stopwords.words("english")).union(set(all_custom_stopwords))
 stopwords_list = list(stopwords_set)

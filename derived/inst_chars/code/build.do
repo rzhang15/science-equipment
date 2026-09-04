@@ -38,8 +38,7 @@ program herd
 end
 
 program endowment
-    * f1endmft = endowment/FTE, GASB (public); f2endmft = endowment/FTE, FASB (private-nonprofit).
-    * Institutions report one or the other; coalesce into a single per-FTE endowment.
+    * f1endmft (GASB) and f2endmft (FASB) are the same endowment/FTE measure; institutions report one or the other
     forval y = 2010/2013 {
         import delimited using ../external/ipeds/endowment_`y', clear stringcols(_all)
         rename unitid ipeds_id

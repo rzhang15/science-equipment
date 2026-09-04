@@ -91,13 +91,6 @@ program gather_external_data
     build_raw_nih
 end
 
-* ---------------------------------------------------------------------------
-* Author-year NIH measures built straight off the grant-level file. The shipped
-* n_grants / nih_total_cost are merged onto the last-author publication panel
-* with keep(1 3), so a PI-year with an active award but no last-author paper is
-* dropped there and then zero-filled downstream. These *_raw measures carry no
-* publication-panel filter and are the ones to trust for a level trend.
-* ---------------------------------------------------------------------------
 program build_raw_nih
     use athr_id year grant_key row_key research total_cost start_year ///
         using ../external/nih_panel/nih_grants_by_athr_id, clear
@@ -143,7 +136,6 @@ program restrict_samp
         save ../temp/athr_min_year_any_`samp', replace
     restore
 
-    * Main (last-author) panel + NIH fields carried through
     use ../external/nih_panel/athr_panel_full_year_last_`samp'_with_nih, clear
     bys athr_id: egen max_year = max(year)
     bys athr_id: egen min_year = min(year)
@@ -182,9 +174,6 @@ program restrict_samp
         save ../temp/athr_xw_`samp', replace
     restore
 
-    * Flags rows that exist in the last-author publication panel. tsfill'd rows
-    * (in_pub_panel==0) are exactly the PI-years where the shipped NIH measures
-    * were dropped upstream and are zero-filled here.
     gen byte in_pub_panel = 1
     xtset athr year
     tsfill, full
@@ -211,7 +200,6 @@ program restrict_samp
     gen pre_ppr_cnt = ppr_cnt if year < 2014
     bys athr_id: egen pre_ppr_cnt_sum = sum(pre_ppr_cnt)
     bys athr_id: egen pre_ppr_cnt_avg = mean(pre_ppr_cnt)
-    * Both p5 cuts from the pre-trim distribution, matching reduced_form
     qui sum pre_ppr_cnt_avg if athr_indicator == 1, d
     local p5_avg = r(p5)
     qui sum pre_ppr_cnt_sum if athr_indicator == 1, d
@@ -227,7 +215,6 @@ program restrict_samp
     merge 1:1 athr_id year using ../temp/athr_yr_grnt_cnt, keep(1 3) nogen
     replace num_grants = 0 if mi(num_grants)
 
-    * NIH fields: zero-fill counts / cost; leave PI/org name blanks alone
     foreach v in n_grants nih_total_cost {
         cap confirm variable `v'
         if !_rc replace `v' = 0 if mi(`v')
@@ -252,7 +239,6 @@ program restrict_samp
     gen nih_per_paper    = n_grants   / ppr_cnt         if ppr_cnt > 0
     gen nih_density      = n_grants   / pre_ppr_cnt_avg if pre_ppr_cnt_avg > 0
 
-    * PI-level indicator refreshed after all merges/drops
     cap drop athr_indicator
     bys athr_id: gen athr_indicator = _n == 1
 
@@ -264,17 +250,10 @@ program restrict_samp
     save ../output/prepped_samples/pi_desc_`samp', replace
 end
 
-* ---------------------------------------------------------------------------
-* PI-level summary: N, share w/ NIH grant, share FOIA, share public inst,
-*                   share top-15, share broad_affl, plus distributions of
-*                   pre-period publication and NIH grant intensity
-* ---------------------------------------------------------------------------
 program describe_pis
     syntax, samp(string)
     use ../output/prepped_samples/pi_desc_`samp', clear
 
-    * PI-level dataset (one row per athr_id) built from time-invariant vars
-    * plus PI-level totals of time-varying counts across the observed window.
     preserve
         bys athr_id: egen tot_ppr        = total(ppr_cnt)
         bys athr_id: egen tot_ppr_any    = total(ppr_cnt_any)
@@ -328,7 +307,6 @@ program describe_pis
         qui matrix_to_txt, saving("../output/tables/`samp'/pi_summary.txt") ///
             matrix(pi_summary) title(<tab:pi_summary_`samp'>) format(%14.4f) replace
 
-        * PI-level distributions
         cap mat drop pi_dist
         local rownames_d ""
         foreach v in pre_ppr_cnt_sum pre_ppr_cnt_avg tot_ppr tot_ppr_any tot_cite ///
@@ -348,9 +326,6 @@ program describe_pis
     restore
 end
 
-* ---------------------------------------------------------------------------
-* Year-level totals + means (all PIs vs FOIA-PIs vs NIH-matched)
-* ---------------------------------------------------------------------------
 program describe_over_time
     syntax, samp(string)
     use ../output/prepped_samples/pi_desc_`samp', clear
@@ -382,7 +357,6 @@ program describe_over_time
         export delimited using ../output/tables/`samp'/year_totals_all_pis.csv, replace
     restore
 
-    * Same collapse restricted to FOIA PIs (the treated set)
     preserve
         keep if foia_athr == 1
         gen one = 1
@@ -405,7 +379,6 @@ program describe_over_time
         export delimited using ../output/tables/`samp'/year_totals_foia_pis.csv, replace
     restore
 
-    * Only NIH-matched PIs
     preserve
         keep if has_nih == 1
         gen one = 1
@@ -419,14 +392,10 @@ program describe_over_time
     restore
 end
 
-* ---------------------------------------------------------------------------
-* Time-series plots (all-PI vs FOIA-PI overlay)
-* ---------------------------------------------------------------------------
 program plot_time_series
     syntax, samp(string)
     use ../output/prepped_samples/pi_desc_`samp', clear
 
-    * Collapse to yearly means, split by foia_athr
     preserve
         gen one = 1
         gcollapse (mean) mean_ppr        = ppr_cnt ///
@@ -444,7 +413,6 @@ program plot_time_series
 
     use ../temp/yr_means_by_foia_`samp', clear
 
-    * Recenter each FOIA-group series at its own 2013 value (0 at 2013)
     gen byte foia_grp = foia_athr == 1
     foreach y in mean_ppr mean_ppr_any mean_cite mean_num_grants mean_n_grants ///
                  mean_nih_cost mean_team_last mean_coathrs {
@@ -455,7 +423,6 @@ program plot_time_series
     }
     sort foia_grp year
 
-    * Two-line overlay: FOIA vs non-FOIA. Uses ebblue + dkorange per house style.
     foreach y in mean_ppr mean_ppr_any mean_cite mean_num_grants mean_n_grants ///
                  mean_nih_cost mean_team_last mean_coathrs n_pi_active {
         if "`y'" == "mean_ppr"        local ytitle "Avg publications per PI (last author)"
@@ -488,7 +455,6 @@ program plot_time_series
         }
     }
 
-    * Pooled (all PIs, no split) time series — same series, single line
     preserve
         use ../output/prepped_samples/pi_desc_`samp', clear
         gen one = 1
@@ -526,20 +492,10 @@ program plot_time_series
     }
 end
 
-* ---------------------------------------------------------------------------
-* Time-series plots split by exposure quartile — the "most exposed vs less
-* exposed" cut. Two variants:
-*   (a) quartiles among ALL PIs on the analysis-sample exposure measure
-*       (imputed for non-FOIA PIs). This is the treatment-intensity split
-*       reduced_form uses.
-*   (b) quartiles among FOIA PIs only, using real observed exposure.
-* Pre-period divergence would flag a differential-trends concern.
-* ---------------------------------------------------------------------------
 program plot_ts_by_exposure
     syntax, samp(string)
     use ../output/prepped_samples/pi_desc_`samp', clear
 
-    * PI-level quartile assignment (exposure is constant within athr_id)
     xtile _q_all = exposure if athr_indicator == 1, nq(4)
     bys athr_id: egen exp_q4 = max(_q_all)
     drop _q_all
@@ -547,7 +503,6 @@ program plot_ts_by_exposure
     bys athr_id: egen foia_exp_q4 = max(_q_foia)
     drop _q_foia
 
-    * Report the exposure cut points so the labels have context
     preserve
         keep if athr_indicator == 1
         di as text _n "===== exposure quartile cuts (all PIs) ====="
@@ -556,9 +511,6 @@ program plot_ts_by_exposure
         tabstat exposure if foia_athr == 1, by(foia_exp_q4) stat(min max mean n) columns(stat)
     restore
 
-    * Snapshot the panel with both quartile assignments so we can reload it
-    * at the top of each loop iteration (the first iteration's collapse
-    * replaces the in-memory data).
     save ../temp/pi_desc_expQ_`samp', replace
 
     foreach grpvar in exp_q4 foia_exp_q4 {
@@ -567,10 +519,6 @@ program plot_ts_by_exposure
 
         use ../temp/pi_desc_expQ_`samp', clear
         gen one = 1
-        * Decompose the common decline: extensive margin (share publishing at
-        * all) vs intensive margin (mean pubs conditional on publishing).
-        * Attrition-with-zeros shows up in share_pub; true intensity in
-        * mean_ppr_cond.
         gen byte pub_any = ppr_cnt > 0
         gen ppr_pos = ppr_cnt if ppr_cnt > 0
         gcollapse (mean) mean_ppr        = ppr_cnt ///
@@ -592,9 +540,6 @@ program plot_ts_by_exposure
                   by(year `grpvar') fast
         drop if mi(`grpvar')
 
-        * Recenter each series so line hits 0 at 2013: subtract each group's
-        * 2013 value from every year. Groups missing 2013 stay missing (no
-        * base to anchor to — flagged in the log).
         foreach y in mean_ppr mean_ppr_any mean_cite mean_num_grants ///
                      mean_n_grants mean_nih_cost mean_team_last mean_coathrs ///
                      share_pub mean_ppr_cond mean_grants_raw mean_new_raw ///
@@ -606,8 +551,6 @@ program plot_ts_by_exposure
             qui count if mi(`y'_base)
             if r(N) > 0 di as text "  recenter `suf' `y': `r(N)' rows lack 2013 baseline"
         }
-        * bys re-sorts by group only, leaving year order arbitrary within
-        * group — line plots connect in data order, so re-sort before plotting
         sort `grpvar' year
         save ../temp/yr_means_by_`suf'_`samp', replace
 
@@ -631,7 +574,6 @@ program plot_ts_by_exposure
             if "`y'" == "share_grant_raw" local ytitle "Share holding >=1 active NIH grant (raw)"
             if "`y'" == "share_in_panel"  local ytitle "Share of PI-years in the publication panel"
 
-            * Top vs bottom quartile only — cleanest "most vs less exposed" contrast
             tw (line `y' year if `grpvar' == 1, lcolor(ebblue) lwidth(medthick)) ///
                (line `y' year if `grpvar' == 4, lcolor(dkorange) lwidth(medthick)), ///
                xlab(2010(1)2019) xtitle("Year") ytitle("`ytitle'") ///
@@ -642,7 +584,6 @@ program plot_ts_by_exposure
                plotregion(margin(sides))
             graph export ../output/figures/`samp'/ts_`suf'_topbot_`y'.pdf, replace
 
-            * All four quartiles — shows the gradient
             tw (line `y' year if `grpvar' == 1, lcolor(ebblue) lwidth(medthick)) ///
                (line `y' year if `grpvar' == 2, lcolor(ebblue%55) lwidth(medthick) lpattern(dash)) ///
                (line `y' year if `grpvar' == 3, lcolor(dkorange%55) lwidth(medthick) lpattern(dash)) ///
@@ -654,7 +595,6 @@ program plot_ts_by_exposure
                plotregion(margin(sides))
             graph export ../output/figures/`samp'/ts_`suf'_all_`y'.pdf, replace
 
-            * Recentered versions: each line = 0 at 2013
             tw (line `y'_c year if `grpvar' == 1, lcolor(ebblue) lwidth(medthick)) ///
                (line `y'_c year if `grpvar' == 4, lcolor(dkorange) lwidth(medthick)), ///
                xlab(2010(1)2019) xtitle("Year") ytitle("`ytitle' (recentered at 2013)") ///
@@ -679,9 +619,6 @@ program plot_ts_by_exposure
             graph export ../output/figures/`samp'/ts_`suf'_all_recentered_`y'.pdf, replace
         }
 
-        * Q4 - Q1 gap in the recentered series: nets out the common decline
-        * and shows the differential path of the most- vs least-exposed as a
-        * single line. Flat at 0 pre-2014 = parallel trends.
         preserve
             keep year `grpvar' *_c
             keep if inlist(`grpvar', 1, 4)
@@ -719,16 +656,6 @@ program plot_ts_by_exposure
     }
 end
 
-* ---------------------------------------------------------------------------
-* Shipped vs raw NIH measures. The shipped n_grants only exists for PI-years
-* that survive into the last-author publication panel; every other PI-year is
-* zero-filled. If share_in_panel trends, so does the measurement error, and any
-* post-period movement in a grant event study is partly that trend.
-*
-* Also splits the two sample-conditioning rules apart: "any grant 2010-2019"
-* (the shipped rule, which conditions on a post-period outcome) vs "grant in
-* 2010-2013" (pre-determined).
-* ---------------------------------------------------------------------------
 program plot_grant_trends
     syntax, samp(string)
     use ../output/prepped_samples/pi_desc_`samp', clear
@@ -779,7 +706,6 @@ program plot_grant_trends
         export delimited using ../output/tables/`samp'/grants_ship_vs_raw.csv, replace
     restore
 
-    * Raw trend under each conditioning rule, top vs bottom exposure quartile.
     foreach rule in everrule prerule {
         preserve
             if "`rule'" == "prerule" keep if pre_holder == 1
@@ -810,14 +736,10 @@ program plot_grant_trends
     }
 end
 
-* ---------------------------------------------------------------------------
-* PI-level distribution plots (histograms + kdensity) for pre-period vars
-* ---------------------------------------------------------------------------
 program plot_distributions
     syntax, samp(string)
     use ../temp/pi_level_`samp', clear
 
-    * Pre-period pubs (sum + avg)
     tw hist pre_ppr_cnt_sum, bin(60) color(ebblue%70) ///
         xtitle("Pre-2014 total publications") ytitle("Density") ///
         plotregion(margin(sides))
@@ -828,7 +750,6 @@ program plot_distributions
         plotregion(margin(sides))
     graph export ../output/figures/`samp'/hist_pre_ppr_cnt_avg.pdf, replace
 
-    * Career total pubs (last author + any)
     tw hist tot_ppr, bin(60) color(ebblue%70) ///
         xtitle("Total last-author pubs 2010-2019") ytitle("Density") ///
         plotregion(margin(sides))
@@ -839,7 +760,6 @@ program plot_distributions
         plotregion(margin(sides))
     graph export ../output/figures/`samp'/hist_tot_ppr_any.pdf, replace
 
-    * NIH funding intensity (PIs with n_grants > 0 only)
     tw hist tot_n_grants if tot_n_grants > 0, bin(40) color(dkorange%70) ///
         xtitle("# NIH grants 2010-2019 (NIH-matched PIs)") ytitle("Density") ///
         plotregion(margin(sides))
@@ -853,13 +773,11 @@ program plot_distributions
         plotregion(margin(sides))
     graph export ../output/figures/`samp'/hist_tot_nih_cost.pdf, replace
 
-    * Age distribution
     tw hist age_2014, bin(30) color(ebblue%70) ///
         xtitle("Approx career age at 2014 (yrs since first pub + 30)") ytitle("Density") ///
         plotregion(margin(sides))
     graph export ../output/figures/`samp'/hist_age_2014.pdf, replace
 
-    * FOIA-vs-non-FOIA overlays for key measures
     qui sum pre_ppr_cnt_sum if foia_athr == 1, d
     local mean_f : di %5.2f r(mean)
     qui sum pre_ppr_cnt_sum if mi(foia_athr), d
@@ -885,14 +803,6 @@ program plot_distributions
     graph export ../output/figures/`samp'/kd_tot_n_grants.pdf, replace
 end
 
-* ---------------------------------------------------------------------------
-* Overall raw plots: every variable on its own, pooled across the whole sample
-* with no exposure / FOIA / quartile split. Two figures per variable —
-*   raw_ts_<var>.pdf   : pooled yearly mean, levels (not recentered)
-*   raw_dist_<var>.pdf : pooled distribution over the full support
-* plus a p99-trimmed distribution where the right tail dominates the axis, and
-* pooled summary tables at the PI-year and PI level.
-* ---------------------------------------------------------------------------
 program plot_raw_overall
     syntax, samp(string)
 
@@ -1020,16 +930,10 @@ program plot_raw_overall
     di as text "plot_raw_overall `samp': PI-year vars = `: word count `yrvars'', PI vars = `: word count `pivars''"
 end
 
-* ---------------------------------------------------------------------------
-* PI counts by institution / geography (top 20 lists + coverage matrix).
-* Non-mover sample: 1 PI = 1 inst, so these are strict PI counts (not
-* PI-year cells) and each PI is attributed to a single institution.
-* ---------------------------------------------------------------------------
 program describe_by_inst
     syntax, samp(string)
     use ../temp/pi_level_`samp', clear
 
-    * Sanity check the non-mover invariant on the PI-level dataset
     qui gunique athr_id
     local n_pi = r(unique)
     qui gunique athr_id inst_id
@@ -1037,7 +941,6 @@ program describe_by_inst
     di as text "describe_by_inst `samp': N PIs = `n_pi', N (PI, inst) pairs = `n_pair' (must match)"
     assert `n_pi' == `n_pair'
 
-    * Top-20 institutions by PI count
     preserve
         contract inst_id inst
         gsort -_freq
@@ -1047,7 +950,6 @@ program describe_by_inst
         export delimited using ../output/tables/`samp'/top20_insts_by_pi_count.csv, replace
     restore
 
-    * PI counts by MSA (top 20)
     preserve
         contract msa_comb
         gsort -_freq
@@ -1056,7 +958,6 @@ program describe_by_inst
         export delimited using ../output/tables/`samp'/top20_msas_by_pi_count.csv, replace
     restore
 
-    * Cluster (research topic) counts
     preserve
         contract cluster_30
         gsort -_freq
@@ -1064,7 +965,6 @@ program describe_by_inst
         export delimited using ../output/tables/`samp'/cluster_pi_counts.csv, replace
     restore
 
-    * Type breakdown (r1/r2 × public/private): rows = type, cols = public
     preserve
         contract type public
         gsort type public

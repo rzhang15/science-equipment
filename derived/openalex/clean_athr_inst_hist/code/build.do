@@ -17,7 +17,6 @@ end
 program load_files
     syntax, samp(int)
     di "`samp'"
-    // append ls files
    /* forval i = 1/5473 {
         di "`i'"
         qui {
@@ -39,7 +38,6 @@ program load_files
             }
         }
     }*/
-    // 20260
     local start = (`samp'-1)*500  + 1
     local end = `samp'*500 
     *forval i = `start'/`end' {
@@ -150,7 +148,6 @@ program clean_panel
     drop new_inst new_inst_id dup_entry tot_times type
     gsort athr_id inst_id `time' country city
     gduplicates drop athr_id inst_id `time', force
-    // keep inst with the largest num_times in a  year
     cap drop N
     bys athr_id `time' : gen N = _N 
     bys athr_id `time': gegen max_num_times = max(num_times)
@@ -158,7 +155,6 @@ program clean_panel
     drop max_num_times
     gunique athr_id `time' 
     local N = r(unique)
-    // imputation process
     foreach loc in inst_id inst_id inst_id { //inst_id inst_id {
         cap drop has_mult 
         cap drop same_as_after 
@@ -168,7 +164,6 @@ program clean_panel
         bys athr_id `time' : gen N = _N 
         if "`time'" == "year" local range 5 
         if "`time'" == "qrtr" local range 20 
-        // if there are mult in a  but sandwiched by the same, then choose that one 
         bys athr_id `time': gen has_mult = _N > 1
         bys athr_id `loc' (`time'): gen same_as_after = `time'[_n+1]-`time' <= `range' & has_mult[_n+1]==0
         by athr_id `loc' (`time'): gen same_as_before = `time' - `time'[_n-1] <= `range'  & has_mult[_n-1]==0
@@ -178,13 +173,11 @@ program clean_panel
         drop sandwiched has_sandwich
         bys athr_id `time': replace has_mult = _N > 1
        
-        // now we prioritize the  before
         bys athr_id `loc' (`time'): replace same_as_after = `time'[_n+1]-`time' <= `range' & has_mult[_n+1]==0
         by athr_id `loc' (`time'): replace same_as_before = `time' - `time'[_n-1] <= `range'  & has_mult[_n-1]==0
         bys athr_id `time': gegen has_before = max(same_as_before)
         drop if has_mult == 1 & has_before == 1 & same_as_before == 0  & N<=10
         bys athr_id `time': replace has_mult = _N > 1
-        // now do same for the `time' after 
         bys athr_id `loc' (`time'): replace same_as_after = `time'[_n+1]-`time' <= `range' & has_mult[_n+1]==0
         by athr_id `loc' (`time'): replace same_as_before = `time' - `time'[_n-1] <= `range'  & has_mult[_n-1]==0
         bys athr_id `time': gegen has_after = max(same_as_after)
@@ -195,7 +188,6 @@ program clean_panel
     replace inst_id = "I183934855" if has_genentech == 1 & inst_id == "I4210150208"
     cap drop N
     bys athr_id `time' : gen N = _N 
-    // if there are sandwiched insts no mater what the `time' gap is
     hashsort athr_id `time'
     gen prev_inst = inst_id[_n-1]
     gen post_inst = inst_id[_n+1]
@@ -242,7 +234,6 @@ program clean_panel
     drop sandwich prev_inst post_inst
     keep athr_id inst_id `time' num_times inst country_code country city region broad_affl hhmi_affl
 
-    // do some final cleaning
     cap gen year  = yofd(dofq(qrtr))
     save ../temp/imputed_athr_panel, replace
     
@@ -331,7 +322,6 @@ program clean_panel
     replace msa_c_world = substr(msa_c_world, 1, strpos(msa_c_world, ", ")-1) + ", US" if country == "United States" & !mi(msa_c_world)
     replace msa_c_world = city + ", " + country_code if country_code != "US" & !mi(city) & !mi(country_code)
     compress, nocoalesce
-    // if there are sandwiched msas no mater what the `time' gap is
     hashsort athr_id `time'
     gen prev_msa = msa_comb[_n-1]
     gen post_msa = msa_comb[_n+1]

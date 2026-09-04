@@ -10,9 +10,6 @@ RAW_DIR = '../external/nsf'
 TMP_DIR = '../temp'
 YEARS = range(2010, 2020)
 
-# NSF grantees have no IPF code, so org ids are minted here. The offset keeps
-# them from ever being mistaken for a RePORTER org_ipf_code if the two grant
-# panels are pooled.
 ORG_ID_BASE = 90_000_000
 
 _RE_WS        = re.compile(r'\s+')
@@ -26,7 +23,6 @@ def clean(s):
 
 
 def org_key(inst):
-    """UEI where NSF records one, else name+state."""
     uei = clean(inst.get('org_uei_num')).upper()
     if uei:
         return 'UEI:' + uei
@@ -35,7 +31,6 @@ def org_key(inst):
 
 
 def pi_name(p):
-    """'LAST, FIRST M', the RePORTER convention match.py's norm_pi expects."""
     last  = clean(p.get('pi_last_name')).replace(';', ' ')
     given = clean(clean(p.get('pi_first_name')) + ' ' + clean(p.get('pi_mid_init')))
     given = given.replace(';', ' ')
@@ -83,9 +78,7 @@ def main():
                                 writer(f_abs, ABS_COLS), writer(f_pgm, PGM_COLS))
 
     for year in YEARS:
-        # '1611112 2.json' is a re-download of '1611112.json'; the canonical
-        # name sorts second, so rank it first and let the awd_id guard below
-        # drop the copy.
+        # 'NNN 2.json' re-downloads sort after the canonical file so the awd_id guard drops them
         files = sorted(glob.glob(f'{RAW_DIR}/{year}/*.json'),
                        key=lambda p: (os.path.basename(p).count(' '), p))
         per_year[year] = len(files)
@@ -169,7 +162,6 @@ def main():
                 fy_dist[int(fy)] += 1
                 wrote = True
             if not wrote:
-                # no obligation record: fall back to the award's effective year
                 eff = clean(d.get('awd_eff_date'))[:4]
                 if eff.isdigit():
                     w_fy.writerow({'awd_id': awd_id, 'fy': int(eff),

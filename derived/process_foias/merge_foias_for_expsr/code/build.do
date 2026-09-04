@@ -98,7 +98,6 @@ program merge_foias
 end
 
 program clean_pi_id 
-    // have utaustin ecu dallas
     import excel using ../external/pis/utaustin_pi, firstrow clear
     rename Account1 purchaser
     save ../output/utaustin_pi, replace

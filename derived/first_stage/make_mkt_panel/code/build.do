@@ -51,9 +51,7 @@ program clean_raw
 *        replace category = "us fbs" if strpos(clean_desc, "fetal")>0& strpos(clean_desc, "bovine")>0 & strpos(clean_desc, "serum")>0
 *        replace category = "us fbs" if strpos(clean_desc, "calf")>0& strpos(clean_desc, "bovine")>0 & strpos(clean_desc, "serum")>0
 *        replace category = "elisa kits" if strpos(clean_desc, "duoset") >0 
-        // drop nonsense negatives
         drop if price <= 0 | qty < 1 | spend <= 0
-        // filter to consumables
         drop if category == "Non-Lab"
         drop if category == "unclassified"
         drop if strpos(category, "electronics")> 0
@@ -82,7 +80,6 @@ program clean_raw
             drop if strpos(clean_desc, "`v'") > 0
         }
         drop if (strpos(clean_desc, "plate") > 0 | strpos(clean_desc, "card")) & category == "synthetic dna oligonucleotide"
-        // drop borderline terms only when model confidence is low
         foreach v in "service" "repair" "maintenance" "consulting" "training" ///
             "rental" "subscription" "license" "software" "warranty" "support contract" ///
             "calibration" "installation" "shipping" "freight" "quote" "estimate" ///
@@ -96,36 +93,23 @@ program clean_raw
             drop if strpos(category, "`v'") > 0
         }
 
-        // === CATEGORY-SPECIFIC ANTI-KEYWORD DROPS ===
-        // TF-IDF classifier mis-routes items that share substring tokens with the
-        // category name but are obviously different products. These drops were
-        // validated by checking that the within-category sd of yoy log-price
-        // changes drops materially (>10%) without dropping real items.
 
-        // carbon dioxide: bone marrow stem cells, surgical bone grafts, anatomical
-        // skulls, ostase (bone-specific alk phos), decalcification stains
         foreach v in "bone " "marrow" "skull" "stem cell" "graft tiss" "ostase" "decalcified" "mesenchymal" "mscs" {
             drop if category == "carbon dioxide" & strpos(clean_desc, "`v'") > 0
         }
-        // direct pcr lysis reagents: construction primer, paint primer, surgical needles
         foreach v in "plaster" "primer c-" "gallon pail" "catheter" "butterfly needle" "infusion" "5# pail" {
             drop if category == "direct pcr lysis reagents" & strpos(clean_desc, "`v'") > 0
         }
-        // chromatography paper: paper plates (food service), bench protector paper, bundled stripette orders
         foreach v in "paper plate" "ppr plt" "bench prot" "laycoat" {
             drop if category == "chromatography paper" & strpos(clean_desc, "`v'") > 0
         }
-        // rifampicin: rifaximin is a different (related) antibiotic
         drop if category == "bacterial selection antibiotics - rifampicin" & strpos(clean_desc, "rifaximin") > 0
-        // storage jars: jarid (antibody caught on "jar"), drierite (desiccant), pigments (paint), antibodies
         foreach v in "jarid" "drierite" "pigment" "anitbody" "antibody" {
             drop if category == "storage jars" & strpos(clean_desc, "`v'") > 0
         }
-        // rectangular carboys: bundled non-carboy orders (gas cylinder accessories, cleaning bundles)
         foreach v in "gas cylinder support" "sparkleen" "stylus" "pen light" {
             drop if category == "rectangular carboys" & strpos(clean_desc, "`v'") > 0
         }
-        // zeocin: phleomycin (precursor antibiotic, sold separately), gentamicin, expression plasmids
         foreach v in "phleomycin" "expression plasmid" "gentamicin" "resistance gene" {
             drop if category == "cell culture antibiotics - zeocin" & strpos(clean_desc, "`v'") > 0
         }
@@ -370,5 +354,4 @@ program make_panels
     restore
 end
 
-**
 main

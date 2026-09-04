@@ -14,7 +14,6 @@ program main
 end
 
 program indiv_did_placebo
-    // per-(iter, placebo-treated category) DiD on log_raw_price AND log_raw_spend
     use ../external/placebo/placebo_matched_mkts$suffix, clear
     qui sum iter
     local n_iter = r(max)
@@ -71,7 +70,6 @@ program indiv_did_placebo
             restore
         }
 
-        // price
         clear
         svmat coef_price
         rename coef_price1 b
@@ -87,7 +85,6 @@ program indiv_did_placebo
         drop if mi(b)
         save `this_price', replace
 
-        // spend
         clear
         svmat coef_spend
         rename coef_spend1 b
@@ -120,7 +117,6 @@ program indiv_did_placebo
         }
     }
 
-    // spend_2013 lookup -- category-level constant, dedupe across iters
     preserve
     use ../external/placebo/placebo_matched_category_panel$suffix, clear
     keep if treated == 1
@@ -150,7 +146,6 @@ program make_placebo_plots
     qui sum iter
     local n_iter = r(max)
 
-    // rank of coef within each iter (1 = highest b); label top categories per iter
     preserve
     gsort iter -b
     by iter: gen coef_rank = _n
@@ -166,7 +161,6 @@ program make_placebo_plots
     graph export ../output/figures/did_coefs_placebo`suf'_top_cats$suffix.pdf, replace
     restore
 
-    // coef-rank profile: x = within-iter rank, y = b, one line per iter
     preserve
     gsort iter -b
     by iter: gen coef_rank = _n
@@ -177,7 +171,6 @@ program make_placebo_plots
     graph export ../output/figures/did_coefs_placebo`suf'_rank_profile$suffix.pdf, replace
     restore
 
-    // distribution of point estimates across all (iter, market) pairs
     sum b, d
     local N    = r(N)
     local mean : di %6.3f r(mean)
@@ -206,7 +199,6 @@ program make_placebo_plots
                pos(1) ring(0) region(fcolor(none)) size(small))
     graph export ../output/figures/did_coefs_placebo`suf'_kdens$suffix.pdf, replace
 
-    // per-iter mean coefficient (one point per placebo replication)
     preserve
     gcollapse (mean) b_mean = b (sd) b_sd = b (count) n_cats = b, by(iter)
     gen lb = b_mean - 1.96*b_sd/sqrt(n_cats)

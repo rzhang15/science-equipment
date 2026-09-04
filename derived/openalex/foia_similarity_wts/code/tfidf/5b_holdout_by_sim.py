@@ -1,33 +1,3 @@
-"""
-Conditional-on-similarity holdout validation.
-
-The raw holdout/LOO marginals mix two things: how well the KNN predicts at a
-given match quality, and the match-quality composition of the held-out set.
-The panel's composition differs from the anchors', so the marginal numbers
-are not the right read. This script reports accuracy CONDITIONAL on match
-similarity instead:
-
-  1. Hold out anchors (LOO against the other 207, plus random subsample
-     folds to populate the low-similarity range) and record, per prediction,
-     the error AND the max cosine similarity to the anchors it was forced
-     to use.
-  2. Trace the error-vs-similarity curve from those held-out predictions.
-  3. Mark the panel's max_sim distribution (from match_diagnostics) on the
-     same axis, and reweight the held-out errors to the panel's similarity
-     distribution.
-
-Headline: "at the match quality that characterizes the panel, held-out
-prediction error is X."
-
-Uses the production recipe (K=3, sharpen=2, floor=0.05) and the production
-panel (final_imputed_shift_share_hc_cf_k3.csv) by default.
-
-Outputs (under ../../output):
-  holdout_by_sim_pairs_{version}.csv     per (anchor, train-set) prediction
-  holdout_by_sim_bins_{version}.csv      quantile-bin corr/MAE/RMSE curve
-  holdout_by_sim_summary_{version}.txt   headline numbers
-  figures/holdout_by_sim_{version}.png   curve + panel similarity overlay
-"""
 import argparse
 import os
 import numpy as np
@@ -41,8 +11,6 @@ EXPOSURE_DIR = "../../external/exposure_wts"
 
 
 def knn_predict_from_sim(sim, e_train, k, sharpen, floor):
-    """Top-K, floor, sharpen, L1-normalize, weighted average. Mirrors
-    2_similarity_wts.process_batch. Returns (pred, max_sim, mean_topk_sim)."""
     n_test, n_train = sim.shape
     k = min(k, n_train)
     topk_idx = np.argpartition(-sim, k - 1, axis=1)[:, :k]
@@ -62,7 +30,6 @@ def knn_predict_from_sim(sim, e_train, k, sharpen, floor):
 
 
 def corr_ci(y, p):
-    """Pearson r + Fisher-z 95% CI."""
     n = len(y)
     if n < 4 or np.std(y) == 0 or np.std(p) == 0:
         return np.nan, np.nan, np.nan
@@ -96,8 +63,6 @@ def weighted_metrics(y, p, w):
 
 
 def run_holdouts(X, e_foia, foia_ids, k, sharpen, floor, fracs, folds, seed):
-    """LOO plus random subsample folds. Each row is one (anchor, train-set)
-    prediction with its realized max_sim_to_train."""
     n = X.shape[0]
     sim_full = (X @ X.T).toarray().astype(np.float64)
     np.fill_diagonal(sim_full, -1.0)
@@ -142,7 +107,6 @@ def run_holdouts(X, e_foia, foia_ids, k, sharpen, floor, fracs, folds, seed):
 
 
 def load_panel_sims(panel_csv, diag_parquet, foia_ids):
-    """max_sim for every panel PI, anchors excluded."""
     panel = pd.read_csv(panel_csv, dtype={"athr_id": str})[["athr_id"]]
     diag = pd.read_parquet(diag_parquet, columns=["athr_id", "max_sim"])
     diag["athr_id"] = diag["athr_id"].astype(str)
@@ -155,7 +119,6 @@ def load_panel_sims(panel_csv, diag_parquet, foia_ids):
 
 
 def bin_curve(df, n_bins):
-    """Quantile-bin corr/MAE/RMSE over max_sim_to_train."""
     q = np.quantile(df["max_sim_to_train"], np.linspace(0, 1, n_bins + 1))
     q[-1] += 1e-12
     bins = np.digitize(df["max_sim_to_train"], q[1:-1])
@@ -180,9 +143,6 @@ def bin_curve(df, n_bins):
 
 
 def panel_reweight(df, panel_sims, width):
-    """Importance weights matching the holdout's max_sim distribution to the
-    panel's, on fixed-width bins. Returns (weights, coverage_share) where
-    coverage_share is the panel mass falling in bins with holdout support."""
     hi = max(df["max_sim_to_train"].max(), panel_sims.max()) + width
     edges = np.arange(0, hi + width, width)
     h_idx = np.digitize(df["max_sim_to_train"], edges) - 1
