@@ -1,18 +1,10 @@
------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
       name:  <unnamed>
        log:  /n/holylabs/pakes_lab/Lab/sci_eq/analysis/rf_heterogeneity/code/test_young_old.log
   log type:  text
- opened on:   4 Sep 2026, 00:59:52
+ opened on:   4 Sep 2026, 15:14:16
 
 . 
-. * Early- vs late-career differential from the joint pooled-DiD PPML that
-. * event_study_het fits (split_type med_pi). Three tests per outcome:
-. *   (1) median split, lincom Z_young - Z_old off the joint VCE
-. *   (2) continuous Z x lab-age interaction (one coefficient, no binning)
-. *   (3) both again with PI age redefined off the first last-author paper that
-. *       was NOT solo-authored (min_year_nonsolo, built here from the
-. *       untruncated last-author panel)
-. * Reads the panels analysis.do already wrote to ../temp/, so no rebuild.
 . 
 . local fes athr_id year
 
@@ -26,26 +18,18 @@
   5.         continue
   6.     }
   7. 
-.     * n_solo_ppr is degenerate in the last-author panel (num_athrs == 1 by
-.     * construction, so it equals ppr_cnt); avg_team_size = mean coauthors is
-.     * genuine, so >0 flags a year with a non-solo last-author paper.
 .     use athr_id year avg_team_size using ///
 >         ../external/samp/athr_panel_full_year_last_all_jrnls`suf', clear
   8.     gen _nonsolo_yr = year if avg_team_size > 0.001 & !mi(avg_team_size)
   9.     gcollapse (min) min_year_nonsolo = _nonsolo_yr, by(athr_id)
  10.     save ../temp/min_year_nonsolo`suf', replace
  11. 
-.     * Career clock excluding solo papers: first year with a non-solo paper in
-.     * any author position.
 .     use athr_id year ppr_cnt n_solo_ppr using ///
 >         ../external/samp/athr_panel_full_year_all_jrnls`suf', clear
  12.     gen _ns_any_yr = year if ppr_cnt - n_solo_ppr > 0.001
  13.     gcollapse (min) min_year_any_ns = _ns_any_yr, by(athr_id)
  14.     save ../temp/min_year_any_ns`suf', replace
  15. 
-.     * Last-author papers excluding solo ones. n_solo_ppr is genuine in the
-.     * all-position panel (num_athrs is real there), where n_last_ppr is the
-.     * same count as ppr_cnt in the analysis panel.
 .     use athr_id year n_last_ppr n_solo_ppr using ///
 >         ../external/samp/athr_panel_full_year_all_jrnls`suf', clear
  16.     gen ppr_cnt_nonsolo = n_last_ppr - n_solo_ppr
@@ -61,9 +45,7 @@
  23.     foreach v in n_last_ppr ppr_cnt_nonsolo {
  24.         replace `v' = 0 if mi(`v')
  25.     }
- 26.     * Nonzero only if the panel was built with reduced_form's DROP_SOLO on, in
-.     * which case ppr_cnt is already the non-solo count and the two are the same.
-.     qui count if ppr_cnt != n_last_ppr
+ 26.     qui count if ppr_cnt != n_last_ppr
  27.     di as text "  rows where ppr_cnt != n_last_ppr (all-position panel): " r(N)
  28.     qui sum ppr_cnt_nonsolo
  29.     local ns_tot = r(sum)
@@ -107,8 +89,6 @@
  61.     gen lab_age_ns  = 2014 - min_year_nonsolo
  62.     gen career_age  = 2014 - min_year_any
  63. 
-.     * Lab-age split dropping PIs whose first indexed paper was already
-.     * last-authored (gap <= 0), for whom min_year cannot measure independence.
 .     gen gap = min_year - min_year_any
  64.     qui count if athr_indicator == 1 & gap <= 0
  65.     local n_nogap = r(N)
@@ -119,8 +99,6 @@
  70.     gen byte young_g = min_year >  `gapmed' if !mi(min_year) & gap >= 1 & !mi(gap)
  71.     gen byte old_g   = min_year <= `gapmed' if !mi(min_year) & gap >= 1 & !mi(gap)
  72. 
-.     * Young on both the lab-age and career-age clocks vs old on both; PIs the
-.     * two clocks disagree on are missing and drop out of the fit.
 .     gen byte young_both = young == 1 & young_any == 1 ///
 >         if young == young_any & !mi(young) & !mi(young_any)
  73.     gen byte old_both   = young == 0 & young_any == 0 ///
@@ -130,7 +108,6 @@
  75.     gen Z_it       = exposure      * post
  76.     gen Z_share_it = mkt_spend_shr * post
  77. 
-.     * ---- (1)/(3a) median splits
 .     cap matrix drop SPLITS
  78.     local split_rows
  79.     local pairs `" "young old" "young_ns old_ns" "young_g old_g" "young_any old_any" "young_anyns old_anyns" "young_both old_both" "young_nih old_nih" "'
@@ -187,7 +164,6 @@
 123.         }
 124.     }
 125. 
-.     * ---- (2)/(3b) continuous age gradient: one coefficient, all PIs
 .     foreach agevar in lab_age lab_age_ns career_age {
 126.         cap confirm variable `agevar'
 127.         if _rc {
@@ -227,9 +203,6 @@
 156.         }
 157.     }
 158. 
-.     * ---- (5) 2x2 career age x lab age. The two switcher cells disagree about
-.     * which clock a PI is young on, so they identify which clock the effect
-.     * actually follows.
 .     cap drop yc_yl oc_ol oc_yl yc_ol
 159.     gen byte yc_yl = (young_any == 1 & young == 1) if !mi(young_any) & !mi(young)
 160.     gen byte oc_ol = (young_any == 0 & young == 0) if !mi(young_any) & !mi(young)
@@ -260,8 +233,7 @@
 182.         di as text "  young career, OLD lab   : b=" %8.4f _b[Z_yc_ol] " (se=" %7.4f _se[Z_yc_ol] ")   <- gap 0"
 183.         di as text "  OLD career, young lab   : b=" %8.4f _b[Z_oc_yl] " (se=" %7.4f _se[Z_oc_yl] ")   <- long apprenticeship"
 184.         di as text "  OLD career, OLD lab     : b=" %8.4f _b[Z_oc_ol] " (se=" %7.4f _se[Z_oc_ol] ")"
-185.         local clabs `" "career effect within young labs" "career effect within old labs" "lab effect within young careers" "lab effect within old careers" "unambiguous young vs old (switchers 
-> dropped)" "'
+185.         local clabs `" "career effect within young labs" "career effect within old labs" "lab effect within young careers" "lab effect within old careers" "unambiguous young vs old (switchers dropped)" "'
 186.         local cvars `" "Z_yc_yl Z_oc_yl" "Z_yc_ol Z_oc_ol" "Z_yc_yl Z_yc_ol" "Z_oc_yl Z_oc_ol" "Z_yc_yl Z_oc_ol" "'
 187.         forval k = 1/5 {
 188.             local dtxt  : word `k' of `clabs'
@@ -277,7 +249,6 @@
 198.         }
 199.     }
 200. 
-.     * ---- (4) horse race: both age measures in one fit
 .     foreach yvar in ppr_cnt {
 201.         cap drop lab_c car_c Z_lab Z_car S_lab S_car PT_lab PT_car
 202.         qui sum lab_age if athr_indicator == 1, d
@@ -311,10 +282,7 @@
 228.         local b_hr  = r(estimate)
 229.         local se_hr = r(se)
 230.         local p_hr  = r(p)
-231.         * Reparametrised: lab_age = career_age - gap, so the fit is equivalent to
-.         * (b_lab+b_car) on career age holding the apprenticeship gap fixed, and
-.         * (-b_lab) on the gap itself.
-.         lincom Z_lab + Z_car
+231.         lincom Z_lab + Z_car
 232.         local b_cg  = r(estimate)
 233.         local se_cg = r(se)
 234.         local p_cg  = r(p)
@@ -347,87 +315,87 @@ file ../temp/nonsolo_ppr_r1_r2.dta saved
     Result                      Number of obs
     -----------------------------------------
     Not matched                             0
-    Matched                           135,080  
+    Matched                           135,150  
     -----------------------------------------
 
     Result                      Number of obs
     -----------------------------------------
     Not matched                             0
-    Matched                           135,080  
+    Matched                           135,150  
     -----------------------------------------
 
     Result                      Number of obs
     -----------------------------------------
-    Not matched                        15,561
-        from master                    15,561  
+    Not matched                        15,575
+        from master                    15,575  
         from using                          0  
 
-    Matched                           119,519  
+    Matched                           119,575  
     -----------------------------------------
-(15,561 real changes made)
-(15,561 real changes made)
-  rows where ppr_cnt != n_last_ppr (all-position panel): 5043
+(15,575 real changes made)
+(15,575 real changes made)
+  rows where ppr_cnt != n_last_ppr (all-position panel): 5045
   solo papers are  3.95% of last-author papers in this sample
 
-== all_jrnls_r1_r2: min_year_nonsolo median = 2001; 8 of 13508 PIs have no non-solo last-author paper ==
+== all_jrnls_r1_r2: min_year_nonsolo median = 2001; 8 of 13515 PIs have no non-solo last-author paper ==
 
     Variable |         N      Mean       p10       p25       p50       p75       p90
 -------------+----------------------------------------------------------------------
-    min_year |   13508.0    1997.1    1980.0    1990.0    2000.0    2006.0    2009.0
-min_year_n~o |   13500.0    1997.9    1982.0    1991.0    2001.0    2006.0    2010.0
-min_year_any |   13508.0    1992.1    1976.0    1985.0    1994.0    2001.0    2005.0
-min_year_a~s |   13504.0    1992.4    1977.0    1985.0    1994.0    2001.0    2005.0
+    min_year |   13515.0    1997.0    1980.0    1990.0    2000.0    2006.0    2009.0
+min_year_n~o |   13507.0    1997.9    1982.0    1991.0    2001.0    2006.0    2010.0
+min_year_any |   13515.0    1992.1    1976.0    1985.0    1994.0    2001.0    2005.0
+min_year_a~s |   13511.0    1992.4    1977.0    1985.0    1994.0    2001.0    2005.0
 ------------------------------------------------------------------------------------
 (80 missing values generated)
 (80 missing values generated)
   PIs that switch side under the non-solo definition: 781
   min_year_any (first pub ever) median = 1994
-  PIs that switch side under the first-pub-ever definition: 2169
+  PIs that switch side under the first-pub-ever definition: 2170
   min_year_any_ns (first non-solo pub, any position) median = 1994
 (40 missing values generated)
 (40 missing values generated)
   PIs that switch side once solo papers are dropped from the career clock: 102
 (80 missing values generated)
-  PIs with gap <= 0 (first paper is last-authored): 3737 of 13508
-(37,370 missing values generated)
-(37,370 missing values generated)
-(21,690 missing values generated)
-(21,690 missing values generated)
-Iteration 1:   deviance = 1.5063e+05  eps = .         iters = 3    tol = 1.0e-04  min(eta) =  -1.54  P   
-Iteration 2:   deviance = 1.4648e+05  eps = 2.83e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.85      
-Iteration 3:   deviance = 1.4644e+05  eps = 2.49e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.91      
-Iteration 4:   deviance = 1.4644e+05  eps = 2.13e-07  iters = 2    tol = 1.0e-04  min(eta) =  -1.92      
-Iteration 5:   deviance = 1.4644e+05  eps = 8.47e-12  iters = 2    tol = 1.0e-05  min(eta) =  -1.92   S  
-Iteration 6:   deviance = 1.4644e+05  eps = 0.00e+00  iters = 2    tol = 1.0e-08  min(eta) =  -1.92   S O
+  PIs with gap <= 0 (first paper is last-authored): 3740 of 13515
+(37,400 missing values generated)
+(37,400 missing values generated)
+(21,700 missing values generated)
+(21,700 missing values generated)
+Iteration 1:   deviance = 1.5071e+05  eps = .         iters = 3    tol = 1.0e-04  min(eta) =  -1.54  P   
+Iteration 2:   deviance = 1.4655e+05  eps = 2.83e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.85      
+Iteration 3:   deviance = 1.4652e+05  eps = 2.49e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.91      
+Iteration 4:   deviance = 1.4652e+05  eps = 2.14e-07  iters = 2    tol = 1.0e-04  min(eta) =  -1.92      
+Iteration 5:   deviance = 1.4652e+05  eps = 8.58e-12  iters = 2    tol = 1.0e-05  min(eta) =  -1.92   S  
+Iteration 6:   deviance = 1.4652e+05  eps = 0.00e+00  iters = 2    tol = 1.0e-08  min(eta) =  -1.92   S O
 ------------------------------------------------------------------------------------------------------------
 (legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
 Converged in 6 iterations and 13 HDFE sub-iterations (tol = 1.0e-08)
 
-HDFE PPML regression                              No. of obs      =    135,080
-Absorbing 2 HDFE groups                           Residual df     =     13,507
-Statistics robust to heteroskedasticity           Wald chi2(5)    =     117.40
-Deviance             =  146444.3192               Prob > chi2     =     0.0000
-Log pseudolikelihood = -203418.2403               Pseudo R2       =     0.1955
+HDFE PPML regression                              No. of obs      =    135,150
+Absorbing 2 HDFE groups                           Residual df     =     13,514
+Statistics robust to heteroskedasticity           Wald chi2(5)    =     114.90
+Deviance             =  146518.1303               Prob > chi2     =     0.0000
+Log pseudolikelihood =  -203522.987               Pseudo R2       =     0.1955
 
-Number of clusters (athr_id)=     13,508
-                           (Std. err. adjusted for 13,508 clusters in athr_id)
+Number of clusters (athr_id)=     13,515
+                           (Std. err. adjusted for 13,515 clusters in athr_id)
 ------------------------------------------------------------------------------
              |               Robust
      ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
 -------------+----------------------------------------------------------------
-     Z_young |  -1.217181    .350508    -3.47   0.001    -1.904164   -.5301981
-       Z_old |  -.1271997   .3747209    -0.34   0.734    -.8616393    .6072398
-     S_young |   .1629199   .1008631     1.62   0.106    -.0347681    .3606079
-       S_old |  -.0738204   .0982845    -0.75   0.453    -.2664545    .1188136
-    PT_young |   .1067414   .0240501     4.44   0.000      .059604    .1538788
-       _cons |   .7525078   .0078207    96.22   0.000     .7371795    .7678362
+     Z_young |  -.7228722   .2351152    -3.07   0.002     -1.18369   -.2620548
+       Z_old |  -.2087189    .249117    -0.84   0.402    -.6969793    .2795416
+     S_young |   .0443833   .0780894     0.57   0.570    -.1086691    .1974356
+       S_old |  -.0654308   .0689264    -0.95   0.342     -.200524    .0696625
+    PT_young |   .1038091   .0306966     3.38   0.001     .0436448    .1639734
+       _cons |   .7562674   .0100466    75.28   0.000     .7365764    .7759585
 ------------------------------------------------------------------------------
 
 Absorbed degrees of freedom:
 -----------------------------------------------------+
  Absorbed FE | Categories  - Redundant  = Num. Coefs |
 -------------+---------------------------------------|
-     athr_id |     13508       13508           0    *|
+     athr_id |     13515       13515           0    *|
         year |        10           1           9     |
 -----------------------------------------------------+
 * = FE nested within cluster; treated as redundant for DoF computation
@@ -437,54 +405,54 @@ Absorbed degrees of freedom:
 ------------------------------------------------------------------------------
      ppr_cnt | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
 -------------+----------------------------------------------------------------
-         (1) |  -1.089981      .5131    -2.12   0.034    -2.095639   -.0843239
+         (1) |  -.5141533    .342547    -1.50   0.133    -1.185533    .1572265
 ------------------------------------------------------------------------------
 
-== all_jrnls_r1_r2 ppr_cnt young vs old (N=135080) ==
-  young: b= -1.2172 (se= 0.3505)
-  old: b= -0.1272 (se= 0.3747)
-  diff, joint VCE:  b= -1.0900 se= 0.5131 t=-2.124 p=0.0336 (one-sided 0.0168)
-  diff, indep. SEs: se= 0.5131 p=0.0336
+== all_jrnls_r1_r2 ppr_cnt young vs old (N=135150) ==
+  young: b= -0.7229 (se= 0.2351)
+  old: b= -0.2087 (se= 0.2491)
+  diff, joint VCE:  b= -0.5142 se= 0.3425 t=-1.501 p=0.1334 (one-sided 0.0667)
+  diff, indep. SEs: se= 0.3425 p=0.1334
 (80 missing values generated)
 (80 missing values generated)
 (80 missing values generated)
 (80 missing values generated)
 (80 missing values generated)
-Iteration 1:   deviance = 1.5055e+05  eps = .         iters = 3    tol = 1.0e-04  min(eta) =  -1.53  P   
-Iteration 2:   deviance = 1.4640e+05  eps = 2.83e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.85      
-Iteration 3:   deviance = 1.4637e+05  eps = 2.49e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.92      
-Iteration 4:   deviance = 1.4637e+05  eps = 2.12e-07  iters = 2    tol = 1.0e-04  min(eta) =  -1.92      
-Iteration 5:   deviance = 1.4637e+05  eps = 8.44e-12  iters = 2    tol = 1.0e-05  min(eta) =  -1.92   S  
-Iteration 6:   deviance = 1.4637e+05  eps = 1.84e-16  iters = 2    tol = 1.0e-08  min(eta) =  -1.92   S O
+Iteration 1:   deviance = 1.5062e+05  eps = .         iters = 3    tol = 1.0e-04  min(eta) =  -1.53  P   
+Iteration 2:   deviance = 1.4647e+05  eps = 2.83e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.85      
+Iteration 3:   deviance = 1.4644e+05  eps = 2.49e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.92      
+Iteration 4:   deviance = 1.4644e+05  eps = 2.13e-07  iters = 2    tol = 1.0e-04  min(eta) =  -1.92      
+Iteration 5:   deviance = 1.4644e+05  eps = 8.60e-12  iters = 2    tol = 1.0e-05  min(eta) =  -1.92   S  
+Iteration 6:   deviance = 1.4644e+05  eps = 0.00e+00  iters = 2    tol = 1.0e-08  min(eta) =  -1.92   S O
 ------------------------------------------------------------------------------------------------------------
 (legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
 Converged in 6 iterations and 13 HDFE sub-iterations (tol = 1.0e-08)
 
-HDFE PPML regression                              No. of obs      =    135,000
-Absorbing 2 HDFE groups                           Residual df     =     13,499
-Statistics robust to heteroskedasticity           Wald chi2(5)    =     114.38
-Deviance             =  146367.5742               Prob > chi2     =     0.0000
-Log pseudolikelihood = -203314.2426               Pseudo R2       =     0.1954
+HDFE PPML regression                              No. of obs      =    135,070
+Absorbing 2 HDFE groups                           Residual df     =     13,506
+Statistics robust to heteroskedasticity           Wald chi2(5)    =     112.64
+Deviance             =  146438.3689               Prob > chi2     =     0.0000
+Log pseudolikelihood = -203417.4811               Pseudo R2       =     0.1954
 
-Number of clusters (athr_id)=     13,500
-                           (Std. err. adjusted for 13,500 clusters in athr_id)
+Number of clusters (athr_id)=     13,507
+                           (Std. err. adjusted for 13,507 clusters in athr_id)
 ------------------------------------------------------------------------------
              |               Robust
      ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
 -------------+----------------------------------------------------------------
-  Z_young_ns |  -1.083589   .3538482    -3.06   0.002    -1.777119   -.3900595
-    Z_old_ns |  -.2658588   .3696019    -0.72   0.472    -.9902652    .4585476
-  S_young_ns |    .130038   .1020685     1.27   0.203    -.0700125    .3300885
-    S_old_ns |  -.0462727   .0974682    -0.47   0.635    -.2373069    .1447616
- PT_young_ns |   .1103294   .0241637     4.57   0.000     .0629693    .1576895
-       _cons |   .7527977   .0076812    98.01   0.000     .7377428    .7678526
+  Z_young_ns |  -.6768921   .2423228    -2.79   0.005    -1.151836   -.2019481
+    Z_old_ns |  -.2778375   .2407822    -1.15   0.249     -.749762     .194087
+  S_young_ns |   .0621573   .0805436     0.77   0.440    -.0957053    .2200198
+    S_old_ns |  -.0601986   .0675187    -0.89   0.373    -.1925328    .0721356
+ PT_young_ns |   .0972716   .0308533     3.15   0.002     .0368002    .1577431
+       _cons |   .7574448   .0099372    76.22   0.000     .7379682    .7769214
 ------------------------------------------------------------------------------
 
 Absorbed degrees of freedom:
 -----------------------------------------------------+
  Absorbed FE | Categories  - Redundant  = Num. Coefs |
 -------------+---------------------------------------|
-     athr_id |     13500       13500           0    *|
+     athr_id |     13507       13507           0    *|
         year |        10           1           9     |
 -----------------------------------------------------+
 * = FE nested within cluster; treated as redundant for DoF computation
@@ -494,54 +462,54 @@ Absorbed degrees of freedom:
 ------------------------------------------------------------------------------
      ppr_cnt | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
 -------------+----------------------------------------------------------------
-         (1) |  -.8177305   .5116777    -1.60   0.110      -1.8206    .1851395
+         (1) |  -.3990545   .3416086    -1.17   0.243    -1.068595     .270486
 ------------------------------------------------------------------------------
 
-== all_jrnls_r1_r2 ppr_cnt young_ns vs old_ns (N=135000) ==
-  young_ns: b= -1.0836 (se= 0.3538)
-  old_ns: b= -0.2659 (se= 0.3696)
-  diff, joint VCE:  b= -0.8177 se= 0.5117 t=-1.598 p=0.1100 (one-sided 0.0550)
-  diff, indep. SEs: se= 0.5117 p=0.1100
-(37,370 missing values generated)
-(37,370 missing values generated)
-(37,370 missing values generated)
-(37,370 missing values generated)
-(37,370 missing values generated)
-Iteration 1:   deviance = 1.0822e+05  eps = .         iters = 3    tol = 1.0e-04  min(eta) =  -1.50  P   
-Iteration 2:   deviance = 1.0533e+05  eps = 2.74e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.82      
-Iteration 3:   deviance = 1.0531e+05  eps = 2.45e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.88      
-Iteration 4:   deviance = 1.0531e+05  eps = 2.65e-07  iters = 2    tol = 1.0e-04  min(eta) =  -1.88      
-Iteration 5:   deviance = 1.0531e+05  eps = 1.28e-11  iters = 2    tol = 1.0e-05  min(eta) =  -1.88   S  
-Iteration 6:   deviance = 1.0531e+05  eps = 0.00e+00  iters = 2    tol = 1.0e-08  min(eta) =  -1.88   S O
+== all_jrnls_r1_r2 ppr_cnt young_ns vs old_ns (N=135070) ==
+  young_ns: b= -0.6769 (se= 0.2423)
+  old_ns: b= -0.2778 (se= 0.2408)
+  diff, joint VCE:  b= -0.3991 se= 0.3416 t=-1.168 p=0.2427 (one-sided 0.1214)
+  diff, indep. SEs: se= 0.3416 p=0.2427
+(37,400 missing values generated)
+(37,400 missing values generated)
+(37,400 missing values generated)
+(37,400 missing values generated)
+(37,400 missing values generated)
+Iteration 1:   deviance = 1.0827e+05  eps = .         iters = 3    tol = 1.0e-04  min(eta) =  -1.51  P   
+Iteration 2:   deviance = 1.0538e+05  eps = 2.74e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.82      
+Iteration 3:   deviance = 1.0536e+05  eps = 2.45e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.89      
+Iteration 4:   deviance = 1.0536e+05  eps = 2.66e-07  iters = 2    tol = 1.0e-04  min(eta) =  -1.89      
+Iteration 5:   deviance = 1.0536e+05  eps = 1.30e-11  iters = 2    tol = 1.0e-05  min(eta) =  -1.89   S  
+Iteration 6:   deviance = 1.0536e+05  eps = 1.24e-16  iters = 2    tol = 1.0e-08  min(eta) =  -1.89   S O
 ------------------------------------------------------------------------------------------------------------
 (legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
 Converged in 6 iterations and 13 HDFE sub-iterations (tol = 1.0e-08)
 
-HDFE PPML regression                              No. of obs      =     97,710
-Absorbing 2 HDFE groups                           Residual df     =      9,770
-Statistics robust to heteroskedasticity           Wald chi2(5)    =     118.08
-Deviance             =   105306.403               Prob > chi2     =     0.0000
-Log pseudolikelihood =  -146740.982               Pseudo R2       =     0.1864
+HDFE PPML regression                              No. of obs      =     97,750
+Absorbing 2 HDFE groups                           Residual df     =      9,774
+Statistics robust to heteroskedasticity           Wald chi2(5)    =     115.14
+Deviance             =  105355.6343               Prob > chi2     =     0.0000
+Log pseudolikelihood =  -146811.162               Pseudo R2       =     0.1864
 
-Number of clusters (athr_id)=      9,771
-                            (Std. err. adjusted for 9,771 clusters in athr_id)
+Number of clusters (athr_id)=      9,775
+                            (Std. err. adjusted for 9,775 clusters in athr_id)
 ------------------------------------------------------------------------------
              |               Robust
      ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
 -------------+----------------------------------------------------------------
-   Z_young_g |  -1.112772   .4046771    -2.75   0.006    -1.905925   -.3196197
-     Z_old_g |  -.2321106   .4243389    -0.55   0.584    -1.063799    .5995784
-   S_young_g |   .2994789   .1157157     2.59   0.010     .0726802    .5262775
-     S_old_g |  -.1006678   .1133459    -0.89   0.374    -.3228216    .1214861
-  PT_young_g |   .0902172   .0273161     3.30   0.001     .0366786    .1437558
-       _cons |   .7289518   .0091136    79.98   0.000     .7110894    .7468141
+   Z_young_g |  -.3947501   .2746764    -1.44   0.151     -.933106    .1436057
+     Z_old_g |  -.3107191   .2837318    -1.10   0.273    -.8668232     .245385
+   S_young_g |   .1238155   .0851057     1.45   0.146    -.0429886    .2906196
+     S_old_g |  -.1526887   .0799835    -1.91   0.056    -.3094534    .0040761
+  PT_young_g |   .0653665   .0347157     1.88   0.060    -.0026751    .1334081
+       _cons |     .74231   .0117943    62.94   0.000     .7191936    .7654264
 ------------------------------------------------------------------------------
 
 Absorbed degrees of freedom:
 -----------------------------------------------------+
  Absorbed FE | Categories  - Redundant  = Num. Coefs |
 -------------+---------------------------------------|
-     athr_id |      9771        9771           0    *|
+     athr_id |      9775        9775           0    *|
         year |        10           1           9     |
 -----------------------------------------------------+
 * = FE nested within cluster; treated as redundant for DoF computation
@@ -551,49 +519,49 @@ Absorbed degrees of freedom:
 ------------------------------------------------------------------------------
      ppr_cnt | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
 -------------+----------------------------------------------------------------
-         (1) |  -.8806616   .5863676    -1.50   0.133    -2.029921    .2685979
+         (1) |   -.084031   .3949061    -0.21   0.831    -.8580328    .6899708
 ------------------------------------------------------------------------------
 
-== all_jrnls_r1_r2 ppr_cnt young_g vs old_g (N=97710) ==
-  young_g: b= -1.1128 (se= 0.4047)
-  old_g: b= -0.2321 (se= 0.4243)
-  diff, joint VCE:  b= -0.8807 se= 0.5864 t=-1.502 p=0.1331 (one-sided 0.0666)
-  diff, indep. SEs: se= 0.5864 p=0.1331
-Iteration 1:   deviance = 1.5061e+05  eps = .         iters = 3    tol = 1.0e-04  min(eta) =  -1.53  P   
-Iteration 2:   deviance = 1.4647e+05  eps = 2.83e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.85      
-Iteration 3:   deviance = 1.4643e+05  eps = 2.47e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.91      
-Iteration 4:   deviance = 1.4643e+05  eps = 2.05e-07  iters = 2    tol = 1.0e-04  min(eta) =  -1.92      
-Iteration 5:   deviance = 1.4643e+05  eps = 8.21e-12  iters = 2    tol = 1.0e-05  min(eta) =  -1.92   S  
-Iteration 6:   deviance = 1.4643e+05  eps = 1.84e-16  iters = 2    tol = 1.0e-08  min(eta) =  -1.92   S O
+== all_jrnls_r1_r2 ppr_cnt young_g vs old_g (N=97750) ==
+  young_g: b= -0.3948 (se= 0.2747)
+  old_g: b= -0.3107 (se= 0.2837)
+  diff, joint VCE:  b= -0.0840 se= 0.3949 t=-0.213 p=0.8315 (one-sided 0.4157)
+  diff, indep. SEs: se= 0.3949 p=0.8315
+Iteration 1:   deviance = 1.5067e+05  eps = .         iters = 3    tol = 1.0e-04  min(eta) =  -1.53  P   
+Iteration 2:   deviance = 1.4653e+05  eps = 2.83e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.85      
+Iteration 3:   deviance = 1.4649e+05  eps = 2.47e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.91      
+Iteration 4:   deviance = 1.4649e+05  eps = 2.04e-07  iters = 2    tol = 1.0e-04  min(eta) =  -1.91      
+Iteration 5:   deviance = 1.4649e+05  eps = 8.08e-12  iters = 2    tol = 1.0e-05  min(eta) =  -1.91   S  
+Iteration 6:   deviance = 1.4649e+05  eps = 0.00e+00  iters = 2    tol = 1.0e-08  min(eta) =  -1.91   S O
 ------------------------------------------------------------------------------------------------------------
 (legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
 Converged in 6 iterations and 13 HDFE sub-iterations (tol = 1.0e-08)
 
-HDFE PPML regression                              No. of obs      =    135,080
-Absorbing 2 HDFE groups                           Residual df     =     13,507
-Statistics robust to heteroskedasticity           Wald chi2(5)    =     124.92
-Deviance             =  146430.1119               Prob > chi2     =     0.0000
-Log pseudolikelihood = -203411.1366               Pseudo R2       =     0.1956
+HDFE PPML regression                              No. of obs      =    135,150
+Absorbing 2 HDFE groups                           Residual df     =     13,514
+Statistics robust to heteroskedasticity           Wald chi2(5)    =     132.39
+Deviance             =  146492.4255               Prob > chi2     =     0.0000
+Log pseudolikelihood = -203510.1346               Pseudo R2       =     0.1956
 
-Number of clusters (athr_id)=     13,508
-                           (Std. err. adjusted for 13,508 clusters in athr_id)
+Number of clusters (athr_id)=     13,515
+                           (Std. err. adjusted for 13,515 clusters in athr_id)
 ------------------------------------------------------------------------------
              |               Robust
      ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
 -------------+----------------------------------------------------------------
- Z_young_any |  -1.121963   .3667987    -3.06   0.002    -1.840875   -.4030505
-   Z_old_any |  -.2658506   .3566658    -0.75   0.456    -.9649027    .4332014
- S_young_any |   .0703383   .1031838     0.68   0.495    -.1318982    .2725748
-   S_old_any |   .0455539   .0955904     0.48   0.634    -.1417998    .2329077
-PT_young_any |   .1426058   .0239187     5.96   0.000     .0957261    .1894856
-       _cons |   .7421479   .0078435    94.62   0.000     .7267748     .757521
+ Z_young_any |  -.8959181   .2372955    -3.78   0.000    -1.361009   -.4308275
+   Z_old_any |  -.0252066   .2462513    -0.10   0.918    -.5078504    .4574371
+ S_young_any |  -.0624276   .0766553    -0.81   0.415    -.2126691     .087814
+   S_old_any |   .0183798   .0703779     0.26   0.794    -.1195584     .156318
+PT_young_any |   .1710594     .03067     5.58   0.000     .1109473    .2311715
+       _cons |   .7405474   .0101259    73.13   0.000      .720701    .7603937
 ------------------------------------------------------------------------------
 
 Absorbed degrees of freedom:
 -----------------------------------------------------+
  Absorbed FE | Categories  - Redundant  = Num. Coefs |
 -------------+---------------------------------------|
-     athr_id |     13508       13508           0    *|
+     athr_id |     13515       13515           0    *|
         year |        10           1           9     |
 -----------------------------------------------------+
 * = FE nested within cluster; treated as redundant for DoF computation
@@ -603,54 +571,54 @@ Absorbed degrees of freedom:
 ------------------------------------------------------------------------------
      ppr_cnt | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
 -------------+----------------------------------------------------------------
-         (1) |  -.8561121   .5116168    -1.67   0.094    -1.858863    .1466384
+         (1) |  -.8707115   .3419779    -2.55   0.011    -1.540976   -.2004472
 ------------------------------------------------------------------------------
 
-== all_jrnls_r1_r2 ppr_cnt young_any vs old_any (N=135080) ==
-  young_any: b= -1.1220 (se= 0.3668)
-  old_any: b= -0.2659 (se= 0.3567)
-  diff, joint VCE:  b= -0.8561 se= 0.5116 t=-1.673 p=0.0943 (one-sided 0.0471)
-  diff, indep. SEs: se= 0.5116 p=0.0943
+== all_jrnls_r1_r2 ppr_cnt young_any vs old_any (N=135150) ==
+  young_any: b= -0.8959 (se= 0.2373)
+  old_any: b= -0.0252 (se= 0.2463)
+  diff, joint VCE:  b= -0.8707 se= 0.3420 t=-2.546 p=0.0109 (one-sided 0.0054)
+  diff, indep. SEs: se= 0.3420 p=0.0109
 (40 missing values generated)
 (40 missing values generated)
 (40 missing values generated)
 (40 missing values generated)
 (40 missing values generated)
-Iteration 1:   deviance = 1.5054e+05  eps = .         iters = 3    tol = 1.0e-04  min(eta) =  -1.53  P   
-Iteration 2:   deviance = 1.4641e+05  eps = 2.83e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.85      
-Iteration 3:   deviance = 1.4637e+05  eps = 2.47e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.91      
-Iteration 4:   deviance = 1.4637e+05  eps = 2.04e-07  iters = 2    tol = 1.0e-04  min(eta) =  -1.91      
-Iteration 5:   deviance = 1.4637e+05  eps = 8.13e-12  iters = 2    tol = 1.0e-05  min(eta) =  -1.91   S  
-Iteration 6:   deviance = 1.4637e+05  eps = 0.00e+00  iters = 2    tol = 1.0e-08  min(eta) =  -1.91   S O
+Iteration 1:   deviance = 1.5061e+05  eps = .         iters = 3    tol = 1.0e-04  min(eta) =  -1.53  P   
+Iteration 2:   deviance = 1.4647e+05  eps = 2.83e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.85      
+Iteration 3:   deviance = 1.4643e+05  eps = 2.47e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.91      
+Iteration 4:   deviance = 1.4643e+05  eps = 2.03e-07  iters = 2    tol = 1.0e-04  min(eta) =  -1.91      
+Iteration 5:   deviance = 1.4643e+05  eps = 8.04e-12  iters = 2    tol = 1.0e-05  min(eta) =  -1.91   S  
+Iteration 6:   deviance = 1.4643e+05  eps = 1.84e-16  iters = 2    tol = 1.0e-08  min(eta) =  -1.91   S O
 ------------------------------------------------------------------------------------------------------------
 (legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
 Converged in 6 iterations and 13 HDFE sub-iterations (tol = 1.0e-08)
 
-HDFE PPML regression                              No. of obs      =    135,040
-Absorbing 2 HDFE groups                           Residual df     =     13,503
-Statistics robust to heteroskedasticity           Wald chi2(5)    =     133.37
-Deviance             =  146369.0319               Prob > chi2     =     0.0000
-Log pseudolikelihood = -203358.2124               Pseudo R2       =     0.1956
+HDFE PPML regression                              No. of obs      =    135,110
+Absorbing 2 HDFE groups                           Residual df     =     13,510
+Statistics robust to heteroskedasticity           Wald chi2(5)    =     140.79
+Deviance             =  146430.9766               Prob > chi2     =     0.0000
+Log pseudolikelihood =  -203457.026               Pseudo R2       =     0.1956
 
-Number of clusters (athr_id)=     13,504
-                             (Std. err. adjusted for 13,504 clusters in athr_id)
+Number of clusters (athr_id)=     13,511
+                             (Std. err. adjusted for 13,511 clusters in athr_id)
 --------------------------------------------------------------------------------
                |               Robust
        ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
 ---------------+----------------------------------------------------------------
- Z_young_anyns |  -1.184179   .3630654    -3.26   0.001    -1.895774   -.4725835
-   Z_old_anyns |   -.155875   .3592825    -0.43   0.664    -.8600557    .5483057
- S_young_anyns |    .070049   .1021635     0.69   0.493    -.1301878    .2702858
-   S_old_anyns |   .0327375   .0962043     0.34   0.734    -.1558195    .2212944
-PT_young_anyns |   .1484526    .023889     6.21   0.000     .1016309    .1952743
-         _cons |   .7405345   .0078653    94.15   0.000     .7251188    .7559503
+ Z_young_anyns |  -.9482072   .2373601    -3.99   0.000    -1.413424     -.48299
+   Z_old_anyns |   .0412964   .2461102     0.17   0.867    -.4410708    .5236636
+ S_young_anyns |  -.0526942   .0760754    -0.69   0.489    -.2017992    .0964107
+   S_old_anyns |   .0042227   .0707895     0.06   0.952    -.1345222    .1429676
+PT_young_anyns |   .1714429   .0306266     5.60   0.000     .1114159    .2314698
+         _cons |   .7402625   .0102073    72.52   0.000     .7202565    .7602684
 --------------------------------------------------------------------------------
 
 Absorbed degrees of freedom:
 -----------------------------------------------------+
  Absorbed FE | Categories  - Redundant  = Num. Coefs |
 -------------+---------------------------------------|
-     athr_id |     13504       13504           0    *|
+     athr_id |     13511       13511           0    *|
         year |        10           1           9     |
 -----------------------------------------------------+
 * = FE nested within cluster; treated as redundant for DoF computation
@@ -660,54 +628,54 @@ Absorbed degrees of freedom:
 ------------------------------------------------------------------------------
      ppr_cnt | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
 -------------+----------------------------------------------------------------
-         (1) |  -1.028304   .5107841    -2.01   0.044    -2.029422   -.0271852
+         (1) |  -.9895036   .3419211    -2.89   0.004    -1.659657   -.3193506
 ------------------------------------------------------------------------------
 
-== all_jrnls_r1_r2 ppr_cnt young_anyns vs old_anyns (N=135040) ==
-  young_anyns: b= -1.1842 (se= 0.3631)
-  old_anyns: b= -0.1559 (se= 0.3593)
-  diff, joint VCE:  b= -1.0283 se= 0.5108 t=-2.013 p=0.0441 (one-sided 0.0220)
-  diff, indep. SEs: se= 0.5108 p=0.0441
-(21,690 missing values generated)
-(21,690 missing values generated)
-(21,690 missing values generated)
-(21,690 missing values generated)
-(21,690 missing values generated)
-Iteration 1:   deviance = 1.2642e+05  eps = .         iters = 3    tol = 1.0e-04  min(eta) =  -1.54  P   
-Iteration 2:   deviance = 1.2295e+05  eps = 2.82e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.85      
-Iteration 3:   deviance = 1.2292e+05  eps = 2.47e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.91      
-Iteration 4:   deviance = 1.2292e+05  eps = 2.12e-07  iters = 2    tol = 1.0e-04  min(eta) =  -1.92      
-Iteration 5:   deviance = 1.2292e+05  eps = 9.10e-12  iters = 2    tol = 1.0e-05  min(eta) =  -1.92   S  
-Iteration 6:   deviance = 1.2292e+05  eps = 0.00e+00  iters = 2    tol = 1.0e-08  min(eta) =  -1.92   S O
+== all_jrnls_r1_r2 ppr_cnt young_anyns vs old_anyns (N=135110) ==
+  young_anyns: b= -0.9482 (se= 0.2374)
+  old_anyns: b=  0.0413 (se= 0.2461)
+  diff, joint VCE:  b= -0.9895 se= 0.3419 t=-2.894 p=0.0038 (one-sided 0.0019)
+  diff, indep. SEs: se= 0.3419 p=0.0038
+(21,700 missing values generated)
+(21,700 missing values generated)
+(21,700 missing values generated)
+(21,700 missing values generated)
+(21,700 missing values generated)
+Iteration 1:   deviance = 1.2649e+05  eps = .         iters = 3    tol = 1.0e-04  min(eta) =  -1.54  P   
+Iteration 2:   deviance = 1.2302e+05  eps = 2.82e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.85      
+Iteration 3:   deviance = 1.2299e+05  eps = 2.47e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.91      
+Iteration 4:   deviance = 1.2299e+05  eps = 2.12e-07  iters = 2    tol = 1.0e-04  min(eta) =  -1.91      
+Iteration 5:   deviance = 1.2299e+05  eps = 8.99e-12  iters = 2    tol = 1.0e-05  min(eta) =  -1.91   S  
+Iteration 6:   deviance = 1.2299e+05  eps = 2.18e-16  iters = 2    tol = 1.0e-08  min(eta) =  -1.91   S O
 ------------------------------------------------------------------------------------------------------------
 (legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
 Converged in 6 iterations and 13 HDFE sub-iterations (tol = 1.0e-08)
 
-HDFE PPML regression                              No. of obs      =    113,390
-Absorbing 2 HDFE groups                           Residual df     =     11,338
-Statistics robust to heteroskedasticity           Wald chi2(5)    =     142.27
-Deviance             =  122921.5039               Prob > chi2     =     0.0000
-Log pseudolikelihood = -170739.7031               Pseudo R2       =     0.1945
+HDFE PPML regression                              No. of obs      =    113,450
+Absorbing 2 HDFE groups                           Residual df     =     11,344
+Statistics robust to heteroskedasticity           Wald chi2(5)    =     143.61
+Deviance             =  122986.6261               Prob > chi2     =     0.0000
+Log pseudolikelihood = -170828.9383               Pseudo R2       =     0.1945
 
-Number of clusters (athr_id)=     11,339
-                            (Std. err. adjusted for 11,339 clusters in athr_id)
+Number of clusters (athr_id)=     11,345
+                            (Std. err. adjusted for 11,345 clusters in athr_id)
 -------------------------------------------------------------------------------
               |               Robust
       ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
 --------------+----------------------------------------------------------------
- Z_young_both |  -1.329817   .3828748    -3.47   0.001    -2.080238   -.5793963
-   Z_old_both |  -.1842869   .3900657    -0.47   0.637    -.9488016    .5802278
- S_young_both |   .1908477   .1112227     1.72   0.086    -.0271449    .4088402
-   S_old_both |    .044085   .1042584     0.42   0.672    -.1602577    .2484278
-PT_young_both |   .1493645    .026322     5.67   0.000     .0977744    .2009547
-        _cons |    .734459   .0084925    86.48   0.000     .7178141    .7511039
+ Z_young_both |  -.8768151   .2532435    -3.46   0.001    -1.373163    -.380467
+   Z_old_both |  -.0586247   .2664035    -0.22   0.826    -.5807659    .4635165
+ S_young_both |   .0011703   .0855781     0.01   0.989    -.1665597    .1689003
+   S_old_both |  -.0104501   .0756373    -0.14   0.890    -.1586964    .1377962
+PT_young_both |   .1649359   .0336281     4.90   0.000      .099026    .2308457
+        _cons |   .7382684   .0109043    67.70   0.000     .7168963    .7596405
 -------------------------------------------------------------------------------
 
 Absorbed degrees of freedom:
 -----------------------------------------------------+
  Absorbed FE | Categories  - Redundant  = Num. Coefs |
 -------------+---------------------------------------|
-     athr_id |     11339       11339           0    *|
+     athr_id |     11345       11345           0    *|
         year |        10           1           9     |
 -----------------------------------------------------+
 * = FE nested within cluster; treated as redundant for DoF computation
@@ -717,54 +685,54 @@ Absorbed degrees of freedom:
 ------------------------------------------------------------------------------
      ppr_cnt | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
 -------------+----------------------------------------------------------------
-         (1) |   -1.14553   .5465751    -2.10   0.036    -2.216798   -.0742626
+         (1) |  -.8181903   .3675637    -2.23   0.026    -1.538602   -.0977787
 ------------------------------------------------------------------------------
 
-== all_jrnls_r1_r2 ppr_cnt young_both vs old_both (N=113390) ==
-  young_both: b= -1.3298 (se= 0.3829)
-  old_both: b= -0.1843 (se= 0.3901)
-  diff, joint VCE:  b= -1.1455 se= 0.5466 t=-2.096 p=0.0361 (one-sided 0.0180)
-  diff, indep. SEs: se= 0.5466 p=0.0361
-(59,490 missing values generated)
-(59,490 missing values generated)
-(59,490 missing values generated)
-(59,490 missing values generated)
-(59,490 missing values generated)
-Iteration 1:   deviance = 8.2228e+04  eps = .         iters = 3    tol = 1.0e-04  min(eta) =  -1.49  P   
-Iteration 2:   deviance = 8.0209e+04  eps = 2.52e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.83      
-Iteration 3:   deviance = 8.0195e+04  eps = 1.70e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.90      
-Iteration 4:   deviance = 8.0195e+04  eps = 4.65e-08  iters = 2    tol = 1.0e-04  min(eta) =  -1.90      
-Iteration 5:   deviance = 8.0195e+04  eps = 4.18e-14  iters = 1    tol = 1.0e-05  min(eta) =  -1.90   S  
-Iteration 6:   deviance = 8.0195e+04  eps = 0.00e+00  iters = 2    tol = 1.0e-09  min(eta) =  -1.90   S O
+== all_jrnls_r1_r2 ppr_cnt young_both vs old_both (N=113450) ==
+  young_both: b= -0.8768 (se= 0.2532)
+  old_both: b= -0.0586 (se= 0.2664)
+  diff, joint VCE:  b= -0.8182 se= 0.3676 t=-2.226 p=0.0260 (one-sided 0.0130)
+  diff, indep. SEs: se= 0.3676 p=0.0260
+(59,530 missing values generated)
+(59,530 missing values generated)
+(59,530 missing values generated)
+(59,530 missing values generated)
+(59,530 missing values generated)
+Iteration 1:   deviance = 8.2280e+04  eps = .         iters = 3    tol = 1.0e-04  min(eta) =  -1.48  P   
+Iteration 2:   deviance = 8.0259e+04  eps = 2.52e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.82      
+Iteration 3:   deviance = 8.0245e+04  eps = 1.71e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.89      
+Iteration 4:   deviance = 8.0245e+04  eps = 4.71e-08  iters = 2    tol = 1.0e-04  min(eta) =  -1.90      
+Iteration 5:   deviance = 8.0245e+04  eps = 4.24e-14  iters = 1    tol = 1.0e-05  min(eta) =  -1.90   S  
+Iteration 6:   deviance = 8.0245e+04  eps = 0.00e+00  iters = 2    tol = 1.0e-09  min(eta) =  -1.90   S O
 ------------------------------------------------------------------------------------------------------------
 (legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
 Converged in 6 iterations and 12 HDFE sub-iterations (tol = 1.0e-08)
 
-HDFE PPML regression                              No. of obs      =     75,590
-Absorbing 2 HDFE groups                           Residual df     =      7,558
-Statistics robust to heteroskedasticity           Wald chi2(5)    =     118.64
-Deviance             =  80195.12899               Prob > chi2     =     0.0000
-Log pseudolikelihood =  -116668.133               Pseudo R2       =     0.1897
+HDFE PPML regression                              No. of obs      =     75,620
+Absorbing 2 HDFE groups                           Residual df     =      7,561
+Statistics robust to heteroskedasticity           Wald chi2(5)    =     108.65
+Deviance             =  80245.02317               Prob > chi2     =     0.0000
+Log pseudolikelihood = -116723.2835               Pseudo R2       =     0.1896
 
-Number of clusters (athr_id)=      7,559
-                            (Std. err. adjusted for 7,559 clusters in athr_id)
+Number of clusters (athr_id)=      7,562
+                            (Std. err. adjusted for 7,562 clusters in athr_id)
 ------------------------------------------------------------------------------
              |               Robust
      ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
 -------------+----------------------------------------------------------------
- Z_young_nih |  -1.678912   .4986556    -3.37   0.001    -2.656259    -.701565
-   Z_old_nih |   .4763135   .4631656     1.03   0.304    -.4314743    1.384101
- S_young_nih |   .4372319   .1446557     3.02   0.003     .1537118    .7207519
-   S_old_nih |  -.1953008   .1222219    -1.60   0.110    -.4348514    .0442497
-PT_young_nih |   .0931906   .0286038     3.26   0.001     .0371281    .1492531
-       _cons |   .8017668   .0092254    86.91   0.000     .7836853    .8198483
+ Z_young_nih |  -.5122355   .2817857    -1.82   0.069    -1.064525    .0400543
+   Z_old_nih |   .1355125   .2908639     0.47   0.641    -.4345703    .7055953
+ S_young_nih |   .0785402   .0938279     0.84   0.403     -.105359    .2624395
+   S_old_nih |  -.0869879   .0823523    -1.06   0.291    -.2483954    .0744196
+PT_young_nih |   .1150229   .0362976     3.17   0.002      .043881    .1861648
+       _cons |   .8013925    .012113    66.16   0.000     .7776515    .8251334
 ------------------------------------------------------------------------------
 
 Absorbed degrees of freedom:
 -----------------------------------------------------+
  Absorbed FE | Categories  - Redundant  = Num. Coefs |
 -------------+---------------------------------------|
-     athr_id |      7559        7559           0    *|
+     athr_id |      7562        7562           0    *|
         year |        10           1           9     |
 -----------------------------------------------------+
 * = FE nested within cluster; treated as redundant for DoF computation
@@ -774,281 +742,281 @@ Absorbed degrees of freedom:
 ------------------------------------------------------------------------------
      ppr_cnt | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
 -------------+----------------------------------------------------------------
-         (1) |  -2.155225   .6805731    -3.17   0.002    -3.489124   -.8213267
+         (1) |   -.647748   .4049753    -1.60   0.110    -1.441485     .145989
 ------------------------------------------------------------------------------
 
-== all_jrnls_r1_r2 ppr_cnt young_nih vs old_nih (N=75590) ==
-  young_nih: b= -1.6789 (se= 0.4987)
-  old_nih: b=  0.4763 (se= 0.4632)
-  diff, joint VCE:  b= -2.1552 se= 0.6806 t=-3.167 p=0.0015 (one-sided 0.0008)
-  diff, indep. SEs: se= 0.6806 p=0.0015
-Iteration 1:   deviance = 1.5046e+05  eps = .         iters = 4    tol = 1.0e-04  min(eta) =  -1.57  P   
-Iteration 2:   deviance = 1.4632e+05  eps = 2.83e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.90      
-Iteration 3:   deviance = 1.4628e+05  eps = 2.48e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.97      
-Iteration 4:   deviance = 1.4628e+05  eps = 2.08e-07  iters = 2    tol = 1.0e-04  min(eta) =  -1.97      
-Iteration 5:   deviance = 1.4628e+05  eps = 8.50e-12  iters = 2    tol = 1.0e-05  min(eta) =  -1.97   S  
-Iteration 6:   deviance = 1.4628e+05  eps = 1.84e-16  iters = 2    tol = 1.0e-08  min(eta) =  -1.97   S O
+== all_jrnls_r1_r2 ppr_cnt young_nih vs old_nih (N=75620) ==
+  young_nih: b= -0.5122 (se= 0.2818)
+  old_nih: b=  0.1355 (se= 0.2909)
+  diff, joint VCE:  b= -0.6477 se= 0.4050 t=-1.599 p=0.1097 (one-sided 0.0549)
+  diff, indep. SEs: se= 0.4050 p=0.1097
+Iteration 1:   deviance = 1.5054e+05  eps = .         iters = 4    tol = 1.0e-04  min(eta) =  -1.56  P   
+Iteration 2:   deviance = 1.4639e+05  eps = 2.83e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.89      
+Iteration 3:   deviance = 1.4635e+05  eps = 2.49e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.96      
+Iteration 4:   deviance = 1.4635e+05  eps = 2.10e-07  iters = 2    tol = 1.0e-04  min(eta) =  -1.96      
+Iteration 5:   deviance = 1.4635e+05  eps = 8.69e-12  iters = 2    tol = 1.0e-05  min(eta) =  -1.96   S  
+Iteration 6:   deviance = 1.4635e+05  eps = 0.00e+00  iters = 2    tol = 1.0e-08  min(eta) =  -1.96   S O
 ------------------------------------------------------------------------------------------------------------
 (legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
 Converged in 6 iterations and 14 HDFE sub-iterations (tol = 1.0e-08)
 
-HDFE PPML regression                              No. of obs      =    135,080
-Absorbing 2 HDFE groups                           Residual df     =     13,507
-Statistics robust to heteroskedasticity           Wald chi2(5)    =     188.81
-Deviance             =  146283.5369               Prob > chi2     =     0.0000
-Log pseudolikelihood = -203337.8491               Pseudo R2       =     0.1958
+HDFE PPML regression                              No. of obs      =    135,150
+Absorbing 2 HDFE groups                           Residual df     =     13,514
+Statistics robust to heteroskedasticity           Wald chi2(5)    =     189.13
+Deviance             =  146354.1262               Prob > chi2     =     0.0000
+Log pseudolikelihood = -203440.9849               Pseudo R2       =     0.1959
 
-Number of clusters (athr_id)=     13,508
-                           (Std. err. adjusted for 13,508 clusters in athr_id)
+Number of clusters (athr_id)=     13,515
+                           (Std. err. adjusted for 13,515 clusters in athr_id)
 ------------------------------------------------------------------------------
              |               Robust
      ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
 -------------+----------------------------------------------------------------
-        Z_it |   -.709158   .2549447    -2.78   0.005    -1.208841   -.2094755
-       Z_age |   .2268949   .2391207     0.95   0.343     -.241773    .6955628
-  Z_share_it |   .0297534   .0697586     0.43   0.670    -.1069709    .1664778
-       S_age |  -.0106836   .0656058    -0.16   0.871    -.1392686    .1179015
-      PT_age |  -.0750935   .0110544    -6.79   0.000    -.0967597   -.0534273
-       _cons |   .7807701   .0053268   146.57   0.000     .7703297    .7912106
+        Z_it |  -.5042887   .1700295    -2.97   0.003    -.8375404   -.1710371
+       Z_age |   .1836678   .1609867     1.14   0.254    -.1318603     .499196
+  Z_share_it |   -.004945   .0514711    -0.10   0.923    -.1058264    .0959364
+       S_age |  -.0426505   .0459317    -0.93   0.353     -.132675    .0473741
+      PT_age |  -.0641142   .0138619    -4.63   0.000     -.091283   -.0369453
+       _cons |   .7816275   .0073308   106.62   0.000     .7672593    .7959957
 ------------------------------------------------------------------------------
 
 Absorbed degrees of freedom:
 -----------------------------------------------------+
  Absorbed FE | Categories  - Redundant  = Num. Coefs |
 -------------+---------------------------------------|
-     athr_id |     13508       13508           0    *|
+     athr_id |     13515       13515           0    *|
         year |        10           1           9     |
 -----------------------------------------------------+
 * = FE nested within cluster; treated as redundant for DoF computation
 
-== all_jrnls_r1_r2 ppr_cnt continuous gradient in lab_age (N=135080) ==
-  Z at mean lab age (16.9 yrs): b= -0.7092 (se= 0.2549)
-  Z x lab age (per decade): b=  0.2269 (se= 0.2391) t= 0.949 p=0.3427 (one-sided 0.1713)
+== all_jrnls_r1_r2 ppr_cnt continuous gradient in lab_age (N=135150) ==
+  Z at mean lab age (17.0 yrs): b= -0.5043 (se= 0.1700)
+  Z x lab age (per decade): b=  0.1837 (se= 0.1610) t= 1.141 p=0.2539 (one-sided 0.1270)
 (80 missing values generated)
 (80 missing values generated)
 (80 missing values generated)
 (80 missing values generated)
-Iteration 1:   deviance = 1.5034e+05  eps = .         iters = 4    tol = 1.0e-04  min(eta) =  -1.59  P   
-Iteration 2:   deviance = 1.4620e+05  eps = 2.83e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.91      
-Iteration 3:   deviance = 1.4616e+05  eps = 2.47e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.98      
-Iteration 4:   deviance = 1.4616e+05  eps = 2.07e-07  iters = 2    tol = 1.0e-04  min(eta) =  -1.98      
-Iteration 5:   deviance = 1.4616e+05  eps = 8.55e-12  iters = 2    tol = 1.0e-05  min(eta) =  -1.98   S  
-Iteration 6:   deviance = 1.4616e+05  eps = 0.00e+00  iters = 2    tol = 1.0e-08  min(eta) =  -1.98   S O
+Iteration 1:   deviance = 1.5041e+05  eps = .         iters = 4    tol = 1.0e-04  min(eta) =  -1.58  P   
+Iteration 2:   deviance = 1.4627e+05  eps = 2.83e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.91      
+Iteration 3:   deviance = 1.4623e+05  eps = 2.47e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.97      
+Iteration 4:   deviance = 1.4623e+05  eps = 2.08e-07  iters = 2    tol = 1.0e-04  min(eta) =  -1.97      
+Iteration 5:   deviance = 1.4623e+05  eps = 8.70e-12  iters = 2    tol = 1.0e-05  min(eta) =  -1.97   S  
+Iteration 6:   deviance = 1.4623e+05  eps = 1.84e-16  iters = 2    tol = 1.0e-08  min(eta) =  -1.97   S O
 ------------------------------------------------------------------------------------------------------------
 (legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
 Converged in 6 iterations and 14 HDFE sub-iterations (tol = 1.0e-08)
 
-HDFE PPML regression                              No. of obs      =    135,000
-Absorbing 2 HDFE groups                           Residual df     =     13,499
-Statistics robust to heteroskedasticity           Wald chi2(5)    =     223.40
-Deviance             =  146163.8675               Prob > chi2     =     0.0000
-Log pseudolikelihood = -203212.3892               Pseudo R2       =     0.1958
+HDFE PPML regression                              No. of obs      =    135,070
+Absorbing 2 HDFE groups                           Residual df     =     13,506
+Statistics robust to heteroskedasticity           Wald chi2(5)    =     225.47
+Deviance             =  146233.8497               Prob > chi2     =     0.0000
+Log pseudolikelihood = -203315.2215               Pseudo R2       =     0.1959
 
-Number of clusters (athr_id)=     13,500
-                           (Std. err. adjusted for 13,500 clusters in athr_id)
+Number of clusters (athr_id)=     13,507
+                           (Std. err. adjusted for 13,507 clusters in athr_id)
 ------------------------------------------------------------------------------
              |               Robust
      ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
 -------------+----------------------------------------------------------------
-        Z_it |  -.6740294   .2543486    -2.65   0.008    -1.172543   -.1755154
-       Z_age |   .3013288   .2517785     1.20   0.231    -.1921481    .7948056
-  Z_share_it |   .0224378   .0696929     0.32   0.747    -.1141577    .1590333
-       S_age |  -.0211615   .0685141    -0.31   0.757    -.1554467    .1131238
-      PT_age |   -.083217   .0111406    -7.47   0.000    -.1050521   -.0613819
-       _cons |   .7809543   .0053233   146.70   0.000     .7705207    .7913879
+        Z_it |  -.5005374   .1694801    -2.95   0.003    -.8327123   -.1683624
+       Z_age |     .24165    .162749     1.48   0.138    -.0773321    .5606321
+  Z_share_it |  -.0045798   .0515383    -0.09   0.929     -.105593    .0964334
+       S_age |  -.0366434   .0459251    -0.80   0.425    -.1266549    .0533682
+      PT_age |  -.0753718   .0140435    -5.37   0.000    -.1028965   -.0478471
+       _cons |   .7815951   .0073343   106.57   0.000     .7672201      .79597
 ------------------------------------------------------------------------------
 
 Absorbed degrees of freedom:
 -----------------------------------------------------+
  Absorbed FE | Categories  - Redundant  = Num. Coefs |
 -------------+---------------------------------------|
-     athr_id |     13500       13500           0    *|
+     athr_id |     13507       13507           0    *|
         year |        10           1           9     |
 -----------------------------------------------------+
 * = FE nested within cluster; treated as redundant for DoF computation
 
-== all_jrnls_r1_r2 ppr_cnt continuous gradient in lab_age_ns (N=135000) ==
-  Z at mean lab age (16.1 yrs): b= -0.6740 (se= 0.2543)
-  Z x lab age (per decade): b=  0.3013 (se= 0.2518) t= 1.197 p=0.2314 (one-sided 0.1157)
-Iteration 1:   deviance = 1.5048e+05  eps = .         iters = 4    tol = 1.0e-04  min(eta) =  -1.55  P   
-Iteration 2:   deviance = 1.4634e+05  eps = 2.83e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.88      
-Iteration 3:   deviance = 1.4631e+05  eps = 2.48e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.95      
-Iteration 4:   deviance = 1.4631e+05  eps = 2.07e-07  iters = 2    tol = 1.0e-04  min(eta) =  -1.95      
-Iteration 5:   deviance = 1.4631e+05  eps = 7.93e-12  iters = 2    tol = 1.0e-05  min(eta) =  -1.95   S  
-Iteration 6:   deviance = 1.4631e+05  eps = 0.00e+00  iters = 2    tol = 1.0e-08  min(eta) =  -1.95   S O
+== all_jrnls_r1_r2 ppr_cnt continuous gradient in lab_age_ns (N=135070) ==
+  Z at mean lab age (16.1 yrs): b= -0.5005 (se= 0.1695)
+  Z x lab age (per decade): b=  0.2417 (se= 0.1627) t= 1.485 p=0.1376 (one-sided 0.0688)
+Iteration 1:   deviance = 1.5056e+05  eps = .         iters = 4    tol = 1.0e-04  min(eta) =  -1.55  P   
+Iteration 2:   deviance = 1.4641e+05  eps = 2.83e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.88      
+Iteration 3:   deviance = 1.4638e+05  eps = 2.48e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.94      
+Iteration 4:   deviance = 1.4638e+05  eps = 2.08e-07  iters = 2    tol = 1.0e-04  min(eta) =  -1.94      
+Iteration 5:   deviance = 1.4638e+05  eps = 8.09e-12  iters = 2    tol = 1.0e-05  min(eta) =  -1.94   S  
+Iteration 6:   deviance = 1.4638e+05  eps = 0.00e+00  iters = 2    tol = 1.0e-08  min(eta) =  -1.94   S O
 ------------------------------------------------------------------------------------------------------------
 (legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
 Converged in 6 iterations and 14 HDFE sub-iterations (tol = 1.0e-08)
 
-HDFE PPML regression                              No. of obs      =    135,080
-Absorbing 2 HDFE groups                           Residual df     =     13,507
-Statistics robust to heteroskedasticity           Wald chi2(5)    =     177.14
-Deviance             =  146308.2061               Prob > chi2     =     0.0000
-Log pseudolikelihood = -203350.1837               Pseudo R2       =     0.1958
+HDFE PPML regression                              No. of obs      =    135,150
+Absorbing 2 HDFE groups                           Residual df     =     13,514
+Statistics robust to heteroskedasticity           Wald chi2(5)    =     179.19
+Deviance             =  146376.0656               Prob > chi2     =     0.0000
+Log pseudolikelihood = -203451.9546               Pseudo R2       =     0.1958
 
-Number of clusters (athr_id)=     13,508
-                           (Std. err. adjusted for 13,508 clusters in athr_id)
+Number of clusters (athr_id)=     13,515
+                           (Std. err. adjusted for 13,515 clusters in athr_id)
 ------------------------------------------------------------------------------
              |               Robust
      ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
 -------------+----------------------------------------------------------------
-        Z_it |  -.6867879   .2545242    -2.70   0.007    -1.185646   -.1879296
-       Z_age |   .3967822   .2359864     1.68   0.093    -.0657427    .8593071
-  Z_share_it |   .0316902   .0696233     0.46   0.649     -.104769    .1681494
-       S_age |   .0202358   .0671605     0.30   0.763    -.1113963    .1518678
-      PT_age |  -.0835765   .0113882    -7.34   0.000    -.1058969    -.061256
-       _cons |   .7797221   .0053226   146.49   0.000       .76929    .7901542
+        Z_it |  -.4842066   .1706279    -2.84   0.005    -.8186311   -.1497821
+       Z_age |   .4272752   .1597122     2.68   0.007     .1142451    .7403053
+  Z_share_it |  -.0161428   .0514054    -0.31   0.753    -.1168955    .0846098
+       S_age |  -.0235865   .0474011    -0.50   0.619    -.1164909     .069318
+      PT_age |  -.0747553   .0144142    -5.19   0.000    -.1030067    -.046504
+       _cons |   .7823445   .0073297   106.74   0.000     .7679786    .7967104
 ------------------------------------------------------------------------------
 
 Absorbed degrees of freedom:
 -----------------------------------------------------+
  Absorbed FE | Categories  - Redundant  = Num. Coefs |
 -------------+---------------------------------------|
-     athr_id |     13508       13508           0    *|
+     athr_id |     13515       13515           0    *|
         year |        10           1           9     |
 -----------------------------------------------------+
 * = FE nested within cluster; treated as redundant for DoF computation
 
-== all_jrnls_r1_r2 ppr_cnt continuous gradient in career_age (N=135080) ==
-  Z at mean lab age (21.9 yrs): b= -0.6868 (se= 0.2545)
-  Z x lab age (per decade): b=  0.3968 (se= 0.2360) t= 1.681 p=0.0927 (one-sided 0.0463)
-  cell yc_yl: 5466 PIs
-  cell oc_ol: 5873 PIs
+== all_jrnls_r1_r2 ppr_cnt continuous gradient in career_age (N=135150) ==
+  Z at mean lab age (21.9 yrs): b= -0.4842 (se= 0.1706)
+  Z x lab age (per decade): b=  0.4273 (se= 0.1597) t= 2.675 p=0.0075 (one-sided 0.0037)
+  cell yc_yl: 5469 PIs
+  cell oc_ol: 5876 PIs
   cell oc_yl: 1144 PIs
-  cell yc_ol: 1025 PIs
-Iteration 1:   deviance = 1.5056e+05  eps = .         iters = 3    tol = 1.0e-04  min(eta) =  -1.54  P   
-Iteration 2:   deviance = 1.4641e+05  eps = 2.83e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.85      
-Iteration 3:   deviance = 1.4638e+05  eps = 2.48e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.92      
-Iteration 4:   deviance = 1.4638e+05  eps = 2.07e-07  iters = 2    tol = 1.0e-04  min(eta) =  -1.92      
-Iteration 5:   deviance = 1.4638e+05  eps = 7.98e-12  iters = 2    tol = 1.0e-05  min(eta) =  -1.92   S  
-Iteration 6:   deviance = 1.4638e+05  eps = 1.84e-16  iters = 2    tol = 1.0e-08  min(eta) =  -1.92   S O
+  cell yc_ol: 1026 PIs
+Iteration 1:   deviance = 1.5063e+05  eps = .         iters = 3    tol = 1.0e-04  min(eta) =  -1.54  P   
+Iteration 2:   deviance = 1.4648e+05  eps = 2.83e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.85      
+Iteration 3:   deviance = 1.4645e+05  eps = 2.47e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.91      
+Iteration 4:   deviance = 1.4645e+05  eps = 2.02e-07  iters = 2    tol = 1.0e-04  min(eta) =  -1.92      
+Iteration 5:   deviance = 1.4645e+05  eps = 7.85e-12  iters = 2    tol = 1.0e-05  min(eta) =  -1.92   S  
+Iteration 6:   deviance = 1.4645e+05  eps = 1.84e-16  iters = 2    tol = 1.0e-08  min(eta) =  -1.92   S O
 ------------------------------------------------------------------------------------------------------------
 (legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
 Converged in 6 iterations and 13 HDFE sub-iterations (tol = 1.0e-08)
 
-HDFE PPML regression                              No. of obs      =    135,080
-Absorbing 2 HDFE groups                           Residual df     =     13,507
-Statistics robust to heteroskedasticity           Wald chi2(11)   =     154.08
-Deviance             =  146376.8387               Prob > chi2     =     0.0000
-Log pseudolikelihood =    -203384.5               Pseudo R2       =     0.1957
+HDFE PPML regression                              No. of obs      =    135,150
+Absorbing 2 HDFE groups                           Residual df     =     13,514
+Statistics robust to heteroskedasticity           Wald chi2(11)   =     153.97
+Deviance             =  146448.3972               Prob > chi2     =     0.0000
+Log pseudolikelihood = -203488.1204               Pseudo R2       =     0.1957
 
-Number of clusters (athr_id)=     13,508
-                           (Std. err. adjusted for 13,508 clusters in athr_id)
+Number of clusters (athr_id)=     13,515
+                           (Std. err. adjusted for 13,515 clusters in athr_id)
 ------------------------------------------------------------------------------
              |               Robust
      ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
 -------------+----------------------------------------------------------------
-     Z_yc_yl |  -1.329817   .3828721    -3.47   0.001    -2.080233   -.5794016
-     Z_oc_ol |  -.1842869   .3900629    -0.47   0.637    -.9487962    .5802224
-     Z_oc_yl |  -.6758418   .8706898    -0.78   0.438    -2.382362    1.030679
-     Z_yc_ol |   .2261243   1.102296     0.21   0.837    -1.934337    2.386585
-     S_yc_yl |   .1908477    .111222     1.72   0.086    -.0271434    .4088387
-     S_oc_ol |    .044085   .1042577     0.42   0.672    -.1602563    .2484264
-     S_oc_yl |   .0115796   .2367442     0.05   0.961    -.4524306    .4755897
-     S_yc_ol |  -.6738719    .279361    -2.41   0.016    -1.221409   -.1263344
-    PT_yc_yl |   .1493645   .0263218     5.67   0.000     .0977748    .2009543
-    PT_oc_yl |    .092314     .04555     2.03   0.043     .0030377    .1815904
-    PT_yc_ol |   .1986425   .0437935     4.54   0.000     .1128087    .2844762
-       _cons |   .7356799    .008568    85.86   0.000      .718887    .7524729
+     Z_yc_yl |  -.8768151   .2532417    -3.46   0.001     -1.37316   -.3804705
+     Z_oc_ol |  -.0586247   .2664016    -0.22   0.826    -.5807622    .4635128
+     Z_oc_yl |  -.0223976   .6175187    -0.04   0.971    -1.232712    1.187917
+     Z_yc_ol |  -.9554087   .6685048    -1.43   0.153    -2.265654    .3548366
+     S_yc_yl |   .0011703   .0855775     0.01   0.989    -.1665585    .1688991
+     S_oc_ol |  -.0104501   .0756367    -0.14   0.890    -.1586954    .1377952
+     S_oc_yl |   .1974023   .1912368     1.03   0.302     -.177415    .5722196
+     S_yc_ol |  -.3704833   .1650082    -2.25   0.025    -.6938934   -.0470733
+    PT_yc_yl |   .1649359   .0336279     4.90   0.000     .0990265    .2308453
+    PT_oc_yl |   .0160318   .0576282     0.28   0.781    -.0969174     .128981
+    PT_yc_ol |   .2121815   .0564646     3.76   0.000      .101513    .3228501
+       _cons |   .7394803   .0109465    67.55   0.000     .7180257     .760935
 ------------------------------------------------------------------------------
 
 Absorbed degrees of freedom:
 -----------------------------------------------------+
  Absorbed FE | Categories  - Redundant  = Num. Coefs |
 -------------+---------------------------------------|
-     athr_id |     13508       13508           0    *|
+     athr_id |     13515       13515           0    *|
         year |        10           1           9     |
 -----------------------------------------------------+
 * = FE nested within cluster; treated as redundant for DoF computation
 
-== all_jrnls_r1_r2 ppr_cnt 2x2 career x lab age (N=135080) ==
-  young career, young lab : b= -1.3298 (se= 0.3829)
-  young career, OLD lab   : b=  0.2261 (se= 1.1023)   <- gap 0
-  OLD career, young lab   : b= -0.6758 (se= 0.8707)   <- long apprenticeship
-  OLD career, OLD lab     : b= -0.1843 (se= 0.3901)
+== all_jrnls_r1_r2 ppr_cnt 2x2 career x lab age (N=135150) ==
+  young career, young lab : b= -0.8768 (se= 0.2532)
+  young career, OLD lab   : b= -0.9554 (se= 0.6685)   <- gap 0
+  OLD career, young lab   : b= -0.0224 (se= 0.6175)   <- long apprenticeship
+  OLD career, OLD lab     : b= -0.0586 (se= 0.2664)
 
  ( 1)  Z_yc_yl - Z_oc_yl = 0
 
 ------------------------------------------------------------------------------
      ppr_cnt | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
 -------------+----------------------------------------------------------------
-         (1) |  -.6539753   .9511528    -0.69   0.492    -2.518201     1.21025
+         (1) |  -.8544174   .6674284    -1.28   0.200    -2.162553    .4537182
 ------------------------------------------------------------------------------
-  career effect within young labs: b= -0.6540 (se= 0.9512) p=0.4917
+  career effect within young labs: b= -0.8544 (se= 0.6674) p=0.2005
 
  ( 1)  - Z_oc_ol + Z_yc_ol = 0
 
 ------------------------------------------------------------------------------
      ppr_cnt | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
 -------------+----------------------------------------------------------------
-         (1) |   .4104112   1.169276     0.35   0.726    -1.881327     2.70215
+         (1) |  -.8967839   .7196307    -1.25   0.213    -2.307234    .5136664
 ------------------------------------------------------------------------------
-  career effect within old labs: b=  0.4104 (se= 1.1693) p=0.7256
+  career effect within old labs: b= -0.8968 (se= 0.7196) p=0.2127
 
  ( 1)  Z_yc_yl - Z_yc_ol = 0
 
 ------------------------------------------------------------------------------
      ppr_cnt | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
 -------------+----------------------------------------------------------------
-         (1) |  -1.555941   1.166897    -1.33   0.182    -3.843017    .7311341
+         (1) |   .0785936   .7148636     0.11   0.912    -1.322513    1.479701
 ------------------------------------------------------------------------------
-  lab effect within young careers: b= -1.5559 (se= 1.1669) p=0.1824
+  lab effect within young careers: b=  0.0786 (se= 0.7149) p=0.9125
 
  ( 1)  - Z_oc_ol + Z_oc_yl = 0
 
 ------------------------------------------------------------------------------
      ppr_cnt | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
 -------------+----------------------------------------------------------------
-         (1) |  -.4915549   .9540701    -0.52   0.606    -2.361498    1.378388
+         (1) |   .0362271   .6725319     0.05   0.957    -1.281911    1.354365
 ------------------------------------------------------------------------------
-  lab effect within old careers: b= -0.4916 (se= 0.9541) p=0.6064
+  lab effect within old careers: b=  0.0362 (se= 0.6725) p=0.9570
 
  ( 1)  Z_yc_yl - Z_oc_ol = 0
 
 ------------------------------------------------------------------------------
      ppr_cnt | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
 -------------+----------------------------------------------------------------
-         (1) |   -1.14553   .5465712    -2.10   0.036     -2.21679   -.0742702
+         (1) |  -.8181903   .3675611    -2.23   0.026    -1.538597   -.0977838
 ------------------------------------------------------------------------------
-  unambiguous young vs old (switchers dropped): b= -1.1455 (se= 0.5466) p=0.0361
-Iteration 1:   deviance = 1.5044e+05  eps = .         iters = 4    tol = 1.0e-04  min(eta) =  -1.57  P   
-Iteration 2:   deviance = 1.4630e+05  eps = 2.83e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.90      
-Iteration 3:   deviance = 1.4626e+05  eps = 2.48e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.96      
-Iteration 4:   deviance = 1.4626e+05  eps = 2.05e-07  iters = 2    tol = 1.0e-04  min(eta) =  -1.97      
-Iteration 5:   deviance = 1.4626e+05  eps = 8.00e-12  iters = 2    tol = 1.0e-05  min(eta) =  -1.97   S  
-Iteration 6:   deviance = 1.4626e+05  eps = 0.00e+00  iters = 2    tol = 1.0e-08  min(eta) =  -1.97   S O
+  unambiguous young vs old (switchers dropped): b= -0.8182 (se= 0.3676) p=0.0260
+Iteration 1:   deviance = 1.5051e+05  eps = .         iters = 4    tol = 1.0e-04  min(eta) =  -1.56  P   
+Iteration 2:   deviance = 1.4636e+05  eps = 2.83e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.89      
+Iteration 3:   deviance = 1.4633e+05  eps = 2.48e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.96      
+Iteration 4:   deviance = 1.4633e+05  eps = 2.06e-07  iters = 2    tol = 1.0e-04  min(eta) =  -1.96      
+Iteration 5:   deviance = 1.4633e+05  eps = 8.17e-12  iters = 2    tol = 1.0e-05  min(eta) =  -1.96   S  
+Iteration 6:   deviance = 1.4633e+05  eps = 0.00e+00  iters = 2    tol = 1.0e-08  min(eta) =  -1.96   S O
 ------------------------------------------------------------------------------------------------------------
 (legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
 Converged in 6 iterations and 14 HDFE sub-iterations (tol = 1.0e-08)
 
-HDFE PPML regression                              No. of obs      =    135,080
-Absorbing 2 HDFE groups                           Residual df     =     13,507
-Statistics robust to heteroskedasticity           Wald chi2(8)    =     197.62
-Deviance             =  146260.8406               Prob > chi2     =     0.0000
-Log pseudolikelihood = -203326.5009               Pseudo R2       =     0.1959
+HDFE PPML regression                              No. of obs      =    135,150
+Absorbing 2 HDFE groups                           Residual df     =     13,514
+Statistics robust to heteroskedasticity           Wald chi2(8)    =     201.09
+Deviance             =  146325.3037               Prob > chi2     =     0.0000
+Log pseudolikelihood = -203426.5737               Pseudo R2       =     0.1959
 
-Number of clusters (athr_id)=     13,508
-                           (Std. err. adjusted for 13,508 clusters in athr_id)
+Number of clusters (athr_id)=     13,515
+                           (Std. err. adjusted for 13,515 clusters in athr_id)
 ------------------------------------------------------------------------------
              |               Robust
      ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
 -------------+----------------------------------------------------------------
-        Z_it |    -.70271   .2547069    -2.76   0.006    -1.201926   -.2034938
-       Z_lab |  -.3213755   .5092127    -0.63   0.528    -1.319414     .676663
-       Z_car |    .632227   .5069171     1.25   0.212    -.3613122    1.625766
-  Z_share_it |   .0300377   .0696407     0.43   0.666    -.1064555    .1665309
-       S_lab |  -.1555677   .1367607    -1.14   0.255    -.4236137    .1124782
-       S_car |   .1681429   .1403692     1.20   0.231    -.1069757    .4432615
-      PT_lab |   -.013641   .0227327    -0.60   0.548    -.0581963    .0309143
-      PT_car |  -.0713653   .0234432    -3.04   0.002     -.117313   -.0254176
-       _cons |   .7805248   .0053148   146.86   0.000     .7701079    .7909416
+        Z_it |  -.4824368   .1695967    -2.84   0.004    -.8148403   -.1500334
+       Z_lab |  -.7387541   .3454727    -2.14   0.032    -1.415868   -.0616402
+       Z_car |   1.060147   .3439669     3.08   0.002     .3859846     1.73431
+  Z_share_it |  -.0096748   .0512613    -0.19   0.850    -.1101451    .0907956
+       S_lab |  -.0653109   .1001228    -0.65   0.514     -.261548    .1309262
+       S_car |   .0346309   .1026606     0.34   0.736    -.1665802     .235842
+      PT_lab |  -.0101943   .0286784    -0.36   0.722    -.0664029    .0460144
+      PT_car |  -.0648375   .0297652    -2.18   0.029    -.1231763   -.0064988
+       _cons |   .7819835   .0072945   107.20   0.000     .7676865    .7962806
 ------------------------------------------------------------------------------
 
 Absorbed degrees of freedom:
 -----------------------------------------------------+
  Absorbed FE | Categories  - Redundant  = Num. Coefs |
 -------------+---------------------------------------|
-     athr_id |     13508       13508           0    *|
+     athr_id |     13515       13515           0    *|
         year |        10           1           9     |
 -----------------------------------------------------+
 * = FE nested within cluster; treated as redundant for DoF computation
@@ -1058,7 +1026,7 @@ Absorbed degrees of freedom:
 ------------------------------------------------------------------------------
      ppr_cnt | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
 -------------+----------------------------------------------------------------
-         (1) |   .9536025    .986012     0.97   0.333    -.9789456    2.886151
+         (1) |   1.798901   .6694386     2.69   0.007     .4868258    3.110977
 ------------------------------------------------------------------------------
 
  ( 1)  Z_lab + Z_car = 0
@@ -1066,32 +1034,32 @@ Absorbed degrees of freedom:
 ------------------------------------------------------------------------------
      ppr_cnt | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
 -------------+----------------------------------------------------------------
-         (1) |   .3108515   .2455712     1.27   0.206    -.1704592    .7921622
+         (1) |   .3213931   .1648668     1.95   0.051    -.0017399    .6445261
 ------------------------------------------------------------------------------
 
-== all_jrnls_r1_r2 ppr_cnt horse race: lab age vs career age (N=135080) ==
-  Z x lab age    (per decade): b= -0.3214 (se= 0.5092) p=0.5280
-  Z x career age (per decade): b=  0.6322 (se= 0.5069) p=0.2123
-  career - lab: b=  0.9536 (se= 0.9860) p=0.3335
-  career age holding gap fixed: b=  0.3109 (se= 0.2456) p=0.2056
-  apprenticeship gap (per decade): b=  0.3214 (se= 0.5092) p=0.5280
+== all_jrnls_r1_r2 ppr_cnt horse race: lab age vs career age (N=135150) ==
+  Z x lab age    (per decade): b= -0.7388 (se= 0.3455) p=0.0325
+  Z x career age (per decade): b=  1.0601 (se= 0.3440) p=0.0021
+  career - lab: b=  1.7989 (se= 0.6694) p=0.0072
+  career age holding gap fixed: b=  0.3214 (se= 0.1649) p=0.0512
+  apprenticeship gap (per decade): b=  0.7388 (se= 0.3455) p=0.0325
 
 == all_jrnls_r1_r2 ppr_cnt: young - old summary across age splits ==
 
              |   b_young   se_young      b_old     se_old     b_diff    se_diff     p_diff   p_1sided          N 
 -------------+---------------------------------------------------------------------------------------------------
-       young |   -1.2172     0.3505    -0.1272     0.3747    -1.0900     0.5131     0.0336     0.0168   1.35e+05 
-    young_ns |   -1.0836     0.3538    -0.2659     0.3696    -0.8177     0.5117     0.1100     0.0550   1.35e+05 
-     young_g |   -1.1128     0.4047    -0.2321     0.4243    -0.8807     0.5864     0.1331     0.0666   9.77e+04 
-   young_any |   -1.1220     0.3668    -0.2659     0.3567    -0.8561     0.5116     0.0943     0.0471   1.35e+05 
- young_anyns |   -1.1842     0.3631    -0.1559     0.3593    -1.0283     0.5108     0.0441     0.0220   1.35e+05 
-  young_both |   -1.3298     0.3829    -0.1843     0.3901    -1.1455     0.5466     0.0361     0.0180   1.13e+05 
-   young_nih |   -1.6789     0.4987     0.4763     0.4632    -2.1552     0.6806     0.0015     0.0008   7.56e+04 
+       young |   -0.7229     0.2351    -0.2087     0.2491    -0.5142     0.3425     0.1334     0.0667   1.35e+05 
+    young_ns |   -0.6769     0.2423    -0.2778     0.2408    -0.3991     0.3416     0.2427     0.1214   1.35e+05 
+     young_g |   -0.3948     0.2747    -0.3107     0.2837    -0.0840     0.3949     0.8315     0.4157   9.78e+04 
+   young_any |   -0.8959     0.2373    -0.0252     0.2463    -0.8707     0.3420     0.0109     0.0054   1.35e+05 
+ young_anyns |   -0.9482     0.2374     0.0413     0.2461    -0.9895     0.3419     0.0038     0.0019   1.35e+05 
+  young_both |   -0.8768     0.2532    -0.0586     0.2664    -0.8182     0.3676     0.0260     0.0130   1.13e+05 
+   young_nih |   -0.5122     0.2818     0.1355     0.2909    -0.6477     0.4050     0.1097     0.0549   7.56e+04 
 
 . 
 . log close
       name:  <unnamed>
        log:  /n/holylabs/pakes_lab/Lab/sci_eq/analysis/rf_heterogeneity/code/test_young_old.log
   log type:  text
- closed on:   4 Sep 2026, 01:00:33
-----------------------------------------------------------------------------------------------------------------------------------------------------------
+ closed on:   4 Sep 2026, 15:14:58
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

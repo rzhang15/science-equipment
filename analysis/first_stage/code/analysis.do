@@ -615,8 +615,8 @@ program event_study
         preserve
         mat drop _all
         if "`yvar'" == "price" local yname "Avg. Log Price"
-        if "`yvar'" == "qty" local yname "Avg. Log Qty"
-        if "`yvar'" == "spend" local yname "Avg. Log Spend"
+        if "`yvar'" == "qty" local yname "Log Qty"
+        if "`yvar'" == "spend" local yname "Log Spend"
         qui sum raw_`yvar' if treated == 1 & year == 2013
         local trt_mean = round(r(mean), 0.001)
         qui sum raw_`yvar' if treated == 0 & year == 2013
@@ -648,8 +648,8 @@ program event_study
         preserve
         mat drop _all
         if "`yvar'" == "price" local yname "Avg. Log Price"
-        if "`yvar'" == "qty" local yname "Avg. Log Qty"
-        if "`yvar'" == "spend" local yname "Avg. Log Spend"
+        if "`yvar'" == "qty" local yname "Log Qty"
+        if "`yvar'" == "spend" local yname "Log Spend"
         qui sum raw_`yvar' if treated == 1 & year == 2013
         local trt_mean = round(r(mean), 0.001)
         qui sum raw_`yvar' if treated == 0 & year == 2013
@@ -746,8 +746,8 @@ program event_study
             preserve
             mat drop _all 
             if "`yvar'" == "price" local yname "Avg. Log Price"
-            if "`yvar'" == "qty" local yname "Avg. Log Qty"
-            if "`yvar'" == "spend" local yname "Avg. Log Spend"
+            if "`yvar'" == "qty" local yname "Log Qty"
+            if "`yvar'" == "spend" local yname "Log Spend"
             qui sum raw_`yvar' if treated == 1 & year == 2013
             local trt_mean = round(r(mean), 0.001)
             qui sum raw_`yvar' if treated == 0 & year == 2013
@@ -992,7 +992,7 @@ program uni_fes
     use ../output/beta_u$suffix, clear
     merge 1:1 uni_id using ../output/beta_u_placebo$suffix, assert(1 3) keep(3) nogen
     tw kdensity beta_u ,   color(lavender) || kdensity beta_u_pl, color(dkorange) ytitle("% of Unis") xtitle("Beta_u") ///
-        legend(on order(1 "University Price Effect Mean: `mean'" 2 "Placebo Treatment Year (mean): `mean_pl'") ring(0) pos(11) region(fcolor(none)))  ///
+        legend(on order(1 "University Price Effect Mean: `mean'" 2 "Placebo Treated Year (mean): `mean_pl'") ring(0) pos(11) region(fcolor(none)))  ///
         xlab(, labsize(small)) xtitle("University Price Estimates", size(small)) 
     graph export ../output/figures/overlaid_beta_u_simple$suffix.pdf, replace
     use ../output/beta_u$suffix, clear
@@ -1115,7 +1115,7 @@ program manual_event_study
     sum year , d
     local year_min = r(min)
     local year_max = r(max)
-    local legend_split legend(on order(3 "Treatment" 4 "Control") ring(0) pos(7) size(small) region(fcolor(none)))
+    local legend_split legend(on order(3 "Treated" 4 "Control") ring(0) pos(7) size(small) region(fcolor(none)))
     local modes $exhibit_mode
     if "$exhibit_mode" == "both" local modes presentation paper
    /* if "`title'" == "" {
@@ -1124,13 +1124,13 @@ program manual_event_study
         scatteri `ymax' -0.25 `ymax' 0.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
         xlab(`lead'(1)`lag', labsize(vsmall)) xtitle("Relative Year", size(small)) ///
         ytitle("`name'", size(small)) ylab(`ymin'(`ygap')`ymax', labsize(vsmall)) yline(0, lcolor(gs10) lpattern(solid))  ///
-        legend(on order(- "Treatment Level Avg. in t = -1: `trt_mean'" "Control Level Avg. in t = -1: `ctrl_mean'") pos(6) rows(2))  ///
+        legend(on order(- "Treated Level Avg. in t = -1: `trt_mean'" "Control Level Avg. in t = -1: `ctrl_mean'") pos(6) rows(2))  ///
         plotregion(margin(sides))
         graph export "../output/figures/es/`suf'es_`yvar'_`file_suf'$suffix.pdf", replace
     }*/
     foreach mode in `modes' {
         local figdir ../output/figures
-        local legend_lvl legend(on order(- "Treatment Level Avg. in t = -1: `trt_mean'" "Control Level Avg. in t = -1: `ctrl_mean'") pos(7) rows(2) bmargin(zero) size(small))
+        local legend_lvl legend(on order(- "Treated Level Avg. in t = -1: `trt_mean'" "Control Level Avg. in t = -1: `ctrl_mean'") pos(7) rows(2) bmargin(zero) size(small))
         if "`mode'" == "paper" {
             local figdir ../output/figures/paper
             local legend_lvl legend(off)
