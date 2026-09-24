@@ -1,0 +1,402 @@
+Script started on 2026-09-20 17:21:06-04:00
+^C/usr/bin/lua: /n/sw/helmod-rocky8/apps/lmod/lmod/libexec/../tools/capture.lua:75: interrupted!
+stack traceback:
+	[C]: in method 'read'
+	/n/sw/helmod-rocky8/apps/lmod/lmod/libexec/../tools/capture.lua:75: in function 'capture'
+	/n/sw/helmod-rocky8/apps/lmod/lmod/libexec/utils.lua:1130: in function 'dynamic_shell'
+	/n/sw/helmod-rocky8/apps/lmod/lmod/libexec/lmod:345: in function 'main'
+	/n/sw/helmod-rocky8/apps/lmod/lmod/libexec/lmod:584: in main chunk
+	[C]: in ?
+]0;cxu75@holy8a28307:~/sci_eq/derived/first_stage/synthetic_ctrl/code[cxu75@holy8a28307 code]$ ^C
+]0;cxu75@holy8a28307:~/sci_eq/derived/first_stage/synthetic_ctrl/code[cxu75@holy8a28307 code]$ ^C
+]0;cxu75@holy8a28307:~/sci_eq/derived/first_stage/synthetic_ctrl/code[cxu75@holy8a28307 code]$ ^C
+]0;cxu75@holy8a28307:~/sci_eq/derived/first_stage/synthetic_ctrl/code[cxu75@holy8a28307 code]$ Rscript synth_did_estimates.R 
+bash: Rscript: command not found
+]0;cxu75@holy8a28307:~/sci_eq/derived/first_stage/synthetic_ctrl/code[cxu75@holy8a28307 code]$ R synth_did_estimates.R 
+bash: R: command not found
+]0;cxu75@holy8a28307:~/sci_eq/derived/first_stage/synthetic_ctrl/code[cxu75@holy8a28307 code]$ Rscript synth_did_estimates.R 
+bash: Rscript: command not found
+]0;cxu75@holy8a28307:~/sci_eq/derived/first_stage/synthetic_ctrl/code[cxu75@holy8a28307 code]$ ^C
+]0;cxu75@holy8a28307:~/sci_eq/derived/first_stage/synthetic_ctrl/code[cxu75@holy8a28307 code]$ ^C
+]0;cxu75@holy8a28307:~/sci_eq/derived/first_stage/synthetic_ctrl/code[cxu75@holy8a28307 code]$ ^C
+]0;cxu75@holy8a28307:~/sci_eq/derived/first_stage/synthetic_ctrl/code[cxu75@holy8a28307 code]$ ^C
+]0;cxu75@holy8a28307:~/sci_eq/derived/first_stage/synthetic_ctrl/code[cxu75@holy8a28307 code]$ ^C
+]0;cxu75@holy8a28307:~/sci_eq/derived/first_stage/synthetic_ctrl/code[cxu75@holy8a28307 code]$ ^C
+]0;cxu75@holy8a28307:~/sci_eq/derived/first_stage/synthetic_ctrl/code[cxu75@holy8a28307 code]$ Rscript synth_did_estimates.R 
+bash: Rscript: command not found
+]0;cxu75@holy8a28307:~/sci_eq/derived/first_stage/synthetic_ctrl/code[cxu75@holy8a28307 code]$ module load R/4.4.3-fasrc01
+]0;cxu75@holy8a28307:~/sci_eq/derived/first_stage/synthetic_ctrl/code[cxu75@holy8a28307 code]$ Rscript -e 'install.packages("Synth", repos="https://cloud.r-project.org")'
+Installing package into ‘/n/home02/cxu75/R/x86_64-pc-linux-gnu-library/4.4’
+(as ‘lib’ is unspecified)
+also installing the dependencies ‘nloptr’, ‘pracma’, ‘kernlab’, ‘optimx’, ‘rgenoud’
+
+trying URL 'https://cloud.r-project.org/src/contrib/nloptr_2.2.1.tar.gz'
+Content type 'application/x-gzip' length 2253853 bytes (2.1 MB)
+==================================================
+downloaded 2.1 MB
+
+trying URL 'https://cloud.r-project.org/src/contrib/pracma_2.4.6.tar.gz'
+Content type 'application/x-gzip' length 398691 bytes (389 KB)
+==================================================
+downloaded 389 KB
+
+trying URL 'https://cloud.r-project.org/src/contrib/kernlab_0.9-33.tar.gz'
+Content type 'application/x-gzip' length 1025337 bytes (1001 KB)
+==================================================
+downloaded 1001 KB
+
+trying URL 'https://cloud.r-project.org/src/contrib/optimx_2025-4.9.tar.gz'
+Content type 'application/x-gzip' length 2259553 bytes (2.2 MB)
+==================================================
+downloaded 2.2 MB
+
+trying URL 'https://cloud.r-project.org/src/contrib/rgenoud_5.9-0.11.tar.gz'
+Content type 'application/x-gzip' length 727266 bytes (710 KB)
+==================================================
+downloaded 710 KB
+
+trying URL 'https://cloud.r-project.org/src/contrib/Synth_1.1-10.tar.gz'
+Content type 'application/x-gzip' length 79797 bytes (77 KB)
+==================================================
+downloaded 77 KB
+
+* installing *source* package ‘nloptr’ ...
+** package ‘nloptr’ successfully unpacked and MD5 sums checked
+** using staged installation
+checking whether the C++ compiler works... yes
+checking for C++ compiler default output file name... a.out
+checking for suffix of executables... 
+checking whether we are cross compiling... no
+checking for suffix of object files... o
+checking whether the compiler supports GNU C++... yes
+checking whether g++ -std=gnu++17 accepts -g... yes
+checking for g++ -std=gnu++17 option to enable C++11 features... none needed
+checking how to run the C++ preprocessor... g++ -std=gnu++17 -E
+checking whether the compiler supports GNU C++... (cached) yes
+checking whether g++ -std=gnu++17 accepts -g... (cached) yes
+checking for g++ -std=gnu++17 option to enable C++11 features... (cached) none needed
+checking for pkg-config... /n/holylabs/LABS/pakes_lab/Lab/env/bin/pkg-config
+checking if pkg-config knows NLopt... no
+checking for cmake... no
+
+------------------ CMAKE NOT FOUND --------------------
+
+CMake was not found on the PATH. Please install CMake:
+
+ - sudo yum install cmake          (Fedora/CentOS; inside a terminal)
+ - sudo apt install cmake          (Debian/Ubuntu; inside a terminal).
+ - sudo pacman -S cmake            (Arch Linux; inside a terminal).
+ - brew install --cask cmake       (MacOS; inside a terminal with Homebrew)
+ - sudo port install cmake         (MacOS; inside a terminal with MacPorts)
+
+Alternatively install CMake from: <https://cmake.org/>
+
+-------------------------------------------------------
+
+ERROR: configuration failed for package ‘nloptr’
+* removing ‘/n/home02/cxu75/R/x86_64-pc-linux-gnu-library/4.4/nloptr’
+* installing *source* package ‘pracma’ ...
+** package ‘pracma’ successfully unpacked and MD5 sums checked
+** using staged installation
+** R
+** data
+*** moving datasets to lazyload DB
+** demo
+** byte-compile and prepare package for lazy loading
+** help
+*** installing help indices
+** building package indices
+** testing if installed package can be loaded from temporary location
+** testing if installed package can be loaded from final location
+** testing if installed package keeps a record of temporary installation path
+* DONE (pracma)
+* installing *source* package ‘kernlab’ ...
+** package ‘kernlab’ successfully unpacked and MD5 sums checked
+** using staged installation
+** libs
+using C compiler: ‘gcc (GCC) 8.5.0 20210514 (Red Hat 8.5.0-28)’
+using C++ compiler: ‘g++ (GCC) 8.5.0 20210514 (Red Hat 8.5.0-28)’
+g++ -std=gnu++17 -I"/n/sw/helmod-rocky8/apps/Core/R/4.4.3-fasrc01/lib64/R/include" -DNDEBUG   -I/usr/local/include    -fpic  -g -O2   -c brweight.cpp -o brweight.o
+g++ -std=gnu++17 -I"/n/sw/helmod-rocky8/apps/Core/R/4.4.3-fasrc01/lib64/R/include" -DNDEBUG   -I/usr/local/include    -fpic  -g -O2   -c ctable.cpp -o ctable.o
+g++ -std=gnu++17 -I"/n/sw/helmod-rocky8/apps/Core/R/4.4.3-fasrc01/lib64/R/include" -DNDEBUG   -I/usr/local/include    -fpic  -g -O2   -c cweight.cpp -o cweight.o
+gcc -I"/n/sw/helmod-rocky8/apps/Core/R/4.4.3-fasrc01/lib64/R/include" -DNDEBUG   -I/usr/local/include    -fpic  -g -O2  -c dbreakpt.c -o dbreakpt.o
+gcc -I"/n/sw/helmod-rocky8/apps/Core/R/4.4.3-fasrc01/lib64/R/include" -DNDEBUG   -I/usr/local/include    -fpic  -g -O2  -c dcauchy.c -o dcauchy.o
+gcc -I"/n/sw/helmod-rocky8/apps/Core/R/4.4.3-fasrc01/lib64/R/include" -DNDEBUG   -I/usr/local/include    -fpic  -g -O2  -c dgpnrm.c -o dgpnrm.o
+gcc -I"/n/sw/helmod-rocky8/apps/Core/R/4.4.3-fasrc01/lib64/R/include" -DNDEBUG   -I/usr/local/include    -fpic  -g -O2  -c dgpstep.c -o dgpstep.o
+gcc -I"/n/sw/helmod-rocky8/apps/Core/R/4.4.3-fasrc01/lib64/R/include" -DNDEBUG   -I/usr/local/include    -fpic  -g -O2  -c dprecond.c -o dprecond.o
+gcc -I"/n/sw/helmod-rocky8/apps/Core/R/4.4.3-fasrc01/lib64/R/include" -DNDEBUG   -I/usr/local/include    -fpic  -g -O2  -c dprsrch.c -o dprsrch.o
+gcc -I"/n/sw/helmod-rocky8/apps/Core/R/4.4.3-fasrc01/lib64/R/include" -DNDEBUG   -I/usr/local/include    -fpic  -g -O2  -c dspcg.c -o dspcg.o
+gcc -I"/n/sw/helmod-rocky8/apps/Core/R/4.4.3-fasrc01/lib64/R/include" -DNDEBUG   -I/usr/local/include    -fpic  -g -O2  -c dtron.c -o dtron.o
+gcc -I"/n/sw/helmod-rocky8/apps/Core/R/4.4.3-fasrc01/lib64/R/include" -DNDEBUG   -I/usr/local/include    -fpic  -g -O2  -c dtrpcg.c -o dtrpcg.o
+gcc -I"/n/sw/helmod-rocky8/apps/Core/R/4.4.3-fasrc01/lib64/R/include" -DNDEBUG   -I/usr/local/include    -fpic  -g -O2  -c dtrqsol.c -o dtrqsol.o
+g++ -std=gnu++17 -I"/n/sw/helmod-rocky8/apps/Core/R/4.4.3-fasrc01/lib64/R/include" -DNDEBUG   -I/usr/local/include    -fpic  -g -O2   -c esa.cpp -o esa.o
+g++ -std=gnu++17 -I"/n/sw/helmod-rocky8/apps/Core/R/4.4.3-fasrc01/lib64/R/include" -DNDEBUG   -I/usr/local/include    -fpic  -g -O2   -c expdecayweight.cpp -o expdecayweight.o
+g++ -std=gnu++17 -I"/n/sw/helmod-rocky8/apps/Core/R/4.4.3-fasrc01/lib64/R/include" -DNDEBUG   -I/usr/local/include    -fpic  -g -O2   -c inductionsort.cpp -o inductionsort.o
+gcc -I"/n/sw/helmod-rocky8/apps/Core/R/4.4.3-fasrc01/lib64/R/include" -DNDEBUG   -I/usr/local/include    -fpic  -g -O2  -c init.c -o init.o
+g++ -std=gnu++17 -I"/n/sw/helmod-rocky8/apps/Core/R/4.4.3-fasrc01/lib64/R/include" -DNDEBUG   -I/usr/local/include    -fpic  -g -O2   -c kspectrumweight.cpp -o kspectrumweight.o
+g++ -std=gnu++17 -I"/n/sw/helmod-rocky8/apps/Core/R/4.4.3-fasrc01/lib64/R/include" -DNDEBUG   -I/usr/local/include    -fpic  -g -O2   -c lcp.cpp -o lcp.o
+gcc -I"/n/sw/helmod-rocky8/apps/Core/R/4.4.3-fasrc01/lib64/R/include" -DNDEBUG   -I/usr/local/include    -fpic  -g -O2  -c misc.c -o misc.o
+g++ -std=gnu++17 -I"/n/sw/helmod-rocky8/apps/Core/R/4.4.3-fasrc01/lib64/R/include" -DNDEBUG   -I/usr/local/include    -fpic  -g -O2   -c msufsort.cpp -o msufsort.o
+gcc -I"/n/sw/helmod-rocky8/apps/Core/R/4.4.3-fasrc01/lib64/R/include" -DNDEBUG   -I/usr/local/include    -fpic  -g -O2  -c solvebqp.c -o solvebqp.o
+gcc -I"/n/sw/helmod-rocky8/apps/Core/R/4.4.3-fasrc01/lib64/R/include" -DNDEBUG   -I/usr/local/include    -fpic  -g -O2  -c stringk.c -o stringk.o
+g++ -std=gnu++17 -I"/n/sw/helmod-rocky8/apps/Core/R/4.4.3-fasrc01/lib64/R/include" -DNDEBUG   -I/usr/local/include    -fpic  -g -O2   -c stringkernel.cpp -o stringkernel.o
+g++ -std=gnu++17 -I"/n/sw/helmod-rocky8/apps/Core/R/4.4.3-fasrc01/lib64/R/include" -DNDEBUG   -I/usr/local/include    -fpic  -g -O2   -c svm.cpp -o svm.o
+g++ -std=gnu++17 -I"/n/sw/helmod-rocky8/apps/Core/R/4.4.3-fasrc01/lib64/R/include" -DNDEBUG   -I/usr/local/include    -fpic  -g -O2   -c wkasailcp.cpp -o wkasailcp.o
+g++ -std=gnu++17 -I"/n/sw/helmod-rocky8/apps/Core/R/4.4.3-fasrc01/lib64/R/include" -DNDEBUG   -I/usr/local/include    -fpic  -g -O2   -c wmsufsort.cpp -o wmsufsort.o
+g++ -std=gnu++17 -shared -L/n/sw/helmod-rocky8/apps/Core/R/4.4.3-fasrc01/lib64/R/lib -L/usr/local/lib64 -o kernlab.so brweight.o ctable.o cweight.o dbreakpt.o dcauchy.o dgpnrm.o dgpstep.o dprecond.o dprsrch.o dspcg.o dtron.o dtrpcg.o dtrqsol.o esa.o expdecayweight.o inductionsort.o init.o kspectrumweight.o lcp.o misc.o msufsort.o solvebqp.o stringk.o stringkernel.o svm.o wkasailcp.o wmsufsort.o -L/n/sw/helmod-rocky8/apps/Core/R/4.4.3-fasrc01/lib64/R/lib -lRlapack -L/n/sw/helmod-rocky8/apps/Core/R/4.4.3-fasrc01/lib64/R/lib -lRblas -lgfortran -lm -lquadmath -L/n/sw/helmod-rocky8/apps/Core/R/4.4.3-fasrc01/lib64/R/lib -lR
+installing to /n/home02/cxu75/R/x86_64-pc-linux-gnu-library/4.4/00LOCK-kernlab/00new/kernlab/libs
+** R
+** data
+** inst
+** byte-compile and prepare package for lazy loading
+Creating a new generic function for ‘pattern’ in package ‘kernlab’
+** help
+*** installing help indices
+** building package indices
+** installing vignettes
+** testing if installed package can be loaded from temporary location
+** checking absolute paths in shared objects and dynamic libraries
+** testing if installed package can be loaded from final location
+** testing if installed package keeps a record of temporary installation path
+* DONE (kernlab)
+* installing *source* package ‘rgenoud’ ...
+** package ‘rgenoud’ successfully unpacked and MD5 sums checked
+** using staged installation
+** libs
+using C compiler: ‘gcc (GCC) 8.5.0 20210514 (Red Hat 8.5.0-28)’
+using C++ compiler: ‘g++ (GCC) 8.5.0 20210514 (Red Hat 8.5.0-28)’
+g++ -std=gnu++17 -I"/n/sw/helmod-rocky8/apps/Core/R/4.4.3-fasrc01/lib64/R/include" -DNDEBUG   -I/usr/local/include    -fpic  -g -O2   -c change_order.cpp -o change_order.o
+g++ -std=gnu++17 -I"/n/sw/helmod-rocky8/apps/Core/R/4.4.3-fasrc01/lib64/R/include" -DNDEBUG   -I/usr/local/include    -fpic  -g -O2   -c eval.cpp -o eval.o
+g++ -std=gnu++17 -I"/n/sw/helmod-rocky8/apps/Core/R/4.4.3-fasrc01/lib64/R/include" -DNDEBUG   -I/usr/local/include    -fpic  -g -O2   -c evaluate.cpp -o evaluate.o
+g++ -std=gnu++17 -I"/n/sw/helmod-rocky8/apps/Core/R/4.4.3-fasrc01/lib64/R/include" -DNDEBUG   -I/usr/local/include    -fpic  -g -O2   -c frange_ran.cpp -o frange_ran.o
+g++ -std=gnu++17 -I"/n/sw/helmod-rocky8/apps/Core/R/4.4.3-fasrc01/lib64/R/include" -DNDEBUG   -I/usr/local/include    -fpic  -g -O2   -c genoud.cpp -o genoud.o
+g++ -std=gnu++17 -I"/n/sw/helmod-rocky8/apps/Core/R/4.4.3-fasrc01/lib64/R/include" -DNDEBUG   -I/usr/local/include    -fpic  -g -O2   -c gradient.cpp -o gradient.o
+gcc -I"/n/sw/helmod-rocky8/apps/Core/R/4.4.3-fasrc01/lib64/R/include" -DNDEBUG   -I/usr/local/include    -fpic  -g -O2  -c init.c -o init.o
+g++ -std=gnu++17 -I"/n/sw/helmod-rocky8/apps/Core/R/4.4.3-fasrc01/lib64/R/include" -DNDEBUG   -I/usr/local/include    -fpic  -g -O2   -c math.cpp -o math.o
+g++ -std=gnu++17 -I"/n/sw/helmod-rocky8/apps/Core/R/4.4.3-fasrc01/lib64/R/include" -DNDEBUG   -I/usr/local/include    -fpic  -g -O2   -c multiply.cpp -o multiply.o
+g++ -std=gnu++17 -I"/n/sw/helmod-rocky8/apps/Core/R/4.4.3-fasrc01/lib64/R/include" -DNDEBUG   -I/usr/local/include    -fpic  -g -O2   -c numerics.cpp -o numerics.o
+g++ -std=gnu++17 -I"/n/sw/helmod-rocky8/apps/Core/R/4.4.3-fasrc01/lib64/R/include" -DNDEBUG   -I/usr/local/include    -fpic  -g -O2   -c operators.cpp -o operators.o
+g++ -std=gnu++17 -I"/n/sw/helmod-rocky8/apps/Core/R/4.4.3-fasrc01/lib64/R/include" -DNDEBUG   -I/usr/local/include    -fpic  -g -O2   -c print_format.cpp -o print_format.o
+g++ -std=gnu++17 -I"/n/sw/helmod-rocky8/apps/Core/R/4.4.3-fasrc01/lib64/R/include" -DNDEBUG   -I/usr/local/include    -fpic  -g -O2   -c rgenoud.cpp -o rgenoud.o
+g++ -std=gnu++17 -shared -L/n/sw/helmod-rocky8/apps/Core/R/4.4.3-fasrc01/lib64/R/lib -L/usr/local/lib64 -o rgenoud.so change_order.o eval.o evaluate.o frange_ran.o genoud.o gradient.o init.o math.o multiply.o numerics.o operators.o print_format.o rgenoud.o -L/n/sw/helmod-rocky8/apps/Core/R/4.4.3-fasrc01/lib64/R/lib -lR
+installing to /n/home02/cxu75/R/x86_64-pc-linux-gnu-library/4.4/00LOCK-rgenoud/00new/rgenoud/libs
+** R
+** inst
+** byte-compile and prepare package for lazy loading
+** help
+*** installing help indices
+** building package indices
+** installing vignettes
+** testing if installed package can be loaded from temporary location
+** checking absolute paths in shared objects and dynamic libraries
+** testing if installed package can be loaded from final location
+** testing if installed package keeps a record of temporary installation path
+* DONE (rgenoud)
+ERROR: dependency ‘nloptr’ is not available for package ‘optimx’
+* removing ‘/n/home02/cxu75/R/x86_64-pc-linux-gnu-library/4.4/optimx’
+ERROR: dependency ‘optimx’ is not available for package ‘Synth’
+* removing ‘/n/home02/cxu75/R/x86_64-pc-linux-gnu-library/4.4/Synth’
+
+The downloaded source packages are in
+	‘/tmp/Rtmp0ZiyXG/downloaded_packages’
+Warning messages:
+1: In install.packages("Synth", repos = "https://cloud.r-project.org") :
+  installation of package ‘nloptr’ had non-zero exit status
+2: In install.packages("Synth", repos = "https://cloud.r-project.org") :
+  installation of package ‘optimx’ had non-zero exit status
+3: In install.packages("Synth", repos = "https://cloud.r-project.org") :
+  installation of package ‘Synth’ had non-zero exit status
+]0;cxu75@holy8a28307:~/sci_eq/derived/first_stage/synthetic_ctrl/code[cxu75@holy8a28307 code]$ cd ~/sci_eq/derived/first_stage/synthetic_ctrl/code
+]0;cxu75@holy8a28307:~/sci_eq/derived/first_stage/synthetic_ctrl/code[cxu75@holy8a28307 code]$ Rscript synth_did_estimates.R
+── [1mAttaching core tidyverse packages[22m ─────────────────────────────────────────────────────────────────────────────────────────────────── tidyverse 2.0.0 ──
+[32m✔[39m [34mdplyr    [39m 1.1.4     [32m✔[39m [34mreadr    [39m 2.1.5
+[32m✔[39m [34mforcats  [39m 1.0.0     [32m✔[39m [34mstringr  [39m 1.5.1
+[32m✔[39m [34mggplot2  [39m 3.5.1     [32m✔[39m [34mtibble   [39m 3.2.1
+[32m✔[39m [34mlubridate[39m 1.9.4     [32m✔[39m [34mtidyr    [39m 1.3.1
+[32m✔[39m [34mpurrr    [39m 1.0.4     
+── [1mConflicts[22m ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────── tidyverse_conflicts() ──
+[31m✖[39m [34mdplyr[39m::[32mfilter()[39m masks [34mstats[39m::filter()
+[31m✖[39m [34mdplyr[39m::[32mlag()[39m    masks [34mstats[39m::lag()
+[36mℹ[39m Use the conflicted package ([3m[34m<http://conflicted.r-lib.org/>[39m[23m) to force all conflicts to become errors
+[?25hError in library(Synth) : there is no package called ‘Synth’
+Execution halted
+[?25h]0;cxu75@holy8a28307:~/sci_eq/derived/first_stage/synthetic_ctrl/code[cxu75@holy8a28307 code]$ [K[cxu75@holy8a28307 code]$ module load R/4.4.3-fasrc01
+]0;cxu75@holy8a28307:~/sci_eq/derived/first_stage/synthetic_ctrl/code[cxu75@holy8a28307 code]$ cd ~/sci_eq/derived/first_stage/synthetic_ctrl/code
+]0;cxu75@holy8a28307:~/sci_eq/derived/first_stage/synthetic_ctrl/code[cxu75@holy8a28307 code]$ Rscript synth_did_estimates.R
+── [1mAttaching core tidyverse packages[22m ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── tidyverse 2.0.0 ──
+[32m✔[39m [34mdplyr    [39m 1.1.4     [32m✔[39m [34mreadr    [39m 2.1.5
+[32m✔[39m [34mforcats  [39m 1.0.0     [32m✔[39m [34mstringr  [39m 1.5.1
+[32m✔[39m [34mggplot2  [39m 3.5.1     [32m✔[39m [34mtibble   [39m 3.2.1
+[32m✔[39m [34mlubridate[39m 1.9.4     [32m✔[39m [34mtidyr    [39m 1.3.1
+[32m✔[39m [34mpurrr    [39m 1.0.4     
+── [1mConflicts[22m ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── tidyverse_conflicts() ──
+[31m✖[39m [34mdplyr[39m::[32mfilter()[39m masks [34mstats[39m::filter()
+[31m✖[39m [34mdplyr[39m::[32mlag()[39m    masks [34mstats[39m::lag()
+[36mℹ[39m Use the conflicted package ([3m[34m<http://conflicted.r-lib.org/>[39m[23m) to force all conflicts to become errors
+[?25h  ##
+## Synth Package: Implements Synthetic Control Methods.
+
+## See https://web.stanford.edu/~jhain/synthpage.html for additional information.
+
+
+[?25h[?25hError: package or namespace load failed for ‘fixest’ in dyn.load(file, DLLpath = DLLpath, ...):
+ unable to load shared object '/n/home02/cxu75/R/x86_64-pc-linux-gnu-library/4.4/fixest/libs/fixest.so':
+  /lib64/libstdc++.so.6: version `GLIBCXX_3.4.26' not found (required by /n/home02/cxu75/R/x86_64-pc-linux-gnu-library/4.4/fixest/libs/fixest.so)
+Execution halted
+[?25h]0;cxu75@holy8a28307:~/sci_eq/derived/first_stage/synthetic_ctrl/code[cxu75@holy8a28307 code]$ Rscript synth_did_estimates.R 
+── [1mAttaching core tidyverse packages[22m ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── tidyverse 2.0.0 ──
+[32m✔[39m [34mdplyr    [39m 1.1.4     [32m✔[39m [34mreadr    [39m 2.1.5
+[32m✔[39m [34mforcats  [39m 1.0.0     [32m✔[39m [34mstringr  [39m 1.5.1
+[32m✔[39m [34mggplot2  [39m 3.5.1     [32m✔[39m [34mtibble   [39m 3.2.1
+[32m✔[39m [34mlubridate[39m 1.9.4     [32m✔[39m [34mtidyr    [39m 1.3.1
+[32m✔[39m [34mpurrr    [39m 1.0.4     
+── [1mConflicts[22m ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── tidyverse_conflicts() ──
+[31m✖[39m [34mdplyr[39m::[32mfilter()[39m masks [34mstats[39m::filter()
+[31m✖[39m [34mdplyr[39m::[32mlag()[39m    masks [34mstats[39m::lag()
+[36mℹ[39m Use the conflicted package ([3m[34m<http://conflicted.r-lib.org/>[39m[23m) to force all conflicts to become errors
+[?25h##
+## Synth Package: Implements Synthetic Control Methods.
+
+## See https://web.stanford.edu/~jhain/synthpage.html for additional information.
+
+
+[?25h[?25hError: package or namespace load failed for ‘fixest’ in dyn.load(file, DLLpath = DLLpath, ...):
+ unable to load shared object '/n/home02/cxu75/R/x86_64-pc-linux-gnu-library/4.4/fixest/libs/fixest.so':
+  /lib64/libstdc++.so.6: version `GLIBCXX_3.4.26' not found (required by /n/home02/cxu75/R/x86_64-pc-linux-gnu-library/4.4/fixest/libs/fixest.so)
+Execution halted
+[?25h]0;cxu75@holy8a28307:~/sci_eq/derived/first_stage/synthetic_ctrl/code[cxu75@holy8a28307 code]$ module load R/4.4.3-fasrc01 gcc/12.2.0-fasrc01
+]0;cxu75@holy8a28307:~/sci_eq/derived/first_stage/synthetic_ctrl/code[cxu75@holy8a28307 code]$ cd ~/sci_eq/derived/first_stage/synthetic_ctrl/code
+]0;cxu75@holy8a28307:~/sci_eq/derived/first_stage/synthetic_ctrl/code[cxu75@holy8a28307 code]$ Rscript synth_did_estimates.R
+── [1mAttaching core tidyverse packages[22m ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── tidyverse 2.0.0 ──
+[32m✔[39m [34mdplyr    [39m 1.1.4     [32m✔[39m [34mreadr    [39m 2.1.5
+[32m✔[39m [34mforcats  [39m 1.0.0     [32m✔[39m [34mstringr  [39m 1.5.1
+[32m✔[39m [34mggplot2  [39m 3.5.1     [32m✔[39m [34mtibble   [39m 3.2.1
+[32m✔[39m [34mlubridate[39m 1.9.4     [32m✔[39m [34mtidyr    [39m 1.3.1
+[32m✔[39m [34mpurrr    [39m 1.0.4     
+── [1mConflicts[22m ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── tidyverse_conflicts() ──
+[31m✖[39m [34mdplyr[39m::[32mfilter()[39m masks [34mstats[39m::filter()
+[31m✖[39m [34mdplyr[39m::[32mlag()[39m    masks [34mstats[39m::lag()
+[36mℹ[39m Use the conflicted package ([3m[34m<http://conflicted.r-lib.org/>[39m[23m) to force all conflicts to become errors
+[?25h##
+## Synth Package: Implements Synthetic Control Methods.
+
+## See https://web.stanford.edu/~jhain/synthpage.html for additional information.
+
+
+[?25h[?25h[?25h[?25h[?25h[?25h[?25h[?25h[?25h[?25h[?25h[?25h[?25h[?25h[?25h[?25h[?25h[?25h[?25hPanel: 137 categories, 31 treated, 106 controls
+[?25h[?25h[?25h[?25h
+==== Outcome: avg_log_price ====
+OLS estimation, Dep. Var.: avg_log_price
+Observations: 33,170
+Weights: composite_weight
+Fixed-effects: stack_id^year: 310,  stack_id^category_num: 3,317
+Standard-errors: Clustered (stack_id) 
+                                  Estimate Std. Error   t value Pr(>|t|)    
+rel_year::-4:is_treated_in_stack -0.004506   0.004362 -1.032947 0.309884    
+rel_year::-3:is_treated_in_stack  0.008921   0.004543  1.963530 0.058912 .  
+rel_year::-2:is_treated_in_stack -0.003523   0.009686 -0.363698 0.718634    
+rel_year::0:is_treated_in_stack   0.027993   0.037706  0.742416 0.463609    
+rel_year::1:is_treated_in_stack   0.135930   0.085285  1.593821 0.121459    
+rel_year::2:is_treated_in_stack   0.127026   0.078316  1.621969 0.115274    
+rel_year::3:is_treated_in_stack   0.169697   0.115115  1.474153 0.150858    
+rel_year::4:is_treated_in_stack   0.132622   0.086721  1.529289 0.136670    
+rel_year::5:is_treated_in_stack   0.154640   0.085954  1.799099 0.082071 .  
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+RMSE: 0.123356     Adj. R2: 0.97418 
+                 Within R2: 0.075542
+
+==== Outcome: log_raw_qty ====
+Error in feols(as.formula(paste0(yvar, " ~ i(rel_year, is_treated, ref = ",  : 
+  The vector of weights contains negative values, this is not allowed (e.g. obs. 951, 952 and 953).
+Calls: bind_rows -> list2 -> lapply -> FUN -> feols
+In addition: Warning messages:
+1: The VCOV matrix is not positive semi-definite and was 'fixed' (see ?vcov). 
+2: The VCOV matrix is not positive semi-definite and was 'fixed' (see ?vcov). 
+3: The VCOV matrix is not positive semi-definite and was 'fixed' (see ?vcov). 
+4: The VCOV matrix is not positive semi-definite and was 'fixed' (see ?vcov). 
+5: The VCOV matrix is not positive semi-definite and was 'fixed' (see ?vcov). 
+6: The VCOV matrix is not positive semi-definite and was 'fixed' (see ?vcov). 
+7: The VCOV matrix is not positive semi-definite and was 'fixed' (see ?vcov). 
+8: The VCOV matrix is not positive semi-definite and was 'fixed' (see ?vcov). 
+9: The VCOV matrix is not positive semi-definite and was 'fixed' (see ?vcov). 
+Execution halted
+[?25h]0;cxu75@holy8a28307:~/sci_eq/derived/first_stage/synthetic_ctrl/code[cxu75@holy8a28307 code]$ Rscript synth_did_estimates.R qty spend
+── [1mAttaching core tidyverse packages[22m ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── tidyverse 2.0.0 ──
+[32m✔[39m [34mdplyr    [39m 1.1.4     [32m✔[39m [34mreadr    [39m 2.1.5
+[32m✔[39m [34mforcats  [39m 1.0.0     [32m✔[39m [34mstringr  [39m 1.5.1
+[32m✔[39m [34mggplot2  [39m 3.5.1     [32m✔[39m [34mtibble   [39m 3.2.1
+[32m✔[39m [34mlubridate[39m 1.9.4     [32m✔[39m [34mtidyr    [39m 1.3.1
+[32m✔[39m [34mpurrr    [39m 1.0.4     
+── [1mConflicts[22m ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── tidyverse_conflicts() ──
+[31m✖[39m [34mdplyr[39m::[32mfilter()[39m masks [34mstats[39m::filter()
+[31m✖[39m [34mdplyr[39m::[32mlag()[39m    masks [34mstats[39m::lag()
+[36mℹ[39m Use the conflicted package ([3m[34m<http://conflicted.r-lib.org/>[39m[23m) to force all conflicts to become errors
+[?25h##
+## Synth Package: Implements Synthetic Control Methods.
+
+## See https://web.stanford.edu/~jhain/synthpage.html for additional information.
+
+
+[?25h[?25h[?25h[?25h[?25h[?25h[?25h[?25h[?25h[?25h[?25h[?25h[?25h[?25h[?25h[?25h[?25h[?25h[?25h[?25h[?25hPanel: 137 categories, 31 treated, 106 controls
+[?25h[?25h[?25h[?25h
+==== Outcome: log_raw_qty ====
+   chemiluminescent substrates done
+   dmem done
+   dmem-f-12 done
+   dnase i done
+   donkey serum done
+   dulbecco's phosphate-buffered saline (dpbs) buffer done
+   first-strand cdna synthesis systems done
+   goat serum done
+   hanks' balanced salt solution (hbss) buffer done
+   high-fidelity dna polymerase done
+c^C
+Timing stopped at: 4.39 0 4.416
+Execution halted
+[?25h]0;cxu75@holy8a28307:~/sci_eq/derived/first_stage/synthetic_ctrl/code[cxu75@holy8a28307 code]$ ^C
+]0;cxu75@holy8a28307:~/sci_eq/derived/first_stage/synthetic_ctrl/code[cxu75@holy8a28307 code]$ ^C
+]0;cxu75@holy8a28307:~/sci_eq/derived/first_stage/synthetic_ctrl/code[cxu75@holy8a28307 code]$ ^C
+]0;cxu75@holy8a28307:~/sci_eq/derived/first_stage/synthetic_ctrl/code[cxu75@holy8a28307 code]$ ^C
+]0;cxu75@holy8a28307:~/sci_eq/derived/first_stage/synthetic_ctrl/code[cxu75@holy8a28307 code]$ ^C
+]0;cxu75@holy8a28307:~/sci_eq/derived/first_stage/synthetic_ctrl/code[cxu75@holy8a28307 code]$ ^C
+]0;cxu75@holy8a28307:~/sci_eq/derived/first_stage/synthetic_ctrl/code[cxu75@holy8a28307 code]$ ^C
+]0;cxu75@holy8a28307:~/sci_eq/derived/first_stage/synthetic_ctrl/code[cxu75@holy8a28307 code]$ ^C
+]0;cxu75@holy8a28307:~/sci_eq/derived/first_stage/synthetic_ctrl/code[cxu75@holy8a28307 code]$ ^C
+]0;cxu75@holy8a28307:~/sci_eq/derived/first_stage/synthetic_ctrl/code[cxu75@holy8a28307 code]$ ^C
+]0;cxu75@holy8a28307:~/sci_eq/derived/first_stage/synthetic_ctrl/code[cxu75@holy8a28307 code]$ [K[cxu75@holy8a28307 code]$ cd
+]0;cxu75@holy8a28307:~[cxu75@holy8a28307 ~]$ cd sci_eq/analysis/
+]0;cxu75@holy8a28307:~/sci_eq/analysis[cxu75@holy8a28307 analysis]$ ls
+bhj_checklist	 govspend_descs  pi_descriptives      predicted_impact	rf_heterogeneity
+first_stage	 hhi_treated	 placebo_first_stage  price_descs	uni_exposure_test
+foia_case_study  inst_level	 placebo_overlay      reduced_form
+]0;cxu75@holy8a28307:~/sci_eq/analysis[cxu75@holy8a28307 analysis]$ cd first_stage/code/
+]0;cxu75@holy8a28307:~/sci_eq/analysis/first_stage/code[cxu75@holy8a28307 code]$ ls
+analysis.do		   links.txt  posttreat_beta_u.ster
+eb_shrinkage_appendix.tex  make.py    posttreat_beta_u_lrsr.ster
+]0;cxu75@holy8a28307:~/sci_eq/analysis/first_stage/code[cxu75@holy8a28307 code]$ pwd
+/n/home02/cxu75/sci_eq/analysis/first_stage/code
+]0;cxu75@holy8a28307:~/sci_eq/analysis/first_stage/code[cxu75@holy8a28307 code]$ python make.py 
+Cleared: `../output/`[0m
+Cleared: `../temp/`[0m
+Removed: `/n/holylabs/pakes_lab/Lab/sci_eq/analysis/first_stage/external`[0m
+Starting makelog file at: `/n/holylabs/pakes_lab/Lab/sci_eq/analysis/first_stage/output/make.log`[0m
+External links successfully created![0m
+[36mExecuting command: `stata-mp -e do \"/n/holylabs/pakes_lab/Lab/sci_eq/analysis/first_stage/code/analysis\.do\"`[0m
+Traceback (most recent call last):
+  File "/n/holylabs/pakes_lab/Lab/sci_eq/analysis/first_stage/code/make.py", line 19, in <module>
+    run_stata(paths, program = 'analysis.do')
+  File "/n/holylabs/LABS/pakes_lab/Lab/env/lib/python3.10/site-packages/gslab_make/run_program.py", line 1018, in run_stata
+    raise ProgramError(error_message, stderr)
+gslab_make.private.exceptionclasses.ProgramError: 
+
+[31m*********************************************************************
+* Stata program executed with errors. Traceback can be found below. *
+*********************************************************************[0m
+
+[31m/bin/sh: stata-mp: command not found
+[0m
+[0m]0;cxu75@holy8a28307:~/sci_eq/analysis/first_stage/code[cxu75@holy8a28307 code]$ exit
+exit
+
+Script done on 2026-09-20 18:09:45-04:00

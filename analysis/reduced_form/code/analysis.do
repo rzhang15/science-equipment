@@ -12,7 +12,7 @@ version 17
 * FE_MODE          : author | athr_clyr | inst_cluster | inst_cluster_fldyr
 * QUICK_TOPJRNL    : 1 = top_jrnls sample, ppr_cnt only, single pass
 * HISIM_PCT        : 0 = off; N = keep top N% of imputed PIs by max_sim
-* FIG_MODES        : pres | paper
+* FIG_MODES        : pres | paper | both
 * NO_SOLO          : 1 = read the no_solo panels
 global EXPOSURE_VERSION "hc_all3"
 global EXPOSURE_FILTER  "_cf_k3"
@@ -20,7 +20,8 @@ global FE_MODE "author"
 global WEIGHT_MSIM 0
 global QUICK_TOPJRNL 0
 global HISIM_PCT 0
-global FIG_MODES "pres"
+global FIG_MODES "both"
+if "$FIG_MODES" == "both" global FIG_MODES "pres paper"
 global NO_SOLO 0
 
 program main
@@ -630,9 +631,9 @@ program event_study
             }
             gen ub = b + 1.96*se
             gen lb = b - 1.96*se
-            local ymax = 1.5
-            local ymin = -3
-            local pgap 0.3
+            local ymax = 1.2
+            local ymin = -2.2
+            local pgap 0.2
             gen rel = -`abs_lead' if _n == 1
             replace rel = rel[_n-1]+1 if _n > 1
             replace rel = rel + 1 if rel >= -1
@@ -651,7 +652,7 @@ program event_study
                   scatter b year, mcolor(ebblue) || ///
                   scatteri `ymax' 2013.75 `ymax' 2014.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
                   xlab(2010(1)2019) xtitle("Year") ///
-                  ytitle("`ppml_ytit'") ysc(titlegap(`tgap') outergap(0)) ylab(`ymin'(`pgap')`ymax') ///
+                  ytitle("`ppml_ytit'") ysc(titlegap(`tgap') outergap(0)) ylab(`ymin'(`pgap')`ymax') ytick(`ymin'(0.2)`ymax') ///
                   yline(0, lcolor(gs10) lpattern(solid)) ///
                   `stats_leg' plotregion(margin(sides))
                 graph export `fdir'/es_`yvar'`suf'_ppml_mshrctrl`wsuf'.pdf, replace
@@ -1891,9 +1892,12 @@ program robustness
         if regexm("`yvar'", "^ppr_cnt")      & "`samp'" == "top_jrnls" local gap 2
         if regexm("`yvar'", "^cite_affl_wt") & "`samp'" == "top_jrnls" local gap 2
 
-        foreach spec in ageCtrl noattrit {
+        foreach spec in ageCtrl noattrit fldyr {
             if "`spec'" == "ageCtrl"  local title "Age x year controls"
             if "`spec'" == "noattrit" local title "PIs with last real pub year >= 2019"
+            if "`spec'" == "fldyr"    local title "Author + field x year FE"
+            local spec_fes `fes'
+            if "`spec'" == "fldyr"    local spec_fes athr_id i.cluster_30#i.year
 
             use ../output/prepped_samples/es_`samp'`suf', clear
             cap drop rel int_lead* int_lag* mshr_lead* mshr_lag*
@@ -1943,7 +1947,7 @@ program robustness
             local esuf ""
             if "`est'" == "ppmlhdfe" local esuf "_ppml"
             cap noi `est' `yvar' `int_leads' `int_lags' `mshr_leads' `mshr_lags' `addctrl', ///
-                    absorb(`fes') vce(cluster `vce_cl')
+                    absorb(`spec_fes') vce(cluster `vce_cl')
             local rc = _rc
             if `rc' {
                 di as error "robustness `samp'`suf' `yvar' `spec' `est' failed (rc=`rc'); skipping."

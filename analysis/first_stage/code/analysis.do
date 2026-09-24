@@ -8,13 +8,14 @@ version 17
 global exhibit_mode both // paper | presentation | both
 
 program main
-    foreach s in "" "_all3" {
+    foreach s in "_all3" {
         global suffix `s'
         *raw_plots
         did
         robustness
         balance_check
         placebo_timing
+        robustness_coefplot
         output_tables
         event_study
         *uni_fes
@@ -492,8 +493,76 @@ program placebo_timing
     mat rownames placebo_timing = avg_log_price log_raw_qty log_raw_spend
 end
 
+program robustness_coefplot
+    foreach var in avg_log_price log_raw_qty log_raw_spend {
+        cap mat drop robust_coefs_`var'
+        mat robust_coefs_`var' = robust_`var'[1..4, 1..2]
+    }
+    use ../external/samp/uni_category_yr_tfidf$suffix, clear
+    gegen uni_mkt = group(uni_id mkt)
+    bys uni_mkt : egen min_year = min(year)
+    bys uni_mkt : egen max_year = max(year)
+    keep if min_year < 2014 & max_year > 2014
+    gen posttreat = treated * (year >= 2014)
+    foreach var in avg_log_price log_raw_qty log_raw_spend {
+        reghdfe `var' posttreat [aw=spend_2013], cluster(mkt) absorb(year uni_id mkt)
+        mat robust_coefs_`var' = robust_coefs_`var' \ (_b[posttreat], _se[posttreat])
+    }
+    local rownames baseline uni_mkt_year uni_year_mkt uni_mkt_uni_year unmatched
+    foreach var in avg_log_price log_raw_qty log_raw_spend {
+        if "`var'" == "avg_log_price" local tag price
+        if "`var'" == "log_raw_qty"   local tag qty
+        if "`var'" == "log_raw_spend" local tag spend
+        use ../external/synth/synth_stacked_panel_`tag'$suffix, clear
+        gen posttreat = is_treated_in_stack * (year >= 2014)
+        reghdfe `var' posttreat [aw=composite_weight], cluster(stack_id) absorb(year category_num)
+        mat robust_coefs_`var' = robust_coefs_`var' \ (_b[posttreat], _se[posttreat])
+    }
+    local rownames `rownames' synth
+    foreach var in avg_log_price log_raw_qty log_raw_spend {
+        mat colnames robust_coefs_`var' = b se
+        mat rownames robust_coefs_`var' = `rownames'
+    }
+    foreach var in avg_log_price log_raw_qty log_raw_spend {
+        if "`var'" == "avg_log_price" local yname "Avg. Log Price"
+        if "`var'" == "log_raw_qty"   local yname "Log Qty"
+        if "`var'" == "log_raw_spend" local yname "Log Spend"
+        clear
+        svmat robust_coefs_`var', names(col)
+        gen lb = b - 1.96*se
+        gen ub = b + 1.96*se
+        gen pos = real(word("10 7 6 5 2 1", _n))
+        local ylabs 10 "{bf:Baseline}" 8 "{bf:Fixed effects}" 7 "University × Market + Year FEs" ///
+            6 "University × Year + Market FEs" 5 "University × Market + University × Year FEs" ///
+            3 "{bf:Control group}" 2 "Unmatched controls" 1 "Synthetic control"
+        local base = b[1]
+        sum lb
+        local xmin = floor(r(min)*10)/10
+        sum ub
+        local xmax = ceil(r(max)*10)/10
+        local step = cond(`xmax' - `xmin' > 0.8, 0.2, 0.1)
+        foreach mode in combined single {
+            local ylab_opt ylab(`ylabs', angle(0) labsize(small) notick nogrid)
+            if "`mode'" == "combined" & "`var'" != "avg_log_price" local ylab_opt ylab(1(1)10, nolabels notick nogrid)
+            tw rcap ub lb pos if pos == 10, horizontal lcolor(dkorange%70) msize(vsmall) || ///
+               scatter pos b if pos == 10, mcolor(dkorange) || ///
+               rcap ub lb pos if inrange(pos, 1, 9), horizontal lcolor(ebblue%70) msize(vsmall) || ///
+               scatter pos b if inrange(pos, 1, 9), mcolor(ebblue) ///
+               , xline(0, lcolor(gs12) lpattern(solid)) xline(`base', lcolor(dkorange) lpattern(dash)) ///
+               xlab(`xmin'(`step')`xmax', labsize(small) format(%3.1f) grid glpattern(dot) glcolor(gs13)) `ylab_opt' ///
+               xtitle("`yname' (95% CI)", size(small)) ytitle("") ysc(range(0.5 10.5) noline) ///
+               legend(off) plotregion(margin(sides)) name(rc_`var'_`mode', replace)
+        }
+        graph export ../output/figures/robust_coefs_`var'$suffix.pdf, replace
+    }
+    graph combine rc_avg_log_price_combined rc_log_raw_qty_combined rc_log_raw_spend_combined, ///
+        rows(1) xsize(12) ysize(4) imargin(small)
+    graph export ../output/figures/robust_coefs_all$suffix.pdf, replace
+    graph drop _all
+end
+
 program output_tables
-    foreach tab in robust_avg_log_price robust_log_raw_qty robust_log_raw_spend pooled_did balance placebo_timing {
+    foreach tab in robust_avg_log_price robust_log_raw_qty robust_log_raw_spend pooled_did balance placebo_timing robust_coefs_avg_log_price robust_coefs_log_raw_qty robust_coefs_log_raw_spend {
         qui matrix_to_txt, saving("../output/tables/`tab'$suffix.txt") matrix(`tab') ///
             title(<tab:`tab'>) format(%20.4f) replace
     }
@@ -1115,7 +1184,7 @@ program manual_event_study
     sum year , d
     local year_min = r(min)
     local year_max = r(max)
-    local legend_split legend(on order(3 "Treated" 4 "Control") ring(0) pos(7) size(small) region(fcolor(none)))
+    local legend_split legend(on order(3 "Treated Level Avg. in t = -1: `trt_mean'" 4 "Control Level Avg. in t = -1: `ctrl_mean'") pos(7) rows(2) bmargin(zero) size(small))
     local modes $exhibit_mode
     if "$exhibit_mode" == "both" local modes presentation paper
    /* if "`title'" == "" {

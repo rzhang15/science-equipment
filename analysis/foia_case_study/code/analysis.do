@@ -813,6 +813,18 @@ program boe
        xtitle("High-Confidence Consumables Expenditure ($)") ytitle("Fraction of PI-Years") legend(on order(- "N = `N_hq'" "Mean = `mean_hq'" "SD = `sd_hq'" "Min = `min_hq'" "Q1 = `q1_hq'" "Median = `median_hq'" "Q3 = `q3_hq'" "Max = `max_hq'") pos(1) ring(0) region(fcolor(none)) size(small))
    graph export ../output/figures/hq_labspend.pdf, replace
     collapse (mean) tot_spend nonlab_spend lab_spend hq_labspend lq_labspend perc_lab_spend perc_nonlab_spend, by(athr_id)
+    sum hq_labspend if hq_labspend >50, d
+    local mean_hq : di %6.2f r(mean)
+    local sd_hq : di %6.2f r(sd)
+    local min_hq : di %6.2f r(min)
+    local max_hq : di %10.2f r(max)
+    local N_hq : di %6.0f r(N)
+    local q1_hq : di %6.2f r(p25)
+    local q3_hq : di %6.2f r(p75)
+    local median_hq : di %6.2f r(p50)
+   tw hist hq_labspend if hq_labspend >50 & hq_labspend <= 75000,  color(edkblue) frac width(5000) xlab(0(7500)75000, angle(45)) ///
+       xtitle("Avg Annual High-Confidence Consumables Expenditure ($)") ytitle("Fraction of PIs") legend(on order(- "N = `N_hq'" "Mean = `mean_hq'" "SD = `sd_hq'" "Min = `min_hq'" "Q1 = `q1_hq'" "Median = `median_hq'" "Q3 = `q3_hq'" "Max = `max_hq'") pos(1) ring(0) region(fcolor(none)) size(small))
+   graph export ../output/figures/hq_labspend_pi.pdf, replace
     graph bar lab_spend nonlab_spend, over(athr_id ,sort((mean) tot_spend) descending) stack bar(1, color(lavender%70)) bar(2, color(dkorange%70)) legend(on order(- "Lab Spend" - "Non-Lab Spend") pos(1) ring(0) size(small) region(fcolor(none))) ytitle("Average Annual Spend ($)") plotregion(margin(sides))
     graph export ../output/figures/avg_spend_by_athr.pdf, replace
    kdensity perc_lab_spend

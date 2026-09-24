@@ -10,8 +10,9 @@ set maxvar 20000
 global EXPOSURE_VERSION "hc_all3"
 global EXPOSURE_FILTER  "_cf_k3"
 global FE_MODE "author"
-* FIG_MODES : pres | paper
-global FIG_MODES "pres"
+* FIG_MODES : pres | paper | both
+global FIG_MODES "both"
+if "$FIG_MODES" == "both" global FIG_MODES "pres paper"
 global HET_RUN_OLS 0
 global DEBUG_YVAR "ppr_cnt"
 global HET_INCLUDE_INSTWTD 0
@@ -22,15 +23,33 @@ global HET_AGE_NBINS 10
 global LAB_CLOCK "panel"
 global HET_HORSERACE_ONLY 0
 if "`1'" == "horserace" global HET_HORSERACE_ONLY 1
+global HET_COEFPLOTS_ONLY 0
+if "`1'" == "coefplots" global HET_COEFPLOTS_ONLY 1
 
 program main
+    if $HET_COEFPLOTS_ONLY == 1 {
+        define_group_labels
+        ppml_het_coefplot, samp(all_jrnls) r1r2(1) public(0)
+        ppml_het_coefplot, samp(all_jrnls) r1r2(1) public(1)
+        exit
+    }
     gather_inst_chars
     define_group_labels
     local s all_jrnls
     cap mkdir "../output/figures/`s'"
+    if $HET_HORSERACE_ONLY == 1 {
+        cap mkdir ../temp
+        cap confirm file ../temp/es_`s'_r1_r2.dta
+        if _rc add_het_splits, samp(`s') r1r2(1) public(0)
+        cap confirm file ../temp/es_`s'_r1_r2_public.dta
+        if _rc add_het_splits, samp(`s') r1r2(1) public(1)
+        desc_exposure_by_age, samp(`s') r1r2(1) public(0)
+        desc_exposure_by_age, samp(`s') r1r2(1) public(1)
+    }
     if $HET_HORSERACE_ONLY == 0 {
         add_het_splits, samp(`s') r1r2(1) public(0)
         desc_pre_output_by_age, samp(`s') r1r2(1) public(0)
+        desc_exposure_by_age, samp(`s') r1r2(1) public(0)
         event_study_het, samp(`s') r1r2(1) public(0)
         ppml_age_gradient, samp(`s') r1r2(1) public(0)
     }
@@ -41,6 +60,7 @@ program main
     if $HET_HORSERACE_ONLY == 0 {
         add_het_splits, samp(all_jrnls) r1r2(1) public(1)
         desc_pre_output_by_age, samp(all_jrnls) r1r2(1) public(1)
+        desc_exposure_by_age, samp(all_jrnls) r1r2(1) public(1)
         event_study_het, samp(all_jrnls) r1r2(1) public(1)
         ppml_age_gradient, samp(all_jrnls) r1r2(1) public(1)
     }
@@ -134,6 +154,8 @@ program define_group_labels
     global LBL_q4_labage    "Q4 Lab Age (Most Established)"
     global LBL_r1           "R1"
     global LBL_r2           "R2"
+    global LBL_pub_inst     "Public Institutions"
+    global LBL_priv_inst    "Private Institutions"
     global LBL_high_pre_ppr "More Productive at Baseline"
     global LBL_low_pre_ppr  "Less Productive at Baseline"
     global LBL_high_nihg    "More NIH Grants at Baseline"
@@ -188,6 +210,9 @@ program define_group_labels
     local ic_lbl_lscx  "Life-Sci Capital Expenditures"
     local ic_lbl_medx  "Medical School Expenditures"
     local ic_lbl_endow "Institutional Endowment"
+    local ic_lbl_nihd  "NIH Funding at Baseline"
+    global LBL_ic_nihd "`ic_lbl_nihd'"
+    global JOINT_AE_CHARS ${IC_ALIASES} nihd
     foreach a of global IC_ALIASES {
         global LBL_ic_`a'   "`ic_lbl_`a''"
         global LBL_hi_`a'   "High `ic_lbl_`a''"
@@ -220,7 +245,7 @@ program define_group_labels
     foreach b of global PI_Q_BASES {
         global PI_PAIRS_Q `"${PI_PAIRS_Q} "q4_`b' q1_`b'" "'
     }
-    global COEFPLOT_PI_PAIRS `" "young old" "r1 r2" "high_pre_ppr low_pre_ppr" "high_nihd low_nihd" "big_msa small_msa" "'
+    global COEFPLOT_PI_PAIRS `" "young old" "r1 r2" "pub_inst priv_inst" "high_pre_ppr low_pre_ppr" "high_nihd low_nihd" "'
 end
 
 program add_het_splits
@@ -286,6 +311,8 @@ program add_het_splits
 
     gen r1 = type == "r1" if !mi(type)
     gen r2 = type == "r2" if !mi(type)
+    gen byte pub_inst  = public == 1 if !mi(public)
+    gen byte priv_inst = public == 0 if !mi(public)
 
     local nih_src   n_grants nih_total_cost
     local nih_alias nihg     nihd
@@ -406,6 +433,13 @@ program add_het_splits
         gen byte o_hi_`a' = (young == 0 & hiw_`a' == 1) if !mi(young) & !mi(hiw_`a')
         gen byte o_lo_`a' = (young == 0 & hiw_`a' == 0) if !mi(young) & !mi(hiw_`a')
     }
+    cap confirm variable high_nihd
+    if !_rc {
+        gen byte y_hi_nihd = (young == 1 & high_nihd == 1) if !mi(young) & !mi(high_nihd)
+        gen byte y_lo_nihd = (young == 1 & high_nihd == 0) if !mi(young) & !mi(high_nihd)
+        gen byte o_hi_nihd = (young == 0 & high_nihd == 1) if !mi(young) & !mi(high_nihd)
+        gen byte o_lo_nihd = (young == 0 & high_nihd == 0) if !mi(young) & !mi(high_nihd)
+    }
 
     cap confirm variable min_year
     if !_rc {
@@ -490,7 +524,7 @@ program event_study_het
         gen ln_`v' = ln(1+`v')
     }
 
-    local het_groups young old young_ns old_ns young_any old_any r1 r2 ///
+    local het_groups young old young_ns old_ns young_any old_any r1 r2 pub_inst priv_inst ///
                      high_pre_ppr low_pre_ppr high_nihg low_nihg high_nihd low_nihd ///
                      young_nih old_nih new_lab est_lab big_msa small_msa ///
                      yhigh_nihd ylow_nihd yq4_nihd yq1_nihd ///
@@ -567,7 +601,7 @@ program event_study_het
     gen Z_it       = exposure      * post
     gen Z_share_it = mkt_spend_shr * post
 
-    local pi_pairs `" "young old" "young_ns old_ns" "young_any old_any" "young_nih old_nih" "r1 r2" "high_pre_ppr low_pre_ppr" "high_nihg low_nihg" "high_nihd low_nihd" "new_lab est_lab" "big_msa small_msa" "yhigh_nihd ylow_nihd" "yq4_nihd yq1_nihd" "'
+    local pi_pairs `" "young old" "young_ns old_ns" "young_any old_any" "young_nih old_nih" "r1 r2" "pub_inst priv_inst" "high_pre_ppr low_pre_ppr" "high_nihg low_nihg" "high_nihd low_nihd" "new_lab est_lab" "big_msa small_msa" "yhigh_nihd ylow_nihd" "yq4_nihd yq1_nihd" "'
     global DUMMY_PAIRS_MED    `" `pi_pairs' ${IC_PAIRS_MED} "'
     global DUMMY_PAIRS_MED_PW `" `pi_pairs' ${IC_PAIRS_MED_PW} "'
 
@@ -650,12 +684,10 @@ program event_study_het
                 gen year = rel + 2014
                 hashsort rel
                 local stats_leg `"legend(on order(- "Num. PIs: `num_athrs'" "Num. Insts: `num_insts'" "Pre-Period Avg : `pre_mean'") pos(7) ring(1) rows(3) bmargin(zero) size(small))"'
-                local es_sub subtitle("`g1_label'", pos(11) size(small))
                 local fdir ../output/figures/`samp'
                 foreach fmode of global FIG_MODES {
                     if "`fmode'" == "paper" {
                         local stats_leg legend(off)
-                        local es_sub
                         local fdir ../output/figures/`samp'/paper
                         cap mkdir "`fdir'"
                     }
@@ -664,7 +696,6 @@ program event_study_het
                     scatteri `ymax' 2013.75 `ymax' 2014.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
                       xlab(2010(1)2019, labsize(small)) xtitle("Year") ///
                       ytitle("Exposure x Post") ysc(titlegap(-6) outergap(0)) ylab(`ymin'(`gap')`ymax') ///
-                      `es_sub' ///
                       `stats_leg' ///
                       yline(0, lcolor(gs10) lpattern(solid)) plotregion(margin(sides))
                     graph export `fdir'/es_`yvar'`suf'_`g1'`plot_suf'.pdf, replace
@@ -773,11 +804,11 @@ program event_study_het
                     keep es1 es2
                     drop if mi(es1)
                     rename (es1 es2) (b se)
-                    local pgap 0.3
+                    local pgap 0.2
                     gen ub = b + 1.96*se
                     gen lb = b - 1.96*se
-                    local ymax = 1.5
-                    local ymin = -3
+                    local ymax = 1.2
+                    local ymin = -2.2
                     gen rel = -`abs_lead' if _n == 1
                     replace rel = rel[_n-1]+1 if _n > 1
                     replace rel = rel + 1 if rel >= -1
@@ -785,12 +816,10 @@ program event_study_het
                     gen year = rel + 2014
                     hashsort rel
                     local stats_leg `"legend(on order(- "Num. PIs: `num_athrs'" "Num. Insts: `num_insts'" "Pre-Period Avg : `pre_mean'") pos(7) ring(1) rows(3) bmargin(zero) size(small))"'
-                    local es_sub subtitle("`grp_label'", pos(11) size(small))
                     local fdir ../output/figures/`samp'/es_ppml
                     foreach fmode of global FIG_MODES {
                         if "`fmode'" == "paper" {
                             local stats_leg legend(off)
-                            local es_sub
                             local fdir ../output/figures/`samp'/es_ppml/paper
                             cap mkdir "`fdir'"
                         }
@@ -798,13 +827,54 @@ program event_study_het
                           scatter b year, mcolor(ebblue) || ///
                         scatteri `ymax' 2013.75 `ymax' 2014.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
                           xlab(2010(1)2019, labsize(small)) xtitle("Year") ///
-                          ytitle("`ppml_ytit'") ysc(titlegap(-6) outergap(0)) ylab(`ymin'(`pgap')`ymax') ///
-                          `es_sub' ///
+                          ytitle("`ppml_ytit'") ysc(titlegap(-6) outergap(0)) ylab(`ymin'(`pgap')`ymax') ytick(`ymin'(0.2)`ymax') ///
                           `stats_leg' ///
                           yline(0, lcolor(gs10) lpattern(solid)) plotregion(margin(sides))
                         graph export `fdir'/es_`yvar'`suf'_`grp'`plot_suf'.pdf, replace
                     }
                     save ../temp/es_`yvar'`suf'_`grp'`plot_suf', replace
+                    restore
+                }
+                if "`g1'" == "young" & "`g2'" == "old" {
+                    preserve
+                    use ../temp/es_`yvar'`suf'_young`plot_suf', clear
+                    gen grp = 1
+                    append using ../temp/es_`yvar'`suf'_old`plot_suf'
+                    replace grp = 2 if mi(grp)
+                    replace year = year - 0.1 if grp == 1
+                    replace year = year + 0.1 if grp == 2
+                    local ymax = 1.2
+                    local ymin = -2.2
+                    local pgap 0.2
+                    local fdir ../output/figures/`samp'/es_ppml
+                    foreach fmode of global FIG_MODES {
+                        if "`fmode'" == "paper" {
+                            local fdir ../output/figures/`samp'/es_ppml/paper
+                            cap mkdir "`fdir'"
+                        }
+                        foreach hide in 0 1 {
+                            local ocol dkorange
+                            local ocol_ci dkorange%70
+                            local olbl "${LBL_old}"
+                            local fsuf young_old
+                            if `hide' {
+                                local ocol none
+                                local ocol_ci none
+                                local olbl " "
+                                local fsuf young_old_hideold
+                            }
+                            tw rcap ub lb year if rel != -1 & grp == 1, lcolor(ebblue%70) msize(vsmall) || ///
+                              scatter b year if grp == 1, mcolor(ebblue) || ///
+                              rcap ub lb year if rel != -1 & grp == 2, lcolor(`ocol_ci') msize(vsmall) || ///
+                              scatter b year if grp == 2, mcolor(`ocol') || ///
+                            scatteri `ymax' 2013.75 `ymax' 2014.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
+                              xlab(2010(1)2019, labsize(small)) xtitle("Year") ///
+                              ytitle("`ppml_ytit'") ysc(titlegap(-6) outergap(0)) ylab(`ymin'(`pgap')`ymax') ytick(`ymin'(0.2)`ymax') ///
+                              legend(on order(2 "${LBL_young}" 4 "`olbl'") pos(6) ring(1) rows(1) size(small)) ///
+                              yline(0, lcolor(gs10) lpattern(solid)) plotregion(margin(sides))
+                            graph export `fdir'/es_`yvar'`suf'_`fsuf'`plot_suf'.pdf, replace
+                        }
+                    }
                     restore
                 }
             }
@@ -899,12 +969,10 @@ program event_study_het
                             drop if mi(es1)
                             rename (es1 es2) (b se)
                             gen ub = b + 1.96*se
-                            sum ub, d
-                            local ymax = round(r(max), 0.1)
                             gen lb = b - 1.96*se
-                            sum lb, d
-                            local ymin = round(r(min), 0.1)
-                            if `ymin' > 0 local ymin = 0
+                            local ymax = 1.2
+                            local ymin = -2.2
+                            local pgap 0.2
                             gen rel = -`abs_lead' if _n == 1
                             replace rel = rel[_n-1]+1 if _n > 1
                             replace rel = rel + 1 if rel >= -1
@@ -912,12 +980,10 @@ program event_study_het
                             gen year = rel + 2014
                             hashsort rel
                             local stats_leg `"legend(on order(- "Num. PIs: `num_athrs'" "Num. Insts: `num_insts'" "Pre-Period Avg : `pre_mean'") pos(7) ring(1) rows(3) bmargin(zero) size(small))"'
-                            local es_sub subtitle("`grp_label'", pos(11) size(small))
                             local fdir ../output/figures/`samp'/es_ppml
                             foreach fmode of global FIG_MODES {
                                 if "`fmode'" == "paper" {
                                     local stats_leg legend(off)
-                                    local es_sub
                                     local fdir ../output/figures/`samp'/es_ppml/paper
                                     cap mkdir "`fdir'"
                                 }
@@ -925,8 +991,7 @@ program event_study_het
                                   scatter b year, mcolor(ebblue) || ///
                                 scatteri `ymax' 2013.75 `ymax' 2014.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
                                   xlab(2010(1)2019, labsize(small)) xtitle("Year") ///
-                                  ytitle("`ppml_ytit'") ysc(titlegap(-6) outergap(0)) ylab(`ymin'(0.1)`ymax') ///
-                                  `es_sub' ///
+                                  ytitle("`ppml_ytit'") ysc(titlegap(-6) outergap(0)) ylab(`ymin'(`pgap')`ymax') ytick(`ymin'(0.2)`ymax') ///
                                   `stats_leg' ///
                                   yline(0, lcolor(gs10) lpattern(solid)) plotregion(margin(sides))
                                 graph export `fdir'/es_`yvar'`suf'_`grp'`plot_suf'.pdf, replace
@@ -1045,12 +1110,10 @@ program event_study_het
                     drop if mi(es1)
                     rename (es1 es2) (b se)
                     gen ub = b + 1.96*se
-                    sum ub, d
-                    local ymax = round(r(max), 0.1)
                     gen lb = b - 1.96*se
-                    sum lb, d
-                    local ymin = round(r(min), 0.1)
-                    if `ymin' > 0 local ymin = 0
+                    local ymax = 1.2
+                    local ymin = -2.2
+                    local pgap 0.2
                     gen rel = -`abs_lead' if _n == 1
                     replace rel = rel[_n-1]+1 if _n > 1
                     replace rel = rel + 1 if rel >= -1
@@ -1058,12 +1121,10 @@ program event_study_het
                     gen year = rel + 2014
                     hashsort rel
                     local stats_leg `"legend(on order(- "Num. PIs: `num_athrs'" "Num. Insts: `num_insts'" "Pre-Period Avg : `pre_mean'") pos(7) ring(1) rows(3) bmargin(zero) size(small))"'
-                    local es_sub subtitle("`grp_label'", pos(11) size(small))
                     local fdir ../output/figures/`samp'/es_ppml
                     foreach fmode of global FIG_MODES {
                         if "`fmode'" == "paper" {
                             local stats_leg legend(off)
-                            local es_sub
                             local fdir ../output/figures/`samp'/es_ppml/paper
                             cap mkdir "`fdir'"
                         }
@@ -1071,8 +1132,7 @@ program event_study_het
                           scatter b year, mcolor(ebblue) || ///
                         scatteri `ymax' 2013.75 `ymax' 2014.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
                           xlab(2010(1)2019, labsize(small)) xtitle("Year") ///
-                          ytitle("`ppml_ytit'") ysc(titlegap(-6) outergap(0)) ylab(`ymin'(0.1)`ymax') ///
-                          `es_sub' ///
+                          ytitle("`ppml_ytit'") ysc(titlegap(-6) outergap(0)) ylab(`ymin'(`pgap')`ymax') ytick(`ymin'(0.2)`ymax') ///
                           `stats_leg' ///
                           yline(0, lcolor(gs10) lpattern(solid)) plotregion(margin(sides))
                         graph export `fdir'/es_`yvar'`suf'_`grp'`plot_suf'.pdf, replace
@@ -1083,7 +1143,7 @@ program event_study_het
             }
             }
 
-            foreach a of global IC_ALIASES {
+            foreach a of global JOINT_AE_CHARS {
                 cap confirm variable y_hi_`a'
                 if _rc continue
                 foreach grp in y_hi_`a' y_lo_`a' o_hi_`a' o_lo_`a' {
@@ -1124,6 +1184,17 @@ program event_study_het
                         " (se=" %8.4f `se_diff' ") p=" %6.4f `p_diff'
                     post `ph_handle' ("`yvar'") ("`age'_diff_`a'") ("mshrctrl") ("joint_ae_diff") ///
                         (`b_diff') (`se_diff') (`p_diff') (.) (`Nppml') (`r2ppml')
+                }
+                foreach hl in hi lo {
+                    cap noi lincom Z_o_`hl'_`a' - Z_y_`hl'_`a'
+                    if _rc continue
+                    local b_gap  = r(estimate)
+                    local se_gap = r(se)
+                    local p_gap  = r(p)
+                    di as text "joint-ae GAP `samp'`suf' `yvar' `hl'_`a' (late - early): b=" %8.4f `b_gap' ///
+                        " (se=" %8.4f `se_gap' ") p=" %6.4f `p_gap'
+                    post `ph_handle' ("`yvar'") ("`hl'_gap_`a'") ("mshrctrl") ("joint_ae_gap") ///
+                        (`b_gap') (`se_gap') (`p_gap') (.) (`Nppml') (`r2ppml')
                 }
             }
 
@@ -1175,7 +1246,7 @@ program ppml_pdid_het_binscatter
     if "`yvar'" == "n_middle_ppr"      local bs_lbl "Middle-Author Papers"
     if "`yvar'" == "ppr_cnt_nonsolo"   local bs_lbl "Publications (Excl. Solo)"
 
-    local dummy_pairs `" "young old" "young_ns old_ns" "young_any old_any" "young_nih old_nih" "r1 r2" "high_pre_ppr low_pre_ppr" "high_nihg low_nihg" "high_nihd low_nihd" "new_lab est_lab" "big_msa small_msa" "yhigh_nihd ylow_nihd" "yq4_nihd yq1_nihd" ${IC_PAIRS_MED_PW} "'
+    local dummy_pairs `" "young old" "young_ns old_ns" "young_any old_any" "young_nih old_nih" "r1 r2" "pub_inst priv_inst" "high_pre_ppr low_pre_ppr" "high_nihg low_nihg" "high_nihd low_nihd" "new_lab est_lab" "big_msa small_msa" "yhigh_nihd ylow_nihd" "yq4_nihd yq1_nihd" ${IC_PAIRS_MED_PW} "'
     if "$HET_INCLUDE_INSTWTD" == "1" local dummy_pairs `" `dummy_pairs' ${IC_PAIRS_MED} "'
 
     preserve
@@ -1490,6 +1561,76 @@ program ppml_age_gradient
     }
 end
 
+program desc_exposure_by_age
+    syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0)]
+    local suf ""
+    if (`r1r2' == 1 & `public' == 0 & `r1_only' == 0) local suf "_r1_r2"
+    if (`r1r2' == 1 & `public' == 1 & `r1_only' == 0) local suf "_r1_r2_public"
+    if (`r1_only' == 1 & `public' == 0) local suf "_r1"
+    if (`r1_only' == 1 & `public' == 1) local suf "_r1_public"
+    cap mkdir "../output/figures/`samp'"
+
+    use ../temp/es_`samp'`suf', clear
+    cap confirm variable nih_pi
+    if _rc gen byte nih_pi = .
+    egen long inst_num = group(inst_id)
+    gcollapse (firstnm) exposure young nih_pi inst_num, by(athr_id)
+    drop if mi(young) | mi(exposure)
+
+    local tag_all ""
+    local tag_nih "_nih"
+    local cond_all "1"
+    local cond_nih "nih_pi == 1"
+    foreach s in all nih {
+        qui count if `cond_`s'' & young == 1
+        local n_y = r(N)
+        qui count if `cond_`s'' & young == 0
+        local n_o = r(N)
+        if `n_y' == 0 | `n_o' == 0 {
+            di as error "desc_exposure_by_age `samp'`suf' [`s']: empty group -- SKIPPED."
+            continue
+        }
+        qui sum exposure if `cond_`s'' & young == 1, d
+        local mu_y = strtrim(string(r(mean), "%6.3f"))
+        local md_y = strtrim(string(r(p50),  "%6.3f"))
+        qui sum exposure if `cond_`s'' & young == 0, d
+        local mu_o = strtrim(string(r(mean), "%6.3f"))
+        local md_o = strtrim(string(r(p50),  "%6.3f"))
+        di as text _n "desc_exposure_by_age `samp'`suf' [`s']: N young = `n_y' (mean=`mu_y' p50=`md_y'), N old = `n_o' (mean=`mu_o' p50=`md_o')"
+        cap noi ksmirnov exposure if `cond_`s'', by(young)
+        qui reg exposure young if `cond_`s'', vce(cluster inst_num)
+        di as text "  young-old diff = " %8.4f _b[young] " (se " %8.4f _se[young] ")"
+
+        qui sum exposure if `cond_`s'', d
+        local xcap = r(p99)
+        cap drop _kx _kd_y _kd_o _kd_c
+        gen _kx = `xcap' * (_n - 1) / 199 if _n <= 200
+        kdensity exposure if `cond_`s'' & young == 1 & exposure <= `xcap', at(_kx) gen(_kd_y) nograph
+        kdensity exposure if `cond_`s'' & young == 0 & exposure <= `xcap', at(_kx) gen(_kd_o) nograph
+        gen _kd_c = min(_kd_y, _kd_o)
+        local leg_y "Early-Career (N=`n_y'): mean=`mu_y'"
+        local leg_o "Late-Career (N=`n_o'): mean=`mu_o'"
+        local kd_leg `"legend(order(3 "`leg_y'" 4 "`leg_o'") pos(2) ring(0) rows(2) size(small))"'
+        local fdir ../output/figures/`samp'
+        foreach fmode of global FIG_MODES {
+            if "`fmode'" == "paper" {
+                local kd_leg `"legend(order(3 "${LBL_young}" 4 "${LBL_old}") pos(2) ring(0) rows(2) size(small))"'
+                local fdir ../output/figures/`samp'/paper
+                cap mkdir "`fdir'"
+            }
+            tw (rarea _kd_c _kd_y _kx, color(ebblue*0.3) lwidth(none)) ///
+               (rarea _kd_c _kd_o _kx, color(dkorange*0.3) lwidth(none)) ///
+               (line _kd_y _kx, lcolor(ebblue) lwidth(medthick)) ///
+               (line _kd_o _kx, lcolor(dkorange) lwidth(medthick)) ///
+               , xtitle("Exposure Measure") ytitle("Density") ysc(titlegap(-6) outergap(0)) ///
+                 `kd_leg' ///
+                 plotregion(margin(sides))
+            graph export `fdir'/desc_kd_exposure`tag_`s''`suf'.pdf, replace
+        }
+        cap drop _kx _kd_y _kd_o _kd_c
+    }
+end
+
 program desc_pre_output_by_age
     syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0)]
     local suf ""
@@ -1676,67 +1817,138 @@ program horse_race_nih
     if "$DEBUG_YVAR" != "" local yvar_list $DEBUG_YVAR
     local nyv : word count `yvar_list'
 
-    mat hrace`suf' = J(14, `nyv', .)
-    mat rownames hrace`suf' = b_z_base se_z_base b_z_early se_z_early ///
-                              b_z_lownih se_z_lownih b_diff se_diff ///
-                              stat_eq p_eq N n_pis n_pis_early n_pis_lownih
+    mat hrace`suf' = J(22, `nyv', .)
+    mat rownames hrace`suf' = b_z_base_career se_z_base_career b_z_early_alone se_z_early_alone ///
+                              b_z_base_fund se_z_base_fund b_z_lownih_alone se_z_lownih_alone ///
+                              b_z_base se_z_base b_z_early se_z_early b_z_lownih se_z_lownih ///
+                              early_shift lownih_shift b_diff se_diff p_eq ///
+                              N n_pis n_pis_early
     mat colnames hrace`suf' = `yvar_list'
 
     local col 0
     foreach yvar of local yvar_list {
         local ++col
+        cap drop hr_samp
         cap noi ppmlhdfe `yvar' Z_it Z_early Z_lownih PT_early PT_lownih Z_share_it, ///
             absorb(`fes') vce(cluster `vce_cl')
         local rc = _rc
         if `rc' {
-            di as error "horse_race_nih `samp'`suf' `yvar' failed (rc=`rc'); column left missing."
+            di as error "horse_race_nih `samp'`suf' `yvar' joint spec failed (rc=`rc'); column left missing."
             continue
         }
+        gen byte hr_samp = e(sample)
         local Nppml = e(N)
-        local b_early   = _b[Z_early]
-        local se_early  = _se[Z_early]
-        local b_lownih  = _b[Z_lownih]
-        local se_lownih = _se[Z_lownih]
-        gunique athr_id if e(sample)
-        local n_pis = r(unique)
-        gunique athr_id if e(sample) & young == 1
-        local n_early = r(unique)
-        gunique athr_id if e(sample) & low_nihd == 1
-        local n_lownih = r(unique)
+        local b_base     = _b[Z_it]
+        local se_base    = _se[Z_it]
+        local b_early    = _b[Z_early]
+        local se_early   = _se[Z_early]
+        local b_lownih   = _b[Z_lownih]
+        local se_lownih  = _se[Z_lownih]
         qui lincom Z_early - Z_lownih
         local b_diff  = r(estimate)
         local se_diff = r(se)
         qui test Z_early = Z_lownih
-        local stat_eq = cond(r(F) < ., r(F), r(chi2))
         local p_eq = r(p)
+        gunique athr_id if hr_samp
+        local n_pis = r(unique)
+        gunique athr_id if hr_samp & young == 1
+        local n_early = r(unique)
 
-        mat hrace`suf'[1,`col']  = _b[Z_it]
-        mat hrace`suf'[2,`col']  = _se[Z_it]
-        mat hrace`suf'[3,`col']  = `b_early'
-        mat hrace`suf'[4,`col']  = `se_early'
-        mat hrace`suf'[5,`col']  = `b_lownih'
-        mat hrace`suf'[6,`col']  = `se_lownih'
-        mat hrace`suf'[7,`col']  = `b_diff'
-        mat hrace`suf'[8,`col']  = `se_diff'
-        mat hrace`suf'[9,`col']  = `stat_eq'
-        mat hrace`suf'[10,`col'] = `p_eq'
-        mat hrace`suf'[11,`col'] = `Nppml'
-        mat hrace`suf'[12,`col'] = `n_pis'
-        mat hrace`suf'[13,`col'] = `n_early'
-        mat hrace`suf'[14,`col'] = `n_lownih'
+        cap noi ppmlhdfe `yvar' Z_it Z_early PT_early Z_share_it if hr_samp, ///
+            absorb(`fes') vce(cluster `vce_cl')
+        local rc = _rc
+        if `rc' {
+            di as error "horse_race_nih `samp'`suf' `yvar' career-only spec failed (rc=`rc'); column left missing."
+            continue
+        }
+        local b_base_c   = _b[Z_it]
+        local se_base_c  = _se[Z_it]
+        local b_early_a  = _b[Z_early]
+        local se_early_a = _se[Z_early]
 
-        di as text "horse_race_nih `samp'`suf' `yvar' (NIH-matched sample):"
-        di as text "  Z x EarlyCareer     = " %9.4f `b_early'  "  (se " %7.4f `se_early' ")"
-        di as text "  Z x BelowMedianNIH  = " %9.4f `b_lownih' "  (se " %7.4f `se_lownih' ")"
-        di as text "  diff (early-lownih) = " %9.4f `b_diff'   "  (se " %7.4f `se_diff' ")   H0 equal: stat = " %8.4f `stat_eq' "  p = " %6.4f `p_eq'
-        di as text "  base Z (late-career x above-median) = " %9.4f _b[Z_it] "  (se " %7.4f _se[Z_it] ")"
-        di as text "  N = " %9.0f `Nppml' "  PIs = `n_pis' (early = `n_early', below-median NIH = `n_lownih')"
+        cap noi ppmlhdfe `yvar' Z_it Z_lownih PT_lownih Z_share_it if hr_samp, ///
+            absorb(`fes') vce(cluster `vce_cl')
+        local rc = _rc
+        if `rc' {
+            di as error "horse_race_nih `samp'`suf' `yvar' funding-only spec failed (rc=`rc'); column left missing."
+            continue
+        }
+        local b_base_f    = _b[Z_it]
+        local se_base_f   = _se[Z_it]
+        local b_lownih_a  = _b[Z_lownih]
+        local se_lownih_a = _se[Z_lownih]
+
+        mat hrace`suf'[1,`col']  = `b_base_c'
+        mat hrace`suf'[2,`col']  = `se_base_c'
+        mat hrace`suf'[3,`col']  = `b_early_a'
+        mat hrace`suf'[4,`col']  = `se_early_a'
+        mat hrace`suf'[5,`col']  = `b_base_f'
+        mat hrace`suf'[6,`col']  = `se_base_f'
+        mat hrace`suf'[7,`col']  = `b_lownih_a'
+        mat hrace`suf'[8,`col']  = `se_lownih_a'
+        mat hrace`suf'[9,`col']  = `b_base'
+        mat hrace`suf'[10,`col'] = `se_base'
+        mat hrace`suf'[11,`col'] = `b_early'
+        mat hrace`suf'[12,`col'] = `se_early'
+        mat hrace`suf'[13,`col'] = `b_lownih'
+        mat hrace`suf'[14,`col'] = `se_lownih'
+        mat hrace`suf'[15,`col'] = `b_early' - `b_early_a'
+        mat hrace`suf'[16,`col'] = `b_lownih' - `b_lownih_a'
+        mat hrace`suf'[17,`col'] = `b_diff'
+        mat hrace`suf'[18,`col'] = `se_diff'
+        mat hrace`suf'[19,`col'] = `p_eq'
+        mat hrace`suf'[20,`col'] = `Nppml'
+        mat hrace`suf'[21,`col'] = `n_pis'
+        mat hrace`suf'[22,`col'] = `n_early'
+
+        mat hrp_`yvar' = (`b_early_a', `se_early_a' \ `b_lownih_a', `se_lownih_a' \ ///
+                          `b_early', `se_early' \ `b_lownih', `se_lownih')
+
+        di as text "horse_race_nih `samp'`suf' `yvar' (NIH-matched sample, N = " %9.0f `Nppml' ", PIs = `n_pis', early = `n_early'):"
+        di as text "  career only   : Z x Early     = " %9.4f `b_early_a'  "  (se " %7.4f `se_early_a' ")"
+        di as text "  funding only  : Z x LowNIH    = " %9.4f `b_lownih_a' "  (se " %7.4f `se_lownih_a' ")"
+        di as text "  horse race    : Z x Early     = " %9.4f `b_early'    "  (se " %7.4f `se_early' ")   shift = " %8.4f `=`b_early' - `b_early_a''
+        di as text "                  Z x LowNIH    = " %9.4f `b_lownih'   "  (se " %7.4f `se_lownih' ")   shift = " %8.4f `=`b_lownih' - `b_lownih_a''
+        di as text "  early - lownih (joint) = " %9.4f `b_diff' "  (se " %7.4f `se_diff' ")   p(equal) = " %6.4f `p_eq'
     }
 
     cap mkdir ../output/tables
     cap mkdir ../output/tables/`samp'
     qui matrix_to_txt, saving("../output/tables/`samp'/horse_race_nih`suf'.txt") ///
         matrix(hrace`suf') title(<tab:horse_race_nih`suf'>) format(%20.4f) replace
+
+    cap mkdir "../output/figures/`samp'/coefplot_evavg"
+    clear
+    foreach yvar of local yvar_list {
+        cap confirm matrix hrp_`yvar'
+        if _rc continue
+        clear
+        svmat double hrp_`yvar', names(col)
+        rename (c1 c2) (b se)
+        gen ub = b + 1.96*se
+        gen lb = b - 1.96*se
+        gen byte career = inlist(_n, 1, 3)
+        gen y = cond(_n == 1, 4.7, cond(_n == 2, 3.7, cond(_n == 3, 2, 1)))
+        qui sum lb
+        local xmin = floor(r(min)/0.5)*0.5
+        qui sum ub
+        local xmax = ceil(r(max)/0.5)*0.5
+        local ylabs `"4.7 "Early-Career {&minus} Late-Career PIs" 3.7 "Below {&minus} Above Median NIH Funding" 2 "Early-Career {&minus} Late-Career PIs, Given Funding" 1 "Below {&minus} Above Median NIH, Given Career Stage""'
+        tw rcap ub lb y if career == 1, horizontal lcolor(ebblue%70) msize(vsmall) || ///
+           scatter y b if career == 1, mcolor(ebblue) msize(small) || ///
+           rcap ub lb y if career == 0, horizontal lcolor(dkorange%70) msize(vsmall) || ///
+           scatter y b if career == 0, mcolor(dkorange) msymbol(D) msize(small) ///
+           , xline(0, lcolor(gs10) lpattern(solid)) ///
+             yline(2.85, lcolor(gs12) lpattern(dash)) ///
+             ylabel(`ylabs', angle(0) labsize(small) noticks nogrid) ///
+             ytitle("") xtitle("Exposure x Post", size(small)) ///
+             xlabel(`xmin'(0.5)`xmax', labsize(small)) ///
+             legend(off) ///
+             ysize(4) xsize(8) yscale(range(0.6 5.1)) ///
+             plotregion(margin(l=zero r=zero b=zero t=vsmall))
+        graph export "../output/figures/`samp'/coefplot_evavg/horse_race_nih_coefplot_`yvar'`suf'.pdf", replace
+        di as text "wrote ../output/figures/`samp'/coefplot_evavg/horse_race_nih_coefplot_`yvar'`suf'.pdf"
+    }
 end
 
 program output_het_tables
@@ -1857,6 +2069,8 @@ program ppml_het_coefplot
         if "$HET_INCLUDE_INSTWTD" == "1" local st_list `st_list' quart
     }
     foreach st of local st_list {
+        local groups_core
+        local groups_core_any
         if strpos("`st'", "joint_") == 1 {
             local groups_pi
             local groups_ic_fund
@@ -1875,6 +2089,7 @@ program ppml_het_coefplot
             foreach a of local ic_expx_aliases {
                 local groups_ic_expx `groups_ic_expx' hi_`a' lo_`a'
             }
+            local groups_core young old hi_tfnd lo_tfnd hi_endow lo_endow
         }
         else if "`st'" == "med_pi" {
             local groups_pi
@@ -1889,6 +2104,8 @@ program ppml_het_coefplot
             foreach a of local ic_expx_aliases {
                 local groups_ic_expx `groups_ic_expx' hiw_`a' low_`a'
             }
+            local groups_core young old hiw_tfnd low_tfnd hiw_endow low_endow
+            local groups_core_any young old young_any old_any hiw_tfnd low_tfnd hiw_endow low_endow
         }
         else if "`st'" == "quart" {
             local groups_pi
@@ -1924,7 +2141,7 @@ program ppml_het_coefplot
             cap mkdir "../output/figures/`samp'/`spec_folder'"
 
         local groups_all `groups_pi' `groups_ic_fund' `groups_ic_expx'
-        foreach panel in pi ic_fund ic_expx all {
+        foreach panel in pi ic_fund ic_expx core core_any all {
             local groups `groups_`panel''
             local n_groups : word count `groups'
             if `n_groups' == 0 continue
@@ -1950,7 +2167,8 @@ program ppml_het_coefplot
                     continue
                 }
 
-                local pair_gap 0.7
+                local within 0.6
+                local between 1.25
                 local npairs = ceil(`n_groups'/2)
                 gen double y = .
                 local ylabs ""
@@ -1958,7 +2176,7 @@ program ppml_het_coefplot
                 foreach g of local groups {
                     local ++i
                     local pair = int((`i'-1)/2)
-                    local ypos = (`n_groups' - `i') + (`npairs' - 1 - `pair')*`pair_gap' + 1
+                    local ypos = (`n_groups' - `i')*`within' + (`npairs' - 1 - `pair')*(`between' - `within') + 1
                     qui replace y = `ypos' if grp == "`g'"
                     local lbl = "${LBL_`g'}"
                     if "`lbl'" == "" local lbl "`g'"
@@ -1974,25 +2192,36 @@ program ppml_het_coefplot
                 gen lb = post_b - 1.96*post_se
 
                 qui sum lb
-                local xmin = floor(r(min)/0.5)*0.5
+                local xmin = min(-2, floor(r(min)/0.5)*0.5)
                 qui sum ub
-                local xmax = ceil(r(max)/0.5)*0.5
+                local xmax = max(1, ceil(r(max)/0.5)*0.5)
+                local xstep 0.5
 
-                local ysize 6
-                if `n_groups' > 20 local ysize 10
-                if `n_groups' > 40 local ysize 14
-                local ysize = round(`ysize' * (`n_groups' + (`npairs'-1)*`pair_gap')/`n_groups', 0.1)
-                local labsize small
-                if `n_groups' > 20 local labsize vsmall
+                local ysize = round(0.28 * ((`n_groups' - 1)*`within' + (`npairs' - 1)*(`between' - `within') + 1), 0.1)
+                local ysize = max(2, min(14, `ysize'))
+                local xsize 5
+                local tscale = 4 / min(`ysize', `xsize')
+                local sz_ylab  = cond(`n_groups' > 20, 2.0833, 2.777) * `tscale'
+                local sz_xlab  = 2.777 * `tscale'
+                local sz_xtit  = 2.777 * `tscale'
+                local sz_mk    = 1.04166 * `tscale'
+                local sz_cap   = 0.520833 * `tscale'
 
-                tw rcap ub lb y, horizontal lcolor(ebblue%70) msize(vsmall) || ///
-                   scatter y post_b, mcolor(ebblue) msize(small) ///
+                gen byte hl = inlist(grp, "young", "old", "young_any", "old_any") & strpos("`panel'", "core") == 1
+                local hl_plots
+                qui count if hl == 1
+                if r(N) > 0 {
+                    local hl_plots `" || rcap ub lb y if hl == 1, horizontal lcolor(dkorange%70) msize(`sz_cap') || scatter y post_b if hl == 1, mcolor(dkorange) msize(`sz_mk')"'
+                }
+
+                tw rcap ub lb y if hl == 0, horizontal lcolor(ebblue%70) msize(`sz_cap') || ///
+                   scatter y post_b if hl == 0, mcolor(ebblue) msize(`sz_mk') `hl_plots' ///
                    , xline(0, lcolor(gs10) lpattern(solid)) ///
-                     ylabel(`ylabs', angle(0) labsize(`labsize') noticks nogrid) ///
-                     ytitle("") xtitle("Exposure x Post", size(small)) ///
-                     xlabel(`xmin'(0.5)`xmax', labsize(small)) ///
+                     ylabel(`ylabs', angle(0) labsize(`sz_ylab') noticks nogrid) ///
+                     ytitle("") xtitle("Exposure x Post", size(`sz_xtit')) ///
+                     xlabel(`xmin'(`xstep')`xmax', labsize(`sz_xlab')) ///
                      legend(off) ///
-                     ysize(`ysize') xsize(7) ///
+                     ysize(`ysize') xsize(`xsize') ///
                      yscale(range(0.9 .)) ///
                      plotregion(margin(l=zero r=zero b=zero t=vsmall))
                 graph export ///
@@ -2080,10 +2309,87 @@ program ppml_het_coefplot
                 di as text "wrote `filename_stem' coefplot for `yv' `spec_tag'"
                 restore
             }
+            joint_ae_panel_coefplot, resfile("`resfile'") yvars(`ppml_het_yvars') samp(`samp') ///
+                suf(`suf') spec_folder(`spec_folder') spec_tag(`spec_tag')
         }
 
         }
     }
 end
 
-main
+program joint_ae_panel_coefplot
+    syntax, resfile(string) yvars(string) samp(string) spec_folder(string) spec_tag(string) [suf(string)]
+    foreach a of global JOINT_AE_CHARS {
+        local clbl = "${LBL_ic_`a'}"
+        if "`clbl'" == "" local clbl "`a'"
+        foreach yv of local yvars {
+            preserve
+            use "`resfile'", clear
+            keep if yvar == "`yv'" & spec == "`spec_tag'" & split_type == "joint_ae"
+            keep if inlist(grp, "y_hi_`a'", "o_hi_`a'", "y_lo_`a'", "o_lo_`a'")
+            qui count if split_type == "joint_ae" & !mi(post_b)
+            if r(N) < 4 {
+                restore
+                continue
+            }
+            gen byte early = substr(grp, 1, 1) == "y"
+            gen ub = post_b + 1.96*post_se
+            gen lb = post_b - 1.96*post_se
+
+            local within 0.6
+            local between 1.25
+            local rows hdr_hi y_hi_`a' o_hi_`a' hdr_lo y_lo_`a' o_lo_`a'
+            local n_rows : word count `rows'
+            gen double y = .
+            local ylabs ""
+            local i = 0
+            foreach r of local rows {
+                local ++i
+                local blk = int((`i'-1)/3)
+                local ypos = (`n_rows' - `i')*`within' + (1 - `blk')*(`between' - `within') + 1
+                if "`r'" == "hdr_hi" local lbl "{bf:Above-median `clbl'}"
+                else if "`r'" == "hdr_lo" local lbl "{bf:Below-median `clbl'}"
+                else {
+                    local lbl = cond(substr("`r'", 1, 1) == "y", "${LBL_young}", "${LBL_old}")
+                    qui replace y = `ypos' if grp == "`r'"
+                }
+                local ylabs `"`ylabs' `ypos' "`lbl'""'
+            }
+
+            qui sum lb
+            local xmin = min(-2, floor(r(min)/0.5)*0.5)
+            qui sum ub
+            local xmax = max(1, ceil(r(max)/0.5)*0.5)
+            local xstep 0.5
+
+            local ysize = round(0.28 * ((`n_rows' - 1)*`within' + (`between' - `within') + 1) + 0.3, 0.1)
+            local xsize 5
+            local tscale = 4 / min(`ysize', `xsize')
+            local sz_ylab = 2.777 * `tscale'
+            local sz_xlab = 2.777 * `tscale'
+            local sz_xtit = 2.777 * `tscale'
+            local sz_mk   = 1.04166 * `tscale'
+            local sz_cap  = 0.520833 * `tscale'
+
+            tw rcap ub lb y if early == 1, horizontal lcolor(ebblue%70) msize(`sz_cap') || ///
+               scatter y post_b if early == 1, mcolor(ebblue) msize(`sz_mk') || ///
+               rcap ub lb y if early == 0, horizontal lcolor(dkorange%70) msize(`sz_cap') || ///
+               scatter y post_b if early == 0, mcolor(dkorange) msize(`sz_mk') ///
+               , xline(0, lcolor(gs10) lpattern(solid)) ///
+                 ylabel(`ylabs', angle(0) labsize(`sz_ylab') noticks nogrid) ///
+                 ytitle("") xtitle("Exposure x Post", size(`sz_xtit')) ///
+                 xlabel(`xmin'(`xstep')`xmax', labsize(`sz_xlab')) ///
+                 legend(off) ///
+                 ysize(`ysize') xsize(`xsize') ///
+                 yscale(range(0.9 .)) ///
+                 plotregion(margin(l=zero r=zero b=zero t=vsmall))
+            graph export ///
+                "../output/figures/`samp'/`spec_folder'/ppml_het_coefplot_`yv'_joint_ae_panel_`a'`suf'.pdf", ///
+                replace
+            di as text "wrote ../output/figures/`samp'/`spec_folder'/ppml_het_coefplot_`yv'_joint_ae_panel_`a'`suf'.pdf"
+            restore
+        }
+    }
+end
+
+if "$HET_SKIP_MAIN" != "1" main

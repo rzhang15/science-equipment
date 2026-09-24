@@ -1,0 +1,2170 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 120,000; see help set_maxvar.
+
+. do analysis.do coefpolots 
+
+. set more off
+
+. clear all
+
+. capture log close
+
+. program drop _all
+
+. set scheme modern
+
+. preliminaries
+
+. version 17
+
+. 
+. * EXPOSURE_VERSION : hc | all | treated_hc
+. * EXPOSURE_FILTER  : "" | _cf | _cf2 | _cf5
+. * EXPOSURE_FILE    : "" = final_imputed_shift_share_${EXPOSURE_VERSION}${EXPOSURE_FILTER}, else a filename under external/exposure/
+. * FE_MODE          : author | athr_clyr | inst_cluster | inst_cluster_fldyr
+. * QUICK_TOPJRNL    : 1 = top_jrnls sample, ppr_cnt only, single pass
+. * HISIM_PCT        : 0 = off; N = keep top N% of imputed PIs by max_sim
+. * FIG_MODES        : pres | paper | both
+. * NO_SOLO          : 1 = read the no_solo panels
+. global EXPOSURE_VERSION "hc_all3"
+
+. global EXPOSURE_FILTER  "_cf_k3"
+
+. global FE_MODE "author"
+
+. global WEIGHT_MSIM 0
+
+. global QUICK_TOPJRNL 0
+
+. global HISIM_PCT 0
+
+. global FIG_MODES "both"
+
+. if "$FIG_MODES" == "both" global FIG_MODES "pres paper"
+
+. global NO_SOLO 0
+
+. 
+. program main
+  1.     gather_external_data
+  2.     if "$QUICK_TOPJRNL" == "1" {
+  3.         cap mkdir "../output/figures/top_jrnls"
+  4.         restrict_samp, samp(top_jrnls) r1r2(1) public(0) 
+  5.         global WEIGHT_MSIM 0
+  6.         di as text _newline "=========================================="
+  7.         di as text "  RUNNING sample=top_jrnls ppr_cnt only (QUICK_TOPJRNL)"
+  8.         di as text "=========================================="
+  9.         mat drop _all
+ 10.         event_study,       samp(top_jrnls) r1r2(1) public(0)
+ 11.         pooled_did,        samp(top_jrnls) r1r2(1) public(0)
+ 12.         ppml_specs,        samp(top_jrnls) r1r2(1) public(0)
+ 13.         placebo_treatment, samp(top_jrnls) r1r2(1) public(0)
+ 14.         trim_top,          samp(top_jrnls) r1r2(1) public(0)
+ 15.         robustness,        samp(top_jrnls) r1r2(1) public(0)
+ 16.         output_tables,     samp(top_jrnls) r1r2(1) public(0)
+ 17.         exit
+ 18.     }
+ 19.     if "$HISIM_PCT" != "0" {
+ 20.         local hs all_jrnls_hisim$HISIM_PCT
+ 21.         cap mkdir "../output/figures/all_jrnls"
+ 22.         cap mkdir "../output/figures/`hs'"
+ 23.         restrict_samp, samp(all_jrnls) r1r2(1) public(0) hisim($HISIM_PCT)
+ 24.         foreach wmode in 0 1 {
+ 25.             global WEIGHT_MSIM `wmode'
+ 26.             di as text _newline "=========================================="
+ 27.             di as text "  RUNNING sample=`hs' WEIGHT_MSIM=`wmode' PUBLIC=0"
+ 28.             di as text "=========================================="
+ 29.             mat drop _all
+ 30.             event_study,   samp(`hs') r1r2(1) public(0)
+ 31.             pooled_did,    samp(`hs') r1r2(1) public(0)
+ 32.             ppml_specs,    samp(`hs') r1r2(1) public(0)
+ 33.             output_tables, samp(`hs') r1r2(1) public(0)
+ 34.         }
+ 35.         global WEIGHT_MSIM 0
+ 36.         exit
+ 37.     }
+ 38.     foreach pub in 0 1 {
+ 39.         foreach s in all_jrnls {
+ 40.             cap mkdir "../output/figures/`s'"
+ 41.             restrict_samp, samp(`s') r1r2(1) public(`pub')
+ 42.             foreach wmode in 0 1 {
+ 43.                 global WEIGHT_MSIM `wmode'
+ 44.                 di as text _newline "=========================================="
+ 45.                 di as text "  RUNNING sample=`s' WEIGHT_MSIM=`wmode' PUBLIC=`pub'"
+ 46.                 di as text "=========================================="
+ 47.                 mat drop _all
+ 48.                 event_study, samp(`s') r1r2(1) public(`pub')
+ 49.                 pooled_did, samp(`s') r1r2(1) public(`pub')
+ 50.                 ppml_specs, samp(`s') r1r2(1) public(`pub')
+ 51.                 if `wmode' == 0 {
+ 52.                     placebo_treatment, samp(`s') r1r2(1) public(`pub')
+ 53.                     trim_top, samp(`s') r1r2(1) public(`pub')
+ 54.                     robustness, samp(`s') r1r2(1) public(`pub')
+ 55.                 }
+ 56.                 output_tables, samp(`s') r1r2(1) public(`pub')
+ 57.             }
+ 58.             global WEIGHT_MSIM 0
+ 59.         }
+ 60.        * joint_outcome_test, samp(all_jrnls) r1r2(1) public(`pub')
+. 
+.         restrict_samp, samp(all_jrnls) r1r2(1) public(`pub') r1_only(1)
+ 61.         foreach wmode in 0 1 {
+ 62.             global WEIGHT_MSIM `wmode'
+ 63.             di as text _newline "=========================================="
+ 64.             di as text "  RUNNING sample=all_jrnls WEIGHT_MSIM=`wmode' PUBLIC=`pub' (R1-only)"
+ 65.             di as text "=========================================="
+ 66.             mat drop _all
+ 67.             event_study, samp(all_jrnls) r1r2(1) public(`pub') r1_only(1)
+ 68.             pooled_did,  samp(all_jrnls) r1r2(1) public(`pub') r1_only(1)
+ 69.             ppml_specs,  samp(all_jrnls) r1r2(1) public(`pub') r1_only(1)
+ 70.             if `wmode' == 0 {
+ 71.                 placebo_treatment, samp(all_jrnls) r1r2(1) public(`pub') r1_only(1)
+ 72.                 trim_top,          samp(all_jrnls) r1r2(1) public(`pub') r1_only(1)
+ 73.                 robustness,        samp(all_jrnls) r1r2(1) public(`pub') r1_only(1)
+ 74.             }
+ 75.             output_tables, samp(all_jrnls) r1r2(1) public(`pub') r1_only(1)
+ 76.         }
+ 77.         global WEIGHT_MSIM 0
+ 78.     }
+ 79. end
+
+. 
+. program gather_external_data
+  1.     if "$EXPOSURE_FILE" == "" {
+  2.         import delimited "../external/exposure/final_imputed_shift_share_${EXPOSURE_VERSION}${EXPOSURE_FILTER}.csv", clear
+  3.     }
+  4.     else {
+  5.         copy ../external/exposure/$EXPOSURE_FILE ../temp/exposure_override.csv, replace
+  6.         import delimited ../temp/exposure_override.csv, clear
+  7.     }
+  8.     rename exposure_ss imputed
+  9.     rename sum_imputed_shares imputed_mkt_spend_shr
+ 10.     save ../temp/exposure, replace
+ 11. 
+.     cap use athr_id year n_grants n_new_grants nih_total_cost ///
+>             using ../external/nih_grants/nih_athr_year, clear
+ 12.     if _rc {
+ 13.         di as error "gather_external_data: nih_athr_year not found -- NIH outcomes SKIPPED (rerun derived/nih/match_pi_athr)."
+ 14.     }
+ 15.     else {
+ 16.         gen byte has_nih = n_grants > 0
+ 17.         duplicates drop athr_id year, force
+ 18.         save ../temp/nih_athr_yr, replace
+ 19. 
+.         use athr_id nih_pi_name using ../external/nih_grants/nih_names_by_athr, clear
+ 20.         gen byte nih_matched = !mi(nih_pi_name)
+ 21.         drop nih_pi_name
+ 22.         merge 1:1 athr_id using ../external/nih_grants/nih_totals_by_athr, ///
+>             keepusing(n_grants_ever nih_cost_ever) keep(1 3) nogen
+ 23.         save ../temp/nih_athr_level, replace
+ 24.     }
+ 25. 
+.     import delimited ../external/cluster/author_static_clusters_30.csv, clear varnames(1)
+ 26.     cap tostring athr_id, replace
+ 27.     rename cluster_label cluster_30
+ 28.     save ../temp/athr_cluster30, replace
+ 29. 
+.     use athr_id max_sim using ../external/exposure/match_diagnostics, clear
+ 30.     save ../temp/match_diag, replace
+ 31. 
+.     use athr_id exposure mkt_spend_shr using ../external/real_exposure/athr_exposure_${EXPOSURE_VERSION}, clear
+ 32.     cap confirm file ../external/exposure/foia_self_exposure_${EXPOSURE_VERSION}${EXPOSURE_FILTER}.csv
+ 33.     if _rc == 0 {
+ 34.         preserve
+ 35.             import delimited ../external/exposure/foia_self_exposure_${EXPOSURE_VERSION}${EXPOSURE_FILTER}.csv, ///
+>                 clear varnames(1)
+ 36.             cap tostring athr_id, replace
+ 37.             keep athr_id self_exposure_eb sum_shares_eb
+ 38.             save ../temp/foia_self_exposure_eb, replace
+ 39.         restore
+ 40.         merge 1:1 athr_id using ../temp/foia_self_exposure_eb, keep(1 3)
+ 41.         qui count if _merge == 1
+ 42.         di as text "observed exposure: EB-shrunk via foia_self_exposure_${EXPOSURE_VERSION}${EXPOSURE_FILTER} (`r(N)' PIs w/o shrunk row stay raw)"
+ 43.         replace exposure = self_exposure_eb if _merge == 3
+ 44.         replace mkt_spend_shr = sum_shares_eb if _merge == 3
+ 45.         drop self_exposure_eb sum_shares_eb _merge
+ 46.     }
+ 47.     save ../temp/observed_exposure, replace
+ 48.     rename (exposure mkt_spend_shr) (exposure_all mkt_spend_shr_all)
+ 49.     save ../temp/foia_observed_exposure, replace
+ 50. end
+
+. 
+. program restrict_samp
+  1.     syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0) no_clin(int 0) hisim(int 0)]
+  2.     local suf ""
+  3.     if (`r1r2' == 1 & `public' == 0 & `r1_only' == 0) local suf "_r1_r2"
+  4.     if (`r1r2' == 1 & `public' == 1 & `r1_only' == 0) local suf "_r1_r2_public"
+  5.     if (`r1_only' == 1 & `public' == 0) local suf "_r1"
+  6.     if (`r1_only' == 1 & `public' == 1) local suf "_r1_public"
+  7.     if (`no_clin' == 1) local suf "_no_clin`suf'"
+  8. 
+.     // no "_r1" panel: R1-only reads the R1+R2 file then filters type=="r1"
+.     local input_suf ""
+  9.     if (`r1r2' == 1 & `public' == 0) local input_suf "_r1_r2"
+ 10.     if (`r1r2' == 1 & `public' == 1) local input_suf "_r1_r2_public"
+ 11.     if (`r1_only' == 1 & `public' == 0) local input_suf "_r1_r2"
+ 12.     if (`r1_only' == 1 & `public' == 1) local input_suf "_r1_r2_public"
+ 13.     if (`no_clin' == 1) local input_suf "_no_clin`input_suf'"
+ 14.     local ns ""
+ 15.     if ($NO_SOLO == 1) local ns "_no_solo"
+ 16. 
+.     preserve
+ 17.         cap use athr_id year ppr_cnt cite_affl_wt affl_wt ///
+>                 avg_position avg_position_rat ///
+>                 n_first_ppr n_middle_ppr n_last_ppr n_solo_ppr ///
+>                 avg_team_size_last avg_team_size_notlast ///
+>                 using ../external/samp/athr_panel_full_year`ns'_`samp'`input_suf', clear
+ 18.         local _pos_rc = _rc
+ 19.         if `_pos_rc' {
+ 20.             di as text "restrict_samp `samp'`suf': position vars not in panel yet — falling back to base _any outcomes. Rerun make_athr_yr_panel/code/build.do to enable them."
+ 21.             use athr_id year ppr_cnt cite_affl_wt affl_wt ///
+>                 using ../external/samp/athr_panel_full_year`ns'_`samp'`input_suf', clear
+ 22.         }
+ 23.         global POSITION_OUTCOMES_AVAIL = cond(`_pos_rc' == 0, 1, 0)
+ 24.         rename (ppr_cnt cite_affl_wt affl_wt) (ppr_cnt_any cite_affl_wt_any affl_wt_any)
+ 25.         save ../temp/athr_any_`samp'`ns'`input_suf', replace
+ 26. 
+.         bys athr_id: egen min_year_any = min(year)
+ 27.         keep athr_id min_year_any
+ 28.         duplicates drop
+ 29.         save ../temp/athr_min_year_any_`samp'`ns'`input_suf', replace
+ 30.     restore
+ 31. 
+.     use ../external/samp/athr_panel_full_year_last`ns'_`samp'`input_suf',clear
+ 32.     if `r1_only' == 1 {
+ 33.         keep if type == "r1"
+ 34.         di as text "restrict_samp `samp'`suf' (r1_only=1): kept N=" _N " R1-only rows"
+ 35.     }
+ 36.     bys athr_id: egen max_year = max(year)
+ 37.     bys athr_id: egen min_year = min(year)
+ 38.     cap confirm variable avg_team_size
+ 39.     if !_rc {
+ 40.         gen _nonsolo_yr = year if avg_team_size > 0.001 & !mi(avg_team_size)
+ 41.         bys athr_id: egen min_year_nonsolo = min(_nonsolo_yr)
+ 42.         drop _nonsolo_yr
+ 43.         preserve
+ 44.             bys athr_id: keep if _n == 1
+ 45.             qui count if mi(min_year_nonsolo)
+ 46.             local n_allsolo = r(N)
+ 47.             qui count
+ 48.             di as text "restrict_samp `samp'`suf': min_year_nonsolo built; `n_allsolo' of " r(N) ///
+>                 " PIs have no non-solo last-author paper (min_year_nonsolo missing)."
+ 49.         restore
+ 50.     }
+ 51.     else di as error "restrict_samp `samp'`suf': avg_team_size not in panel -- min_year_nonsolo SKIPPED (rerun make_athr_yr_panel/code/build.do)."
+ 52.     keep if min_year <= 2013
+ 53.     keep if max_year >= 2015
+ 54.     keep if inrange(year, 2010, 2019)
+ 55.     * keep(1 3) so FOIA PIs without an imputed row survive
+.     merge m:1 athr_id using ../temp/exposure, keep(1 3) nogen
+ 56.     merge m:1 athr_id using ../temp/observed_exposure, keep(1 3) nogen
+ 57.     keep if !mi(imputed) | !mi(exposure)
+ 58.     merge m:1 athr_id using ../temp/athr_cluster30, keep(1 3) nogen
+ 59.     merge m:1 athr_id using ../temp/athr_min_year_any_`samp'`ns'`input_suf', keep(1 3) nogen
+ 60.     replace min_year_any = min_year if mi(min_year_any)
+ 61.     gen foia_athr = 1 if !mi(exposure)
+ 62.     merge m:1 athr_id using ../temp/match_diag, keep(1 3) nogen
+ 63.     replace max_sim = 1 if foia_athr == 1
+ 64.     replace max_sim = 0 if mi(max_sim)
+ 65.     bys athr_id : gen athr_indicator = _n == 1
+ 66.     preserve
+ 67.         keep if athr_indicator == 1
+ 68.         keep athr_id imputed imputed_mkt_spend_shr
+ 69.         append using ../temp/foia_observed_exposure
+ 70.         sum exposure_all, d
+ 71.         local mean : di %4.3f r(mean)
+ 72.         local sd   : di %4.3f r(sd)
+ 73.         sum imputed, d
+ 74.         local imputed_mean : di %4.3f r(mean)
+ 75.         local imputed_sd   : di %4.3f r(sd)
+ 76.         sum mkt_spend_shr_all, d
+ 77.         local mshr_mean : di %4.3f r(mean)
+ 78.         local mshr_sd   : di %4.3f r(sd)
+ 79.         sum imputed_mkt_spend_shr, d
+ 80.         local imshr_mean : di %4.3f r(mean)
+ 81.         local imshr_sd   : di %4.3f r(sd)
+ 82.         tw kdensity exposure_all, lcolor(ebblue)   || kdensity imputed, lcolor(dkorange)   xtitle("Exposure Measure") ytitle("Density") ysc(titlegap(-6) outergap(0)) ///
+>             xlab(#15) ///
+>             legend(on label(1 "FOIA PI Observed Exposure (mean = `mean', sd = `sd')") label(2 "Imputed Exposure (mean = `imputed_mean', sd = `imputed_sd')") pos(7) ring(1) size(small))
+ 83.         graph export ../output/figures/`samp'/exposure_dist`suf'.pdf, replace
+ 84.         tw kdensity mkt_spend_shr_all, lcolor(ebblue)  || kdensity imputed_mkt_spend_shr, lcolor(dkorange)   xtitle("Market Spend Share") ytitle("Density") ysc(titlegap(-6) outergap(0)) ///
+>             xlab(#15) ///
+>             legend(on label(1 "FOIA PI Observed (mean = `mshr_mean', sd = `mshr_sd')") label(2 "Imputed (mean = `imshr_mean', sd = `imshr_sd')") pos(7) ring(1) size(small))
+ 85.         graph export ../output/figures/`samp'/mkt_spend_shr_dist`suf'.pdf, replace
+ 86.     restore
+ 87.     replace imputed = exposure if !mi(exposure)
+ 88.     replace imputed_mkt_spend_shr = mkt_spend_shr if !mi(mkt_spend_shr)
+ 89.     drop exposure
+ 90.     rename imputed exposure
+ 91.     drop mkt_spend_shr
+ 92.     rename imputed_mkt_spend_shr mkt_spend_shr
+ 93.     bys athr_id: egen num_yrs_pre = total(year < 2014)
+ 94.     bys athr_id: egen num_yrs_post = total(year >= 2014)
+ 95.     bys athr_id: gen tot_yrs = _N
+ 96.     bys athr_id inst_id: gen plc_cntr = _n == 1
+ 97.     bys athr_id : egen num_place = total(plc_cntr)
+ 98.     drop if num_yrs_pre <=2 
+ 99.     keep if num_place==1
+100.     gegen athr = group(athr_id)
+101.     preserve
+102.     contract athr num_place athr_id exposure inst_id inst msa_comb msa_c_world min_year min_year_nonsolo min_year_any max_year type public mkt_spend_shr cluster_30 max_sim foia_athr
+103.     drop _freq
+104.     save ../temp/athr_xw, replace
+105.     restore
+106.     xtset athr year
+107.     tsfill, full
+108.     drop athr_id exposure inst_id inst msa_comb msa_c_world min_year min_year_nonsolo min_year_any max_year type public mkt_spend_shr cluster_30 max_sim foia_athr
+109.     merge m:1 athr using ../temp/athr_xw, assert(3) keep(3) nogen
+110.     foreach v in n_first_ppr n_middle_ppr n_last_ppr n_solo_ppr ///
+>                  avg_position avg_position_rat ///
+>                  avg_team_size_last avg_team_size_notlast {
+111.         cap drop `v'
+112.     }
+113.     merge 1:1 athr_id year using ../temp/athr_any_`samp'`ns'`input_suf', keep(1 3) nogen
+114.     foreach var in ppr_cnt cite_affl_wt affl_wt ppr_cnt_any cite_affl_wt_any affl_wt_any {
+115.         replace `var' = 0 if mi(`var')
+116.     }
+117.     foreach var in n_first_ppr n_middle_ppr n_last_ppr n_solo_ppr {
+118.         cap confirm variable `var'
+119.         if !_rc replace `var' = 0 if mi(`var')
+120.     }
+121.     cap confirm variable n_solo_ppr
+122.     if !_rc {
+123.         qui count if ppr_cnt != n_last_ppr
+124.         if r(N) > 0 di as error "restrict_samp `samp'`suf': ppr_cnt != n_last_ppr on " r(N) ///
+>             " rows -- ppr_cnt_nonsolo may not be a clean subset of ppr_cnt. VERIFY."
+125.         gen ppr_cnt_nonsolo = n_last_ppr - n_solo_ppr
+126.         qui sum ppr_cnt_nonsolo
+127.         local ns_tot = r(sum)
+128.         qui sum ppr_cnt
+129.         local solo_shr = 100*(1 - `ns_tot'/r(sum))
+130.         di as text "restrict_samp `samp'`suf': ppr_cnt_nonsolo built; solo papers are " ///
+>             %5.2f `solo_shr' "% of last-author papers."
+131.     }
+132.     gen pre_ppr_cnt = ppr_cnt if year < 2014
+133.     bys athr_id: egen pre_ppr_cnt_sum = sum(pre_ppr_cnt)
+134.     bys athr_id: egen pre_ppr_cnt_avg = mean(pre_ppr_cnt)
+135.     qui sum pre_ppr_cnt_avg if athr_indicator == 1, d
+136.     local p5_avg = r(p5)
+137.     qui sum pre_ppr_cnt_sum if athr_indicator == 1, d
+138.     local p5_sum = r(p5)
+139.     drop if pre_ppr_cnt_avg <= `p5_avg'
+140.     drop if pre_ppr_cnt_sum <= `p5_sum'
+141.     gen age_2014 = 2014 - min_year_any + 30
+142.     drop if mi(exposure)
+143.     drop if mi(mkt_spend_shr) | mkt_spend_shr <= 0
+144.     merge 1:1 athr_id year using ../external/coathrs/avg_coathrs, keep(1 3) nogen
+145.     cap confirm file ../temp/nih_athr_yr.dta
+146.     if _rc di as error "restrict_samp `samp'`suf': ../temp/nih_athr_yr missing -- NIH outcomes unavailable this run."
+147.     else {
+148.         merge 1:1 athr_id year using ../temp/nih_athr_yr, keep(1 3) nogen
+149.         merge m:1 athr_id using ../temp/nih_athr_level, keep(1 3) nogen
+150.         replace nih_matched = 0 if mi(nih_matched)
+151.         foreach v in n_grants n_new_grants nih_total_cost has_nih {
+152.             replace `v' = 0 if mi(`v') & nih_matched == 1
+153.         }
+154.         foreach v in n_grants n_new_grants has_nih {
+155.             replace `v' = . if nih_matched != 1 | mi(n_grants_ever) | n_grants_ever == 0
+156.         }
+157.         replace nih_total_cost = . if nih_matched != 1 | mi(nih_cost_ever) | nih_cost_ever == 0
+158.         qui gunique athr_id if !mi(n_grants)
+159.         di as text "restrict_samp `samp'`suf': " r(unique) " PIs in the NIH grant-count sample"
+160.         qui gunique athr_id if !mi(nih_total_cost)
+161.         di as text "restrict_samp `samp'`suf': " r(unique) " PIs in the NIH award-amount sample"
+162.     }
+163. 
+.     cap confirm variable n_grants
+164.     if _rc {
+165.         gen byte nih_athr = 0
+166.     }
+167.     else {
+168.         bys athr_id: egen byte nih_athr = max(!mi(n_grants))
+169.     }
+170. 
+.     gen ppr_cnt_notlast      = ppr_cnt_any      - ppr_cnt
+171.     gen cite_affl_wt_notlast = cite_affl_wt_any - cite_affl_wt
+172.     gen affl_wt_notlast      = affl_wt_any      - affl_wt
+173.     foreach v in ppr_cnt_notlast cite_affl_wt_notlast affl_wt_notlast {
+174.         replace `v' = 0 if `v' < 0
+175.     }
+176.     foreach v in cite_affl_wt affl_wt cite_affl_wt_any affl_wt_any ///
+>                  cite_affl_wt_notlast affl_wt_notlast {
+177.         qui sum `v' if year < 2014, d
+178.         local p99_`v' = r(p99)
+179.         replace `v' = `p99_`v'' if `v' > `p99_`v'' & !mi(`v')
+180.         di as text "restrict_samp `samp'`suf' winsorized `v' at pre-period p99=`p99_`v''"
+181.     }
+182. 
+.     assert !mi(athr_id)
+183.     assert !mi(exposure)
+184.     assert !mi(mkt_spend_shr)
+185.     cap mkdir ../output/prepped_samples
+186.     compress
+187.     if `hisim' > 0 {
+188.         bys athr_id: gen byte _hs_one = _n == 1
+189.         qui _pctile max_sim if _hs_one == 1 & foia_athr != 1, p(`=100 - `hisim'')
+190.         local hs_cut = r(r1)
+191.         qui gunique athr_id
+192.         local hs_n0 = r(unique)
+193.         keep if max_sim >= `hs_cut'
+194.         drop _hs_one
+195.         qui gunique athr_id
+196.         di as text "restrict_samp `samp'`suf' hisim=`hisim': max_sim cut=" %6.4f `hs_cut' ///
+>             "  PIs kept " r(unique) " / `hs_n0'"
+197.         save ../output/prepped_samples/es_`samp'_hisim`hisim'`suf', replace
+198.     }
+199.     else {
+200.         save ../output/prepped_samples/es_`samp'`suf', replace
+201.     }
+202. end
+
+. 
+. program event_study
+  1.     syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0) no_clin(int 0)]
+  2.     local fes athr_id year
+  3.     local vce_cl athr_id
+  4.     if "$FE_MODE" == "athr_clyr" {
+  5.         local fes athr_id i.cluster_30#i.year
+  6.     }
+  7.     if "$FE_MODE" == "inst_cluster" {
+  8.         local fes inst_id cluster_30 year
+  9.         local vce_cl inst_id
+ 10.     }
+ 11.     if "$FE_MODE" == "inst_cluster_fldyr" {
+ 12.         local fes inst_id i.cluster_30#i.year
+ 13.         local vce_cl inst_id
+ 14.     }
+ 15.     local wt ""
+ 16.     local wsuf ""
+ 17.     if "$WEIGHT_MSIM" == "1" {
+ 18.         local wt "[pw=max_sim]"
+ 19.         local wsuf "_msimwt"
+ 20.     }
+ 21.     local suf ""
+ 22.     if (`r1r2' == 1 & `public' == 0 & `r1_only' == 0) local suf "_r1_r2"
+ 23.     if (`r1r2' == 1 & `public' == 1 & `r1_only' == 0) local suf "_r1_r2_public"
+ 24.     if (`r1_only' == 1 & `public' == 0) local suf "_r1"
+ 25.     if (`r1_only' == 1 & `public' == 1) local suf "_r1_public"
+ 26.     if (`no_clin' == 1) local suf "_no_clin`suf'"
+ 27.     use ../output/prepped_samples/es_`samp'`suf', clear
+ 28. 
+.     gen rel = year - 2014
+ 29.     qui sum rel, d
+ 30.     local abs_lag  = abs(r(max))
+ 31.     local abs_lead = abs(r(min))
+ 32.     forval i = 1/`abs_lead' {
+ 33.         gen int_lead`i'  = exposure      if rel == -`i'
+ 34.         gen mshr_lead`i' = mkt_spend_shr if rel == -`i'
+ 35.     }
+ 36.     forval i = 0/`abs_lag' {
+ 37.         gen int_lag`i'  = exposure      if rel == `i'
+ 38.         gen mshr_lag`i' = mkt_spend_shr if rel == `i'
+ 39.     }
+ 40.     ds int_lead* int_lag* mshr_lead* mshr_lag*
+ 41.     foreach var in `r(varlist)' {
+ 42.         replace `var' = 0 if mi(`var')
+ 43.     }
+ 44.     local int_leads
+ 45.     local mshr_leads
+ 46.     local int_lags
+ 47.     local mshr_lags
+ 48.     forval i = 2/`abs_lead' {
+ 49.         local int_leads int_lead`i' `int_leads'
+ 50.         local mshr_leads mshr_lead`i' `mshr_leads'
+ 51.     }
+ 52.     forval i = 0/`abs_lag' {
+ 53.         local int_lags `int_lags' int_lag`i'
+ 54.         local mshr_lags `mshr_lags' mshr_lag`i'
+ 55.     }
+ 56.     foreach v in ppr_cnt cite_affl_wt ppr_cnt_any cite_affl_wt_any ///
+>                  ppr_cnt_notlast cite_affl_wt_notlast {
+ 57.         gen ln_`v' = ln(1+`v')
+ 58.     }
+ 59. 
+.     local position_outcomes ""
+ 60.     if "$POSITION_OUTCOMES_AVAIL" == "1" {
+ 61.         local position_outcomes n_middle_ppr avg_position avg_team_size_last avg_team_size_notlast
+ 62.     }
+ 63. 
+.     local outcomes ppr_cnt cite_affl_wt ln_ppr_cnt ppr_cnt_any cite_affl_wt_any ///
+>                    ppr_cnt_notlast cite_affl_wt_notlast avg_num_coathrs n_grants nih_total_cost ///
+>                    `position_outcomes'
+ 64.     if "$QUICK_TOPJRNL" == "1" local outcomes ppr_cnt ln_ppr_cnt
+ 65. 
+.     foreach yvar of local outcomes {
+ 66.         if "`yvar'" == "cite_affl_wt" local var_name = "Citation Weighted Output"
+ 67.         if "`yvar'" == "cite_affl_wt" local gap  1
+ 68.         if "`yvar'" == "ppr_cnt" local var_name = "Publication Count"
+ 69.         if "`yvar'" == "ppr_cnt" local gap 0.5
+ 70.         if "`yvar'" == "ln_ppr_cnt"      local var_name = "Log Publication Counts"
+ 71.         if "`yvar'" == "ln_ppr_cnt"      local gap 0.1
+ 72.         if "`yvar'" == "ppr_cnt"      & "`samp'" == "top_jrnls" local gap 2
+ 73.         if "`yvar'" == "cite_affl_wt" & "`samp'" == "top_jrnls" local gap 2
+ 74.         if "`yvar'" == "ppr_cnt_any"         local var_name = "Publication Count (any position)"
+ 75.         if "`yvar'" == "ppr_cnt_any"         local gap 0.5
+ 76.         if "`yvar'" == "cite_affl_wt_any"    local var_name = "Citation Weighted Output (any position)"
+ 77.         if "`yvar'" == "cite_affl_wt_any"    local gap 1
+ 78.         if "`yvar'" == "ppr_cnt_any"         & "`samp'" == "top_jrnls" local gap 2
+ 79.         if "`yvar'" == "cite_affl_wt_any"    & "`samp'" == "top_jrnls" local gap 2
+ 80.         if "`yvar'" == "ppr_cnt_notlast"         local var_name = "Publication Count (non-last author)"
+ 81.         if "`yvar'" == "ppr_cnt_notlast"         local gap 0.5
+ 82.         if "`yvar'" == "cite_affl_wt_notlast"    local var_name = "Citation Weighted Output (non-last author)"
+ 83.         if "`yvar'" == "cite_affl_wt_notlast"    local gap 1
+ 84.         if "`yvar'" == "ppr_cnt_notlast"         & "`samp'" == "top_jrnls" local gap 2
+ 85.         if "`yvar'" == "cite_affl_wt_notlast"    & "`samp'" == "top_jrnls" local gap 2
+ 86.         if "`yvar'" == "avg_num_coathrs"   local var_name = "Average Team Size"
+ 87.         if "`yvar'" == "avg_num_coathrs"   local gap 0.5
+ 88.         if "`yvar'" == "n_grants"          local var_name = "# Active NIH Research Grants"
+ 89.         if "`yvar'" == "n_grants"          local gap 0.5
+ 90.         if "`yvar'" == "nih_total_cost"    local var_name = "NIH Award Amount ($)"
+ 91.         if "`yvar'" == "nih_total_cost"    local gap 50000
+ 92.         if "`yvar'" == "n_first_ppr"           local var_name = "# First-Author Papers"
+ 93.         if "`yvar'" == "n_first_ppr"           local gap 0.5
+ 94.         if "`yvar'" == "n_middle_ppr"          local var_name = "# Middle-Author Papers"
+ 95.         if "`yvar'" == "n_middle_ppr"          local gap 0.5
+ 96.         if "`yvar'" == "n_last_ppr"            local var_name = "# Last-Author Papers"
+ 97.         if "`yvar'" == "n_last_ppr"            local gap 0.5
+ 98.         if "`yvar'" == "avg_position"          local var_name = "Avg Author Position (1=first, N=last)"
+ 99.         if "`yvar'" == "avg_position"          local gap 0.5
+100.         if "`yvar'" == "avg_position_rat"      local var_name = "Avg Author Position / Team Size (0-1)"
+101.         if "`yvar'" == "avg_position_rat"      local gap 0.05
+102.         if "`yvar'" == "avg_team_size_last"    local var_name = "Team Size (papers where PI is last)"
+103.         if "`yvar'" == "avg_team_size_last"    local gap 0.5
+104.         if "`yvar'" == "avg_team_size_notlast" local var_name = "Team Size (papers where PI is not last)"
+105.         if "`yvar'" == "avg_team_size_notlast" local gap 0.5
+106.         local poisson_name "`var_name'"
+107.         if "`yvar'" == "ppr_cnt"              local poisson_name "Publications"
+108.         if "`yvar'" == "cite_affl_wt"         local poisson_name "Citation-Weighted Output"
+109.         if "`yvar'" == "ppr_cnt_any"          local poisson_name "Publications (any position)"
+110.         if "`yvar'" == "cite_affl_wt_any"     local poisson_name "Citation-Weighted Output (any position)"
+111.         if "`yvar'" == "ppr_cnt_notlast"      local poisson_name "Publications (non-last author)"
+112.         if "`yvar'" == "cite_affl_wt_notlast" local poisson_name "Citation-Weighted Output (non-last author)"
+113.         if "`yvar'" == "avg_num_coathrs"      local poisson_name "Coauthors"
+114.         if "`yvar'" == "n_grants"             local poisson_name "Active NIH Research Grants"
+115.         if "`yvar'" == "nih_total_cost"       local poisson_name "NIH Award Dollars"
+116.         local ppml_ytit "Output-Cost Elasticity"
+117.         if inlist("`yvar'", "n_grants", "n_new_grants", "nih_total_cost") ///
+>             local ppml_ytit "{&Delta} Log Expected `poisson_name'"
+118. 
+.         local ppml_ok = !regexm("`yvar'", "^ln_") & (!regexm("`yvar'", "^avg_") | "`yvar'" == "avg_num_coathrs")
+119.         local ols_ok  = inlist("`yvar'", "ppr_cnt", "ln_ppr_cnt") | !`ppml_ok'
+120. 
+.         if `ols_ok' {
+121.         preserve
+122.         cap mat drop es
+123.         cap noi reghdfe `yvar' `int_leads' `int_lags' `mshr_leads' `mshr_lags' `wt', ///
+>                        absorb(`fes') vce(cluster `vce_cl')
+124.         local rc = _rc
+125.         if `rc' {
+126.             di as error "event_study `samp'`suf' `yvar' mshrctrl failed (rc=`rc'); skipping mshrctrl plot."
+127.             restore
+128.         }
+129.         else {
+130.         gunique athr_id if e(sample)
+131.         local num_athrs = r(unique)
+132.         gunique inst_id if e(sample)
+133.         local num_insts = r(unique)
+134.         sum `yvar' if rel <= -1 & e(sample), d
+135.         local pre_mean : dis %4.3f r(mean)
+136.         foreach var in `int_leads' `int_lags' int_lead1 {
+137.             if "`var'" == "int_lead1" {
+138.                 mat row = 0,0
+139.             }
+140.             else {
+141.                 mat row = _b[`var'], _se[`var']
+142.             }
+143.             mat es = nullmat(es) \ row
+144.         }
+145.         svmat es
+146.         keep es1 es2
+147.         drop if mi(es1)
+148.         rename (es1 es2) (b se)
+149.         gen ub = b + 1.96*se
+150.         sum ub, d
+151.         local ymax = round(r(max),`gap')
+152.         gen lb = b - 1.96*se
+153.         sum lb, d
+154.         local ymin = round(r(min),`gap')
+155.         if `ymin' > 0 local ymin = 0
+156.         if inlist("`yvar'", "ln_ppr_cnt", "ln_cite_affl_wt") local ymin = -1
+157.         gen rel = -`abs_lead' if _n == 1
+158.         replace rel = rel[_n-1]+1 if _n > 1
+159.         replace rel = rel + 1 if rel >= -1
+160.         replace rel = -1 if rel == `abs_lag' + 1
+161.         gen year = rel + 2014
+162.         hashsort rel
+163.         local stats_leg `"legend(on order(- "Num. PIs: `num_athrs'" "Num. Institutions: `num_insts'" "Pre-Period Avg : `pre_mean'") pos(7) ring(1) rows(2) bmargin(zero) size(small))"'
+164.         local fdir ../output/figures/`samp'
+165.         foreach fmode of global FIG_MODES {
+166.             if "`fmode'" == "paper" {
+167.                 local stats_leg legend(off)
+168.                 local fdir ../output/figures/`samp'/paper
+169.                 cap mkdir "`fdir'"
+170.             }
+171.             tw rcap ub lb year if year != 2013 , lcolor(ebblue%70) msize(vsmall) || ///
+>               scatter b year, mcolor(ebblue) || ///
+>               scatteri `ymax' 2013.75 `ymax' 2014.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
+>               xlab(2010(1)2019) xtitle("Year") ///
+>               ytitle("`var_name'") ysc(titlegap(-6) outergap(0)) ylab(`ymin'(`gap')`ymax') ///
+>               yline(0, lcolor(gs10) lpattern(solid)) ///
+>               `stats_leg' plotregion(margin(sides))
+172.             graph export `fdir'/es_`yvar'`suf'_mshrctrl`wsuf'.pdf, replace
+173.         }
+174.         save ../temp/es_`yvar'`suf'_mshrctrl`wsuf', replace
+175.         restore
+176.         }
+177.         }
+178. 
+.         if `ppml_ok' {
+179.             preserve
+180.             cap mat drop es
+181.             cap noi ppmlhdfe `yvar' `int_leads' `int_lags' ///
+>                                    `mshr_leads' `mshr_lags' `wt', ///
+>                     absorb(`fes') vce(cluster `vce_cl')
+182.             local rc = _rc
+183.             if `rc' {
+184.                 di as error "ppmlhdfe `yvar' mshrctrl failed (rc=`rc'); skipping plot."
+185.                 restore
+186.             }
+187.             else {
+188.             gunique athr_id if e(sample)
+189.             local num_athrs = r(unique)
+190.             gunique inst_id if e(sample)
+191.             local num_insts = r(unique)
+192.             sum `yvar' if rel <= -1 & e(sample), d
+193.             local pre_mean : dis %4.3f r(mean)
+194.             foreach var in `int_leads' `int_lags' int_lead1 {
+195.                 if "`var'" == "int_lead1" {
+196.                     mat row = 0,0
+197.                 }
+198.                 else {
+199.                     mat row = _b[`var'], _se[`var']
+200.                 }
+201.                 mat es = nullmat(es) \ row
+202.             }
+203.             svmat es
+204.             keep es1 es2
+205.             drop if mi(es1)
+206.             rename (es1 es2) (b se)
+207.             local pgap 0.1
+208.             local tgap -6
+209.             if inlist("`yvar'", "n_grants", "nih_total_cost") {
+210.                 local pgap 0.4
+211.                 local tgap 0
+212.             }
+213.             gen ub = b + 1.96*se
+214.             gen lb = b - 1.96*se
+215.             local ymax = 1.2
+216.             local ymin = -2.2
+217.             local pgap 0.2
+218.             gen rel = -`abs_lead' if _n == 1
+219.             replace rel = rel[_n-1]+1 if _n > 1
+220.             replace rel = rel + 1 if rel >= -1
+221.             replace rel = -1 if rel == `abs_lag' + 1
+222.             gen year = rel + 2014
+223.             hashsort rel
+224.             local stats_leg `"legend(on order(- "Num. PIs: `num_athrs'" "Num. Institutions: `num_insts'" "Pre-Period Avg : `pre_mean'") pos(7) ring(1) rows(2) bmargin(zero) size(small))"'
+225.             local fdir ../output/figures/`samp'
+226.             foreach fmode of global FIG_MODES {
+227.                 if "`fmode'" == "paper" {
+228.                     local stats_leg legend(off)
+229.                     local fdir ../output/figures/`samp'/paper
+230.                     cap mkdir "`fdir'"
+231.                 }
+232.                 tw rcap ub lb year if year != 2013, lcolor(ebblue%70) msize(vsmall) || ///
+>                   scatter b year, mcolor(ebblue) || ///
+>                   scatteri `ymax' 2013.75 `ymax' 2014.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
+>                   xlab(2010(1)2019) xtitle("Year") ///
+>                   ytitle("`ppml_ytit'") ysc(titlegap(`tgap') outergap(0)) ylab(`ymin'(`pgap')`ymax') ytick(`ymin'(0.2)`ymax') ///
+>                   yline(0, lcolor(gs10) lpattern(solid)) ///
+>                   `stats_leg' plotregion(margin(sides))
+233.                 graph export `fdir'/es_`yvar'`suf'_ppml_mshrctrl`wsuf'.pdf, replace
+234.             }
+235.             save ../temp/es_`yvar'`suf'_ppml_mshrctrl`wsuf', replace
+236.             restore
+237.             }
+238.         }
+239. 
+.         if "`yvar'" == "ppr_cnt" {
+240.             preserve
+241.             keep if foia_athr == 1
+242.             cap mat drop es
+243.             cap noi ppmlhdfe `yvar' `int_leads' `int_lags' ///
+>                                    `mshr_leads' `mshr_lags' `wt', ///
+>                     absorb(`fes') vce(cluster `vce_cl')
+244.             local rc = _rc
+245.             if `rc' {
+246.                 di as error "ppmlhdfe `yvar' foia-only mshrctrl failed (rc=`rc'); skipping plot."
+247.                 restore
+248.             }
+249.             else {
+250.             gunique athr_id if e(sample)
+251.             local num_athrs = r(unique)
+252.             gunique inst_id if e(sample)
+253.             local num_insts = r(unique)
+254.             sum `yvar' if rel <= -1 & e(sample), d
+255.             local pre_mean : dis %4.3f r(mean)
+256.             foreach var in `int_leads' `int_lags' int_lead1 {
+257.                 if "`var'" == "int_lead1" {
+258.                     mat row = 0,0
+259.                 }
+260.                 else {
+261.                     cap mat row = _b[`var'], _se[`var']
+262.                     if _rc mat row = ., .
+263.                 }
+264.                 mat es = nullmat(es) \ row
+265.             }
+266.             svmat es
+267.             keep es1 es2
+268.             drop if mi(es1)
+269.             rename (es1 es2) (b se)
+270.             gen ub = b + 1.96*se
+271.             sum ub, d
+272.             local ymax = r(max)
+273.             gen lb = b - 1.96*se
+274.             sum lb, d
+275.             local ymin = min(r(min), 0)
+276.             gen rel = -`abs_lead' if _n == 1
+277.             replace rel = rel[_n-1]+1 if _n > 1
+278.             replace rel = rel + 1 if rel >= -1
+279.             replace rel = -1 if rel == `abs_lag' + 1
+280.             gen year = rel + 2014
+281.             hashsort rel
+282.             local stats_leg `"legend(on order(- "Num. PIs: `num_athrs'" "Num. Institutions: `num_insts'" "Pre-Period Avg : `pre_mean'") pos(7) ring(1) rows(2) bmargin(zero) size(small))"'
+283.             local es_title title("FOIA PIs only (observed exposure)", size(small))
+284.             local fdir ../output/figures/`samp'
+285.             foreach fmode of global FIG_MODES {
+286.                 if "`fmode'" == "paper" {
+287.                     local stats_leg legend(off)
+288.                     local es_title
+289.                     local fdir ../output/figures/`samp'/paper
+290.                     cap mkdir "`fdir'"
+291.                 }
+292.                 tw rcap ub lb year if year != 2013, lcolor(dkorange%70) msize(vsmall) || ///
+>                   scatter b year, mcolor(dkorange) || ///
+>                   scatteri `ymax' 2013.75 `ymax' 2014.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
+>                   xlab(2010(1)2019) xtitle("Year") ///
+>                   ytitle("`ppml_ytit'") ysc(titlegap(-6) outergap(0)) ylab(#6) ///
+>                   yline(0, lcolor(gs10) lpattern(solid)) ///
+>                   `es_title' ///
+>                   `stats_leg' plotregion(margin(sides))
+293.                 graph export `fdir'/es_`yvar'`suf'_ppml_mshrctrl_foia`wsuf'.pdf, replace
+294.             }
+295.             save ../temp/es_`yvar'`suf'_ppml_mshrctrl_foia`wsuf', replace
+296.             restore
+297.             }
+298.         }
+299. 
+.         if inlist("`yvar'", "ppr_cnt", "cite_affl_wt") {
+300.             preserve
+301.             keep if nih_athr == 1
+302.             cap mat drop es
+303.             cap noi ppmlhdfe `yvar' `int_leads' `int_lags' ///
+>                                    `mshr_leads' `mshr_lags' `wt', ///
+>                     absorb(`fes') vce(cluster `vce_cl')
+304.             local rc = _rc
+305.             if `rc' {
+306.                 di as error "ppmlhdfe `yvar' nih-only mshrctrl failed (rc=`rc'); skipping plot."
+307.                 restore
+308.             }
+309.             else {
+310.             gunique athr_id if e(sample)
+311.             local num_athrs = r(unique)
+312.             gunique inst_id if e(sample)
+313.             local num_insts = r(unique)
+314.             sum `yvar' if rel <= -1 & e(sample), d
+315.             local pre_mean : dis %4.3f r(mean)
+316.             foreach var in `int_leads' `int_lags' int_lead1 {
+317.                 if "`var'" == "int_lead1" {
+318.                     mat row = 0,0
+319.                 }
+320.                 else {
+321.                     cap mat row = _b[`var'], _se[`var']
+322.                     if _rc mat row = ., .
+323.                 }
+324.                 mat es = nullmat(es) \ row
+325.             }
+326.             svmat es
+327.             keep es1 es2
+328.             drop if mi(es1)
+329.             rename (es1 es2) (b se)
+330.             gen ub = b + 1.96*se
+331.             sum ub, d
+332.             local ymax = r(max)
+333.             gen lb = b - 1.96*se
+334.             sum lb, d
+335.             local ymin = min(r(min), 0)
+336.             gen rel = -`abs_lead' if _n == 1
+337.             replace rel = rel[_n-1]+1 if _n > 1
+338.             replace rel = rel + 1 if rel >= -1
+339.             replace rel = -1 if rel == `abs_lag' + 1
+340.             gen year = rel + 2014
+341.             hashsort rel
+342.             local stats_leg `"legend(on order(- "Num. PIs: `num_athrs'" "Num. Institutions: `num_insts'" "Pre-Period Avg : `pre_mean'") pos(7) ring(1) rows(2) bmargin(zero) size(small))"'
+343.             local es_title title("NIH-matched PIs only", size(small))
+344.             local fdir ../output/figures/`samp'
+345.             foreach fmode of global FIG_MODES {
+346.                 if "`fmode'" == "paper" {
+347.                     local stats_leg legend(off)
+348.                     local es_title
+349.                     local fdir ../output/figures/`samp'/paper
+350.                     cap mkdir "`fdir'"
+351.                 }
+352.                 tw rcap ub lb year if year != 2013, lcolor(lavender%70) msize(vsmall) || ///
+>                   scatter b year, mcolor(lavender) || ///
+>                   scatteri `ymax' 2013.75 `ymax' 2014.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
+>                   xlab(2010(1)2019) xtitle("Year") ///
+>                   ytitle("`ppml_ytit'") ysc(titlegap(-6) outergap(0)) ylab(#6) ///
+>                   yline(0, lcolor(gs10) lpattern(solid)) ///
+>                   `es_title' ///
+>                   `stats_leg' plotregion(margin(sides))
+353.                 graph export `fdir'/es_`yvar'`suf'_ppml_mshrctrl_nih`wsuf'.pdf, replace
+354.             }
+355.             save ../temp/es_`yvar'`suf'_ppml_mshrctrl_nih`wsuf', replace
+356.             restore
+357.             }
+358.         }
+359.     }
+360. end
+
+. 
+. program pooled_did
+  1.     syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0) no_clin(int 0)]
+  2.     local fes athr_id year
+  3.     local vce_cl athr_id
+  4.     if "$FE_MODE" == "athr_clyr" {
+  5.         local fes athr_id i.cluster_30#i.year
+  6.     }
+  7.     if "$FE_MODE" == "inst_cluster" {
+  8.         local fes inst_id cluster_30 year
+  9.         local vce_cl inst_id
+ 10.     }
+ 11.     if "$FE_MODE" == "inst_cluster_fldyr" {
+ 12.         local fes inst_id i.cluster_30#i.year
+ 13.         local vce_cl inst_id
+ 14.     }
+ 15.     local wt ""
+ 16.     local wsuf ""
+ 17.     if "$WEIGHT_MSIM" == "1" {
+ 18.         // ppmlhdfe rejects aw, binscatter rejects pw
+.         local wt "[pw=max_sim]"
+ 19.         local wt_bin "[aw=max_sim]"
+ 20.         local wsuf "_msimwt"
+ 21.     }
+ 22.     local suf ""
+ 23.     if (`r1r2' == 1 & `public' == 0 & `r1_only' == 0) local suf "_r1_r2"
+ 24.     if (`r1r2' == 1 & `public' == 1 & `r1_only' == 0) local suf "_r1_r2_public"
+ 25.     if (`r1_only' == 1 & `public' == 0) local suf "_r1"
+ 26.     if (`r1_only' == 1 & `public' == 1) local suf "_r1_public"
+ 27.     if (`no_clin' == 1) local suf "_no_clin`suf'"
+ 28.     use ../output/prepped_samples/es_`samp'`suf', clear
+ 29. 
+.     foreach v in cite_affl_wt ppr_cnt cite_affl_wt_any ppr_cnt_any ///
+>                  cite_affl_wt_notlast ppr_cnt_notlast {
+ 30.         cap gen ln_`v' = ln(1+`v')
+ 31.     }
+ 32. 
+.     gen post       = year >= 2014
+ 33.     gen Z_it       = exposure              * post
+ 34.     gen Z_share_it = mkt_spend_shr * post
+ 35. 
+.     local position_outcomes ""
+ 36.     if "$POSITION_OUTCOMES_AVAIL" == "1" {
+ 37.         local position_outcomes n_middle_ppr avg_position avg_team_size_last avg_team_size_notlast
+ 38.     }
+ 39.     local outcomes cite_affl_wt ppr_cnt ln_ppr_cnt ///
+>                    cite_affl_wt_any ppr_cnt_any cite_affl_wt_notlast ppr_cnt_notlast  ///
+>                    avg_num_coathrs n_grants nih_total_cost ///
+>                    `position_outcomes'
+ 40.     if "$QUICK_TOPJRNL" == "1" local outcomes ppr_cnt ln_ppr_cnt
+ 41. 
+.     cap mkdir ../output/tables
+ 42.     cap mkdir ../output/tables/`samp'
+ 43. 
+.     cap mat drop results
+ 44.     local kept_outcomes
+ 45.     local ppml_covered cite_affl_wt cite_affl_wt_any ppr_cnt_any ///
+>                        cite_affl_wt_notlast ppr_cnt_notlast ///
+>                        avg_num_coathrs n_grants nih_total_cost n_middle_ppr
+ 46.     foreach yvar of local outcomes {
+ 47.         if `: list yvar in ppml_covered' continue
+ 48. 
+.         local b_b = .
+ 49.         local b_se = .
+ 50.         local b_N = .
+ 51.         local b_r2 = .
+ 52.         local b_pmn = .
+ 53. 
+.         local s_bx = .
+ 54.         local s_sex = .
+ 55.         local s_bs = .
+ 56.         local s_ses = .
+ 57.         local s_N = .
+ 58.         local s_r2 = .
+ 59. 
+.         if "`yvar'" == "ppr_cnt" {
+ 60.             cap noi qui reghdfe `yvar' Z_it `wt', absorb(`fes') vce(cluster `vce_cl')
+ 61.             local rc = _rc
+ 62.             if `rc' == 0 {
+ 63.                 local b_b  = _b[Z_it]
+ 64.                 local b_se = _se[Z_it]
+ 65.                 local b_N  = e(N)
+ 66.                 local b_r2 = e(r2)
+ 67.                 qui sum `yvar' if year < 2014 & e(sample)
+ 68.                 local b_pmn = r(mean)
+ 69.             }
+ 70.             else di as error "pooled_did `samp'`suf' `yvar' base failed (rc=`rc')."
+ 71.         }
+ 72. 
+.         cap noi qui reghdfe `yvar' Z_it Z_share_it `wt', absorb(`fes') vce(cluster `vce_cl')
+ 73.         local rc = _rc
+ 74.         if `rc' {
+ 75.             di as error "pooled_did `samp'`suf' `yvar' +share failed (rc=`rc'); skipping outcome."
+ 76.             continue
+ 77.         }
+ 78.         local s_bx  = _b[Z_it]
+ 79.         local s_sex = _se[Z_it]
+ 80.         local s_bs  = _b[Z_share_it]
+ 81.         local s_ses = _se[Z_share_it]
+ 82.         local s_N   = e(N)
+ 83.         local s_r2  = e(r2)
+ 84.         qui sum `yvar' if year < 2014 & e(sample)
+ 85.         local pre_mean = r(mean)
+ 86. 
+.         di as text "pooled_did `samp'`suf' `yvar':  base b=" %7.4f `b_b' " se=" %7.4f `b_se' ///
+>             "    +share b=" %7.4f `s_bx' " se=" %7.4f `s_sex' ///
+>             "    share_b=" %7.4f `s_bs' " se=" %7.4f `s_ses' ///
+>             "    pre-mean=" %7.4f `pre_mean'
+ 87. 
+.         cap mat drop pdid_`yvar'
+ 88.         mat pdid_`yvar' = J(7,2,.)
+ 89.         mat pdid_`yvar'[1,1] = `b_b'
+ 90.         mat pdid_`yvar'[2,1] = `b_se'
+ 91.         mat pdid_`yvar'[5,1] = `b_pmn'
+ 92.         mat pdid_`yvar'[6,1] = `b_N'
+ 93.         mat pdid_`yvar'[7,1] = `b_r2'
+ 94.         mat pdid_`yvar'[1,2] = `s_bx'
+ 95.         mat pdid_`yvar'[2,2] = `s_sex'
+ 96.         mat pdid_`yvar'[3,2] = `s_bs'
+ 97.         mat pdid_`yvar'[4,2] = `s_ses'
+ 98.         mat pdid_`yvar'[5,2] = `pre_mean'
+ 99.         mat pdid_`yvar'[6,2] = `s_N'
+100.         mat pdid_`yvar'[7,2] = `s_r2'
+101.         mat rownames pdid_`yvar' = b_exposure se_exposure b_share se_share pre_mean N r2
+102.         mat colnames pdid_`yvar' = base with_share
+103. 
+.         mat row = `b_b', `b_se', `s_bx', `s_sex', `s_bs', `s_ses', `pre_mean'
+104.         mat results = nullmat(results) \ row
+105.         local kept_outcomes `kept_outcomes' `yvar'
+106. 
+.         local var_name "`yvar'"
+107.         if "`yvar'" == "cite_affl_wt"            local var_name "Citation Weighted Output"
+108.         if "`yvar'" == "ppr_cnt"                 local var_name "Publication Count"
+109.         if "`yvar'" == "ln_cite_affl_wt"         local var_name "Log Citation Weighted Output"
+110.         if "`yvar'" == "ln_ppr_cnt"              local var_name "Log Publication Counts"
+111.         if "`yvar'" == "cite_affl_wt_any"        local var_name "Citation Weighted Output (any position)"
+112.         if "`yvar'" == "ppr_cnt_any"             local var_name "Publication Count (any position)"
+113.         if "`yvar'" == "ln_cite_affl_wt_any"     local var_name "Log Citation Weighted Output (any position)"
+114.         if "`yvar'" == "ln_ppr_cnt_any"          local var_name "Log Publication Counts (any position)"
+115.         if "`yvar'" == "cite_affl_wt_notlast"    local var_name "Citation Weighted Output (non-last author)"
+116.         if "`yvar'" == "ppr_cnt_notlast"         local var_name "Publication Count (non-last author)"
+117.         if "`yvar'" == "ln_cite_affl_wt_notlast" local var_name "Log Citation Weighted Output (non-last author)"
+118.         if "`yvar'" == "ln_ppr_cnt_notlast"      local var_name "Log Publication Counts (non-last author)"
+119.         if "`yvar'" == "avg_num_coathrs"         local var_name "Avg Coauthors"
+120.         if "`yvar'" == "n_grants"                local var_name "# Active NIH Research Grants"
+121.         if "`yvar'" == "nih_total_cost"          local var_name "NIH Award Amount ($)"
+122.         if "`yvar'" == "n_first_ppr"             local var_name "# First-Author Papers"
+123.         if "`yvar'" == "n_middle_ppr"            local var_name "# Middle-Author Papers"
+124.         if "`yvar'" == "n_last_ppr"              local var_name "# Last-Author Papers"
+125.         if "`yvar'" == "avg_position"            local var_name "Avg Author Position"
+126.         if "`yvar'" == "avg_position_rat"        local var_name "Avg Author Position Ratio"
+127.         if "`yvar'" == "avg_team_size_last"      local var_name "Team Size (last-author papers)"
+128.         if "`yvar'" == "avg_team_size_notlast"   local var_name "Team Size (non-last papers)"
+129. 
+.         /*
+>         preserve
+>             cap noi qui reghdfe `yvar' Z_share_it `wt', absorb(`fes') residuals(_y_r)
+>             if _rc == 0 cap noi qui reghdfe Z_it Z_share_it `wt', absorb(`fes') residuals(_Z_r)
+>             if _rc == 0 {
+>                 local pds_b_str  : dis %7.3f `s_bx'
+>                 local pds_se_str : dis %7.3f `s_sex'
+>                 binscatter _y_r _Z_r `wt_bin', n(30) ///
+>                     xtitle("Exposure x Post") ytitle("`var_name'") ysc(titlegap(-6) outergap(0)) ///
+>                     xlab(-0.06(0.015)0.06, format(%5.3f)) ///
+>                     msymbol(O) mcolors(gs6) lcolors(ebblue) ///
+>                     note("{&beta} = `pds_b_str' (SE: `pds_se_str')") ///
+>                     plotregion(margin(sides))
+>                 graph export ../output/figures/`samp'/pdid_`yvar'`suf'_mshrctrl`wsuf'.pdf, replace
+>             }
+>             else di as error "pdid mshrctrl binscatter `yvar' failed; skipping plot."
+>         restore
+>         */
+.     }
+130. 
+.     preserve
+131.         clear
+132.         svmat results
+133.         rename (results1 results2 results3 results4 results5 results6 results7) ///
+>                (b_base se_base b_exp_wshr se_exp_wshr b_shr_wshr se_shr_wshr pre_mean)
+134.         gen outcome = ""
+135.         local i = 1
+136.         foreach yvar of local kept_outcomes {
+137.             replace outcome = "`yvar'" if _n == `i'
+138.             local ++i
+139.         }
+140.         order outcome b_base se_base b_exp_wshr se_exp_wshr b_shr_wshr se_shr_wshr pre_mean
+141.         save ../temp/pooled_did_`samp'`suf'`wsuf', replace
+142.         list, sep(0) noobs abbrev(20)
+143.     restore
+144. end
+
+. 
+. program ppml_specs
+  1.     syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0) no_clin(int 0)]
+  2.     local fes athr_id year
+  3.     local vce_cl athr_id
+  4.     if "$FE_MODE" == "athr_clyr" {
+  5.         local fes athr_id i.cluster_30#i.year
+  6.     }
+  7.     if "$FE_MODE" == "inst_cluster" {
+  8.         local fes inst_id cluster_30 year
+  9.         local vce_cl inst_id
+ 10.     }
+ 11.     if "$FE_MODE" == "inst_cluster_fldyr" {
+ 12.         local fes inst_id i.cluster_30#i.year
+ 13.         local vce_cl inst_id
+ 14.     }
+ 15.     local wt ""
+ 16.     local wsuf ""
+ 17.     if "$WEIGHT_MSIM" == "1" {
+ 18.         // ppmlhdfe rejects aw, binscatter rejects pw
+.         local wt "[pw=max_sim]"
+ 19.         local wt_bin "[aw=max_sim]"
+ 20.         local wsuf "_msimwt"
+ 21.     }
+ 22.     local suf ""
+ 23.     if (`r1r2' == 1 & `public' == 0 & `r1_only' == 0) local suf "_r1_r2"
+ 24.     if (`r1r2' == 1 & `public' == 1 & `r1_only' == 0) local suf "_r1_r2_public"
+ 25.     if (`r1_only' == 1 & `public' == 0) local suf "_r1"
+ 26.     if (`r1_only' == 1 & `public' == 1) local suf "_r1_public"
+ 27.     if (`no_clin' == 1) local suf "_no_clin`suf'"
+ 28.     use ../output/prepped_samples/es_`samp'`suf', clear
+ 29. 
+.     gen post = year >= 2014
+ 30.     gen Z_it       = exposure      * post
+ 31.     gen Z_share_it = mkt_spend_shr * post
+ 32. 
+.     local position_outcomes ""
+ 33.     if "$POSITION_OUTCOMES_AVAIL" == "1" {
+ 34.         local position_outcomes n_middle_ppr
+ 35.     }
+ 36.     local outcomes cite_affl_wt ppr_cnt ///
+>                    cite_affl_wt_any ppr_cnt_any ///
+>                    cite_affl_wt_notlast ppr_cnt_notlast ///
+>                    avg_num_coathrs n_grants nih_total_cost ///
+>                    `position_outcomes'
+ 37.     if "$QUICK_TOPJRNL" == "1" local outcomes ppr_cnt
+ 38. 
+.     foreach yvar of local outcomes {
+ 39.         foreach v in _mu_b _mu_s _dvarb _dvars {
+ 40.             cap drop `v'
+ 41.         }
+ 42.         local b_b = .
+ 43.         local b_se = .
+ 44.         local b_N = .
+ 45.         local b_r2 = .
+ 46.         local b_pmn = .
+ 47.         local s_bx = .
+ 48.         local s_sex = .
+ 49.         local s_bs = .
+ 50.         local s_ses = .
+ 51.         local s_N = .
+ 52.         local s_r2 = .
+ 53.         local s_pmn = .
+ 54.         if "`yvar'" == "ppr_cnt" {
+ 55.             cap noi ppmlhdfe `yvar' Z_it            `wt', absorb(`fes') vce(cluster `vce_cl') d(_dvarb)
+ 56.             local rc = _rc
+ 57.             if `rc' == 0 {
+ 58.                 local b_b  = _b[Z_it]
+ 59.                 local b_se = _se[Z_it]
+ 60.                 local b_N  = e(N)
+ 61.                 local b_r2 = e(r2_p)
+ 62.                 qui sum `yvar' if year < 2014 & e(sample)
+ 63.                 local b_pmn = r(mean)
+ 64.                 predict double _mu_b, mu
+ 65.             }
+ 66.             else di as error "ppml_pdid `yvar' base failed (rc=`rc')"
+ 67.         }
+ 68.         cap noi ppmlhdfe `yvar' Z_it Z_share_it `wt', absorb(`fes') vce(cluster `vce_cl') d(_dvars)
+ 69.         local rc = _rc
+ 70.         if `rc' == 0 {
+ 71.             local s_bx  = _b[Z_it]
+ 72.             local s_sex = _se[Z_it]
+ 73.             local s_bs  = _b[Z_share_it]
+ 74.             local s_ses = _se[Z_share_it]
+ 75.             local s_N   = e(N)
+ 76.             local s_r2  = e(r2_p)
+ 77.             qui sum `yvar' if year < 2014 & e(sample)
+ 78.             local s_pmn = r(mean)
+ 79.             predict double _mu_s, mu
+ 80.         }
+ 81.         else di as error "ppml_pdid `yvar' +share failed (rc=`rc')"
+ 82.         cap mat drop ppml_pdid_`yvar'
+ 83.         mat ppml_pdid_`yvar' = J(7,2,.)
+ 84.         mat ppml_pdid_`yvar'[1,1] = `b_b'
+ 85.         mat ppml_pdid_`yvar'[2,1] = `b_se'
+ 86.         mat ppml_pdid_`yvar'[5,1] = `b_pmn'
+ 87.         mat ppml_pdid_`yvar'[6,1] = `b_N'
+ 88.         mat ppml_pdid_`yvar'[7,1] = `b_r2'
+ 89.         mat ppml_pdid_`yvar'[1,2] = `s_bx'
+ 90.         mat ppml_pdid_`yvar'[2,2] = `s_sex'
+ 91.         mat ppml_pdid_`yvar'[3,2] = `s_bs'
+ 92.         mat ppml_pdid_`yvar'[4,2] = `s_ses'
+ 93.         mat ppml_pdid_`yvar'[5,2] = `s_pmn'
+ 94.         mat ppml_pdid_`yvar'[6,2] = `s_N'
+ 95.         mat ppml_pdid_`yvar'[7,2] = `s_r2'
+ 96.         mat rownames ppml_pdid_`yvar' = b_exposure se_exposure b_share se_share pre_mean N r2_p
+ 97.         mat colnames ppml_pdid_`yvar' = base with_share
+ 98. 
+.         di as text "ppml_specs `samp'`suf' `yvar': pdid b=" %7.4f ppml_pdid_`yvar'[1,1] ///
+>             "  pre_mean=" %7.4f `s_pmn'
+ 99. 
+.         local var_name "`yvar'"
+100.         if "`yvar'" == "cite_affl_wt"         local var_name "Citation Weighted Output"
+101.         if "`yvar'" == "ppr_cnt"              local var_name "Publication Count"
+102.         if "`yvar'" == "affl_wt"              local var_name "Affiliation Weighted Output"
+103.         if "`yvar'" == "cite_affl_wt_any"     local var_name "Citation Weighted Output (any position)"
+104.         if "`yvar'" == "ppr_cnt_any"          local var_name "Publication Count (any position)"
+105.         if "`yvar'" == "affl_wt_any"          local var_name "Affiliation Weighted Output (any position)"
+106.         if "`yvar'" == "cite_affl_wt_notlast" local var_name "Citation Weighted Output (non-last author)"
+107.         if "`yvar'" == "ppr_cnt_notlast"      local var_name "Publication Count (non-last author)"
+108.         if "`yvar'" == "affl_wt_notlast"      local var_name "Affiliation Weighted Output (non-last author)"
+109.         if "`yvar'" == "avg_num_coathrs"      local var_name "Avg Coauthors"
+110.         if "`yvar'" == "n_grants"             local var_name "# Active NIH Research Grants"
+111.         if "`yvar'" == "nih_total_cost"       local var_name "NIH Award Amount ($)"
+112.         if "`yvar'" == "n_first_ppr"          local var_name "# First-Author Papers"
+113.         if "`yvar'" == "n_middle_ppr"         local var_name "# Middle-Author Papers"
+114.         if "`yvar'" == "n_last_ppr"           local var_name "# Last-Author Papers"
+115.         local poisson_name "`var_name'"
+116.         if "`yvar'" == "ppr_cnt"              local poisson_name "Publications"
+117.         if "`yvar'" == "cite_affl_wt"         local poisson_name "Citation-Weighted Output"
+118.         if "`yvar'" == "affl_wt"              local poisson_name "Affiliation-Weighted Output"
+119.         if "`yvar'" == "ppr_cnt_any"          local poisson_name "Publications (any position)"
+120.         if "`yvar'" == "cite_affl_wt_any"     local poisson_name "Citation-Weighted Output (any position)"
+121.         if "`yvar'" == "affl_wt_any"          local poisson_name "Affiliation-Weighted Output (any position)"
+122.         if "`yvar'" == "ppr_cnt_notlast"      local poisson_name "Publications (non-last author)"
+123.         if "`yvar'" == "cite_affl_wt_notlast" local poisson_name "Citation-Weighted Output (non-last author)"
+124.         if "`yvar'" == "affl_wt_notlast"      local poisson_name "Affiliation-Weighted Output (non-last author)"
+125.         if "`yvar'" == "avg_num_coathrs"      local poisson_name "Coauthors"
+126.         if "`yvar'" == "n_grants"             local poisson_name "Active NIH Research Grants"
+127.         if "`yvar'" == "nih_total_cost"       local poisson_name "NIH Award Dollars"
+128. 
+.         if "`yvar'" == "ppr_cnt" {
+129.         preserve
+130.             cap confirm variable _mu_b
+131.             if _rc == 0 {
+132.                 keep if !mi(_mu_b) & _mu_b > 0
+133.                 gen double _z_work = ln(_mu_b) + (`yvar' - _mu_b)/_mu_b
+134.                 gen double _fwlw = _mu_b
+135.                 if "$WEIGHT_MSIM" == "1" replace _fwlw = _mu_b * max_sim
+136.                 cap noi qui reghdfe _z_work [pw=_fwlw], absorb(`fes') residuals(_y_r)
+137.                 if _rc == 0 cap noi qui reghdfe Z_it [pw=_fwlw], absorb(`fes') residuals(_Z_r)
+138.                 if _rc {
+139.                     di as error "ppml FWL `yvar' failed; skipping plot."
+140.                 }
+141.                 else {
+142.                     local pb_str  : dis %7.3f ppml_pdid_`yvar'[1,1]
+143.                     local pse_str : dis %7.3f ppml_pdid_`yvar'[2,1]
+144.                     binscatter _y_r _Z_r [aw=_fwlw], n(30) ///
+>                         xtitle("Exposure x Post") ///
+>                         ytitle("{&Delta} Log Expected `poisson_name'") ysc(titlegap(0) outergap(0)) ///
+>                         xlab(-0.06(0.015)0.06, format(%5.3f)) ///
+>                         msymbol(O) mcolors(gs6) lcolors(ebblue) ///
+>                         note("{&beta} = `pb_str' (SE: `pse_str')", size(small) pos(7) ring(1) justification(left)) ///
+>                         plotregion(margin(sides))
+145.                     graph export ../output/figures/`samp'/ppml_pdid_`yvar'`suf'`wsuf'.pdf, replace
+146.                 }
+147.             }
+148.         restore
+149.         }
+150. 
+.         preserve
+151.             cap confirm variable _mu_s
+152.             if _rc == 0 {
+153.                 keep if !mi(_mu_s) & _mu_s > 0
+154.                 gen double _z_work = ln(_mu_s) + (`yvar' - _mu_s)/_mu_s
+155.                 gen double _fwlw = _mu_s
+156.                 if "$WEIGHT_MSIM" == "1" replace _fwlw = _mu_s * max_sim
+157.                 cap noi qui reghdfe _z_work Z_share_it [pw=_fwlw], absorb(`fes') residuals(_y_r)
+158.                 if _rc == 0 cap noi qui reghdfe Z_it Z_share_it [pw=_fwlw], absorb(`fes') residuals(_Z_r)
+159.                 if _rc {
+160.                     di as error "ppml FWL mshrctrl `yvar' failed; skipping plot."
+161.                 }
+162.                 else {
+163.                     local pbs_str  : dis %7.3f ppml_pdid_`yvar'[1,2]
+164.                     local pses_str : dis %7.3f ppml_pdid_`yvar'[2,2]
+165.                     binscatter _y_r _Z_r [aw=_fwlw], n(30) ///
+>                         xtitle("Exposure x Post") ///
+>                         ytitle("{&Delta} Log Expected `poisson_name'") ysc(titlegap(0) outergap(0)) ///
+>                         xlab(-0.06(0.015)0.06, format(%5.3f)) ///
+>                         msymbol(O) mcolors(gs6) lcolors(ebblue) ///
+>                         note("{&beta} = `pbs_str' (SE: `pses_str')", size(small) pos(7) ring(1) justification(left)) ///
+>                         plotregion(margin(sides))
+166.                     graph export ../output/figures/`samp'/ppml_pdid_`yvar'`suf'_mshrctrl`wsuf'.pdf, replace
+167.                 }
+168.             }
+169.         restore
+170. 
+.         if !inlist("`yvar'", "n_grants", "nih_total_cost") {
+171.         preserve
+172.             keep if nih_athr == 1
+173.             local n_b    = .
+174.             local n_se   = .
+175.             local n_N    = .
+176.             local n_r2   = .
+177.             local n_pmn  = .
+178.             local ns_bx  = .
+179.             local ns_sex = .
+180.             local ns_bs  = .
+181.             local ns_ses = .
+182.             local ns_N   = .
+183.             local ns_r2  = .
+184.             local ns_pmn = .
+185.             if "`yvar'" == "ppr_cnt" {
+186.                 cap noi ppmlhdfe `yvar' Z_it `wt', absorb(`fes') vce(cluster `vce_cl')
+187.                 if _rc == 0 {
+188.                     local n_b   = _b[Z_it]
+189.                     local n_se  = _se[Z_it]
+190.                     local n_N   = e(N)
+191.                     local n_r2  = e(r2_p)
+192.                     qui sum `yvar' if year < 2014 & e(sample)
+193.                     local n_pmn = r(mean)
+194.                 }
+195.                 else di as error "ppml_pdid `yvar' nih-only base failed"
+196.             }
+197.             foreach v in _mu_ns _dvarns {
+198.                 cap drop `v'
+199.             }
+200.             cap noi ppmlhdfe `yvar' Z_it Z_share_it `wt', absorb(`fes') vce(cluster `vce_cl') d(_dvarns)
+201.             if _rc == 0 {
+202.                 local ns_bx  = _b[Z_it]
+203.                 local ns_sex = _se[Z_it]
+204.                 local ns_bs  = _b[Z_share_it]
+205.                 local ns_ses = _se[Z_share_it]
+206.                 local ns_N   = e(N)
+207.                 local ns_r2  = e(r2_p)
+208.                 qui sum `yvar' if year < 2014 & e(sample)
+209.                 local ns_pmn = r(mean)
+210.                 cap noi predict double _mu_ns, mu
+211.                 if _rc di as error "ppml_pdid `yvar' nih-only: predict mu failed -- binscatter SKIPPED."
+212.             }
+213.             else di as error "ppml_pdid `yvar' nih-only +share failed"
+214.             cap mat drop nih_ppml_`yvar'
+215.             mat nih_ppml_`yvar' = J(7,2,.)
+216.             mat nih_ppml_`yvar'[1,1] = `n_b'
+217.             mat nih_ppml_`yvar'[2,1] = `n_se'
+218.             mat nih_ppml_`yvar'[5,1] = `n_pmn'
+219.             mat nih_ppml_`yvar'[6,1] = `n_N'
+220.             mat nih_ppml_`yvar'[7,1] = `n_r2'
+221.             mat nih_ppml_`yvar'[1,2] = `ns_bx'
+222.             mat nih_ppml_`yvar'[2,2] = `ns_sex'
+223.             mat nih_ppml_`yvar'[3,2] = `ns_bs'
+224.             mat nih_ppml_`yvar'[4,2] = `ns_ses'
+225.             mat nih_ppml_`yvar'[5,2] = `ns_pmn'
+226.             mat nih_ppml_`yvar'[6,2] = `ns_N'
+227.             mat nih_ppml_`yvar'[7,2] = `ns_r2'
+228.             mat rownames nih_ppml_`yvar' = b_exposure se_exposure b_share se_share pre_mean N r2_p
+229.             mat colnames nih_ppml_`yvar' = base with_share
+230. 
+.             qui gunique athr_id
+231.             di as text "ppml_specs `samp'`suf' `yvar' (NIH-matched only, " r(unique) " PIs): pdid b=" ///
+>                 %7.4f `ns_bx' "  pre_mean=" %7.4f `ns_pmn'
+232. 
+.             cap confirm variable _mu_ns
+233.             if _rc == 0 {
+234.                 keep if !mi(_mu_ns) & _mu_ns > 0
+235.                 gen double _z_work = ln(_mu_ns) + (`yvar' - _mu_ns)/_mu_ns
+236.                 gen double _fwlw = _mu_ns
+237.                 if "$WEIGHT_MSIM" == "1" replace _fwlw = _mu_ns * max_sim
+238.                 cap noi qui reghdfe _z_work Z_share_it [pw=_fwlw], absorb(`fes') residuals(_y_r)
+239.                 if _rc == 0 cap noi qui reghdfe Z_it Z_share_it [pw=_fwlw], absorb(`fes') residuals(_Z_r)
+240.                 if _rc {
+241.                     di as error "ppml FWL nih-only `yvar' failed; skipping plot."
+242.                 }
+243.                 else {
+244.                     local pbn_str  : dis %7.3f nih_ppml_`yvar'[1,2]
+245.                     local psen_str : dis %7.3f nih_ppml_`yvar'[2,2]
+246.                     binscatter _y_r _Z_r [aw=_fwlw], n(30) ///
+>                         xtitle("Exposure x Post") ///
+>                         ytitle("{&Delta} Log Expected `poisson_name'") ysc(titlegap(0) outergap(0)) ///
+>                         xlab(-0.06(0.015)0.06, format(%5.3f)) ///
+>                         msymbol(O) mcolors(gs6) lcolors(ebblue) ///
+>                         title("NIH-matched PIs only", size(small)) ///
+>                         note("{&beta} = `pbn_str' (SE: `psen_str')", size(small) pos(7) ring(1) justification(left)) ///
+>                         plotregion(margin(sides))
+247.                     graph export ../output/figures/`samp'/ppml_pdid_`yvar'`suf'_mshrctrl_nih`wsuf'.pdf, replace
+248.                 }
+249.             }
+250.         restore
+251.         }
+252. 
+.         if "`yvar'" == "ppr_cnt" {
+253.         preserve
+254.             keep if foia_athr == 1
+255.             local f_b    = .
+256.             local f_se   = .
+257.             local f_N    = .
+258.             local f_r2   = .
+259.             local f_pmn  = .
+260.             local fs_bx  = .
+261.             local fs_sex = .
+262.             local fs_bs  = .
+263.             local fs_ses = .
+264.             local fs_N   = .
+265.             local fs_r2  = .
+266.             local fs_pmn = .
+267.             cap noi ppmlhdfe `yvar' Z_it `wt', absorb(`fes') vce(cluster `vce_cl')
+268.             if _rc == 0 {
+269.                 local f_b   = _b[Z_it]
+270.                 local f_se  = _se[Z_it]
+271.                 local f_N   = e(N)
+272.                 local f_r2  = e(r2_p)
+273.                 qui sum `yvar' if year < 2014 & e(sample)
+274.                 local f_pmn = r(mean)
+275.             }
+276.             else di as error "ppml_pdid `yvar' foia-only base failed"
+277.             foreach v in _mu_fs _dvarfs {
+278.                 cap drop `v'
+279.             }
+280.             cap noi ppmlhdfe `yvar' Z_it Z_share_it `wt', absorb(`fes') vce(cluster `vce_cl') d(_dvarfs)
+281.             if _rc == 0 {
+282.                 local fs_bx  = _b[Z_it]
+283.                 local fs_sex = _se[Z_it]
+284.                 local fs_bs  = _b[Z_share_it]
+285.                 local fs_ses = _se[Z_share_it]
+286.                 local fs_N   = e(N)
+287.                 local fs_r2  = e(r2_p)
+288.                 qui sum `yvar' if year < 2014 & e(sample)
+289.                 local fs_pmn = r(mean)
+290.                 cap noi predict double _mu_fs, mu
+291.                 if _rc di as error "ppml_pdid `yvar' foia-only: predict mu failed -- binscatter SKIPPED."
+292.             }
+293.             else di as error "ppml_pdid `yvar' foia-only +share failed"
+294.             cap mat drop foia_ppml_`yvar'
+295.             mat foia_ppml_`yvar' = J(7,2,.)
+296.             mat foia_ppml_`yvar'[1,1] = `f_b'
+297.             mat foia_ppml_`yvar'[2,1] = `f_se'
+298.             mat foia_ppml_`yvar'[5,1] = `f_pmn'
+299.             mat foia_ppml_`yvar'[6,1] = `f_N'
+300.             mat foia_ppml_`yvar'[7,1] = `f_r2'
+301.             mat foia_ppml_`yvar'[1,2] = `fs_bx'
+302.             mat foia_ppml_`yvar'[2,2] = `fs_sex'
+303.             mat foia_ppml_`yvar'[3,2] = `fs_bs'
+304.             mat foia_ppml_`yvar'[4,2] = `fs_ses'
+305.             mat foia_ppml_`yvar'[5,2] = `fs_pmn'
+306.             mat foia_ppml_`yvar'[6,2] = `fs_N'
+307.             mat foia_ppml_`yvar'[7,2] = `fs_r2'
+308.             mat rownames foia_ppml_`yvar' = b_exposure se_exposure b_share se_share pre_mean N r2_p
+309.             mat colnames foia_ppml_`yvar' = base with_share
+310. 
+.             qui gunique athr_id
+311.             di as text "ppml_specs `samp'`suf' `yvar' (FOIA PIs only, " r(unique) " PIs): pdid b=" ///
+>                 %7.4f `fs_bx' "  pre_mean=" %7.4f `fs_pmn'
+312. 
+.             cap confirm variable _mu_fs
+313.             if _rc == 0 {
+314.                 keep if !mi(_mu_fs) & _mu_fs > 0
+315.                 gen double _z_work = ln(_mu_fs) + (`yvar' - _mu_fs)/_mu_fs
+316.                 gen double _fwlw = _mu_fs
+317.                 if "$WEIGHT_MSIM" == "1" replace _fwlw = _mu_fs * max_sim
+318.                 cap noi qui reghdfe _z_work Z_share_it [pw=_fwlw], absorb(`fes') residuals(_y_r)
+319.                 if _rc == 0 cap noi qui reghdfe Z_it Z_share_it [pw=_fwlw], absorb(`fes') residuals(_Z_r)
+320.                 if _rc {
+321.                     di as error "ppml FWL foia-only `yvar' failed; skipping plot."
+322.                 }
+323.                 else {
+324.                     local pbf_str  : dis %7.3f foia_ppml_`yvar'[1,2]
+325.                     local psef_str : dis %7.3f foia_ppml_`yvar'[2,2]
+326.                     binscatter _y_r _Z_r [aw=_fwlw], n(30) ///
+>                         xtitle("Exposure x Post") ///
+>                         ytitle("{&Delta} Log Expected `poisson_name'") ysc(titlegap(0) outergap(0)) ///
+>                         xlab(#6, format(%5.3f)) ///
+>                         msymbol(O) mcolors(gs6) lcolors(dkorange) ///
+>                         title("FOIA PIs only (observed exposure)", size(small)) ///
+>                         note("{&beta} = `pbf_str' (SE: `psef_str')", size(small) pos(7) ring(1) justification(left)) ///
+>                         plotregion(margin(sides))
+327.                     graph export ../output/figures/`samp'/ppml_pdid_`yvar'`suf'_mshrctrl_foia`wsuf'.pdf, replace
+328.                 }
+329.             }
+330.         restore
+331.         }
+332.     }
+333. end
+
+. 
+. program placebo_treatment
+  1.     syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0) no_clin(int 0)]
+  2.     local fes athr_id year
+  3.     local vce_cl athr_id
+  4.     if "$FE_MODE" == "athr_clyr" {
+  5.         local fes athr_id i.cluster_30#i.year
+  6.     }
+  7.     if "$FE_MODE" == "inst_cluster" {
+  8.         local fes inst_id cluster_30 year
+  9.         local vce_cl inst_id
+ 10.     }
+ 11.     if "$FE_MODE" == "inst_cluster_fldyr" {
+ 12.         local fes inst_id i.cluster_30#i.year
+ 13.         local vce_cl inst_id
+ 14.     }
+ 15.     local suf ""
+ 16.     if (`r1r2' == 1 & `public' == 0 & `r1_only' == 0) local suf "_r1_r2"
+ 17.     if (`r1r2' == 1 & `public' == 1 & `r1_only' == 0) local suf "_r1_r2_public"
+ 18.     if (`r1_only' == 1 & `public' == 0) local suf "_r1"
+ 19.     if (`r1_only' == 1 & `public' == 1) local suf "_r1_public"
+ 20.     if (`no_clin' == 1) local suf "_no_clin`suf'"
+ 21. 
+.     local outcomes ppr_cnt
+ 22. 
+.     cap mkdir ../output/tables
+ 23.     cap mkdir ../output/tables/`samp'
+ 24.     cap mkdir ../output/figures/`samp'
+ 25. 
+.     foreach placebo_yr in 2011 2012 {
+ 26.         use ../output/prepped_samples/es_`samp'`suf', clear
+ 27.         keep if year <= 2013
+ 28. 
+.         gen placebo_post   = year >= `placebo_yr'
+ 29.         gen Z_placebo      = exposure      * placebo_post
+ 30.         gen Z_share_placebo = mkt_spend_shr * placebo_post
+ 31. 
+.         foreach yvar of local outcomes {
+ 32.             local b     = .
+ 33.             local se    = .
+ 34.             local b_s   = .
+ 35.             local se_s  = .
+ 36.             local N     = .
+ 37.             local r2_p  = .
+ 38.             local pre_mean = .
+ 39.             cap noi ppmlhdfe `yvar' Z_placebo Z_share_placebo, ///
+>                     absorb(`fes') vce(cluster `vce_cl')
+ 40.             local rc = _rc
+ 41.             if `rc' == 0 {
+ 42.                 local b    = _b[Z_placebo]
+ 43.                 local se   = _se[Z_placebo]
+ 44.                 local b_s  = _b[Z_share_placebo]
+ 45.                 local se_s = _se[Z_share_placebo]
+ 46.                 local N    = e(N)
+ 47.                 local r2_p = e(r2_p)
+ 48.                 qui sum `yvar' if year < `placebo_yr' & e(sample)
+ 49.                 local pre_mean = r(mean)
+ 50.             }
+ 51.             else di as error "placebo_treatment `yvar' (placebo=`placebo_yr') ppml failed (rc=`rc')"
+ 52. 
+.             local t = cond(`se' > 0 & !mi(`se'), `b' / `se', .)
+ 53.             di as text "placebo_treatment `samp'`suf' `yvar' (placebo=`placebo_yr'):" ///
+>                 _newline "    ppmlhdfe (+share)  b=" %8.4f `b'   "  se=" %8.4f `se'   "  t=" %6.2f `t' ///
+>                 "  b_share=" %8.4f `b_s' "  se_share=" %8.4f `se_s' ///
+>                 "  pre_mean=" %8.4f `pre_mean' "  N=" %8.0f `N'
+ 54. 
+.             cap mat drop placebo`placebo_yr'_`yvar'
+ 55.             mat placebo`placebo_yr'_`yvar' = J(7,1,.)
+ 56.             mat placebo`placebo_yr'_`yvar'[1,1] = `b'
+ 57.             mat placebo`placebo_yr'_`yvar'[2,1] = `se'
+ 58.             mat placebo`placebo_yr'_`yvar'[3,1] = `b_s'
+ 59.             mat placebo`placebo_yr'_`yvar'[4,1] = `se_s'
+ 60.             mat placebo`placebo_yr'_`yvar'[5,1] = `pre_mean'
+ 61.             mat placebo`placebo_yr'_`yvar'[6,1] = `N'
+ 62.             mat placebo`placebo_yr'_`yvar'[7,1] = `r2_p'
+ 63.             mat rownames placebo`placebo_yr'_`yvar' = b_exp se_exp b_share se_share pre_mean N r2_p
+ 64.             mat colnames placebo`placebo_yr'_`yvar' = ppmlhdfe_wshr
+ 65.         }
+ 66.     }
+ 67. 
+.     foreach placebo_yr in 2011 2012 {
+ 68.         foreach yvar in ppr_cnt {
+ 69.             local poisson_name "Publications"
+ 70.             local ppml_ytit "Output-Cost Elasticity"
+ 71. 
+.             use ../output/prepped_samples/es_`samp'`suf', clear
+ 72.             cap drop pl_rel pl_int_lead* pl_int_lag* pl_mshr_lead* pl_mshr_lag*
+ 73.             gen pl_rel = year - `placebo_yr'
+ 74.             qui sum pl_rel
+ 75.             local pl_abs_lag  = abs(r(max))
+ 76.             local pl_abs_lead = abs(r(min))
+ 77.             forval i = 1/`pl_abs_lead' {
+ 78.                 gen pl_int_lead`i'  = exposure      if pl_rel == -`i'
+ 79.                 gen pl_mshr_lead`i' = mkt_spend_shr if pl_rel == -`i'
+ 80.             }
+ 81.             forval i = 0/`pl_abs_lag' {
+ 82.                 gen pl_int_lag`i'  = exposure      if pl_rel == `i'
+ 83.                 gen pl_mshr_lag`i' = mkt_spend_shr if pl_rel == `i'
+ 84.             }
+ 85.             ds pl_int_lead* pl_int_lag* pl_mshr_lead* pl_mshr_lag*
+ 86.             foreach v in `r(varlist)' {
+ 87.                 replace `v' = 0 if mi(`v')
+ 88.             }
+ 89.             local pl_int_leads
+ 90.             local pl_int_lags
+ 91.             local pl_mshr_leads
+ 92.             local pl_mshr_lags
+ 93.             forval i = 2/`pl_abs_lead' {
+ 94.                 local pl_int_leads  pl_int_lead`i'  `pl_int_leads'
+ 95.                 local pl_mshr_leads pl_mshr_lead`i' `pl_mshr_leads'
+ 96.             }
+ 97.             forval i = 0/`pl_abs_lag' {
+ 98.                 local pl_int_lags  `pl_int_lags'  pl_int_lag`i'
+ 99.                 local pl_mshr_lags `pl_mshr_lags' pl_mshr_lag`i'
+100.             }
+101. 
+.             cap noi ppmlhdfe `yvar' `pl_int_leads' `pl_int_lags' ///
+>                                     `pl_mshr_leads' `pl_mshr_lags', ///
+>                     absorb(`fes') vce(cluster `vce_cl')
+102.             local rc = _rc
+103.             if `rc' {
+104.                 di as error "placebo ES ppmlhdfe `yvar' yr`placebo_yr' failed (rc=`rc'); skipping."
+105.                 continue
+106.             }
+107. 
+.             preserve
+108.             cap mat drop es
+109.             foreach var in `pl_int_leads' `pl_int_lags' pl_int_lead1 {
+110.                 if "`var'" == "pl_int_lead1" {
+111.                     mat row = 0,0
+112.                 }
+113.                 else {
+114.                     mat row = _b[`var'], _se[`var']
+115.                 }
+116.                 mat es = nullmat(es) \ row
+117.             }
+118.             svmat es
+119.             keep es1 es2
+120.             drop if mi(es1)
+121.             rename (es1 es2) (b se)
+122.             gen ub = b + 1.96*se
+123.             gen lb = b - 1.96*se
+124.             gen rel = -`pl_abs_lead' if _n == 1
+125.             replace rel = rel[_n-1]+1 if _n > 1
+126.             replace rel = rel + 1 if rel >= -1
+127.             replace rel = -1 if rel == `pl_abs_lag' + 1
+128.             gen year = rel + `placebo_yr'
+129.             hashsort rel
+130.             sum ub, d
+131.             local ymax = round(r(max), 0.1)
+132.             sum lb, d
+133.             local ymin = round(r(min), 0.1)
+134.             if `ymin' > 0 local ymin = 0
+135.             local ref_yr = `placebo_yr' - 1
+136.             tw rcap ub lb year if year != `ref_yr', lcolor(dkorange%70) msize(vsmall) || ///
+>               scatter b year, mcolor(dkorange) ///
+>               , xlab(2010(1)2019) xtitle("Year (placebo treatment at `placebo_yr')") ///
+>                 ytitle("`ppml_ytit'") ysc(titlegap(-6) outergap(0)) ///
+>                 ylab(`ymin'(0.1)`ymax') yline(0, lcolor(gs10) lpattern(solid)) ///
+>                 xline(2014, lpattern(dash) lcolor(gs10)) ///
+>                 title("Placebo ES: treatment shifted to `placebo_yr' (real: 2014)", size(small)) ///
+>                 legend(off) plotregion(margin(sides))
+137.             graph export ../output/figures/`samp'/placebo_es_`yvar'_yr`placebo_yr'`suf'.pdf, replace
+138.             save ../temp/placebo_es_`yvar'_yr`placebo_yr'`suf', replace
+139.             restore
+140.         }
+141.     }
+142. end
+
+. 
+. program trim_top
+  1.     syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0) no_clin(int 0)]
+  2.     local fes athr_id year
+  3.     local vce_cl athr_id
+  4.     if "$FE_MODE" == "athr_clyr" {
+  5.         local fes athr_id i.cluster_30#i.year
+  6.     }
+  7.     if "$FE_MODE" == "inst_cluster" {
+  8.         local fes inst_id cluster_30 year
+  9.         local vce_cl inst_id
+ 10.     }
+ 11.     if "$FE_MODE" == "inst_cluster_fldyr" {
+ 12.         local fes inst_id i.cluster_30#i.year
+ 13.         local vce_cl inst_id
+ 14.     }
+ 15.     local suf ""
+ 16.     if (`r1r2' == 1 & `public' == 0 & `r1_only' == 0) local suf "_r1_r2"
+ 17.     if (`r1r2' == 1 & `public' == 1 & `r1_only' == 0) local suf "_r1_r2_public"
+ 18.     if (`r1_only' == 1 & `public' == 0) local suf "_r1"
+ 19.     if (`r1_only' == 1 & `public' == 1) local suf "_r1_public"
+ 20.     if (`no_clin' == 1) local suf "_no_clin`suf'"
+ 21. 
+.     local outcomes ppr_cnt
+ 22.     local trims 0 1 5 10 25
+ 23. 
+.     cap mkdir ../output/tables/`samp'
+ 24.     cap mkdir ../output/figures/`samp'
+ 25. 
+.     foreach trim of local trims {
+ 26.         use ../output/prepped_samples/es_`samp'`suf', clear
+ 27.         qui gunique athr_id
+ 28.         local n_pre = r(unique)
+ 29.         if `trim' > 0 {
+ 30.             bys athr_id: gen _one = _n == 1
+ 31.             local p = 100 - `trim'
+ 32.             qui _pctile pre_ppr_cnt_sum if _one == 1, p(`p')
+ 33.             local cut = r(r1)
+ 34.             drop if pre_ppr_cnt_sum > `cut'
+ 35.             drop _one
+ 36.             qui gunique athr_id
+ 37.             local n_post = r(unique)
+ 38.             di as text "trim_top `samp'`suf' trim=`trim'%: cut=" %7.2f `cut' ///
+>                 "  PIs dropped " (`n_pre' - `n_post') " / `n_pre' (kept " %7.4f (`n_post' / `n_pre') ")"
+ 39.         }
+ 40.         else {
+ 41.             local n_post = `n_pre'
+ 42.             di as text "trim_top `samp'`suf' trim=0: full sample, N PIs = `n_post'"
+ 43.         }
+ 44. 
+.         gen post       = year >= 2014
+ 45.         gen Z_it       = exposure      * post
+ 46.         gen Z_share_it = mkt_spend_shr * post
+ 47. 
+.         foreach yvar of local outcomes {
+ 48.             local lb = .
+ 49.             local lse = .
+ 50.             local lN = .
+ 51.             local l_pmn = .
+ 52.             cap noi reghdfe `yvar' Z_it Z_share_it, absorb(`fes') vce(cluster `vce_cl')
+ 53.             if _rc == 0 {
+ 54.                 local lb  = _b[Z_it]
+ 55.                 local lse = _se[Z_it]
+ 56.                 local lN  = e(N)
+ 57.                 qui sum `yvar' if year < 2014 & e(sample)
+ 58.                 local l_pmn = r(mean)
+ 59.             }
+ 60. 
+.             local pb = .
+ 61.             local pse = .
+ 62.             local pN = .
+ 63.             local p_pmn = .
+ 64.             cap noi ppmlhdfe `yvar' Z_it Z_share_it, absorb(`fes') vce(cluster `vce_cl')
+ 65.             if _rc == 0 {
+ 66.                 local pb  = _b[Z_it]
+ 67.                 local pse = _se[Z_it]
+ 68.                 local pN  = e(N)
+ 69.                 qui sum `yvar' if year < 2014 & e(sample)
+ 70.                 local p_pmn = r(mean)
+ 71.             }
+ 72. 
+.             di as text "  trim=`trim'% `yvar': reghdfe b=" %8.4f `lb' "  se=" %8.4f `lse' ///
+>                 "    ppml b=" %8.4f `pb' "  se=" %8.4f `pse' "    pre_mean=" %7.4f `l_pmn'
+ 73. 
+.             cap mat drop trim`trim'_`yvar'
+ 74.             mat trim`trim'_`yvar' = J(5,2,.)
+ 75.             mat trim`trim'_`yvar'[1,1] = `lb'
+ 76.             mat trim`trim'_`yvar'[2,1] = `lse'
+ 77.             mat trim`trim'_`yvar'[3,1] = `l_pmn'
+ 78.             mat trim`trim'_`yvar'[4,1] = `lN'
+ 79.             mat trim`trim'_`yvar'[5,1] = `n_post'
+ 80.             mat trim`trim'_`yvar'[1,2] = `pb'
+ 81.             mat trim`trim'_`yvar'[2,2] = `pse'
+ 82.             mat trim`trim'_`yvar'[3,2] = `p_pmn'
+ 83.             mat trim`trim'_`yvar'[4,2] = `pN'
+ 84.             mat trim`trim'_`yvar'[5,2] = `n_post'
+ 85.             mat rownames trim`trim'_`yvar' = b se pre_mean N n_PIs
+ 86.             mat colnames trim`trim'_`yvar' = reghdfe ppmlhdfe
+ 87.         }
+ 88.     }
+ 89. 
+.     foreach yvar in ppr_cnt {
+ 90.         local var_name "Publication Count"
+ 91.         local poisson_name "Publications"
+ 92.         local ppml_ytit "Output-Cost Elasticity"
+ 93. 
+.         preserve
+ 94.         clear
+ 95.         set obs 5
+ 96.         gen trim = .
+ 97.         gen b  = .
+ 98.         gen se = .
+ 99.         local i = 1
+100.         foreach t of local trims {
+101.             replace trim = `t' in `i'
+102.             cap confirm matrix trim`t'_`yvar'
+103.             if !_rc {
+104.                 replace b  = trim`t'_`yvar'[1,1] in `i'
+105.                 replace se = trim`t'_`yvar'[2,1] in `i'
+106.             }
+107.             local ++i
+108.         }
+109.         gen ub = b + 1.96*se
+110.         gen lb = b - 1.96*se
+111.         tw rcap ub lb trim, lcolor(ebblue%70) msize(small) || ///
+>            scatter b trim, mcolor(ebblue) msize(medium) ///
+>            , xlab(0 "Full sample" 1 "Drop top 1%" 5 "5%" 10 "10%" 25 "25%", labsize(small)) ///
+>              xtitle("Top-pre-pub PIs dropped") ///
+>              ytitle("pdid {&beta}: `var_name'") ysc(titlegap(-6) outergap(0)) ///
+>              yline(0, lcolor(gs10) lpattern(solid)) ///
+>              title("Trim-top sensitivity: `var_name'", size(small)) ///
+>              legend(off) plotregion(margin(sides))
+112.         graph export ../output/figures/`samp'/trim_top_`yvar'`suf'.pdf, replace
+113.         restore
+114. 
+.         preserve
+115.         clear
+116.         set obs 5
+117.         gen trim = .
+118.         gen b  = .
+119.         gen se = .
+120.         local i = 1
+121.         foreach t of local trims {
+122.             replace trim = `t' in `i'
+123.             cap confirm matrix trim`t'_`yvar'
+124.             if !_rc {
+125.                 replace b  = trim`t'_`yvar'[1,2] in `i'
+126.                 replace se = trim`t'_`yvar'[2,2] in `i'
+127.             }
+128.             local ++i
+129.         }
+130.         gen ub = b + 1.96*se
+131.         gen lb = b - 1.96*se
+132.         tw rcap ub lb trim, lcolor(dkorange%70) msize(small) || ///
+>            scatter b trim, mcolor(dkorange) msize(medium) ///
+>            , xlab(0 "Full sample" 1 "Drop top 1%" 5 "5%" 10 "10%" 25 "25%", labsize(small)) ///
+>              xtitle("Top-pre-pub PIs dropped") ///
+>              ytitle("`ppml_ytit'") ysc(titlegap(-6) outergap(0)) ///
+>              yline(0, lcolor(gs10) lpattern(solid)) ///
+>              title("Trim-top sensitivity (ppml): `var_name'", size(small)) ///
+>              legend(off) plotregion(margin(sides))
+133.         graph export ../output/figures/`samp'/trim_top_ppml_`yvar'`suf'.pdf, replace
+134.         restore
+135.     }
+136. end
+
+. 
+. program joint_outcome_test
+  1.     syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0) no_clin(int 0)]
+  2.     local suf ""
+  3.     if (`r1r2' == 1 & `public' == 0 & `r1_only' == 0) local suf "_r1_r2"
+  4.     if (`r1r2' == 1 & `public' == 1 & `r1_only' == 0) local suf "_r1_r2_public"
+  5.     if (`r1_only' == 1 & `public' == 0) local suf "_r1"
+  6.     if (`r1_only' == 1 & `public' == 1) local suf "_r1_public"
+  7.     if (`no_clin' == 1) local suf "_no_clin`suf'"
+  8.     use ../output/prepped_samples/es_`samp'`suf', clear
+  9. 
+.     foreach v in cite_affl_wt ppr_cnt {
+ 10.         cap gen ln_`v' = ln(1+`v')
+ 11.     }
+ 12. 
+.     gen post = year >= 2014
+ 13.     gen Z_it = exposure * post
+ 14.     gen Z_share_it = mkt_spend_shr * post
+ 15. 
+.     qui sum ppr_cnt      if year < 2014
+ 16.     local mean_ppr = r(mean)
+ 17.     qui sum cite_affl_wt if year < 2014
+ 18.     local mean_cite = r(mean)
+ 19. 
+.     keep athr_id year Z_it Z_share_it ppr_cnt cite_affl_wt ln_ppr_cnt ln_cite_affl_wt
+ 20. 
+.     preserve
+ 21.         gen outcome = 1
+ 22.         gen y_raw = cite_affl_wt
+ 23.         gen y_ln  = ln_cite_affl_wt
+ 24.         gen y_nrm = cite_affl_wt / `mean_cite'
+ 25.         keep athr_id year Z_it Z_share_it outcome y_raw y_ln y_nrm
+ 26.         save ../temp/stack_cite_`samp'`suf', replace
+ 27.     restore
+ 28.     gen outcome = 0
+ 29.     gen y_raw = ppr_cnt
+ 30.     gen y_ln  = ln_ppr_cnt
+ 31.     gen y_nrm = ppr_cnt / `mean_ppr'
+ 32.     keep athr_id year Z_it Z_share_it outcome y_raw y_ln y_nrm
+ 33.     append using ../temp/stack_cite_`samp'`suf'
+ 34. 
+.     egen athr_outcome = group(athr_id outcome)
+ 35.     egen year_outcome = group(year outcome)
+ 36.     gen Z_it_cite = Z_it * (outcome == 1)
+ 37.     gen Z_share_it_cite = Z_share_it * (outcome == 1)
+ 38. 
+.     cap mat drop joint_`samp'`suf'
+ 39.     mat joint_`samp'`suf' = J(8,3,.)
+ 40.     mat rownames joint_`samp'`suf' = b_ppr se_ppr b_cite se_cite b_diff se_diff Wald_F p_value
+ 41.     mat colnames joint_`samp'`suf' = log norm_levels ppml
+ 42. 
+.     reghdfe y_ln Z_it Z_it_cite Z_share_it Z_share_it_cite, absorb(athr_outcome year_outcome) vce(cluster athr_id)
+ 43.     local b_ppr_ln  = _b[Z_it]
+ 44.     local se_ppr_ln = _se[Z_it]
+ 45.     local b_diff_ln = _b[Z_it_cite]
+ 46.     local se_diff_ln = _se[Z_it_cite]
+ 47.     qui lincom Z_it + Z_it_cite
+ 48.     local b_cite_ln  = r(estimate)
+ 49.     local se_cite_ln = r(se)
+ 50.     qui test Z_it_cite
+ 51.     local F_ln = r(F)
+ 52.     local p_ln = r(p)
+ 53.     mat joint_`samp'`suf'[1,1] = `b_ppr_ln'
+ 54.     mat joint_`samp'`suf'[2,1] = `se_ppr_ln'
+ 55.     mat joint_`samp'`suf'[3,1] = `b_cite_ln'
+ 56.     mat joint_`samp'`suf'[4,1] = `se_cite_ln'
+ 57.     mat joint_`samp'`suf'[5,1] = `b_diff_ln'
+ 58.     mat joint_`samp'`suf'[6,1] = `se_diff_ln'
+ 59.     mat joint_`samp'`suf'[7,1] = `F_ln'
+ 60.     mat joint_`samp'`suf'[8,1] = `p_ln'
+ 61. 
+.     reghdfe y_nrm Z_it Z_it_cite Z_share_it Z_share_it_cite, absorb(athr_outcome year_outcome) vce(cluster athr_id)
+ 62.     local b_ppr_nr  = _b[Z_it]
+ 63.     local se_ppr_nr = _se[Z_it]
+ 64.     local b_diff_nr = _b[Z_it_cite]
+ 65.     local se_diff_nr = _se[Z_it_cite]
+ 66.     qui lincom Z_it + Z_it_cite
+ 67.     local b_cite_nr  = r(estimate)
+ 68.     local se_cite_nr = r(se)
+ 69.     qui test Z_it_cite
+ 70.     local F_nr = r(F)
+ 71.     local p_nr = r(p)
+ 72.     mat joint_`samp'`suf'[1,2] = `b_ppr_nr'
+ 73.     mat joint_`samp'`suf'[2,2] = `se_ppr_nr'
+ 74.     mat joint_`samp'`suf'[3,2] = `b_cite_nr'
+ 75.     mat joint_`samp'`suf'[4,2] = `se_cite_nr'
+ 76.     mat joint_`samp'`suf'[5,2] = `b_diff_nr'
+ 77.     mat joint_`samp'`suf'[6,2] = `se_diff_nr'
+ 78.     mat joint_`samp'`suf'[7,2] = `F_nr'
+ 79.     mat joint_`samp'`suf'[8,2] = `p_nr'
+ 80. 
+.     local b_ppr_pp = .
+ 81.     local se_ppr_pp = .
+ 82.     local b_cite_pp = .
+ 83.     local se_cite_pp = .
+ 84.     local b_diff_pp = .
+ 85.     local se_diff_pp = .
+ 86.     local F_pp = .
+ 87.     local p_pp = .
+ 88.     cap noi ppmlhdfe y_raw Z_it Z_it_cite Z_share_it Z_share_it_cite, absorb(athr_outcome year_outcome) vce(cluster athr_id)
+ 89.     local rc = _rc
+ 90.     if `rc' == 0 {
+ 91.         local b_ppr_pp  = _b[Z_it]
+ 92.         local se_ppr_pp = _se[Z_it]
+ 93.         local b_diff_pp = _b[Z_it_cite]
+ 94.         local se_diff_pp = _se[Z_it_cite]
+ 95.         qui lincom Z_it + Z_it_cite
+ 96.         local b_cite_pp  = r(estimate)
+ 97.         local se_cite_pp = r(se)
+ 98.         qui test Z_it_cite
+ 99.         local F_pp = r(F)
+100.         local p_pp = r(p)
+101.     }
+102.     else di as error "joint_outcome_test ppml failed (rc=`rc'); ppml column left missing."
+103.     mat joint_`samp'`suf'[1,3] = `b_ppr_pp'
+104.     mat joint_`samp'`suf'[2,3] = `se_ppr_pp'
+105.     mat joint_`samp'`suf'[3,3] = `b_cite_pp'
+106.     mat joint_`samp'`suf'[4,3] = `se_cite_pp'
+107.     mat joint_`samp'`suf'[5,3] = `b_diff_pp'
+108.     mat joint_`samp'`suf'[6,3] = `se_diff_pp'
+109.     mat joint_`samp'`suf'[7,3] = `F_pp'
+110.     mat joint_`samp'`suf'[8,3] = `p_pp'
+111. 
+.     di as text "joint outcome test `samp'`suf':  H0 beta_ppr = beta_cite (same H0 in three flavors)"
+112.     di as text "  --- log      : β_ln_ppr    = " %9.4f `b_ppr_ln'  "  β_ln_cite    = " %9.4f `b_cite_ln'  "  diff = " %9.4f `b_diff_ln'  "  F = " %9.4f `F_ln'  "  p = " %9.4f `p_ln'
+113.     di as text "  --- norm lvl : β_ppr/mean  = " %9.4f `b_ppr_nr'  "  β_cite/mean  = " %9.4f `b_cite_nr'  "  diff = " %9.4f `b_diff_nr'  "  F = " %9.4f `F_nr'  "  p = " %9.4f `p_nr'
+114.     di as text "  --- ppml     : β_ppr (sel) = " %9.4f `b_ppr_pp'  "  β_cite (sel) = " %9.4f `b_cite_pp'  "  diff = " %9.4f `b_diff_pp'  "  F = " %9.4f `F_pp'  "  p = " %9.4f `p_pp'
+115. 
+.     cap mkdir ../output/tables
+116.     cap mkdir ../output/tables/`samp'
+117.     qui matrix_to_txt, saving("../output/tables/`samp'/joint_outcome_test`suf'.txt") ///
+>         matrix(joint_`samp'`suf') title(<tab:joint_outcome_test`suf'>) format(%20.4f) replace
+118. end
+
+. 
+. program robustness
+  1.     syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0) no_clin(int 0)]
+  2.     local fes athr_id year
+  3.     local vce_cl athr_id
+  4.     if "$FE_MODE" == "athr_clyr" {
+  5.         local fes athr_id i.cluster_30#i.year
+  6.     }
+  7.     if "$FE_MODE" == "inst_cluster" {
+  8.         local fes inst_id cluster_30 year
+  9.         local vce_cl inst_id
+ 10.     }
+ 11.     if "$FE_MODE" == "inst_cluster_fldyr" {
+ 12.         local fes inst_id i.cluster_30#i.year
+ 13.         local vce_cl inst_id
+ 14.     }
+ 15.     local suf ""
+ 16.     if (`r1r2' == 1 & `public' == 0 & `r1_only' == 0) local suf "_r1_r2"
+ 17.     if (`r1r2' == 1 & `public' == 1 & `r1_only' == 0) local suf "_r1_r2_public"
+ 18.     if (`r1_only' == 1 & `public' == 0) local suf "_r1"
+ 19.     if (`r1_only' == 1 & `public' == 1) local suf "_r1_public"
+ 20.     if (`no_clin' == 1) local suf "_no_clin`suf'"
+ 21.     cap mkdir "../output/figures/`samp'/robustness"
+ 22.     cap mkdir "../output/tables"
+ 23.     cap mkdir "../output/tables/`samp'"
+ 24.     cap mkdir "../output/tables/`samp'/robustness"
+ 25. 
+.     local outcomes ppr_cnt cite_affl_wt ppr_cnt_any cite_affl_wt_any ///
+>                    ppr_cnt_notlast cite_affl_wt_notlast
+ 26.     if "$QUICK_TOPJRNL" == "1" local outcomes ppr_cnt
+ 27. 
+.     foreach yvar of local outcomes {
+ 28.         if "`yvar'" == "ppr_cnt"              local var_name "Publication Count"
+ 29.         if "`yvar'" == "cite_affl_wt"         local var_name "Citation Weighted Output"
+ 30.         if "`yvar'" == "ppr_cnt_any"          local var_name "Publication Count (any position)"
+ 31.         if "`yvar'" == "cite_affl_wt_any"     local var_name "Citation Weighted Output (any position)"
+ 32.         if "`yvar'" == "ppr_cnt_notlast"      local var_name "Publication Count (non-last author)"
+ 33.         if "`yvar'" == "cite_affl_wt_notlast" local var_name "Citation Weighted Output (non-last author)"
+ 34.         local poisson_name "`var_name'"
+ 35.         if "`yvar'" == "ppr_cnt"              local poisson_name "Publications"
+ 36.         if "`yvar'" == "cite_affl_wt"         local poisson_name "Citation-Weighted Output"
+ 37.         if "`yvar'" == "ppr_cnt_any"          local poisson_name "Publications (any position)"
+ 38.         if "`yvar'" == "cite_affl_wt_any"     local poisson_name "Citation-Weighted Output (any position)"
+ 39.         if "`yvar'" == "ppr_cnt_notlast"      local poisson_name "Publications (non-last author)"
+ 40.         if "`yvar'" == "cite_affl_wt_notlast" local poisson_name "Citation-Weighted Output (non-last author)"
+ 41.         local ppml_ytit "Output-Cost Elasticity"
+ 42.         if regexm("`yvar'", "^ppr_cnt")      local gap 0.5
+ 43.         if regexm("`yvar'", "^cite_affl_wt") local gap 1
+ 44.         if regexm("`yvar'", "^ppr_cnt")      & "`samp'" == "top_jrnls" local gap 2
+ 45.         if regexm("`yvar'", "^cite_affl_wt") & "`samp'" == "top_jrnls" local gap 2
+ 46. 
+.         foreach spec in ageCtrl noattrit fldyr {
+ 47.             if "`spec'" == "ageCtrl"  local title "Age x year controls"
+ 48.             if "`spec'" == "noattrit" local title "PIs with last real pub year >= 2019"
+ 49.             if "`spec'" == "fldyr"    local title "Author + field x year FE"
+ 50.             local spec_fes `fes'
+ 51.             if "`spec'" == "fldyr"    local spec_fes athr_id i.cluster_30#i.year
+ 52. 
+.             use ../output/prepped_samples/es_`samp'`suf', clear
+ 53.             cap drop rel int_lead* int_lag* mshr_lead* mshr_lag*
+ 54.             gen rel = year - 2014
+ 55.             qui sum rel
+ 56.             local abs_lag  = abs(r(max))
+ 57.             local abs_lead = abs(r(min))
+ 58.             forval i = 1/`abs_lead' {
+ 59.                 gen int_lead`i'  = exposure      if rel == -`i'
+ 60.                 gen mshr_lead`i' = mkt_spend_shr if rel == -`i'
+ 61.             }
+ 62.             forval i = 1/`abs_lag' {
+ 63.                 gen int_lag`i'  = exposure      if rel == `i'
+ 64.                 gen mshr_lag`i' = mkt_spend_shr if rel == `i'
+ 65.             }
+ 66.             gen int_lag0  = exposure      if rel == 0
+ 67.             gen mshr_lag0 = mkt_spend_shr if rel == 0
+ 68.             ds int_lead* int_lag* mshr_lead* mshr_lag*
+ 69.             foreach var in `r(varlist)' {
+ 70.                 replace `var' = 0 if mi(`var')
+ 71.             }
+ 72.             if "`spec'" == "noattrit" {
+ 73.                 keep if max_year >= 2019
+ 74.             }
+ 75.             qui sum rel
+ 76.             local abs_lag  = abs(r(max))
+ 77.             local abs_lead = abs(r(min))
+ 78.             local int_leads
+ 79.             local int_lags
+ 80.             local mshr_leads
+ 81.             local mshr_lags
+ 82.             forval i = 2/`abs_lead' {
+ 83.                 local int_leads int_lead`i' `int_leads'
+ 84.                 local mshr_leads mshr_lead`i' `mshr_leads'
+ 85.             }
+ 86.             forval i = 0/`abs_lag' {
+ 87.                 local int_lags `int_lags' int_lag`i'
+ 88.                 local mshr_lags `mshr_lags' mshr_lag`i'
+ 89.             }
+ 90.             local addctrl
+ 91.             if "`spec'" == "ageCtrl" local addctrl c.age_2014#i.year
+ 92. 
+.             local ests ppmlhdfe
+ 93.             if "`yvar'" == "ppr_cnt" local ests reghdfe ppmlhdfe
+ 94. 
+.             foreach est of local ests {
+ 95.             local esuf ""
+ 96.             if "`est'" == "ppmlhdfe" local esuf "_ppml"
+ 97.             cap noi `est' `yvar' `int_leads' `int_lags' `mshr_leads' `mshr_lags' `addctrl', ///
+>                     absorb(`spec_fes') vce(cluster `vce_cl')
+ 98.             local rc = _rc
+ 99.             if `rc' {
+100.                 di as error "robustness `samp'`suf' `yvar' `spec' `est' failed (rc=`rc'); skipping."
+101.                 continue
+102.             }
+103.             gunique athr_id if e(sample)
+104.             local n_pi = r(unique)
+105. 
+.             preserve
+106.             cap mat drop es
+107.             foreach var in `int_leads' `int_lags' int_lead1 {
+108.                 if "`var'" == "int_lead1" {
+109.                     mat row = 0,0
+110.                 }
+111.                 else {
+112.                     cap mat row = _b[`var'], _se[`var']
+113.                     if _rc mat row = ., .
+114.                 }
+115.                 mat es = nullmat(es) \ row
+116.             }
+117.             svmat es
+118.             keep es1 es2
+119.             drop if mi(es1)
+120.             rename (es1 es2) (b se)
+121.             gen ub = b + 1.96*se
+122.             gen lb = b - 1.96*se
+123.             gen rel = -`abs_lead' if _n == 1
+124.             replace rel = rel[_n-1]+1 if _n > 1
+125.             replace rel = rel + 1 if rel >= -1
+126.             replace rel = -1 if rel == `abs_lag' + 1
+127.             gen year = rel + 2014
+128.             hashsort rel
+129.             save ../temp/robust_es_main_`yvar'`esuf'_`spec'_`samp'`suf', replace
+130.             local ytit "`var_name'"
+131.             local ylabopt ""
+132.             if "`est'" == "ppmlhdfe" {
+133.                 local ytit "`ppml_ytit'"
+134.                 local ylabopt "ylab(#6)"
+135.             }
+136.             else {
+137.                 sum ub, d
+138.                 local ymax = round(r(max),`gap')
+139.                 sum lb, d
+140.                 local ymin = round(r(min),`gap')
+141.                 if `ymin' > 0 local ymin = 0
+142.                 local ylabopt "ylab(`ymin'(`gap')`ymax')"
+143.             }
+144.             cap graph drop _all
+145.             cap noi tw rcap ub lb year if year != 2013, lcolor(ebblue%70) msize(vsmall) || ///
+>               scatter b year, mcolor(ebblue) ///
+>               , xlab(2010(1)2019) xtitle("Year") ytitle("`ytit'") ysc(titlegap(-6) outergap(0)) ///
+>                 `ylabopt' yline(0, lcolor(gs10) lpattern(solid)) ///
+>                 title("Main ES: `title' (N PIs = `n_pi')", size(small)) ///
+>                 legend(off) plotregion(margin(sides))
+146.             cap noi graph export ../output/figures/`samp'/robustness/es_`yvar'_main`esuf'_`spec'`suf'.pdf, replace
+147.             restore
+148.             }
+149.         }
+150.     }
+151. 
+. end
+
+. 
+. program output_tables
+  1.     syntax, samp(string) [, r1r2(int 0) public(int 0) r1_only(int 0) no_clin(int 0)]
+  2.     local wsuf ""
+  3.     if "$WEIGHT_MSIM" == "1" local wsuf "_msimwt"
+  4.     local suf ""
+  5.     if (`r1r2' == 1 & `public' == 0 & `r1_only' == 0) local suf "_r1_r2"
+  6.     if (`r1r2' == 1 & `public' == 1 & `r1_only' == 0) local suf "_r1_r2_public"
+  7.     if (`r1_only' == 1 & `public' == 0) local suf "_r1"
+  8.     if (`r1_only' == 1 & `public' == 1) local suf "_r1_public"
+  9.     if (`no_clin' == 1) local suf "_no_clin`suf'"
+ 10.     cap mkdir ../output/tables
+ 11.     cap mkdir ../output/tables/`samp'
+ 12.     local position_outcomes ""
+ 13.     if "$POSITION_OUTCOMES_AVAIL" == "1" {
+ 14.         local position_outcomes n_middle_ppr avg_position avg_team_size_last avg_team_size_notlast
+ 15.     }
+ 16.     local outcomes cite_affl_wt ppr_cnt ln_ppr_cnt ///
+>                    cite_affl_wt_any ppr_cnt_any ///
+>                    cite_affl_wt_notlast ppr_cnt_notlast ///
+>                    avg_num_coathrs n_grants nih_total_cost ///
+>                    `position_outcomes'
+ 17.     if "$QUICK_TOPJRNL" == "1" local outcomes ppr_cnt ln_ppr_cnt
+ 18.     foreach prog in pdid ppml_pdid nih_ppml foia_ppml placebo2011 placebo2012 trim0 trim1 trim5 trim10 trim25 {
+ 19.         foreach yvar of local outcomes {
+ 20.             cap confirm matrix `prog'_`yvar'
+ 21.             if !_rc {
+ 22.                 qui matrix_to_txt, saving("../output/tables/`samp'/`prog'_`yvar'`suf'`wsuf'.txt") ///
+>                     matrix(`prog'_`yvar') title(<tab:`prog'_`yvar'`suf'`wsuf'>) format(%20.4f) replace
+ 23.             }
+ 24.         }
+ 25.     }
+ 26. 
+.     write_rf_main_tex, samp(`samp') suf(`suf') wsuf(`wsuf')
+ 27. end
+
+. 
+. program write_rf_main_tex
+  1.     syntax, samp(string) [suf(string) wsuf(string)]
+  2.     cap confirm matrix ppml_pdid_ppr_cnt
+  3.     if _rc {
+  4.         di as text "write_rf_main_tex: ppml_pdid_ppr_cnt matrix missing; skipping."
+  5.         exit 0
+  6.     }
+  7. 
+.     local b_ms   = ppml_pdid_ppr_cnt[1,2]
+  8.     local se_ms  = ppml_pdid_ppr_cnt[2,2]
+  9.     local b_sh   = ppml_pdid_ppr_cnt[3,2]
+ 10.     local se_sh  = ppml_pdid_ppr_cnt[4,2]
+ 11.     local pmn    = ppml_pdid_ppr_cnt[5,2]
+ 12.     local pmn_b  = ppml_pdid_ppr_cnt[5,1]
+ 13.     local n_ms   = ppml_pdid_ppr_cnt[6,2]
+ 14.     local b_base = ppml_pdid_ppr_cnt[1,1]
+ 15.     local se_base= ppml_pdid_ppr_cnt[2,1]
+ 16.     local n_base = ppml_pdid_ppr_cnt[6,1]
+ 17. 
+.     if mi(`b_base') | mi(`se_base') | mi(`b_ms') | mi(`se_ms') {
+ 18.         di as text "write_rf_main_tex: base or with-share PPML missing for ppr_cnt; skipping."
+ 19.         exit 0
+ 20.     }
+ 21. 
+.     local t_ms   = abs(`b_ms'   / `se_ms')
+ 22.     local t_base = abs(`b_base' / `se_base')
+ 23.     local t_sh   = abs(`b_sh'   / `se_sh')
+ 24.     local st_ms   = cond(`t_ms'   >= 2.576, "^{***}", cond(`t_ms'   >= 1.960, "^{**}", cond(`t_ms'   >= 1.645, "^{*}", "")))
+ 25.     local st_base = cond(`t_base' >= 2.576, "^{***}", cond(`t_base' >= 1.960, "^{**}", cond(`t_base' >= 1.645, "^{*}", "")))
+ 26.     local st_sh   = cond(mi(`t_sh'), "", cond(`t_sh' >= 2.576, "^{***}", cond(`t_sh' >= 1.960, "^{**}", cond(`t_sh' >= 1.645, "^{*}", ""))))
+ 27. 
+.     local b_ms_s   : dis %6.3f `b_ms'
+ 28.     local se_ms_s  : dis %6.3f `se_ms'
+ 29.     local b_base_s : dis %6.3f `b_base'
+ 30.     local se_base_s: dis %6.3f `se_base'
+ 31.     local b_sh_s   : dis %6.3f `b_sh'
+ 32.     local se_sh_s  : dis %6.3f `se_sh'
+ 33.     local pmn_s    : dis %6.2f `pmn'
+ 34.     local pmn_b_s  : dis %6.2f `pmn_b'
+ 35.     local n_ms_s   : dis %12.0fc `n_ms'
+ 36.     local n_base_s : dis %12.0fc `n_base'
+ 37. 
+.     local out ../output/tables/`samp'/rf_main`suf'`wsuf'.tex
+ 38.     tempname fh
+ 39.     file open `fh' using "`out'", write replace
+ 40.     file write `fh' "\begin{table}[htbp]" _n
+ 41.     file write `fh' "\centering" _n
+ 42.     file write `fh' "\caption{Effect of Merger Exposure on Publication Output}" _n
+ 43.     file write `fh' "\label{tab:rf_main`suf'`wsuf'}" _n
+ 44.     file write `fh' "\begin{tabular}{lcc}" _n
+ 45.     file write `fh' "\toprule" _n
+ 46.     file write `fh' " & (1) & (2) \\" _n
+ 47.     file write `fh' " & With share control & Without share control \\" _n
+ 48.     file write `fh' "\midrule" _n
+ 49.     file write `fh' "Exposure measure            & $`b_ms_s'`st_ms'$ & $`b_base_s'`st_base'$ \\" _n
+ 50.     file write `fh' "                            & ($`se_ms_s'$) & ($`se_base_s'$) \\" _n
+ 51.     file write `fh' "\addlinespace" _n
+ 52.     file write `fh' "Treated-market share $S_i$  & $`b_sh_s'`st_sh'$ &  \\" _n
+ 53.     file write `fh' "                            & ($`se_sh_s'$) &  \\" _n
+ 54.     file write `fh' "\midrule" _n
+ 55.     file write `fh' "Pre-period mean             & `pmn_s' & `pmn_b_s' \\" _n
+ 56.     file write `fh' "Observations                & `n_ms_s' & `n_base_s' \\" _n
+ 57.     file write `fh' "\bottomrule" _n
+ 58.     file write `fh' "\end{tabular}" _n
+ 59.     file write `fh' "\end{table}" _n
+ 60.     file close `fh'
+ 61.     di as text "wrote `out'"
+ 62. end
+
+. 
+. main

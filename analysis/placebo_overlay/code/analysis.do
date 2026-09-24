@@ -94,10 +94,7 @@ program overlay_hist
         kdensity b if sample == 1, nograph at(xgrid) gen(dens_r)
         kdensity b if sample == 2, nograph at(xgrid) gen(dens_p)
 
-        gen hi_r = dens_r if dens_r >= dens_p
-        gen lo_r = dens_p if dens_r >= dens_p
-        gen hi_p = dens_p if dens_p >  dens_r
-        gen lo_p = dens_r if dens_p >  dens_r
+        gen lo = min(dens_r, dens_p)
 
         local modes $exhibit_mode
         if "$exhibit_mode" == "both" local modes presentation paper
@@ -108,8 +105,8 @@ program overlay_hist
                 local figdir ../output/figures/paper
                 local stats_note
             }
-            tw rarea hi_r lo_r xgrid, color(ebblue%25) lwidth(none) || ///
-               rarea hi_p lo_p xgrid, color(gs12%50) lwidth(none) || ///
+            tw rarea dens_r lo xgrid, color(ebblue%25) lwidth(none) || ///
+               rarea dens_p lo xgrid, color(gs12%50) lwidth(none) || ///
                line dens_r xgrid, color(ebblue%70) lwidth(medthick) || ///
                line dens_p xgrid, color(gs10%80) lwidth(medthick) lpattern(dash) ///
                xtitle("DiD Coefficient (log `outcome')") ///

@@ -79,6 +79,8 @@ Run with `--tag restricted` throughout. All outputs land in `../output/` and car
 | 2.2 | `tfidf/test_coauthor_similarity.py --tag restricted` | `coauthor_validation_pairs_tfidf.csv`, `coauthor_validation_summary_tfidf.txt` |
 | 2.3 | `plot_coauthor_validation.py --method tfidf` | `output/figures/coauthor_validation_tfidf.png`, `coauthor_validation_by_copubs_tfidf.csv`, `coauthor_validation_trend_tfidf.csv` |
 | 2.4 | `cluster_sanity_check.py --tag restricted --k 25` | `k25_cluster_sanity.csv`, `k25_cluster_sanity_overall.txt`, `output/figures/k25_cluster_sanity.png` |
+| 2.7 | `tfidf/5e_coauthor_validation.py --version hc_all3` | `coauthor_validation_pairs_{stem}.csv`, `coauthor_by_copubs_{stem}.csv`, `coauthor_validation_summary_{stem}.txt`, `output/figures/coauthor_validation_{stem}.{pdf,png}` |
+| 2.6 | `tfidf/5d_loo_shares.py --version hc --sample all3` | `loo_shares_{summary,pi,cells}_{stem}.csv`, `loo_shares_summary_{stem}.txt`, `output/figures/loo_shares_{stem}.{pdf,png}` |
 | 2.5 | `tfidf/5c_exposure_variogram.py` | `exposure_variogram_{pairs,bins,threshold,ksweep}_{stem}.csv`, `exposure_variogram_fit_{stem}.json`, `exposure_variogram_summary_{stem}.txt`, `output/figures/exposure_variogram_{stem}.png` |
 
 **Step 2.1** — held-out-FOIA stress test (per-fold predictions of held-out FOIAs' exposure) — evidence that the imputation is well-calibrated when the anchor set is smaller.
@@ -86,6 +88,10 @@ Run with `--tag restricted` throughout. All outputs land in `../output/` and car
 **Steps 2.2–2.3** — coauthor validation: for each known (FOIA, coauthor) pair, imputed coauthor exposure should track FOIA true exposure. Produces the TF-IDF side of the coauthor comparison figure.
 
 **Step 2.4** — new sanity check. For each k=25 cluster from `../us_cluster_fields` (US-only corpus, matches this pipeline's universe), reports (a) # FOIA authors, (b) # non-FOIA universe authors, (c) mean/median own-cluster W share (fraction of a universe author's imputation weight that lands on FOIAs in the same k=25 cluster). Own-cluster share ≫ 1/k means TF-IDF nearest-neighbors and the k=25 clustering see the same topical signal. Summary breaks out FOIA-rich (≥5 anchors) vs thin (1–4) vs empty (0) clusters so uneven FOIA coverage doesn't muddy the read.
+
+**Step 2.7** — coauthor validation with every FOIA partner of the coauthor removed from the coauthor's donor set (the older `k_sweep.py sweep_coauthor` leaves the partner in, which is mechanical). Reads observed exposure straight from `athr_exposure_{version}.dta`, so it does not need the first-stage betas. Figure: corr by number of copublications.
+
+**Step 2.6** — leave-one-out on the object the kNN actually imputes: each anchor's 31-market treated-share vector, imputed from its k=3 text neighbours among the other anchors. Reports cell-level (PI x market) and within-market agreement, plus the implied treated-market share and exposure, against a grand-mean null, split by nearest-donor similarity. One figure for the deck.
 
 **Step 2.5** — pair-level variogram. Estimates how fast agreement in exposure
 decays with text similarity from all C(208,2) anchor pairs, so nobody is held

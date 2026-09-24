@@ -1,0 +1,17 @@
+import os
+from gslab_make.move_sources import *
+from gslab_make.run_program import *
+from gslab_make.modify_dir import *
+from gslab_make.write_logs import *
+clear_dir(['../output/', '../temp/'])
+os.mkdir('../output/figures/')
+os.mkdir('../output/tables/')
+remove_dir(['../external/'])
+paths = {'makelog' : '../output/make.log', 'external_dir' : '../external/'}
+start_makelog(paths)
+
+link_externals(paths, ['links.txt'])
+run_python(paths, program = 'prep_shares.py')
+run_stata(paths, program = 'analysis.do')
+end_makelog(paths)
+input('\n Press <Enter> to exit.')
