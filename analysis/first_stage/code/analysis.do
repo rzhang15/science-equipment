@@ -8,9 +8,9 @@ version 17
 global exhibit_mode both // paper | presentation | both
 
 program main
-    foreach s in "_all3" {
+    foreach s in "" "_all3" {
         global suffix `s'
-        *raw_plots
+        raw_plots
         did
         robustness
         balance_check
@@ -22,104 +22,63 @@ program main
     }
 end
 
-program raw_plots
-    use ../external/samp/full_category_yr_tfidf$suffix, clear
-    gen tot_qty = raw_qty
-    gen tot_spend = raw_spend
-    replace treated = 2 if keep == 0 & treated == 1
-    replace treated = 3 if keep == 0 & treated == 0
-    collapse (mean) avg_raw_price = raw_price item_price avg_log_price raw_qty log_raw_qty avg_raw_qty = raw_qty raw_spend log_raw_spend avg_raw_spend = raw_spend (sum) tot_spend tot_qty [aw = spend_2013], by(year treated)
-    gen tot_price = tot_spend/tot_qty
-    gen log_tot_price = ln(tot_price)
-    gen log_tot_spend = ln(tot_spend)
-    gen log_tot_qty = ln(tot_qty)
+program apply_hhi_cut
+    syntax, [suffix(string)]
+    // Refresh eligibility from the shared HHI file, including cached panels.
+    cap drop delta_hhi
+    cap drop first_stage_sample
+    merge m:1 category using ../external/samp/category_hhi_tfidf`suffix', ///
+        keepusing(delta_hhi first_stage_sample) assert(1 2 3) keep(3) nogen
+    keep if first_stage_sample == 1
+end
 
-    foreach var in avg_raw_price item_price avg_log_price tot_price log_tot_price raw_qty log_raw_qty avg_raw_qty tot_qty log_tot_qty raw_spend log_raw_spend avg_raw_spend tot_spend log_tot_spend {
-        gen trt_`var' = `var' if treated == 1
-        gen ctrl_`var' = `var' if treated == 0
-        gen othr_trt_`var' = `var' if treated == 2
-        gen othr_ctrl_`var' = `var' if treated == 3
-    }
-    foreach var in avg_log_price log_raw_qty log_raw_spend avg_raw_price raw_qty raw_spend log_tot_price log_tot_qty log_tot_spend { //avg_log_price item_price log_raw_price tot_price log_tot_price raw_qty log_raw_qty avg_log_qty tot_qty log_tot_qty raw_spend log_raw_spend avg_log_spend tot_spend log_tot_spend {
-        if strpos("`var'", "price") > 0 {
-            local yname "Price"
-        }   
-        if strpos("`var'", "qty") > 0 {
-            local yname "Qty"
-        }   
-        if strpos("`var'", "spend") > 0 {
-            local yname "Spend"
-        }   
-        if strpos("`var'", "log") > 0 {
-            local yname = "Log " + "`yname'"
-        }
-        local yname = "Avg. " + "`yname'"
-        qui sum trt_`var' if year == 2013 
-        qui replace trt_`var' = trt_`var' - r(mean)
-        qui sum ctrl_`var' if year == 2013 
-        qui replace ctrl_`var' = ctrl_`var' - r(mean)
-        qui sum othr_trt_`var' if year == 2013 
-        qui replace othr_trt_`var' = othr_trt_`var' - r(mean)
-        qui sum othr_ctrl_`var' if year == 2013 
-        qui replace othr_ctrl_`var' = othr_ctrl_`var' - r(mean)
-        qui tw connected trt_`var' year , lcolor(lavender) mcolor(lavender) || connected ctrl_`var' year , lcolor(dkorange) mcolor(dkorange) ///
-          || connected othr_trt_`var' year, lcolor(lavender%40) mcolor(lavender%20) lpattern(dash) || ///
-          connected othr_ctrl_`var' year, lcolor(dkorange%40) mcolor(dkorange%20) lpattern(dash) legend(on label(1 "Treated") label(2 "Control") label(3 "Bad ML Treated") label(4 "Bad ML Control") ring(1) pos(6) rows(1) size(small)) ytitle("`yname'", size(small)) yline(0, lcolor(gs10) lpattern(solid)) ylabel(#6, labsize(small)) xlabel(2010(1)2019, labsize(small)) xtitle("Year", size(small)) tline(2013.5, lpattern(shortdash) lcolor(gs4%80)) 
-        qui graph export "../output/figures/raw/`var'_trends_pooled$suffix.pdf", replace
-    }
-    use ../external/merged/matched_mkts$suffix, clear
-    qui glevelsof category, local(categories)
-    foreach c in `categories' {
-        preserve
-        use ../external/merged/matched_pairs$suffix, clear 
-        local del_hhi
-        local sim_hhi
-        qui glevelsof control_market if category == "`c'", local(match) 
-        use ../external/merged/matched_category_panel$suffix, clear
-        gen keep = 1 if category == "`c'" 
-        qui glevelsof delta_hhi if category == "`c'", local(del_hhi) 
-        local del_hhi = round(`del_hhi', 0.001)
-        qui glevelsof simulated_hhi if category == "`c'", local(sim_hhi) 
-        local sim_hhi = round(`sim_hhi', 0.001)
-        local match_name ""
-        foreach  m in `match' {
-            replace keep = 1 if category == "`m'"
-            local match_name = "`match_name'" + ", " + strproper("`m'")
-        }
-        qui keep if keep == 1 
-        local name = strproper("`c'")
-        gen tot_qty = raw_qty
-        gen tot_spend = raw_spend
-        collapse (mean) avg_log_price item_price raw_qty log_raw_qty avg_log_qty raw_spend log_raw_spend avg_log_spend (sum) tot_spend tot_qty [aw=spend_2013], by(year treated)
-        gen tot_price = tot_spend/tot_qty
-        gen log_tot_price = ln(tot_price)
-        gen log_tot_spend = ln(tot_spend)
-        gen log_tot_qty = ln(tot_qty)
-        foreach var in log_tot_price log_tot_spend log_tot_qty { //avg_log_price item_price log_raw_price tot_price log_tot_price raw_qty log_raw_qty avg_log_qty tot_qty log_tot_qty raw_spend log_raw_spend avg_log_spend tot_spend log_tot_spend { 
-            gen trt_`var' = `var' if treated == 1
-            gen ctrl_`var' = `var' if treated == 0
-        }
-        foreach var in log_tot_price log_tot_qty log_tot_spend { // avg_log_price item_price log_raw_price tot_price log_tot_price raw_qty log_raw_qty avg_log_qty tot_qty log_tot_qty raw_spend log_raw_spend avg_log_spend tot_spend log_tot_spend { 
-            if strpos("`var'", "price") > 0 {
-                local yname "Price"
-            }   
-            if strpos("`var'", "qty") > 0 {
-                local yname "Qty"
-            }   
-            if strpos("`var'", "spend") > 0 {
-                local yname "Spend"
-            }   
-            if strpos("`var'", "log") > 0 {
-                local yname = "Log " + "`yname'"
+program raw_plots
+    use ../external/merged/matched_uni_category_panel$suffix, clear
+    apply_hhi_cut, suffix("$suffix")
+    merge m:1 category using ../external/samp/category_hhi_tfidf$suffix, assert(1 2 3) keep(3) nogen
+    gegen uni_mkt = group(uni_id mkt)
+    bys uni_mkt: egen min_year = min(year)
+    bys uni_mkt: egen max_year = max(year)
+    keep if min_year < 2014 & max_year > 2014
+    foreach var in avg_log_price log_raw_qty log_raw_spend raw_price raw_qty raw_spend {
+        if "`var'" == "avg_log_price" local yname "Avg. Log Price"
+        if "`var'" == "log_raw_qty" local yname "Log Qty"
+        if "`var'" == "log_raw_spend" local yname "Log Spend"
+        if "`var'" == "raw_price" local yname "Price"
+        if "`var'" == "raw_qty" local yname "Qty"
+        if "`var'" == "raw_spend" local yname "Spend"
+        qui reg `var' ibn.year#ibn.treated [aw = spend_2013], noconstant vce(cluster mkt)
+        cap mat drop raw
+        forval g = 0/1 {
+            forval y = 2010/2019 {
+                qui lincom `y'.year#`g'.treated - 2013.year#`g'.treated
+                mat raw = nullmat(raw) \ (`y', `g', _b[`y'.year#`g'.treated], _se[`y'.year#`g'.treated], r(estimate), r(se))
             }
-            local yname = "Avg. " + "`yname'"
-            qui sum trt_`var' if year == 2013 
-            qui replace trt_`var' = trt_`var' - r(mean)
-            qui sum ctrl_`var' if year == 2013 
-            qui replace ctrl_`var' = ctrl_`var' - r(mean)
-            qui tw connected trt_`var' year , lcolor(lavender) mcolor(lavender) || connected ctrl_`var' year , lcolor(dkorange%40) mcolor(dkorange%40) legend(on label(1 "Treated: `name'") label(2 "Control: `match_name'") ring(1) pos(6) rows(1) size(small)) ytitle("`yname'", size(small)) yline(0, lcolor(gs10) lpattern(solid)) ylabel(#6, labsize(small)) xlabel(2010(1)2019, labsize(small)) xtitle("Year", size(small)) tline(2013.5, lpattern(shortdash) lcolor(gs4%80)) title("Simulated HHI: `sim_hhi'; Delta HHI: `del_hhi'", size(small))
-            qui graph export "../output/figures/raw/`var'_trends_category`c'$suffix.pdf", replace
         }
+        preserve
+        clear
+        svmat raw
+        rename (raw1 raw2 raw3 raw4 raw5 raw6) (year treated lvl lvl_se dev dev_se)
+        foreach v in lvl dev {
+            gen `v'_ub = `v' + 1.96 * `v'_se
+            gen `v'_lb = `v' - 1.96 * `v'_se
+        }
+        gen x = year + 0.1 * (treated == 0)
+        export delimited using "../output/estimates/raw_`var'_pooled$suffix.csv", replace
+        tw connected lvl year if treated == 1, lcolor(ebblue) mcolor(ebblue) || ///
+           connected lvl year if treated == 0, lcolor(dkorange) mcolor(dkorange) msymbol(diamond) lpattern(dash) ///
+           legend(on order(1 "Treated" 2 "Control") pos(6) rows(1) size(small)) ///
+           ytitle("`yname'") ysc(titlegap(-6) outergap(0)) ylabel(#6) xlabel(2010(1)2019) xtitle("Year") ///
+           tline(2013.5, lpattern(shortdash) lcolor(gs4%80)) plotregion(margin(sides))
+        graph export "../output/figures/raw/`var'_levels_pooled$suffix.pdf", replace
+        tw rcap dev_ub dev_lb x if treated == 1 & year != 2013, lcolor(ebblue%70) msize(vsmall) || ///
+           rcap dev_ub dev_lb x if treated == 0 & year != 2013, lcolor(dkorange%70) lpattern(dash) msize(vsmall) || ///
+           connected dev x if treated == 1, lcolor(ebblue) mcolor(ebblue) || ///
+           connected dev x if treated == 0, lcolor(dkorange) mcolor(dkorange) msymbol(diamond) lpattern(dash) ///
+           legend(on order(3 "Treated" 4 "Control") pos(6) rows(1) size(small)) ///
+           ytitle("`yname', Relative to 2013") ysc(titlegap(-6) outergap(0)) ylabel(#6) xlabel(2010(1)2019) xtitle("Year") ///
+           yline(0, lcolor(gs10) lpattern(solid)) tline(2013.5, lpattern(shortdash) lcolor(gs4%80)) plotregion(margin(sides))
+        graph export "../output/figures/raw/`var'_trends_pooled$suffix.pdf", replace
         restore
     }
 end
@@ -127,6 +86,7 @@ end
 program did
     cap mat drop coef_price coef_spend
     use ../external/samp/uni_category_yr_tfidf$suffix, clear
+    apply_hhi_cut, suffix("$suffix")
     gegen uni_mkt = group(uni_id mkt)
     bys uni_mkt : egen min_year = min(year)
     bys uni_mkt : egen max_year = max(year)
@@ -140,6 +100,7 @@ program did
     }
 
     use ../external/merged/matched_uni_category_panel$suffix, clear
+    apply_hhi_cut, suffix("$suffix")
     gegen uni_mkt = group(uni_id mkt)
     bys uni_mkt : egen min_year = min(year)
     bys uni_mkt : egen max_year = max(year)
@@ -152,6 +113,7 @@ program did
         reghdfe `var' posttreat [aw=spend_2013], cluster(mkt) absorb(year uni_id mkt)
     }
     use ../external/merged/matched_category_panel$suffix, clear
+    apply_hhi_cut, suffix("$suffix")
     gen post = 0
     replace post = 1 if year >= 2014
     gen posttreat = treated * post
@@ -166,6 +128,7 @@ program did
         use ../external/merged/matched_pairs$suffix, clear
         qui glevelsof control_market if category == "`c'", local(match)
         use ../external/merged/matched_uni_category_panel$suffix, clear
+        apply_hhi_cut, suffix("$suffix")
         gegen uni_mkt = group(uni_id mkt)
         bys uni_mkt : egen min_year = min(year)
         bys uni_mkt : egen max_year = max(year)
@@ -223,7 +186,7 @@ program process_coefs
 
     use `infile', clear
     merge m:1 category using ../external/samp/category_hhi_tfidf$suffix, assert(1 2 3) keep(3) nogen
-*    drop if delta_hhi <= -2500
+    keep if first_stage_sample == 1
     merge m:1 category using ../external/merged/spend_xw$suffix, assert(2 3) keep(3) nogen
     gen lb = b - 1.96*se
     gen ub = b + 1.96*se
@@ -351,6 +314,7 @@ end
 
 program robustness
     use ../external/merged/matched_uni_category_panel$suffix, clear
+    apply_hhi_cut, suffix("$suffix")
     gegen uni_mkt = group(uni_id mkt)
     bys uni_mkt : egen min_year = min(year)
     bys uni_mkt : egen max_year = max(year)
@@ -396,6 +360,8 @@ program robustness
     replace rel = . if treated == 0
     forval i = 1/5 {
         gen lag`i' = 1 if rel == `i'
+    }
+    forval i = 1/4 {
         gen lead`i' = 1 if rel == -`i'
     }
     gen lag0 = 1 if rel == 0
@@ -403,7 +369,7 @@ program robustness
     foreach v in `r(varlist)' {
         replace `v' = 0 if mi(`v')
     }
-    local rhs lead5 lead4 lead3 lead2 lag0 lag1 lag2 lag3 lag4 lag5
+    local rhs lead4 lead3 lead2 lag0 lag1 lag2 lag3 lag4 lag5
     foreach var in avg_log_price log_raw_qty log_raw_spend {
         if "`var'" == "avg_log_price" local yname "Avg. Log Price"
         if "`var'" == "log_raw_qty"   local yname "Log Qty"
@@ -438,7 +404,7 @@ program robustness
            scatter b rel if spec == 3, mcolor(ebblue) msymbol(smsquare) msize(small) || ///
            rcap ub lb rel if spec == 4, lcolor(emerald%70) msize(vsmall) || ///
            scatter b rel if spec == 4, mcolor(emerald) msymbol(smtriangle) msize(small) ///
-           , xlab(-5(1)5, labsize(small)) ylab(`ymin'(0.1)`ymax', labsize(small)) ///
+           , xlab(-4(1)5, labsize(small)) ylab(`ymin'(0.1)`ymax', labsize(small)) ///
            yline(0, lcolor(gs10) lpattern(solid)) ///
            xtitle("Relative Year", size(small)) ytitle("`yname'", size(small)) ///
            legend(on order(2 "baseline" 4 "uni#mkt + year" 6 "uni#year + mkt" 8 "uni#mkt + uni#year") ///
@@ -451,6 +417,7 @@ end
 
 program balance_check
     use ../external/merged/matched_uni_category_panel$suffix, clear
+    apply_hhi_cut, suffix("$suffix")
     gegen uni_mkt = group(uni_id mkt)
     bys uni_mkt : egen min_year = min(year)
     bys uni_mkt : egen max_year = max(year)
@@ -476,6 +443,7 @@ end
 
 program placebo_timing
     use ../external/merged/matched_uni_category_panel$suffix, clear
+    apply_hhi_cut, suffix("$suffix")
     gegen uni_mkt = group(uni_id mkt)
     bys uni_mkt : egen min_year = min(year)
     bys uni_mkt : egen max_year = max(year)
@@ -499,6 +467,7 @@ program robustness_coefplot
         mat robust_coefs_`var' = robust_`var'[1..4, 1..2]
     }
     use ../external/samp/uni_category_yr_tfidf$suffix, clear
+    apply_hhi_cut, suffix("$suffix")
     gegen uni_mkt = group(uni_id mkt)
     bys uni_mkt : egen min_year = min(year)
     bys uni_mkt : egen max_year = max(year)
@@ -507,21 +476,49 @@ program robustness_coefplot
     foreach var in avg_log_price log_raw_qty log_raw_spend {
         reghdfe `var' posttreat [aw=spend_2013], cluster(mkt) absorb(year uni_id mkt)
         mat robust_coefs_`var' = robust_coefs_`var' \ (_b[posttreat], _se[posttreat])
+        mat robust_`var' = robust_`var' \ (_b[posttreat], _se[posttreat], e(N), e(r2))
     }
-    local rownames baseline uni_mkt_year uni_year_mkt uni_mkt_uni_year unmatched
+    use ../external/merged/matched_uni_category_panel_all3, clear
+    apply_hhi_cut, suffix("_all3")
+    egen cat_tag = tag(category) if treated == 1
+    count if cat_tag == 1
+    local n_trt_all3 = r(N)
+    use ../external/merged/matched_uni_category_panel, clear
+    apply_hhi_cut, suffix("")
+    egen cat_tag = tag(category) if treated == 1
+    count if cat_tag == 1
+    global n_comp = `n_trt_all3' - r(N)
+    gegen uni_mkt = group(uni_id mkt)
+    bys uni_mkt : egen min_year = min(year)
+    bys uni_mkt : egen max_year = max(year)
+    keep if min_year < 2014 & max_year > 2014
+    gen posttreat = treated * (year >= 2014)
+    foreach var in avg_log_price log_raw_qty log_raw_spend {
+        reghdfe `var' posttreat [aw=spend_2013], cluster(mkt) absorb(year uni_id mkt)
+        mat robust_coefs_`var' = robust_coefs_`var' \ (_b[posttreat], _se[posttreat])
+        mat robust_`var' = robust_`var' \ (_b[posttreat], _se[posttreat], e(N), e(r2))
+    }
     foreach var in avg_log_price log_raw_qty log_raw_spend {
         if "`var'" == "avg_log_price" local tag price
         if "`var'" == "log_raw_qty"   local tag qty
         if "`var'" == "log_raw_spend" local tag spend
-        use ../external/synth/synth_stacked_panel_`tag'$suffix, clear
-        gen posttreat = is_treated_in_stack * (year >= 2014)
-        reghdfe `var' posttreat [aw=composite_weight], cluster(stack_id) absorb(year category_num)
-        mat robust_coefs_`var' = robust_coefs_`var' \ (_b[posttreat], _se[posttreat])
+        cap confirm file ../external/synth/synth_estimates$suffix.dta
+        if _rc {
+            mat robust_coefs_`var' = robust_coefs_`var' \ (., .)
+            mat robust_`var' = robust_`var' \ (., ., ., .)
+            continue
+        }
+        use ../external/synth/synth_estimates$suffix, clear
+        keep if outcome == "`var'" & version == "spend_weighted"
+        mat robust_coefs_`var' = robust_coefs_`var' \ (tau[1], se_placebo[1])
+        mat robust_`var' = robust_`var' \ (tau[1], se_placebo[1], N[1], .)
     }
-    local rownames `rownames' synth
+    local rownames baseline uni_mkt_year uni_year_mkt uni_mkt_uni_year unmatched excl_comp synth
     foreach var in avg_log_price log_raw_qty log_raw_spend {
         mat colnames robust_coefs_`var' = b se
         mat rownames robust_coefs_`var' = `rownames'
+        mat colnames robust_`var' = b se N r2
+        mat rownames robust_`var' = `rownames'
     }
     foreach var in avg_log_price log_raw_qty log_raw_spend {
         if "`var'" == "avg_log_price" local yname "Avg. Log Price"
@@ -531,10 +528,10 @@ program robustness_coefplot
         svmat robust_coefs_`var', names(col)
         gen lb = b - 1.96*se
         gen ub = b + 1.96*se
-        gen pos = real(word("10 7 6 5 2 1", _n))
-        local ylabs 10 "{bf:Baseline}" 8 "{bf:Fixed effects}" 7 "University × Market + Year FEs" ///
-            6 "University × Year + Market FEs" 5 "University × Market + University × Year FEs" ///
-            3 "{bf:Control group}" 2 "Unmatched controls" 1 "Synthetic control"
+        gen pos = real(word("11 8 7 6 3 2 1", _n))
+        local ylabs 11 "{bf:Baseline}" 9 "{bf:Fixed effects}" 8 "University × Market + Year FEs" ///
+            7 "University × Year + Market FEs" 6 "University × Market + University × Year FEs" ///
+            4 "{bf:Comparison group and sample}" 3 "Unmatched controls" 2 "Excl. complementary markets" 1 "Synthetic control"
         local base = b[1]
         sum lb
         local xmin = floor(r(min)*10)/10
@@ -543,14 +540,14 @@ program robustness_coefplot
         local step = cond(`xmax' - `xmin' > 0.8, 0.2, 0.1)
         foreach mode in combined single {
             local ylab_opt ylab(`ylabs', angle(0) labsize(small) notick nogrid)
-            if "`mode'" == "combined" & "`var'" != "avg_log_price" local ylab_opt ylab(1(1)10, nolabels notick nogrid)
-            tw rcap ub lb pos if pos == 10, horizontal lcolor(dkorange%70) msize(vsmall) || ///
-               scatter pos b if pos == 10, mcolor(dkorange) || ///
-               rcap ub lb pos if inrange(pos, 1, 9), horizontal lcolor(ebblue%70) msize(vsmall) || ///
-               scatter pos b if inrange(pos, 1, 9), mcolor(ebblue) ///
+            if "`mode'" == "combined" & "`var'" != "avg_log_price" local ylab_opt ylab(1(1)11, nolabels notick nogrid)
+            tw rcap ub lb pos if pos == 11, horizontal lcolor(dkorange%70) msize(vsmall) || ///
+               scatter pos b if pos == 11, mcolor(dkorange) || ///
+               rcap ub lb pos if inrange(pos, 1, 10), horizontal lcolor(ebblue%70) msize(vsmall) || ///
+               scatter pos b if inrange(pos, 1, 10), mcolor(ebblue) ///
                , xline(0, lcolor(gs12) lpattern(solid)) xline(`base', lcolor(dkorange) lpattern(dash)) ///
                xlab(`xmin'(`step')`xmax', labsize(small) format(%3.1f) grid glpattern(dot) glcolor(gs13)) `ylab_opt' ///
-               xtitle("`yname' (95% CI)", size(small)) ytitle("") ysc(range(0.5 10.5) noline) ///
+               xtitle("`yname' (95% CI)", size(small)) ytitle("") ysc(range(0.5 11.5) noline) ///
                legend(off) plotregion(margin(sides)) name(rc_`var'_`mode', replace)
         }
         graph export ../output/figures/robust_coefs_`var'$suffix.pdf, replace
@@ -567,6 +564,7 @@ program output_tables
             title(<tab:`tab'>) format(%20.4f) replace
     }
     merger_validity_tex
+    robustness_tex
 end
 
 program merger_validity_tex
@@ -670,10 +668,91 @@ program merger_validity_tex
     di as text "wrote `texfile'"
 end
 
+program robustness_tex
+    local texfile "../output/tables/robustness$suffix.tex"
+    cap file close rt
+    file open rt using "`texfile'", write replace
+
+    local outs avg_log_price log_raw_qty log_raw_spend
+    local lbl1 "Baseline: year, university, and market FE"
+    local lbl2 "University\(\times\)market + year FE"
+    local lbl3 "University\(\times\)year + market FE"
+    local lbl4 "University\(\times\)market + university\(\times\)year FE"
+    local lbl5 "Unmatched controls"
+    local lbl6 "Excluding $n_comp complementary markets"
+    local lbl7 "Synthetic control"
+
+    file write rt "% First-stage robustness: pooled DiD under alternative fixed effects (Panel A)" _n
+    file write rt "% and alternative comparison groups / samples with baseline fixed effects (Panel B)." _n
+    file write rt "\begin{table}[htbp]" _n
+    file write rt "\centering" _n
+    file write rt "\caption{First-stage robustness: pooled difference-in-differences estimates}" _n
+    file write rt "\label{tab:robustness_first_stage}" _n
+    file write rt "\begin{threeparttable}" _n
+    file write rt "\footnotesize" _n
+    file write rt "\begin{tabular}{lccccccccc}" _n
+    file write rt "\toprule" _n
+    file write rt " & \multicolumn{3}{c}{Avg.\ log price} & \multicolumn{3}{c}{Log quantity} & \multicolumn{3}{c}{Log spending} \\" _n
+    file write rt "\cmidrule(lr){2-4} \cmidrule(lr){5-7} \cmidrule(lr){8-10}" _n
+    file write rt " & \(\hat{\beta}\) & SE & N & \(\hat{\beta}\) & SE & N & \(\hat{\beta}\) & SE & N \\" _n
+    file write rt "\midrule" _n
+    file write rt "\multicolumn{10}{l}{\textit{Panel A: Fixed effects}} \\" _n
+
+    forval r = 1/7 {
+        if `r' == 5 {
+            file write rt "\midrule" _n
+            file write rt "\multicolumn{10}{l}{\textit{Panel B: Comparison group and sample (baseline fixed effects)}} \\" _n
+        }
+        local line "`lbl`r''"
+        foreach y of local outs {
+            local b  = robust_`y'[`r', 1]
+            local se = robust_`y'[`r', 2]
+            local n  = robust_`y'[`r', 3]
+            if mi(`b') {
+                local line "`line' & -- & -- & --"
+                continue
+            }
+            local stars ""
+            if `se' > 0 {
+                local t = abs(`b') / `se'
+                if `t' >= 1.645 local stars "\(^{*}\)"
+                if `t' >= 1.96  local stars "\(^{**}\)"
+                if `t' >= 2.576 local stars "\(^{***}\)"
+            }
+            local bf : display %7.3f `b'
+            local sf : display %7.3f `se'
+            local nf : display %9.0fc `n'
+            local line "`line' & `bf'`stars' & (`sf') & `nf'"
+        }
+        file write rt "`line' \\" _n
+    }
+
+    file write rt "\bottomrule" _n
+    file write rt "\end{tabular}" _n
+    file write rt "\begin{tablenotes}[flushleft]\footnotesize" _n
+    file write rt "\item Each cell reports the coefficient on treated\(\times\)post\(_t\), post\(_t = \mathbb{1}\{t \ge 2014\}\)," _n
+    file write rt "      from a pooled DiD on the university\(\times\)market\(\times\)year panel, weighted by 2013 spending," _n
+    file write rt "      with SE clustered by market. Panel A re-estimates the matched-sample DiD under alternative" _n
+    file write rt "      fixed effects. Panel B keeps the baseline fixed effects (year, university, market) and varies" _n
+    file write rt "      the comparison group or sample: unmatched controls compares treated markets against all" _n
+    file write rt "      candidate control markets; the complementary-markets row drops the $n_comp treated markets" _n
+    file write rt "      classified as complementary, together with their matched controls; synthetic control" _n
+    file write rt "      is the synthetic difference-in-differences estimator of Arkhangelsky et al. (2021) on the" _n
+    file write rt "      market-by-year panel, with the treated unit defined as the 2013-spend-weighted average of" _n
+    file write rt "      treated markets; SE from 200 placebo draws of control markets." _n
+    file write rt "      Cells marked -- are outcomes for which the synthetic-control panel was not built." _n
+    file write rt "\item Significance: \(^{*}\) \(p<0.10\), \(^{**}\) \(p<0.05\), \(^{***}\) \(p<0.01\)." _n
+    file write rt "\end{tablenotes}" _n
+    file write rt "\end{threeparttable}" _n
+    file write rt "\end{table}" _n
+    file close rt
+    di as text "wrote `texfile'"
+end
+
 program event_study
     use ../external/samp/uni_category_yr_tfidf$suffix, clear
+    apply_hhi_cut, suffix("$suffix")
     merge m:1 category using ../external/samp/category_hhi_tfidf$suffix, assert(1 2 3) keep(3) nogen
-    drop if delta_hhi <= -2000
     gen rel = year - 2014
     replace rel = . if treated == 0
     local fes uni_id mkt
@@ -701,8 +780,8 @@ program event_study
     }
 
     use ../external/merged/matched_uni_category_panel$suffix ,clear 
+    apply_hhi_cut, suffix("$suffix")
     merge m:1 category using ../external/samp/category_hhi_tfidf$suffix, assert(1 2 3) keep(3) nogen
-    drop if delta_hhi <= -2000
     gegen uni_mkt = group(uni_id mkt)
     bys uni_mkt : egen min_year = min(year)
     bys uni_mkt : egen max_year = max(year)
@@ -797,6 +876,7 @@ program event_study
         use ../external/merged/matched_pairs$suffix, clear 
         qui glevelsof control_market if category == "`c'", local(match) 
         use ../external/merged/matched_uni_category_panel$suffix, clear 
+        apply_hhi_cut, suffix("$suffix")
         gen rel = year - 2014
         replace rel = . if treated == 0
         gen keep = 1 if category == "`c'"
@@ -889,6 +969,7 @@ end
 program uni_fes
     cap mat drop betas betas_placebo betas_lr_sr
     use ../external/merged/matched_uni_category_panel$suffix, clear 
+    apply_hhi_cut, suffix("$suffix")
     keep if inrange(year, 2015,2019)
     gen post = 0 
     replace post = 1 if year >= 2017
@@ -918,6 +999,7 @@ program uni_fes
     save ../output/beta_u_placebo$suffix, replace
 
     use ../external/merged/matched_uni_category_panel$suffix, clear 
+    apply_hhi_cut, suffix("$suffix")
     global r1 `" "east carolina university" "florida international university" "florida state university (fsu)" "georgia institute of technology" "kent state university" "texas a&m university" "texas tech university" "university of florida" "university of central florida" "university of kentucky" "university of florida" "university of kentucky" "university of michigan at ann arbor" "university of south florida" "university of southern mississippi" "washington state university" "wayne state university" "'
     global r2 `" "central michigan university" "georgia southern university" "idaho state university" "illinois state university" "indiana university of pennsylvania" "kennesaw state university" "louisiana state university health sciences center - new orleans" "northern illinois university" "suny upstate medical university" "the university of akron" "university of michigan - dearborn" "university of new orleans" "university of north carolina-wilmington" "'
     global r3 `" "grand valley state university" "lincoln university" "morehead state university" "northern kentucky university" "sul ross state university" "texas a&m international university" "western kentucky university" "western washington university" "youngstown state university" "'

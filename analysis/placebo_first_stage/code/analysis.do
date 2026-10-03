@@ -53,7 +53,7 @@ program indiv_did_placebo
                 replace keep = 1 if category == "`m'"
             }
             keep if keep == 1
-            cap noi reghdfe log_raw_price posttreat [aw=spend_2013], cluster(mkt) absorb(year uni_id mkt)
+            cap noi reghdfe avg_log_price posttreat [aw=spend_2013], cluster(mkt) absorb(year uni_id mkt)
             if _rc == 0 {
                 mat coef_price = nullmat(coef_price) \ (_b[posttreat], _se[posttreat])
             }

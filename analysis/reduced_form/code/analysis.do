@@ -15,7 +15,10 @@ version 17
 * FIG_MODES        : pres | paper | both
 * NO_SOLO          : 1 = read the no_solo panels
 global EXPOSURE_VERSION "hc_all3"
-global EXPOSURE_FILTER  "_cf_k3"
+* Spending-share shrinkage is off: generate this imputation with
+* 4_impute_shift_share.py --all3 --versions hc --k 2 --eb-own-weight 1
+* and the cluster filter corresponding to _cf. First-stage b_eb is unchanged.
+global EXPOSURE_FILTER  "_cf_k2"
 global FE_MODE "author"
 global WEIGHT_MSIM 0
 global QUICK_TOPJRNL 0
@@ -145,23 +148,10 @@ program gather_external_data
     use athr_id max_sim using ../external/exposure/match_diagnostics, clear
     save ../temp/match_diag, replace
 
+    * Use raw observed FOIA spending shares and exposure. Diagnostics files must
+    * not automatically change the exposure definition when present on disk.
     use athr_id exposure mkt_spend_shr using ../external/real_exposure/athr_exposure_${EXPOSURE_VERSION}, clear
-    cap confirm file ../external/exposure/foia_self_exposure_${EXPOSURE_VERSION}${EXPOSURE_FILTER}.csv
-    if _rc == 0 {
-        preserve
-            import delimited ../external/exposure/foia_self_exposure_${EXPOSURE_VERSION}${EXPOSURE_FILTER}.csv, ///
-                clear varnames(1)
-            cap tostring athr_id, replace
-            keep athr_id self_exposure_eb sum_shares_eb
-            save ../temp/foia_self_exposure_eb, replace
-        restore
-        merge 1:1 athr_id using ../temp/foia_self_exposure_eb, keep(1 3)
-        qui count if _merge == 1
-        di as text "observed exposure: EB-shrunk via foia_self_exposure_${EXPOSURE_VERSION}${EXPOSURE_FILTER} (`r(N)' PIs w/o shrunk row stay raw)"
-        replace exposure = self_exposure_eb if _merge == 3
-        replace mkt_spend_shr = sum_shares_eb if _merge == 3
-        drop self_exposure_eb sum_shares_eb _merge
-    }
+    di as text "observed FOIA exposure: raw spending shares (share shrinkage off)"
     save ../temp/observed_exposure, replace
     rename (exposure mkt_spend_shr) (exposure_all mkt_spend_shr_all)
     save ../temp/foia_observed_exposure, replace
@@ -188,15 +178,25 @@ program restrict_samp
 
     preserve
         cap use athr_id year ppr_cnt cite_affl_wt affl_wt ///
+                ppr_cnt_notlast cite_affl_wt_notlast affl_wt_notlast ///
                 avg_position avg_position_rat ///
                 n_first_ppr n_middle_ppr n_last_ppr n_solo_ppr ///
                 avg_team_size_last avg_team_size_notlast ///
                 using ../external/samp/athr_panel_full_year`ns'_`samp'`input_suf', clear
         local _pos_rc = _rc
+        local _nonlast_corrected = (`_pos_rc' == 0)
         if `_pos_rc' {
-            di as text "restrict_samp `samp'`suf': position vars not in panel yet — falling back to base _any outcomes. Rerun make_athr_yr_panel/code/build.do to enable them."
-            use athr_id year ppr_cnt cite_affl_wt affl_wt ///
-                using ../external/samp/athr_panel_full_year`ns'_`samp'`input_suf', clear
+            cap use athr_id year ppr_cnt cite_affl_wt affl_wt ///
+                    avg_position avg_position_rat ///
+                    n_first_ppr n_middle_ppr n_last_ppr n_solo_ppr ///
+                    avg_team_size_last avg_team_size_notlast ///
+                    using ../external/samp/athr_panel_full_year`ns'_`samp'`input_suf', clear
+            local _pos_rc = _rc
+            if `_pos_rc' {
+                use athr_id year ppr_cnt cite_affl_wt affl_wt ///
+                    using ../external/samp/athr_panel_full_year`ns'_`samp'`input_suf', clear
+            }
+            di as error "WARNING: corrected non-last outcomes unavailable; using legacy subtraction and clipping until make_athr_yr_panel is rebuilt. Non-last/position results remain provisional."
         }
         global POSITION_OUTCOMES_AVAIL = cond(`_pos_rc' == 0, 1, 0)
         rename (ppr_cnt cite_affl_wt affl_wt) (ppr_cnt_any cite_affl_wt_any affl_wt_any)
@@ -209,6 +209,19 @@ program restrict_samp
     restore
 
     use ../external/samp/athr_panel_full_year_last`ns'_`samp'`input_suf',clear
+    cap confirm variable cite_affl_wt_last_common n_solo_ppr
+    local _last_corrected = (_rc == 0)
+    if `_last_corrected' {
+        gen ppr_cnt_nonsolo = ppr_cnt - n_solo_ppr
+        assert ppr_cnt_nonsolo >= 0 & ppr_cnt_nonsolo <= ppr_cnt
+    }
+    else {
+        di as error "WARNING: corrected last-author positions unavailable; using legacy non-solo construction until make_athr_yr_panel is rebuilt."
+    }
+    * Non-last outcomes must come from the any-author panel, not the last panel.
+    foreach v in ppr_cnt_notlast cite_affl_wt_notlast affl_wt_notlast {
+        cap drop `v'
+    }
     if `r1_only' == 1 {
         keep if type == "r1"
         di as text "restrict_samp `samp'`suf' (r1_only=1): kept N=" _N " R1-only rows"
@@ -306,12 +319,14 @@ program restrict_samp
         cap confirm variable `var'
         if !_rc replace `var' = 0 if mi(`var')
     }
-    cap confirm variable n_solo_ppr
+    if `_last_corrected' {
+        replace ppr_cnt_nonsolo = 0 if mi(ppr_cnt_nonsolo)
+    }
+    else {
+        cap gen ppr_cnt_nonsolo = n_last_ppr - n_solo_ppr
+    }
+    cap confirm variable ppr_cnt_nonsolo
     if !_rc {
-        qui count if ppr_cnt != n_last_ppr
-        if r(N) > 0 di as error "restrict_samp `samp'`suf': ppr_cnt != n_last_ppr on " r(N) ///
-            " rows -- ppr_cnt_nonsolo may not be a clean subset of ppr_cnt. VERIFY."
-        gen ppr_cnt_nonsolo = n_last_ppr - n_solo_ppr
         qui sum ppr_cnt_nonsolo
         local ns_tot = r(sum)
         qui sum ppr_cnt
@@ -359,11 +374,22 @@ program restrict_samp
         bys athr_id: egen byte nih_athr = max(!mi(n_grants))
     }
 
-    gen ppr_cnt_notlast      = ppr_cnt_any      - ppr_cnt
-    gen cite_affl_wt_notlast = cite_affl_wt_any - cite_affl_wt
-    gen affl_wt_notlast      = affl_wt_any      - affl_wt
-    foreach v in ppr_cnt_notlast cite_affl_wt_notlast affl_wt_notlast {
-        replace `v' = 0 if `v' < 0
+    if `_nonlast_corrected' {
+        * Direct paper-level sums from rebuilt panels; absent author-years are zero.
+        foreach v in ppr_cnt_notlast cite_affl_wt_notlast affl_wt_notlast {
+            replace `v' = 0 if mi(`v')
+            assert `v' >= 0 & !mi(`v')
+        }
+    }
+    else {
+        * Temporary compatibility with old panels. This reproduces old results,
+        * including the known citation-weight mismatch; warnings above identify it.
+        gen ppr_cnt_notlast = ppr_cnt_any - ppr_cnt
+        gen cite_affl_wt_notlast = cite_affl_wt_any - cite_affl_wt
+        gen affl_wt_notlast = affl_wt_any - affl_wt
+        foreach v in ppr_cnt_notlast cite_affl_wt_notlast affl_wt_notlast {
+            replace `v' = 0 if `v' < 0
+        }
     }
     foreach v in cite_affl_wt affl_wt cite_affl_wt_any affl_wt_any ///
                  cite_affl_wt_notlast affl_wt_notlast {

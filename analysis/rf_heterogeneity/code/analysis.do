@@ -8,7 +8,7 @@ version 17
 set maxvar 20000
 
 global EXPOSURE_VERSION "hc_all3"
-global EXPOSURE_FILTER  "_cf_k3"
+global EXPOSURE_FILTER  "_cf_k2"
 global FE_MODE "author"
 * FIG_MODES : pres | paper | both
 global FIG_MODES "both"
@@ -18,7 +18,8 @@ global DEBUG_YVAR "ppr_cnt"
 global HET_INCLUDE_INSTWTD 0
 global HET_RUN_QUARTILES 0
 global HET_IC_FULL 0
-global HET_AGE_NBINS 10
+global HET_AGE_BINW 10
+global HET_AGE_BIN_MINPI 30
 * LAB_CLOCK : athr_age | panel
 global LAB_CLOCK "panel"
 global HET_HORSERACE_ONLY 0
@@ -1451,7 +1452,7 @@ program ppml_age_gradient
     gen Z_it       = exposure      * post
     gen Z_share_it = mkt_spend_shr * post
 
-    local K = $HET_AGE_NBINS
+    local binw = $HET_AGE_BINW
     foreach agevar in age_2014 lab_age_2014 lab_age_ns_2014 {
     cap confirm variable `agevar'
     if _rc {
@@ -1472,9 +1473,17 @@ program ppml_age_gradient
         local gxtit "Years Running Lab in 2014 (Excl. Solo Papers)"
     }
     cap drop agebin
-    xtile _agebin_pi = `agevar' if athr_indicator == 1, n(`K')
+    gen _agebin_pi = floor(max(`agevar', 0) / `binw') + 1 if athr_indicator == 1
     bys athr_id: egen agebin = max(_agebin_pi)
     drop _agebin_pi
+    qui sum agebin if athr_indicator == 1
+    local K = r(max)
+    while `K' > 1 {
+        gunique athr_id if agebin == `K' & athr_indicator == 1
+        if r(unique) >= $HET_AGE_BIN_MINPI continue, break
+        replace agebin = `K' - 1 if agebin == `K'
+        local --K
+    }
 
     local zvars
     local svars
@@ -1539,6 +1548,8 @@ program ppml_age_gradient
         gen ub = b + 1.96*se
         gen lb = b - 1.96*se
         save ../temp/`gtmp'_`samp'`suf'_`yvar', replace
+        qui sum age_mean
+        local xmax = ceil(r(max) / `binw') * `binw'
         local stats_leg `"legend(on order(- "Num. PIs: `n_pis'" "Num. Insts: `n_insts'") pos(7) ring(1) rows(2) bmargin(zero) size(small))"'
         local fdir ../output/figures/`samp'
         foreach fmode of global FIG_MODES {
@@ -1550,7 +1561,7 @@ program ppml_age_gradient
             tw rcap ub lb age_mean, lcolor(ebblue%70) msize(vsmall) || ///
                scatter b age_mean, mcolor(ebblue) || ///
                lfit b age_mean [aw=1/(se*se)], lcolor(dkorange) lpattern(dash) ///
-               xtitle("`gxtit'") ytitle("`ppml_ytit'") ysc(titlegap(-6) outergap(0)) ///
+               xlab(0(`binw')`xmax') xtitle("`gxtit'") ytitle("`ppml_ytit'") ysc(titlegap(-6) outergap(0)) ///
                yline(0, lcolor(gs10) lpattern(solid)) ///
                `stats_leg' ///
                plotregion(margin(sides))

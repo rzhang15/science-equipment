@@ -285,7 +285,7 @@ program make_panels
     save ../output/supplier_category_yr_`embed'`suffix', replace
     gen pre_period = year < 2014
     keep if inrange(year, 2011,2013) | inrange(year, 2015, 2017)
-    collapse (sum) raw_spend obs_cnt (firstnm) suppliername treated , by(supplier_id category pre_period)
+    collapse (sum) raw_spend obs_cnt (firstnm) suppliername treated mkt , by(supplier_id category pre_period)
     bys category pre_period: gegen total_spend = total(raw_spend)
     gen mkt_shr = raw_spend/total_spend * 100
     gen life_tech = mkt_shr if suppliername == "life technologies"
@@ -295,7 +295,8 @@ program make_panels
     gen simulated_hhi = 2 * life_tech * thermo if pre_period == 1
     bys category (simulated_hhi): replace simulated_hhi = simulated_hhi[_n-1] if mi(simulated_hhi) & pre_period == 0
     replace suppliername = "thermo fisher scientific" if suppliername == "life technologies" & pre_period == 0 
-    drop mkt_shr
+    // Combine the merged firm's spending before squaring supplier shares.
+    gcollapse (sum) raw_spend obs_cnt (firstnm) total_spend simulated_hhi treated mkt, by(suppliername category pre_period)
     gen mkt_shr = raw_spend/total_spend * 100
     replace mkt_shr = mkt_shr * mkt_shr
     gcollapse (sum) obs_cnt hhi = mkt_shr (firstnm) simulated_hhi treated mkt, by(category pre_period)
@@ -306,9 +307,17 @@ program make_panels
     gcontract category simulated_hhi delta_hhi treated tot_cnt
     drop _freq
     gisid category
+    // Shared sample definition for matching and all first-stage estimators.
+    gen byte first_stage_sample = delta_hhi > -2000 & !missing(delta_hhi)
     save ../output/category_hhi_`embed'`suffix', replace
     restore
 
+    // Apply shared eligibility before building the estimation panels.
+    // The full_* panels above remain the unfiltered diagnostic samples.
+    merge m:1 category using ../output/category_hhi_`embed'`suffix', ///
+        keepusing(first_stage_sample) assert(2 3) keep(3) nogen
+    keep if first_stage_sample == 1
+    drop first_stage_sample
 
     preserve
     collapse (max) treated (sum) raw_spend raw_qty obs_cnt (mean) min_raw_price max_raw_price sd_raw_price range_raw_price spend_2013 obs_2013 precision recall support tier1 tier2 tier3 item_price = raw_price avg_log_price = price avg_log_spend = spend avg_log_qty = qty (firstnm) agencyname mkt , by(uni_id category year)

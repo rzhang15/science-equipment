@@ -21,6 +21,9 @@ cat("\n########## Running suffix:", ifelse(SUFFIX == "", "baseline", SUFFIX), "#
 cat("Loading data...\n")
 panel <- read_dta(paste0("../external/samp/category_yr_tfidf", SUFFIX, ".dta"))
 panel <- panel %>% mutate(category = as.character(category))
+eligible_categories <- read_dta(paste0("../external/samp/category_hhi_tfidf", SUFFIX, ".dta")) %>%
+  filter(first_stage_sample == 1) %>% select(category)
+panel <- semi_join(panel, eligible_categories, by = "category")
 
 cat("Panel dimensions:", dim(panel), "\n")
 cat("Years in data:", sort(unique(panel$year)), "\n")

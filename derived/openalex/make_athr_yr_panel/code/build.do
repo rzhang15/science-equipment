@@ -9,30 +9,66 @@ set seed 8975
 program main
     foreach s in all_jrnls { //} all_jrnls_no_clin top_jrnls top_jrnls_no_clin { 
         local t year
-       /* make_panel, time(`t') last(1) samp(`s') us(1)
-        merge_ipeds, time(`t') last(1) samp(`s') us(1)
-        make_panel, time(`t') samp(`s') us(1)
-        merge_ipeds, time(`t') samp(`s') us(1)*/
-        make_panel, time(`t') last(1) samp(`s') us(1) nosolo(1)
-        merge_ipeds, time(`t') last(1) samp(`s') us(1) nosolo(1)
-        make_panel, time(`t') samp(`s') us(1) nosolo(1)
-        merge_ipeds, time(`t') samp(`s') us(1) nosolo(1)
+        local src "openalex"
+        if regexm("`s'", "_no_clin$") local src "openalex_no_clin"
+        paper_author_metadata, samp(`s') src(`src') time(`t')
+        foreach ns in 0 1 {
+            make_panel, time(`t') last(1) samp(`s') us(1) nosolo(`ns') metadata(1)
+            merge_ipeds, time(`t') last(1) samp(`s') us(1) nosolo(`ns')
+            make_panel, time(`t') samp(`s') us(1) nosolo(`ns') metadata(1)
+            merge_ipeds, time(`t') samp(`s') us(1) nosolo(`ns')
+        }
     }
 end
 
+* Build positions and additive citation weights on the full author list, before
+* selecting author positions or dropping authors without a research cluster.
+* Legacy headline outcomes retain their existing weights below.
+program paper_author_metadata
+    syntax, samp(str) src(str) time(str)
+    use pmid athr_id which_athr which_affl year pub_date cite_count ///
+        using ../external/`src'/cleaned_`samp', clear
+    bys pmid athr_id (which_athr which_affl): keep if _n == 1
+    isid pmid athr_id
+    preserve
+        keep pmid athr_id
+        save ../temp/all_athrs_`samp', replace
+    restore
+    bys pmid: gen paper_team_size = _N
+    bys pmid: egen original_last_position = max(which_athr)
+    rename which_athr original_position
+    preserve
+        keep pmid paper_team_size
+        duplicates drop
+        save ../temp/paper_team_size_`samp', replace
+    restore
+
+    local date date("`c(current_date)'", "DMY")
+    gen double common_age = yofd(`date') - year + 1
+    if "`time'" == "qrtr" replace common_age = qofd(`date') - qofd(pub_date) + 1
+    gen double common_cite_rate = cite_count / common_age
+    bys pmid: gen byte paper_one = _n == 1
+    qui sum common_cite_rate if paper_one
+    local cite_total = r(sum)
+    qui count if paper_one
+    local paper_total = r(N)
+    gen double affl_common = 1 / paper_team_size
+    gen double cite_common = 0
+    if `cite_total' > 0 {
+        replace cite_common = affl_common * common_cite_rate * `paper_total' / `cite_total'
+    }
+    keep pmid athr_id original_position original_last_position affl_common cite_common
+    save ../temp/paper_author_metadata_`samp', replace
+end
+
 program make_panel
-    syntax, time(string) samp(str) [, firstlast(int 0) last(int 0) first(int 0) us(int 0) second(int 0) nosolo(int 0)]
+    syntax, time(string) samp(str) [, firstlast(int 0) last(int 0) first(int 0) us(int 0) second(int 0) nosolo(int 0) metadata(int 0)]
     local src "openalex"
     if regexm("`samp'", "_no_clin$") local src "openalex_no_clin"
     import delimited ../external/clusters/author_static_clusters_30.csv, clear
     save ../temp/clusters, replace
 
-    use pmid athr_id using ../external/`src'/cleaned_`samp', clear
-    gcontract pmid athr_id
-    drop _freq
-    save ../temp/all_athrs_`samp', replace
-    gcontract pmid, freq(paper_team_size)
-    save ../temp/paper_team_size_`samp', replace
+    if `metadata' == 0 paper_author_metadata, samp(`samp') src(`src') time(`time')
 
     use id pmid which_athr which_affl pub_date year jrnl cite_count athr_id athr_name country_code msa_comb msa_c_world inst inst_id msacode using ../external/`src'/cleaned_`samp', clear
     local suf = "" 
@@ -60,6 +96,7 @@ program make_panel
     merge m:1 athr_id using ../temp/clusters, assert(1 2 3) keep(3) nogen
     merge m:1 id using ../external/patents/patent_ppr_cnt, assert(1 2 3) keep(1 3) nogen keepusing(patent_count front_only body_only)
     merge m:1 pmid using ../temp/paper_team_size_`samp', assert(2 3) keep(3) nogen
+    merge m:1 pmid athr_id using ../temp/paper_author_metadata_`samp', assert(2 3) keep(3) nogen
     if `nosolo' == 1 drop if paper_team_size == 1
     rename cluster_label field
 
@@ -196,19 +233,26 @@ program make_panel
     bys athr_id `time': gegen avg_team_size = mean(paper_team_size) if athr_pmid_cntr == 1
     replace avg_team_size = avg_team_size - 1
 
-    gen paper_position     = which_athr                              if athr_pmid_cntr == 1
-    gen paper_position_rat = which_athr / num_athrs                  if athr_pmid_cntr == 1
+    gen paper_position     = original_position                     if athr_pmid_cntr == 1
+    gen paper_position_rat = original_position / original_last_position if athr_pmid_cntr == 1
     // solo papers count as last only, so n_first + n_middle + n_last = ppr_cnt
-    gen paper_is_first     = (which_athr == 1) & (num_athrs > 1)     if athr_pmid_cntr == 1
-    gen paper_is_last      = (which_athr == num_athrs)               if athr_pmid_cntr == 1
-    gen paper_is_middle    = (which_athr > 1) & (which_athr < num_athrs) if athr_pmid_cntr == 1
-    gen paper_is_solo      = (num_athrs == 1)                        if athr_pmid_cntr == 1
-    gen team_size_last     = paper_team_size if athr_pmid_cntr == 1 & which_athr == num_athrs
-    gen team_size_notlast  = paper_team_size if athr_pmid_cntr == 1 & which_athr <  num_athrs & num_athrs > 1
+    gen paper_is_first     = (original_position == 1) & (paper_team_size > 1) if athr_pmid_cntr == 1
+    gen paper_is_last      = (original_position == original_last_position) if athr_pmid_cntr == 1
+    gen paper_is_middle    = (original_position > 1) & (original_position < original_last_position) if athr_pmid_cntr == 1
+    gen paper_is_solo      = (paper_team_size == 1)                  if athr_pmid_cntr == 1
+    gen team_size_last     = paper_team_size if athr_pmid_cntr == 1 & paper_is_last == 1
+    gen team_size_notlast  = paper_team_size if athr_pmid_cntr == 1 & paper_is_last == 0
+    gen ppr_cnt_notlast = paper_is_last == 0 if athr_pmid_cntr == 1
+    gen double cite_affl_wt_notlast = cite_common * ppr_cnt_notlast
+    gen double affl_wt_notlast = affl_common * ppr_cnt_notlast
+    gen double cite_affl_wt_last_common = cite_common * paper_is_last
+    gen double affl_wt_last_common = affl_common * paper_is_last
     preserve
     if "`time'" == "year" {
         gcollapse (sum) ppr_cnt cns affl_wt pat_affl_wt cite_affl_wt pat_adj_wt pat_wt patent_count body_affl_wt front_affl_wt frnt_adj_wt body_adj_wt front_only body_only ///
                         n_first_ppr=paper_is_first n_middle_ppr=paper_is_middle n_last_ppr=paper_is_last n_solo_ppr=paper_is_solo ///
+                        ppr_cnt_notlast cite_affl_wt_notlast affl_wt_notlast ///
+                        cite_affl_wt_last_common affl_wt_last_common ///
                   (mean) avg_team_size ///
                          avg_position=paper_position avg_position_rat=paper_position_rat ///
                          avg_team_size_last=team_size_last avg_team_size_notlast=team_size_notlast ///
@@ -225,6 +269,8 @@ program make_panel
     if "`time'" == "qrtr" {
         gcollapse (sum) ppr_cnt cns affl_wt pat_affl_wt body_affl_wt front_affl_wt cite_affl_wt pat_adj_wt pat_wt patent_count frnt_adj_wt body_adj_wt front_only body_only ///
                         n_first_ppr=paper_is_first n_middle_ppr=paper_is_middle n_last_ppr=paper_is_last n_solo_ppr=paper_is_solo ///
+                        ppr_cnt_notlast cite_affl_wt_notlast affl_wt_notlast ///
+                        cite_affl_wt_last_common affl_wt_last_common ///
                   (mean) avg_team_size ///
                          avg_position=paper_position avg_position_rat=paper_position_rat ///
                          avg_team_size_last=team_size_last avg_team_size_notlast=team_size_notlast ///
@@ -267,6 +313,8 @@ program make_panel
     if "`time'" == "year" {
         gcollapse (sum) ppr_cnt cns affl_wt pat_affl_wt body_affl_wt front_affl_wt cite_affl_wt pat_adj_wt pat_wt patent_count front_only body_only frnt_adj_wt body_adj_wt ///
                         n_first_ppr=paper_is_first n_middle_ppr=paper_is_middle n_last_ppr=paper_is_last n_solo_ppr=paper_is_solo ///
+                        ppr_cnt_notlast cite_affl_wt_notlast affl_wt_notlast ///
+                        cite_affl_wt_last_common affl_wt_last_common ///
                   (mean) avg_team_size ///
                          avg_position=paper_position avg_position_rat=paper_position_rat ///
                          avg_team_size_last=team_size_last avg_team_size_notlast=team_size_notlast ///
@@ -283,6 +331,8 @@ program make_panel
     if "`time'" == "qrtr" {
         gcollapse (sum) ppr_cnt cns affl_wt pat_affl_wt body_affl_wt front_affl_wt cite_affl_wt frnt_adj_wt body_adj_wt body_only front_only pat_adj_wt pat_wt patent_count ///
                         n_first_ppr=paper_is_first n_middle_ppr=paper_is_middle n_last_ppr=paper_is_last n_solo_ppr=paper_is_solo ///
+                        ppr_cnt_notlast cite_affl_wt_notlast affl_wt_notlast ///
+                        cite_affl_wt_last_common affl_wt_last_common ///
                   (mean) avg_team_size ///
                          avg_position=paper_position avg_position_rat=paper_position_rat ///
                          avg_team_size_last=team_size_last avg_team_size_notlast=team_size_notlast ///

@@ -170,7 +170,7 @@ def make_figure(S, P, g, res, ci, sim_ref, max_sim, out_stem):
     plt.close(fig)
 
 
-def make_simple_figure(S, P, g, res, ci, out_stem, n_bins=5):
+def make_simple_figure(S, P, g, res, ci, out_stem, n_bins=20):
     z, zh = S @ g, P @ g
     df = pd.DataFrame({"x": zh, "y": z})
     df["b"] = pd.qcut(df["x"].rank(method="first"), n_bins, labels=False)
@@ -182,7 +182,7 @@ def make_simple_figure(S, P, g, res, ci, out_stem, n_bins=5):
     ax.plot([lo_, hi_], [lo_, hi_], color="k", lw=0.8, ls=":", label="45-degree line")
     ax.axhline(z.mean(), color="grey", lw=0.8, ls="--", label="Predict every PI at the mean")
     ax.errorbar(grp["x"], grp["y"], yerr=1.96 * grp["se"], fmt="o", color=EBBLUE,
-                ms=7, capsize=3, lw=1.2, label=f"Quintile of imputed exposure (n = {S.shape[0]} FOIA PIs)")
+                ms=6, capsize=2.5, lw=1.0, label=f"{n_bins} bins of imputed exposure (n = {S.shape[0]} FOIA PIs)")
     b = res["expo_slope"]; a = z.mean() - b * zh.mean()
     xs = np.linspace(lo_, hi_, 50)
     ax.plot(xs, a + b * xs, color=DKORANGE, lw=1.4, label=f"Fitted line, slope = {b:.2f}")
@@ -192,6 +192,54 @@ def make_simple_figure(S, P, g, res, ci, out_stem, n_bins=5):
     ax.text(0.03, 0.97, f"corr = {res['expo_corr']:.2f}  [{ci['expo_corr'][0]:.2f}, {ci['expo_corr'][1]:.2f}]",
             transform=ax.transAxes, va="top", fontsize=10)
     ax.legend(fontsize=7.5, loc="lower right", frameon=False)
+    ax.spines[["top", "right"]].set_visible(False)
+    fig.tight_layout()
+    fig.savefig(f"{FIG_DIR}/{out_stem}.pdf", bbox_inches="tight")
+    fig.savefig(f"{FIG_DIR}/{out_stem}.png", dpi=160, bbox_inches="tight")
+    plt.close(fig)
+
+
+def make_scatter_figure(S, P, g, res, ci, out_stem):
+    z, zh = S @ g, P @ g
+    fig, ax = plt.subplots(figsize=(5.6, 4.6))
+    lo_ = float(min(z.min(), zh.min())) - 0.005
+    hi_ = float(max(z.max(), zh.max())) + 0.005
+    ax.plot([lo_, hi_], [lo_, hi_], color="k", lw=0.8, ls=":", label="45-degree line")
+    ax.axhline(z.mean(), color="grey", lw=0.8, ls="--", label="Predict every PI at the mean")
+    ax.scatter(zh, z, s=16, color=EBBLUE, alpha=0.65, edgecolors="none",
+               label=f"FOIA PIs (n = {S.shape[0]})")
+    b = res["expo_slope"]; a = z.mean() - b * zh.mean()
+    xs = np.linspace(lo_, hi_, 50)
+    ax.plot(xs, a + b * xs, color=DKORANGE, lw=1.4, label=f"Fitted line, slope = {b:.2f}")
+    ax.set_xlim(lo_, hi_); ax.set_ylim(lo_, hi_)
+    ax.set_xlabel("Imputed exposure (leave-one-out, from text neighbours)")
+    ax.set_ylabel("Observed exposure (FOIA purchasing data)")
+    ax.text(0.03, 0.97, f"corr = {res['expo_corr']:.2f}  [{ci['expo_corr'][0]:.2f}, {ci['expo_corr'][1]:.2f}]",
+            transform=ax.transAxes, va="top", fontsize=10)
+    ax.legend(fontsize=7.5, loc="lower right", frameon=False)
+    ax.spines[["top", "right"]].set_visible(False)
+    fig.tight_layout()
+    fig.savefig(f"{FIG_DIR}/{out_stem}.pdf", bbox_inches="tight")
+    fig.savefig(f"{FIG_DIR}/{out_stem}.png", dpi=160, bbox_inches="tight")
+    plt.close(fig)
+
+
+def make_dist_figure(S, P, g, out_stem, n_bins=30):
+    from scipy.stats import gaussian_kde
+    z, zh = S @ g, P @ g
+    lo_, hi_ = float(min(z.min(), zh.min())), float(max(z.max(), zh.max()))
+    pad = 0.1 * (hi_ - lo_)
+    edges = np.linspace(lo_ - pad, hi_ + pad, n_bins + 1)
+    xs = np.linspace(lo_ - pad, hi_ + pad, 300)
+    fig, ax = plt.subplots(figsize=(5.6, 4.6))
+    for v, c, lab in ((z, EBBLUE, "Observed exposure (FOIA purchasing data)"),
+                      (zh, DKORANGE, "Imputed exposure (leave-one-out)")):
+        ax.hist(v, bins=edges, density=True, color=c, alpha=0.2)
+        ax.plot(xs, gaussian_kde(v)(xs), color=c, lw=1.6,
+                label=f"{lab}\nmean = {v.mean():.3f}, sd = {v.std():.3f}")
+    ax.set_xlabel(f"PI exposure (n = {S.shape[0]} FOIA PIs)")
+    ax.set_ylabel("Density")
+    ax.legend(fontsize=8, loc="upper right", frameon=False)
     ax.spines[["top", "right"]].set_visible(False)
     fig.tight_layout()
     fig.savefig(f"{FIG_DIR}/{out_stem}.pdf", bbox_inches="tight")
@@ -209,6 +257,7 @@ def main():
     ap.add_argument("--floor", type=float, default=0.05)
     ap.add_argument("--betas-path", default="")
     ap.add_argument("--sim-ref", type=float, default=0.20)
+    ap.add_argument("--bins", type=int, default=20)
     ap.add_argument("--boot", type=int, default=1000)
     ap.add_argument("--seed", type=int, default=8975)
     args = ap.parse_args()
@@ -261,8 +310,10 @@ def main():
     print("CIs:", ci)
 
     make_figure(S, P, g, rows[0], ci, args.sim_ref, max_sim, f"loo_shares_{stem}")
-    make_simple_figure(S, P, g, rows[0], ci, f"loo_exposure_simple_{stem}")
-    print(f"Saved {FIG_DIR}/loo_shares_{stem}.pdf, {FIG_DIR}/loo_exposure_simple_{stem}.pdf, {OUT_DIR}/loo_shares_summary_{stem}.txt")
+    make_simple_figure(S, P, g, rows[0], ci, f"loo_exposure_simple_{stem}", args.bins)
+    make_scatter_figure(S, P, g, rows[0], ci, f"loo_exposure_scatter_{stem}")
+    make_dist_figure(S, P, g, f"loo_exposure_dist_{stem}")
+    print(f"Saved {FIG_DIR}/loo_shares_{stem}.pdf, loo_exposure_{{simple,scatter,dist}}_{stem}.pdf, {OUT_DIR}/loo_shares_summary_{stem}.txt")
 
 
 if __name__ == "__main__":

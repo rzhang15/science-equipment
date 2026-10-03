@@ -1,0 +1,2 @@
+./rf/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/analysis/reduced_form/output
+./exposure/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/foia_similarity_wts/output

@@ -14,7 +14,18 @@ end
 
 program merge_matched
     syntax, [suffix(string)]
+    tempfile eligible_categories
+    use ../external/samp/category_hhi_tfidf`suffix', clear
+    keep if first_stage_sample == 1
+    keep category
+    save `eligible_categories'
     import delimited ../external/matched/match_pairs`suffix'.csv, clear varn(1) 
+    rename treated_market category
+    merge m:1 category using `eligible_categories', keep(3) nogen
+    rename category treated_market
+    rename control_market category
+    merge m:1 category using `eligible_categories', keep(3) nogen
+    rename category control_market
     rename treated_market category
     save ../output/matched_pairs`suffix', replace
     preserve
@@ -35,6 +46,7 @@ program merge_matched
     drop if treated == 0 & _merge == 1 
     drop _merge
     merge m:1 category using ../external/samp/category_hhi_tfidf`suffix', assert(2 3) keep(3) nogen
+    keep if first_stage_sample == 1
     foreach var in avg_log_price log_raw_price log_raw_qty log_raw_spend {
         gen trt_`var' = `var' if treated == 1
         gen ctrl_`var' = `var' if treated == 0
@@ -44,7 +56,7 @@ program merge_matched
     drop _freq
     save ../output/spend_xw`suffix', replace
 
-    use ../external/samp/category_yr_tfidf`suffix', clear
+    use ../output/matched_category_panel`suffix', clear
     keep if treated == 1
     glevelsof category, local(treated_cats)
     foreach c in `treated_cats' {
@@ -56,7 +68,7 @@ program merge_matched
         contract control_market
         drop _freq
         rename control_market category
-        merge 1:m category using ../external/samp/category_yr_tfidf`suffix', assert(2 3) keep(3) nogen
+        merge 1:m category using ../output/matched_category_panel`suffix', assert(2 3) keep(3) nogen
         append using "../temp/cat_`c'`suffix'"
         gen experiment = "`c'"
         save "../output/cat_`c'`suffix'", replace
@@ -76,13 +88,14 @@ program merge_matched
     drop if treated == 0 & _merge == 1 
     drop _merge
     merge m:1 category using ../external/samp/category_hhi_tfidf`suffix', assert(2 3) keep(3) nogen
+    keep if first_stage_sample == 1
     foreach var in avg_log_price log_raw_price log_raw_qty log_raw_spend {
         gen trt_`var' = `var' if treated == 1
         gen ctrl_`var' = `var' if treated == 0
     }
     save ../output/matched_uni_category_panel`suffix' , replace
 
-    use ../external/samp/uni_category_yr_tfidf`suffix', clear
+    use ../output/matched_uni_category_panel`suffix', clear
     keep if treated == 1
     glevelsof category, local(treated_cats)
     foreach c in `treated_cats' {
@@ -94,7 +107,7 @@ program merge_matched
         contract control_market
         drop _freq          
         rename control_market category
-        merge 1:m category using ../external/samp/uni_category_yr_tfidf`suffix', assert(2 3) keep(3) nogen
+        merge 1:m category using ../output/matched_uni_category_panel`suffix', assert(2 3) keep(3) nogen
         append using "../temp/uni_cat_`c'`suffix'"
         gen experiment = "`c'"
         save "../output/uni_cat_`c'`suffix'", replace

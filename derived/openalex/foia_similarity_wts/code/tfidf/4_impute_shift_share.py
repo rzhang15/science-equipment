@@ -486,7 +486,7 @@ def apply_filters(df_univ, S_hat, args, df_foia):
 
 
 def build_suffixes(args):
-    k_sfx = "" if args.k == 5 else f"_k{args.k}"
+    k_sfx = "" if args.k == 5 and not args.tag_k else f"_k{args.k}"
 
     filter_sfx = ""
 
@@ -546,6 +546,12 @@ def main():
         ),
     )
 
+
+    ap.add_argument(
+        "--tag-k",
+        action="store_true",
+        help="Always use weight_matrix_k{k}.npz and the _k{k} suffix, including k=5.",
+    )
 
     ap.add_argument(
         "--eb-own-weight",
@@ -669,7 +675,7 @@ def main():
     print(f"Treated markets: {len(markets)}")
 
 
-    k_sfx = "" if args.k == 5 else f"_k{args.k}"
+    k_sfx = "" if args.k == 5 and not args.tag_k else f"_k{args.k}"
     weights_file = f"{OUT_DIR}/weight_matrix{k_sfx}.npz"
 
     if not os.path.exists(weights_file):
