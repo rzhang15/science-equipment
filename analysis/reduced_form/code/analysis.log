@@ -10753,3 +10753,1059 @@ restrict_samp all_jrnls_r1 winsorized affl_wt_notlast at pre-period p99=.9166666
   variable unbal_msa_size was double now int
   variable ppr_cnt_any was double now byte
   variable n_first_ppr was double now byte
+  variable n_middle_ppr was double now byte
+  variable n_last_ppr was double now byte
+  variable n_solo_ppr was double now byte
+  variable n_grants was double now byte
+  variable n_new_grants was double now byte
+  variable nih_total_cost was double now long
+  variable n_grants_ever was double now byte
+  variable nih_cost_ever was double now long
+  variable region was str28 now str20
+  variable country was str33 now str13
+  variable city was str45 now str15
+  variable inst was str191 now str51
+  athr_name is strL now coalesced
+  (50,518,198 bytes saved)
+(file ../output/prepped_samples/es_all_jrnls_r1.dta not found)
+file ../output/prepped_samples/es_all_jrnls_r1.dta saved
+
+==========================================
+  RUNNING sample=all_jrnls WEIGHT_MSIM=0 PUBLIC=0 (R1-only)
+==========================================
+(115,596 missing values generated)
+(115,596 missing values generated)
+(115,596 missing values generated)
+(115,596 missing values generated)
+(115,596 missing values generated)
+(115,596 missing values generated)
+(115,596 missing values generated)
+(115,596 missing values generated)
+(115,596 missing values generated)
+(115,596 missing values generated)
+(115,596 missing values generated)
+(115,596 missing values generated)
+(115,596 missing values generated)
+(115,596 missing values generated)
+(115,596 missing values generated)
+(115,596 missing values generated)
+(115,596 missing values generated)
+(115,596 missing values generated)
+(115,596 missing values generated)
+(115,596 missing values generated)
+int_lead1   int_lead2   int_lead3   int_lead4   int_lag0    int_lag1    int_lag2    int_lag3    int_lag4    int_lag5    mshr_lead1  mshr_lead2  mshr_lead3  mshr_lead4  mshr_lag0   mshr_lag1   mshr_lag2   mshr_lag3   mshr_lag4   mshr_lag5
+(115,596 real changes made)
+(115,596 real changes made)
+(115,596 real changes made)
+(115,596 real changes made)
+(115,596 real changes made)
+(115,596 real changes made)
+(115,596 real changes made)
+(115,596 real changes made)
+(115,596 real changes made)
+(115,596 real changes made)
+(115,596 real changes made)
+(115,596 real changes made)
+(115,596 real changes made)
+(115,596 real changes made)
+(115,596 real changes made)
+(115,596 real changes made)
+(115,596 real changes made)
+(115,596 real changes made)
+(115,596 real changes made)
+(115,596 real changes made)
+(MWFE estimator converged in 2 iterations)
+
+HDFE Linear regression                            Number of obs   =    128,440
+Absorbing 2 HDFE groups                           F(  18,  12843) =       2.51
+Statistics robust to heteroskedasticity           Prob > F        =     0.0004
+                                                  R-squared       =     0.4706
+                                                  Adj R-squared   =     0.4116
+                                                  Within R-sq.    =     0.0007
+Number of clusters (athr_id) =     12,844         Root MSE        =     1.4273
+
+                           (Std. err. adjusted for 12,844 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+   int_lead4 |  -.0397686   .5300029    -0.08   0.940    -1.078653    .9991158
+   int_lead3 |   -.614419   .5220106    -1.18   0.239    -1.637637    .4087995
+   int_lead2 |   -.162673   .4879397    -0.33   0.739    -1.119107    .7937613
+    int_lag0 |  -.6958579   .4802871    -1.45   0.147    -1.637292    .2455764
+    int_lag1 |  -1.078861   .4914204    -2.20   0.028    -2.042118   -.1156042
+    int_lag2 |  -.8129774    .492104    -1.65   0.099    -1.777574    .1516197
+    int_lag3 |  -1.284003   .4968239    -2.58   0.010    -2.257852   -.3101545
+    int_lag4 |  -1.291851   .5056448    -2.55   0.011     -2.28299   -.3007123
+    int_lag5 |  -1.522572   .4992173    -3.05   0.002    -2.501112   -.5440316
+  mshr_lead4 |    .132178    .149528     0.88   0.377    -.1609191    .4252751
+  mshr_lead3 |   .1334414   .1442471     0.93   0.355    -.1493042    .4161871
+  mshr_lead2 |   .0795111   .1379243     0.58   0.564    -.1908411    .3498633
+   mshr_lag0 |   .0238312   .1331025     0.18   0.858    -.2370695     .284732
+   mshr_lag1 |  -.0270258   .1384481    -0.20   0.845    -.2984046    .2443531
+   mshr_lag2 |  -.3828759   .1428488    -2.68   0.007    -.6628809    -.102871
+   mshr_lag3 |  -.2920495   .1427186    -2.05   0.041    -.5717992   -.0122997
+   mshr_lag4 |  -.3159338   .1451988    -2.18   0.030     -.600545   -.0313227
+   mshr_lag5 |  -.3445753   .1450316    -2.38   0.018    -.6288589   -.0602917
+       _cons |   1.822526   .0254924    71.49   0.000     1.772557    1.872495
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |     12844       12844           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+N = 128,440; 12,844 balanced groups of size 10
+N = 128,440; 115 unbalanced groups of sizes 20 to 4,940
+
+                        (sum) ppr_cnt
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            0              0
+ 5%            0              0
+10%            0              0       Obs              51,376
+25%            1              0       Sum of wgt.      51,376
+
+50%            2                      Mean           2.176483
+                        Largest       Std. dev.      1.876917
+75%            3             23
+90%            4             27       Variance       3.522819
+95%            6             28       Skewness       2.154175
+99%            9             32       Kurtosis       12.64683
+(128,430 observations deleted)
+
+                             ub
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%    -.5441058      -.5441058
+ 5%    -.5441058      -.3102284
+10%    -.4271671      -.3007875       Obs                  10
+25%    -.3007875      -.1156773       Sum of wgt.          10
+
+50%     .0757733                      Mean             .13277
+                        Largest       Std. dev.      .4942084
+75%     .4087218       .2455049
+90%     .8963629       .4087218       Variance        .244242
+95%      .999037       .7936888       Skewness       .4511755
+99%      .999037        .999037       Kurtosis       2.168412
+
+                             lb
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%    -2.501038      -2.501038
+ 5%    -2.501038      -2.282915
+10%    -2.391976      -2.257778       Obs                  10
+25%    -2.257778      -2.042045       Sum of wgt.          10
+
+50%     -1.70753                      Mean          -1.633367
+                        Largest       Std. dev.      .7448117
+75%    -1.119035      -1.637221
+90%    -.5392871      -1.119035       Variance       .5547444
+95%            0      -1.078574       Skewness        .970146
+99%            0              0       Kurtosis       3.292598
+(9 missing values generated)
+(9 real changes made)
+(7 real changes made)
+(1 real change made)
+file ../output/figures/all_jrnls/es_ppr_cnt_r1_mshrctrl.pdf saved as PDF format
+file ../output/figures/all_jrnls/paper/es_ppr_cnt_r1_mshrctrl.pdf saved as PDF format
+(file ../temp/es_ppr_cnt_r1_mshrctrl.dta not found)
+file ../temp/es_ppr_cnt_r1_mshrctrl.dta saved
+Iteration 1:   deviance = 1.4402e+05  eps = .         iters = 4    tol = 1.0e-04  min(eta) =  -1.57  P   
+Iteration 2:   deviance = 1.4005e+05  eps = 2.84e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.90      
+Iteration 3:   deviance = 1.4001e+05  eps = 2.55e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.97      
+Iteration 4:   deviance = 1.4001e+05  eps = 2.40e-07  iters = 2    tol = 1.0e-04  min(eta) =  -1.97      
+Iteration 5:   deviance = 1.4001e+05  eps = 1.16e-11  iters = 2    tol = 1.0e-05  min(eta) =  -1.97   S O
+------------------------------------------------------------------------------------------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
+Converged in 5 iterations and 12 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =    128,440
+Absorbing 2 HDFE groups                           Residual df     =     12,843
+Statistics robust to heteroskedasticity           Wald chi2(18)   =      20.00
+Deviance             =  140013.5252               Prob > chi2     =     0.3328
+Log pseudolikelihood = -194369.7046               Pseudo R2       =     0.1951
+
+Number of clusters (athr_id)=     12,844
+                           (Std. err. adjusted for 12,844 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+   int_lead4 |   .0095469   .2356988     0.04   0.968    -.4524142     .471508
+   int_lead3 |  -.2685253   .2257268    -1.19   0.234    -.7109416    .1738911
+   int_lead2 |   -.068534   .2133597    -0.32   0.748    -.4867114    .3496434
+    int_lag0 |  -.2469809   .2347318    -1.05   0.293    -.7070468    .2130849
+    int_lag1 |   -.449164   .2470094    -1.82   0.069    -.9332935    .0349654
+    int_lag2 |  -.2932375   .2670824    -1.10   0.272    -.8167094    .2302345
+    int_lag3 |  -.5920895   .2756388    -2.15   0.032    -1.132332   -.0518474
+    int_lag4 |  -.6011748   .2904538    -2.07   0.038    -1.170454   -.0318957
+    int_lag5 |  -.7843002   .3012493    -2.60   0.009    -1.374738   -.1938623
+  mshr_lead4 |    .068917   .0646154     1.07   0.286     -.057727    .1955609
+  mshr_lead3 |   .0474943   .0606011     0.78   0.433    -.0712816    .1662702
+  mshr_lead2 |   .0325485   .0586574     0.55   0.579    -.0824179    .1475149
+   mshr_lag0 |   .0734192   .0636485     1.15   0.249    -.0513296    .1981679
+   mshr_lag1 |    .062554   .0682372     0.92   0.359    -.0711885    .1962965
+   mshr_lag2 |  -.1057427   .0767952    -1.38   0.169    -.2562585     .044773
+   mshr_lag3 |  -.0447152    .078575    -0.57   0.569    -.1987195     .109289
+   mshr_lag4 |  -.0424254     .08373    -0.51   0.612    -.2065332    .1216825
+   mshr_lag5 |  -.0468096   .0883833    -0.53   0.596    -.2200377    .1264184
+       _cons |   .7851139   .0115715    67.85   0.000     .7624342    .8077937
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |     12844       12844           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+N = 128,440; 12,844 balanced groups of size 10
+N = 128,440; 115 unbalanced groups of sizes 20 to 4,940
+
+                        (sum) ppr_cnt
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            0              0
+ 5%            0              0
+10%            0              0       Obs              51,376
+25%            1              0       Sum of wgt.      51,376
+
+50%            2                      Mean           2.176483
+                        Largest       Std. dev.      1.876917
+75%            3             23
+90%            4             27       Variance       3.522819
+95%            6             28       Skewness       2.154175
+99%            9             32       Kurtosis       12.64683
+(128,430 observations deleted)
+(9 missing values generated)
+(9 real changes made)
+(7 real changes made)
+(1 real change made)
+file ../output/figures/all_jrnls/es_ppr_cnt_r1_ppml_mshrctrl.pdf saved as PDF format
+file ../output/figures/all_jrnls/paper/es_ppr_cnt_r1_ppml_mshrctrl.pdf saved as PDF format
+(file ../temp/es_ppr_cnt_r1_ppml_mshrctrl.dta not found)
+file ../temp/es_ppr_cnt_r1_ppml_mshrctrl.dta saved
+(127,670 observations deleted)
+Iteration 1:   deviance = 7.1233e+02  eps = .         iters = 4    tol = 1.0e-04  min(eta) =  -2.00  P   
+Iteration 2:   deviance = 6.9885e+02  eps = 1.93e-02  iters = 3    tol = 1.0e-04  min(eta) =  -2.71      
+Iteration 3:   deviance = 6.9875e+02  eps = 1.46e-04  iters = 3    tol = 1.0e-04  min(eta) =  -2.87      
+Iteration 4:   deviance = 6.9875e+02  eps = 9.39e-08  iters = 2    tol = 1.0e-04  min(eta) =  -2.87      
+Iteration 5:   deviance = 6.9875e+02  eps = 1.41e-13  iters = 2    tol = 1.0e-05  min(eta) =  -2.87   S  
+Iteration 6:   deviance = 6.9875e+02  eps = 0.00e+00  iters = 3    tol = 1.0e-09  min(eta) =  -2.87   S O
+------------------------------------------------------------------------------------------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
+Converged in 6 iterations and 17 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =        770
+Absorbing 2 HDFE groups                           Residual df     =         76
+Statistics robust to heteroskedasticity           Wald chi2(18)   =      77.92
+Deviance             =  698.7480111               Prob > chi2     =     0.0000
+Log pseudolikelihood = -1096.805018               Pseudo R2       =     0.1212
+
+Number of clusters (athr_id)=         77
+                               (Std. err. adjusted for 77 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+   int_lead4 |  -2.606027   3.791847    -0.69   0.492    -10.03791    4.825856
+   int_lead3 |  -3.385523   2.640659    -1.28   0.200    -8.561119    1.790074
+   int_lead2 |   1.766077   3.694317     0.48   0.633    -5.474652    9.006806
+    int_lag0 |   3.822488   4.302644     0.89   0.374     -4.61054    12.25551
+    int_lag1 |   2.419694   4.069907     0.59   0.552    -5.557177    10.39657
+    int_lag2 |   5.187896   4.148563     1.25   0.211    -2.943139    13.31893
+    int_lag3 |   4.203396   4.211987     1.00   0.318    -4.051946    12.45874
+    int_lag4 |   3.868915   5.028156     0.77   0.442     -5.98609    13.72392
+    int_lag5 |   3.817886   5.245211     0.73   0.467    -6.462538    14.09831
+  mshr_lead4 |    1.14479   .8380529     1.37   0.172    -.4977637    2.787343
+  mshr_lead3 |  -.5811699   .5744949    -1.01   0.312    -1.707159    .5448194
+  mshr_lead2 |  -.1050094   .8757396    -0.12   0.905    -1.821428    1.611409
+   mshr_lag0 |  -1.021946   .8821983    -1.16   0.247    -2.751023     .707131
+   mshr_lag1 |   -1.32322   .8792501    -1.50   0.132    -3.046519    .4000785
+   mshr_lag2 |  -2.169198   .9407668    -2.31   0.021    -4.013067   -.3253285
+   mshr_lag3 |  -.6586261   .9218331    -0.71   0.475    -2.465386    1.148133
+   mshr_lag4 |    -1.3152   1.034729    -1.27   0.204    -3.343232    .7128319
+   mshr_lag5 |  -1.707757   1.088762    -1.57   0.117    -3.841691    .4261763
+       _cons |   .6792579   .1451323     4.68   0.000     .3948037     .963712
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |        77          77           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+N = 770; 77 balanced groups of size 10
+N = 770; 4 unbalanced groups of sizes 10 to 650
+
+                        (sum) ppr_cnt
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            0              0
+ 5%            0              0
+10%            0              0       Obs                 308
+25%            1              0       Sum of wgt.         308
+
+50%            2                      Mean           1.827922
+                        Largest       Std. dev.      1.477166
+75%            2              7
+90%            4              8       Variance       2.182019
+95%            4              9       Skewness       1.640204
+99%            7              9       Kurtosis       7.384661
+(760 observations deleted)
+
+                             ub
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            0              0
+ 5%            0       1.790169
+10%     .8950845       4.825992       Obs                  10
+25%     4.825992       9.006939       Sum of wgt.          10
+
+50%     11.32619                      Mean           9.187605
+                        Largest       Std. dev.      5.180438
+75%     13.31908       12.45889
+90%      13.9113       13.31908       Variance       26.83694
+95%      14.0985        13.7241       Skewness      -.7711295
+99%      14.0985        14.0985       Kurtosis       2.054164
+
+                             lb
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%    -10.03805      -10.03805
+ 5%    -10.03805      -8.561214
+10%     -9.29963      -6.462727       Obs                  10
+25%    -6.462727       -5.98627       Sum of wgt.          10
+
+50%    -5.516054                      Mean          -5.368645
+                        Largest       Std. dev.      2.801461
+75%    -4.052098      -4.610694
+90%    -1.471644      -4.052098       Variance       7.848182
+95%            0      -2.943288       Skewness       .1908095
+99%            0              0       Kurtosis       2.905358
+(9 missing values generated)
+(9 real changes made)
+(7 real changes made)
+(1 real change made)
+file ../output/figures/all_jrnls/es_ppr_cnt_r1_ppml_mshrctrl_foia.pdf saved as PDF format
+file ../output/figures/all_jrnls/paper/es_ppr_cnt_r1_ppml_mshrctrl_foia.pdf saved as PDF format
+(file ../temp/es_ppr_cnt_r1_ppml_mshrctrl_foia.dta not found)
+file ../temp/es_ppr_cnt_r1_ppml_mshrctrl_foia.dta saved
+(56,290 observations deleted)
+Iteration 1:   deviance = 7.8967e+04  eps = .         iters = 3    tol = 1.0e-04  min(eta) =  -1.49  P   
+Iteration 2:   deviance = 7.7023e+04  eps = 2.52e-02  iters = 2    tol = 1.0e-04  min(eta) =  -1.83      
+Iteration 3:   deviance = 7.7010e+04  eps = 1.72e-04  iters = 2    tol = 1.0e-04  min(eta) =  -1.91      
+Iteration 4:   deviance = 7.7010e+04  eps = 4.95e-08  iters = 2    tol = 1.0e-04  min(eta) =  -1.91      
+Iteration 5:   deviance = 7.7010e+04  eps = 4.92e-14  iters = 1    tol = 1.0e-05  min(eta) =  -1.91   S  
+Iteration 6:   deviance = 7.7010e+04  eps = 0.00e+00  iters = 2    tol = 1.0e-09  min(eta) =  -1.91   S O
+------------------------------------------------------------------------------------------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
+Converged in 6 iterations and 12 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =     72,150
+Absorbing 2 HDFE groups                           Residual df     =      7,214
+Statistics robust to heteroskedasticity           Wald chi2(18)   =      23.23
+Deviance             =  77009.86782               Prob > chi2     =     0.1818
+Log pseudolikelihood = -111906.2511               Pseudo R2       =     0.1897
+
+Number of clusters (athr_id)=      7,215
+                            (Std. err. adjusted for 7,215 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+   int_lead4 |  -.1341006   .3061144    -0.44   0.661    -.7340737    .4658725
+   int_lead3 |  -.7436377    .295965    -2.51   0.012    -1.323718    -.163557
+   int_lead2 |   -.125367   .2715049    -0.46   0.644    -.6575069    .4067729
+    int_lag0 |  -.0553097    .302001    -0.18   0.855    -.6472209    .5366014
+    int_lag1 |  -.4324984   .3058093    -1.41   0.157    -1.031874    .1668769
+    int_lag2 |  -.3767434   .3192365    -1.18   0.238    -1.002435    .2489486
+    int_lag3 |  -.4884771   .3271781    -1.49   0.135    -1.129734    .1527801
+    int_lag4 |  -.5271622   .3629375    -1.45   0.146    -1.238507    .1841823
+    int_lag5 |  -.5874791   .3723639    -1.58   0.115    -1.317299    .1423408
+  mshr_lead4 |   .1374078   .0853466     1.61   0.107    -.0298684    .3046841
+  mshr_lead3 |   .1208066   .0821261     1.47   0.141    -.0401575    .2817708
+  mshr_lead2 |   .1062106   .0768198     1.38   0.167    -.0443535    .2567747
+   mshr_lag0 |   .1694839   .0830652     2.04   0.041     .0066792    .3322887
+   mshr_lag1 |   .1252878   .0865808     1.45   0.148    -.0444076    .2949831
+   mshr_lag2 |  -.0229065   .0979903    -0.23   0.815     -.214964     .169151
+   mshr_lag3 |   .0264011   .0968111     0.27   0.785    -.1633452    .2161473
+   mshr_lag4 |  -.0584825   .1036162    -0.56   0.572    -.2615666    .1446015
+   mshr_lag5 |  -.1066472   .1116864    -0.95   0.340    -.3255484    .1122541
+       _cons |   .8266079   .0150562    54.90   0.000     .7970982    .8561176
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      7215        7215           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+N = 72,150; 7,215 balanced groups of size 10
+N = 72,150; 114 unbalanced groups of sizes 10 to 3,000
+
+                        (sum) ppr_cnt
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            0              0
+ 5%            0              0
+10%            0              0       Obs              28,860
+25%            1              0       Sum of wgt.      28,860
+
+50%            2                      Mean           2.288427
+                        Largest       Std. dev.      1.940513
+75%            3             23
+90%            5             27       Variance       3.765589
+95%            6             28       Skewness       2.136339
+99%            9             32       Kurtosis       13.12721
+(72,140 observations deleted)
+
+                             ub
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%    -.1635463      -.1635463
+ 5%    -.1635463              0
+10%    -.0817732       .1423542       Obs                  10
+25%     .1423542       .1527919       Sum of wgt.          10
+
+50%     .1755416                      Mean           .2140922
+                        Largest       Std. dev.      .2124555
+75%     .4067827       .2489601
+90%     .5012479       .4067827       Variance       .0451373
+95%     .5366123       .4658835       Skewness      -.0939357
+99%     .5366123       .5366123       Kurtosis       2.345341
+
+                             lb
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%    -1.323729      -1.323729
+ 5%    -1.323729      -1.317312
+10%    -1.320521       -1.23852       Obs                  10
+25%     -1.23852      -1.129746       Sum of wgt.          10
+
+50%    -1.017166                      Mean          -.9082472
+                        Largest       Std. dev.      .4094036
+75%    -.6575167      -.7340847
+90%    -.3236159      -.6575167       Variance       .1676113
+95%            0      -.6472318       Skewness       1.021108
+99%            0              0       Kurtosis       3.350418
+(9 missing values generated)
+(9 real changes made)
+(7 real changes made)
+(1 real change made)
+file ../output/figures/all_jrnls/es_ppr_cnt_r1_ppml_mshrctrl_nih.pdf saved as PDF format
+file ../output/figures/all_jrnls/paper/es_ppr_cnt_r1_ppml_mshrctrl_nih.pdf saved as PDF format
+(file ../temp/es_ppr_cnt_r1_ppml_mshrctrl_nih.dta not found)
+file ../temp/es_ppr_cnt_r1_ppml_mshrctrl_nih.dta saved
+Iteration 1:   deviance = 4.4406e+05  eps = .         iters = 4    tol = 1.0e-04  min(eta) =  -2.42  P   
+Iteration 2:   deviance = 4.0888e+05  eps = 8.60e-02  iters = 2    tol = 1.0e-04  min(eta) =  -3.40      
+Iteration 3:   deviance = 4.0773e+05  eps = 2.80e-03  iters = 2    tol = 1.0e-04  min(eta) =  -4.31      
+Iteration 4:   deviance = 4.0771e+05  eps = 6.14e-05  iters = 2    tol = 1.0e-04  min(eta) =  -5.10      
+Iteration 5:   deviance = 4.0771e+05  eps = 2.89e-06  iters = 2    tol = 1.0e-05  min(eta) =  -5.63      
+Iteration 6:   deviance = 4.0771e+05  eps = 1.16e-07  iters = 2    tol = 1.0e-06  min(eta) =  -5.83      
+Iteration 7:   deviance = 4.0771e+05  eps = 8.83e-10  iters = 2    tol = 1.0e-07  min(eta) =  -5.86   S O
+------------------------------------------------------------------------------------------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
+Converged in 7 iterations and 16 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =    128,440
+Absorbing 2 HDFE groups                           Residual df     =     12,843
+Statistics robust to heteroskedasticity           Wald chi2(18)   =      13.19
+Deviance             =  407706.5328               Prob > chi2     =     0.7799
+Log pseudolikelihood = -340989.8783               Pseudo R2       =     0.3973
+
+Number of clusters (athr_id)=     12,844
+                           (Std. err. adjusted for 12,844 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+cite_affl_wt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+   int_lead4 |   .2574957   .3778087     0.68   0.496    -.4829958    .9979872
+   int_lead3 |  -.0455774   .3536098    -0.13   0.897    -.7386399    .6474851
+   int_lead2 |  -.1991908   .3586834    -0.56   0.579    -.9021972    .5038157
+    int_lag0 |   .0016803   .3827804     0.00   0.996    -.7485555     .751916
+    int_lag1 |  -.6882042   .3992989    -1.72   0.085    -1.470816    .0944073
+    int_lag2 |  -.2011761   .4375953    -0.46   0.646    -1.058847    .6564949
+    int_lag3 |  -.3037301   .4194488    -0.72   0.469    -1.125835    .5183745
+    int_lag4 |  -.3605338   .4296977    -0.84   0.401    -1.202726    .4816583
+    int_lag5 |  -.6734488   .4773672    -1.41   0.158    -1.609071    .2621737
+  mshr_lead4 |   .1427447   .0991733     1.44   0.150    -.0516314    .3371208
+  mshr_lead3 |   .0320191   .0953014     0.34   0.737    -.1547682    .2188064
+  mshr_lead2 |   .0434587   .0944786     0.46   0.646     -.141716    .2286334
+   mshr_lag0 |  -.0190912     .10873    -0.18   0.861    -.2321981    .1940157
+   mshr_lag1 |   .1005625    .109381     0.92   0.358    -.1138203    .3149453
+   mshr_lag2 |  -.0296924   .1186095    -0.25   0.802    -.2621628     .202778
+   mshr_lag3 |   .0840942    .117943     0.71   0.476    -.1470697    .3152582
+   mshr_lag4 |  -.0479519   .1195708    -0.40   0.688    -.2823063    .1864025
+   mshr_lag5 |   .0774093   .1309489     0.59   0.554    -.1792457    .3340644
+       _cons |      1.772   .0184442    96.07   0.000      1.73585     1.80815
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |     12844       12844           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+N = 128,440; 12,844 balanced groups of size 10
+N = 128,440; 115 unbalanced groups of sizes 20 to 4,940
+
+                     (sum) cite_affl_wt
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            0              0
+ 5%            0              0
+10%            0              0       Obs              51,376
+25%     .7097083              0       Sum of wgt.      51,376
+
+50%     2.158696                      Mean           4.327779
+                        Largest       Std. dev.      6.384913
+75%     5.133557       39.06179
+90%     10.55691       39.06179       Variance       40.76711
+95%     16.38939       39.06179       Skewness        3.11753
+99%     39.06179       39.06179       Kurtosis       14.60838
+(128,430 observations deleted)
+(9 missing values generated)
+(9 real changes made)
+(7 real changes made)
+(1 real change made)
+file ../output/figures/all_jrnls/es_cite_affl_wt_r1_ppml_mshrctrl.pdf saved as PDF format
+file ../output/figures/all_jrnls/paper/es_cite_affl_wt_r1_ppml_mshrctrl.pdf saved as PDF format
+(file ../temp/es_cite_affl_wt_r1_ppml_mshrctrl.dta not found)
+file ../temp/es_cite_affl_wt_r1_ppml_mshrctrl.dta saved
+(56,290 observations deleted)
+Iteration 1:   deviance = 2.6548e+05  eps = .         iters = 4    tol = 1.0e-04  min(eta) =  -2.34  P   
+Iteration 2:   deviance = 2.4642e+05  eps = 7.73e-02  iters = 2    tol = 1.0e-04  min(eta) =  -3.31      
+Iteration 3:   deviance = 2.4590e+05  eps = 2.11e-03  iters = 2    tol = 1.0e-04  min(eta) =  -4.21      
+Iteration 4:   deviance = 2.4589e+05  eps = 2.86e-05  iters = 2    tol = 1.0e-04  min(eta) =  -4.96      
+Iteration 5:   deviance = 2.4589e+05  eps = 7.94e-07  iters = 2    tol = 1.0e-05  min(eta) =  -5.42      
+Iteration 6:   deviance = 2.4589e+05  eps = 3.61e-08  iters = 2    tol = 1.0e-06  min(eta) =  -5.58      
+Iteration 7:   deviance = 2.4589e+05  eps = 2.07e-10  iters = 2    tol = 1.0e-08  min(eta) =  -5.59   S O
+------------------------------------------------------------------------------------------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
+Converged in 7 iterations and 16 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =     72,150
+Absorbing 2 HDFE groups                           Residual df     =      7,214
+Statistics robust to heteroskedasticity           Wald chi2(18)   =      14.42
+Deviance             =  245891.9916               Prob > chi2     =     0.7011
+Log pseudolikelihood = -206410.1943               Pseudo R2       =     0.3923
+
+Number of clusters (athr_id)=      7,215
+                            (Std. err. adjusted for 7,215 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+cite_affl_wt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+   int_lead4 |   .2540076   .4860327     0.52   0.601    -.6985989    1.206614
+   int_lead3 |  -.1497752   .4529305    -0.33   0.741    -1.037503    .7379523
+   int_lead2 |  -.2628858   .4559441    -0.58   0.564     -1.15652    .6307482
+    int_lag0 |   .3309748   .4895978     0.68   0.499    -.6286192    1.290569
+    int_lag1 |  -.6187746   .4963685    -1.25   0.213    -1.591639    .3540897
+    int_lag2 |  -.2925044   .5392996    -0.54   0.588    -1.349512    .7645034
+    int_lag3 |   .0182402    .500125     0.04   0.971    -.9619867    .9984671
+    int_lag4 |   .2601463    .531822     0.49   0.625    -.7822056    1.302498
+    int_lag5 |  -.1232576   .6076013    -0.20   0.839    -1.314134    1.067619
+  mshr_lead4 |   .2075751   .1255592     1.65   0.098    -.0385164    .4536665
+  mshr_lead3 |   .0779254   .1199056     0.65   0.516    -.1570852     .312936
+  mshr_lead2 |   .0575447   .1203965     0.48   0.633    -.1784281    .2935175
+   mshr_lag0 |   .0620461   .1369837     0.45   0.651     -.206437    .3305292
+   mshr_lag1 |   .0705001   .1383394     0.51   0.610    -.2006401    .3416404
+   mshr_lag2 |   .0383038   .1446677     0.26   0.791    -.2452397    .3218472
+   mshr_lag3 |    .147122   .1446379     1.02   0.309     -.136363     .430607
+   mshr_lag4 |  -.1781024   .1499776    -1.19   0.235    -.4720531    .1158483
+   mshr_lag5 |   .0230464   .1637534     0.14   0.888    -.2979044    .3439971
+       _cons |   1.865131   .0227675    81.92   0.000     1.820507    1.909754
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      7215        7215           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+N = 72,150; 7,215 balanced groups of size 10
+N = 72,150; 114 unbalanced groups of sizes 10 to 3,000
+
+                     (sum) cite_affl_wt
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            0              0
+ 5%            0              0
+10%            0              0       Obs              28,860
+25%     .9010512              0       Sum of wgt.      28,860
+
+50%     2.509854                      Mean           4.853087
+                        Largest       Std. dev.      6.830017
+75%     5.847701       39.06179
+90%     11.78672       39.06179       Variance       46.64913
+95%     18.57464       39.06179       Skewness        2.87228
+99%     39.06179       39.06179       Kurtosis       12.54429
+(72,140 observations deleted)
+
+                             ub
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            0              0
+ 5%            0       .3541076
+10%     .1770538       .6307647       Obs                  10
+25%     .6307647       .7379686       Sum of wgt.          10
+
+50%      .881504                      Mean           .8353225
+                        Largest       Std. dev.      .4255279
+75%     1.206632       1.067641
+90%     1.296552       1.206632       Variance        .181074
+95%     1.302517       1.290586       Skewness      -.6683847
+99%     1.302517       1.302517       Kurtosis       2.468528
+
+                             lb
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%    -1.591657      -1.591657
+ 5%    -1.591657      -1.349532
+10%    -1.470594      -1.314156       Obs                  10
+25%    -1.314156      -1.156536       Sum of wgt.          10
+
+50%    -.9997619                      Mean          -.9520882
+                        Largest       Std. dev.      .4535652
+75%    -.6986164      -.7822248
+90%    -.3143184      -.6986164       Variance       .2057214
+95%            0      -.6286368       Skewness       .6740962
+99%            0              0       Kurtosis       3.059649
+(9 missing values generated)
+(9 real changes made)
+(7 real changes made)
+(1 real change made)
+file ../output/figures/all_jrnls/es_cite_affl_wt_r1_ppml_mshrctrl_nih.pdf saved as PDF format
+file ../output/figures/all_jrnls/paper/es_cite_affl_wt_r1_ppml_mshrctrl_nih.pdf saved as PDF format
+(file ../temp/es_cite_affl_wt_r1_ppml_mshrctrl_nih.dta not found)
+file ../temp/es_cite_affl_wt_r1_ppml_mshrctrl_nih.dta saved
+(MWFE estimator converged in 2 iterations)
+
+HDFE Linear regression                            Number of obs   =    128,440
+Absorbing 2 HDFE groups                           F(  18,  12843) =       1.63
+Statistics robust to heteroskedasticity           Prob > F        =     0.0450
+                                                  R-squared       =     0.4071
+                                                  Adj R-squared   =     0.3411
+                                                  Within R-sq.    =     0.0003
+Number of clusters (athr_id) =     12,844         Root MSE        =     0.4944
+
+                           (Std. err. adjusted for 12,844 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+  ln_ppr_cnt | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+   int_lead4 |   .0128267   .1708767     0.08   0.940     -.322117    .3477705
+   int_lead3 |  -.2180343   .1599353    -1.36   0.173    -.5315313    .0954628
+   int_lead2 |  -.0618307   .1574755    -0.39   0.695    -.3705061    .2468448
+    int_lag0 |  -.1235404   .1597542    -0.77   0.439    -.4366825    .1896016
+    int_lag1 |  -.2170895   .1625933    -1.34   0.182    -.5357965    .1016174
+    int_lag2 |  -.2024005   .1624008    -1.25   0.213    -.5207301    .1159292
+    int_lag3 |  -.2838571   .1655997    -1.71   0.087    -.6084571     .040743
+    int_lag4 |  -.3342967   .1686152    -1.98   0.047    -.6648077   -.0037858
+    int_lag5 |  -.3960193   .1671319    -2.37   0.018    -.7236228   -.0684159
+  mshr_lead4 |   .0440273   .0486285     0.91   0.365    -.0512917    .1393463
+  mshr_lead3 |   .0553497   .0451433     1.23   0.220    -.0331379    .1438372
+  mshr_lead2 |   .0141196   .0447143     0.32   0.752    -.0735271    .1017663
+   mshr_lag0 |   .0116615   .0448212     0.26   0.795    -.0761947    .0995178
+   mshr_lag1 |   .0167121    .046819     0.36   0.721      -.07506    .1084843
+   mshr_lag2 |  -.0898846   .0475173    -1.89   0.059    -.1830256    .0032564
+   mshr_lag3 |  -.0735061   .0477166    -1.54   0.123    -.1670378    .0200256
+   mshr_lag4 |  -.0780399    .048288    -1.62   0.106    -.1726915    .0166116
+   mshr_lag5 |  -.0645756   .0482461    -1.34   0.181    -.1591453     .029994
+       _cons |   .8422306    .008271   101.83   0.000     .8260182    .8584431
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |     12844       12844           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+N = 128,440; 12,844 balanced groups of size 10
+N = 128,440; 115 unbalanced groups of sizes 20 to 4,940
+
+                         ln_ppr_cnt
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            0              0
+ 5%            0              0
+10%            0              0       Obs              51,376
+25%     .6931472              0       Sum of wgt.      51,376
+
+50%     1.098612                      Mean           1.008143
+                        Largest       Std. dev.      .5431808
+75%     1.386294       3.178054
+90%     1.609438       3.332205       Variance       .2950454
+95%      1.94591       3.367296       Skewness      -.0026608
+99%     2.302585       3.496508       Kurtosis       2.975441
+(128,430 observations deleted)
+
+                             ub
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%    -.0684408      -.0684408
+ 5%    -.0684408      -.0038108
+10%    -.0361258              0       Obs                  10
+25%            0       .0407183       Sum of wgt.          10
+
+50%     .0985161                      Mean           .1065548
+                        Largest       Std. dev.      .1262574
+75%     .1895779       .1159051
+90%     .2972832       .1895779       Variance       .0159409
+95%     .3477451       .2468213       Skewness       .5332466
+99%     .3477451       .3477451       Kurtosis       2.454706
+
+                             lb
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%    -.7235979      -.7235979
+ 5%    -.7235979      -.6647826
+10%    -.6941903      -.6084325       Obs                  10
+25%    -.6084325      -.5357723       Sum of wgt.          10
+
+50%    -.5261067                      Mean          -.4714032
+                        Largest       Std. dev.      .2070611
+75%    -.3704827      -.4366587
+90%    -.1610458      -.3704827       Variance       .0428743
+95%            0      -.3220916       Skewness       1.091132
+99%            0              0       Kurtosis       3.748744
+(9 missing values generated)
+(9 real changes made)
+(7 real changes made)
+(1 real change made)
+file ../output/figures/all_jrnls/es_ln_ppr_cnt_r1_mshrctrl.pdf saved as PDF format
+file ../output/figures/all_jrnls/paper/es_ln_ppr_cnt_r1_mshrctrl.pdf saved as PDF format
+(file ../temp/es_ln_ppr_cnt_r1_mshrctrl.dta not found)
+file ../temp/es_ln_ppr_cnt_r1_mshrctrl.dta saved
+Iteration 1:   deviance = 1.7253e+05  eps = .         iters = 3    tol = 1.0e-04  min(eta) =  -1.52  P   
+Iteration 2:   deviance = 1.6647e+05  eps = 3.64e-02  iters = 2    tol = 1.0e-04  min(eta) =  -2.09      
+Iteration 3:   deviance = 1.6640e+05  eps = 3.86e-04  iters = 2    tol = 1.0e-04  min(eta) =  -2.33      
+Iteration 4:   deviance = 1.6640e+05  eps = 5.82e-07  iters = 2    tol = 1.0e-04  min(eta) =  -2.37      
+Iteration 5:   deviance = 1.6640e+05  eps = 4.31e-11  iters = 1    tol = 1.0e-05  min(eta) =  -2.37   S  
+Iteration 6:   deviance = 1.6640e+05  eps = 1.56e-16  iters = 2    tol = 1.0e-08  min(eta) =  -2.37   S O
+------------------------------------------------------------------------------------------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
+Converged in 6 iterations and 12 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =    128,440
+Absorbing 2 HDFE groups                           Residual df     =     12,843
+Statistics robust to heteroskedasticity           Wald chi2(18)   =      39.98
+Deviance             =   166402.497               Prob > chi2     =     0.0021
+Log pseudolikelihood = -258733.2086               Pseudo R2       =     0.2899
+
+Number of clusters (athr_id)=     12,844
+                           (Std. err. adjusted for 12,844 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+ ppr_cnt_any | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+   int_lead4 |   .2947255    .181773     1.62   0.105    -.0615431    .6509941
+   int_lead3 |  -.0656149   .1770139    -0.37   0.711    -.4125557     .281326
+   int_lead2 |  -.0827184   .1688169    -0.49   0.624    -.4135933    .2481566
+    int_lag0 |  -.1944866   .1701553    -1.14   0.253    -.5279848    .1390116
+    int_lag1 |  -.4841843   .1872777    -2.59   0.010    -.8512418   -.1171268
+    int_lag2 |  -.2682901   .2031771    -1.32   0.187      -.66651    .1299298
+    int_lag3 |  -.4420414   .2158451    -2.05   0.041      -.86509   -.0189928
+    int_lag4 |  -.6605433   .2234936    -2.96   0.003    -1.098583   -.2225039
+    int_lag5 |  -.9537834   .2347542    -4.06   0.000    -1.413893   -.4936738
+  mshr_lead4 |    .028464   .0524593     0.54   0.587    -.0743544    .1312823
+  mshr_lead3 |    .045129   .0487294     0.93   0.354     -.050379    .1406369
+  mshr_lead2 |   .0180383   .0469838     0.38   0.701    -.0740482    .1101247
+   mshr_lag0 |   .0343301   .0475516     0.72   0.470    -.0588694    .1275295
+   mshr_lag1 |  -.0087728   .0552094    -0.16   0.874    -.1169812    .0994355
+   mshr_lag2 |  -.0937384   .0572939    -1.64   0.102    -.2060324    .0185557
+   mshr_lag3 |  -.1051253   .0608008    -1.73   0.084    -.2242928    .0140422
+   mshr_lag4 |  -.0463515   .0645417    -0.72   0.473    -.1728509    .0801479
+   mshr_lag5 |   -.088478   .0692574    -1.28   0.201      -.22422     .047264
+       _cons |   1.561037   .0091873   169.91   0.000      1.54303    1.579043
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |     12844       12844           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+N = 128,440; 12,844 balanced groups of size 10
+N = 128,440; 115 unbalanced groups of sizes 20 to 4,940
+
+                        (sum) ppr_cnt
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            0              0
+ 5%            1              0
+10%            1              0       Obs              51,376
+25%            2              0       Sum of wgt.      51,376
+
+50%            3                      Mean           4.209378
+                        Largest       Std. dev.      3.413232
+75%            6             47
+90%            8             52       Variance       11.65016
+95%           11             52       Skewness       2.307319
+99%           16             64       Kurtosis        14.9453
+(128,430 observations deleted)
+(9 missing values generated)
+(9 real changes made)
+(7 real changes made)
+(1 real change made)
+file ../output/figures/all_jrnls/es_ppr_cnt_any_r1_ppml_mshrctrl.pdf saved as PDF format
+file ../output/figures/all_jrnls/paper/es_ppr_cnt_any_r1_ppml_mshrctrl.pdf saved as PDF format
+(file ../temp/es_ppr_cnt_any_r1_ppml_mshrctrl.dta not found)
+file ../temp/es_ppr_cnt_any_r1_ppml_mshrctrl.dta saved
+Iteration 1:   deviance = 1.3908e+05  eps = .         iters = 4    tol = 1.0e-04  min(eta) =  -2.05  P   
+Iteration 2:   deviance = 1.3051e+05  eps = 6.56e-02  iters = 2    tol = 1.0e-04  min(eta) =  -2.98      
+Iteration 3:   deviance = 1.3029e+05  eps = 1.73e-03  iters = 2    tol = 1.0e-04  min(eta) =  -3.85      
+Iteration 4:   deviance = 1.3028e+05  eps = 4.29e-05  iters = 2    tol = 1.0e-04  min(eta) =  -4.53      
+Iteration 5:   deviance = 1.3028e+05  eps = 1.14e-06  iters = 2    tol = 1.0e-05  min(eta) =  -4.90      
+Iteration 6:   deviance = 1.3028e+05  eps = 1.69e-08  iters = 2    tol = 1.0e-06  min(eta) =  -4.98   S  
+Iteration 7:   deviance = 1.3028e+05  eps = 2.31e-11  iters = 2    tol = 1.0e-07  min(eta) =  -4.99   S O
+------------------------------------------------------------------------------------------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
+Converged in 7 iterations and 16 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =    128,440
+Absorbing 2 HDFE groups                           Residual df     =     12,843
+Statistics robust to heteroskedasticity           Wald chi2(18)   =      13.06
+Deviance             =  130280.3852               Prob > chi2     =     0.7878
+Log pseudolikelihood = -186283.3089               Pseudo R2       =     0.2960
+
+Number of clusters (athr_id)=     12,844
+                           (Std. err. adjusted for 12,844 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+cite_affl_~y | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+   int_lead4 |   .3072257    .317048     0.97   0.333     -.314177    .9286284
+   int_lead3 |  -.1623134   .3064506    -0.53   0.596    -.7629456    .4383187
+   int_lead2 |  -.2458161   .3072207    -0.80   0.424    -.8479575    .3563254
+    int_lag0 |  -.1449002   .3072912    -0.47   0.637    -.7471798    .4573794
+    int_lag1 |  -.3433476   .3047499    -1.13   0.260    -.9406465    .2539512
+    int_lag2 |  -.2083386   .3337237    -0.62   0.532     -.862425    .4457478
+    int_lag3 |  -.1722499    .342813    -0.50   0.615    -.8441511    .4996512
+    int_lag4 |   -.353687   .3512036    -1.01   0.314    -1.042033    .3346594
+    int_lag5 |  -.6647939   .3502411    -1.90   0.058    -1.351254     .021666
+  mshr_lead4 |   .0349092    .087688     0.40   0.691    -.1369561    .2067745
+  mshr_lead3 |  -.0295937   .0827927    -0.36   0.721    -.1918645    .1326771
+  mshr_lead2 |   .0333345   .0841433     0.40   0.692    -.1315832    .1982523
+   mshr_lag0 |  -.0346381   .0868828    -0.40   0.690    -.2049253    .1356491
+   mshr_lag1 |   .0813018   .0905704     0.90   0.369    -.0962129    .2588165
+   mshr_lag2 |   .0178142   .0939776     0.19   0.850    -.1663784    .2020069
+   mshr_lag3 |   .0423239   .0980954     0.43   0.666    -.1499395    .2345873
+   mshr_lag4 |  -.0035681   .0979393    -0.04   0.971    -.1955257    .1883894
+   mshr_lag5 |   .1098142   .1008442     1.09   0.276    -.0878368    .3074652
+       _cons |   .8895441    .016297    54.58   0.000     .8576025    .9214858
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |     12844       12844           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+N = 128,440; 12,844 balanced groups of size 10
+N = 128,440; 115 unbalanced groups of sizes 20 to 4,940
+
+                     (sum) cite_affl_wt
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            0              0
+ 5%     .0393286              0
+10%     .1570456              0       Obs              51,376
+25%     .4457244              0       Sum of wgt.      51,376
+
+50%     1.050209                      Mean           1.773417
+                        Largest       Std. dev.      2.209533
+75%     2.192102       13.13884
+90%     4.115148       13.13884       Variance       4.882037
+95%     6.061739       13.13884       Skewness       2.779031
+99%     13.13884       13.13884       Kurtosis        12.3857
+(128,430 observations deleted)
+(9 missing values generated)
+(9 real changes made)
+(7 real changes made)
+(1 real change made)
+file ../output/figures/all_jrnls/es_cite_affl_wt_any_r1_ppml_mshrctrl.pdf saved as PDF format
+file ../output/figures/all_jrnls/paper/es_cite_affl_wt_any_r1_ppml_mshrctrl.pdf saved as PDF format
+(file ../temp/es_cite_affl_wt_any_r1_ppml_mshrctrl.dta not found)
+file ../temp/es_cite_affl_wt_any_r1_ppml_mshrctrl.dta saved
+(dropped 1940 observations that are either singletons or separated by a fixed effect)
+Iteration 1:   deviance = 1.6230e+05  eps = .         iters = 4    tol = 1.0e-04  min(eta) =  -1.93  P   
+Iteration 2:   deviance = 1.5338e+05  eps = 5.81e-02  iters = 2    tol = 1.0e-04  min(eta) =  -2.78      
+Iteration 3:   deviance = 1.5299e+05  eps = 2.55e-03  iters = 2    tol = 1.0e-04  min(eta) =  -3.30      
+Iteration 4:   deviance = 1.5298e+05  eps = 9.63e-05  iters = 2    tol = 1.0e-04  min(eta) =  -3.48      
+Iteration 5:   deviance = 1.5298e+05  eps = 6.94e-07  iters = 2    tol = 1.0e-05  min(eta) =  -3.50      
+Iteration 6:   deviance = 1.5298e+05  eps = 5.79e-11  iters = 2    tol = 1.0e-06  min(eta) =  -3.50   S O
+------------------------------------------------------------------------------------------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
+Converged in 6 iterations and 14 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =    126,500
+Absorbing 2 HDFE groups                           Residual df     =     12,649
+Statistics robust to heteroskedasticity           Wald chi2(18)   =      30.07
+Deviance             =  152978.6925               Prob > chi2     =     0.0368
+Log pseudolikelihood = -195802.3535               Pseudo R2       =     0.3316
+
+Number of clusters (athr_id)=     12,650
+                           (Std. err. adjusted for 12,650 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+ppr_cnt_no~t | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+   int_lead4 |   .6230621   .2676359     2.33   0.020     .0985055    1.147619
+   int_lead3 |   .1565133   .2583538     0.61   0.545    -.3498508    .6628774
+   int_lead2 |  -.1110582   .2441272    -0.45   0.649    -.5895387    .3674222
+    int_lag0 |  -.0930723     .24489    -0.38   0.704    -.5730479    .3869033
+    int_lag1 |  -.4545551   .2587101    -1.76   0.079    -.9616176    .0525073
+    int_lag2 |  -.1706853   .2781161    -0.61   0.539    -.7157828    .3744122
+    int_lag3 |  -.2246525   .2912675    -0.77   0.441    -.7955262    .3462213
+    int_lag4 |  -.6021931   .2954615    -2.04   0.042    -1.181287   -.0230992
+    int_lag5 |  -.9568218   .3022713    -3.17   0.002    -1.549263    -.364381
+  mshr_lead4 |   -.054905   .0797022    -0.69   0.491    -.2111184    .1013084
+  mshr_lead3 |   .0148334   .0745646     0.20   0.842    -.1313105    .1609774
+  mshr_lead2 |  -.0120268   .0698124    -0.17   0.863    -.1488567     .124803
+   mshr_lag0 |   .0390611   .0702093     0.56   0.578    -.0985466    .1766688
+   mshr_lag1 |  -.0247858   .0789046    -0.31   0.753     -.179436    .1298644
+   mshr_lag2 |  -.0131025   .0780797    -0.17   0.867    -.1661359    .1399309
+   mshr_lag3 |  -.0689805    .083186    -0.83   0.407    -.2320221    .0940611
+   mshr_lag4 |   .0465612    .086939     0.54   0.592     -.123836    .2169584
+   mshr_lag5 |  -.0100743   .0913579    -0.11   0.912    -.1891324    .1689839
+       _cons |   1.098327   .0130994    83.85   0.000     1.072652    1.124001
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |     12650       12650           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+N = 126,500; 12,650 balanced groups of size 10
+N = 126,500; 115 unbalanced groups of sizes 20 to 4,910
+
+                       ppr_cnt_notlast
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            0              0
+ 5%            0              0
+10%            0              0       Obs              50,600
+25%            0              0       Sum of wgt.      50,600
+
+50%            1                      Mean           2.064071
+                        Largest       Std. dev.      2.480806
+75%            3             31
+90%            5             36       Variance       6.154396
+95%            7             36       Skewness       2.684748
+99%           11             37       Kurtosis       16.81129
+(128,430 observations deleted)
+(9 missing values generated)
+(9 real changes made)
+(7 real changes made)
+(1 real change made)
+file ../output/figures/all_jrnls/es_ppr_cnt_notlast_r1_ppml_mshrctrl.pdf saved as PDF format
+file ../output/figures/all_jrnls/paper/es_ppr_cnt_notlast_r1_ppml_mshrctrl.pdf saved as PDF format
+(file ../temp/es_ppr_cnt_notlast_r1_ppml_mshrctrl.dta not found)
+file ../temp/es_ppr_cnt_notlast_r1_ppml_mshrctrl.dta saved
+(dropped 14620 observations that are either singletons or separated by a fixed effect)
+Iteration 1:   deviance = 8.1233e+04  eps = .         iters = 4    tol = 1.0e-04  min(eta) =  -3.06  P   
+Iteration 2:   deviance = 7.1910e+04  eps = 1.30e-01  iters = 2    tol = 1.0e-04  min(eta) =  -4.09      
+Iteration 3:   deviance = 7.1267e+04  eps = 9.02e-03  iters = 2    tol = 1.0e-04  min(eta) =  -5.10      
+Iteration 4:   deviance = 7.1238e+04  eps = 4.16e-04  iters = 2    tol = 1.0e-04  min(eta) =  -6.08      
+Iteration 5:   deviance = 7.1233e+04  eps = 5.97e-05  iters = 2    tol = 1.0e-04  min(eta) =  -7.03      
+Iteration 6:   deviance = 7.1233e+04  eps = 9.52e-06  iters = 2    tol = 1.0e-05  min(eta) =  -7.94      
+Iteration 7:   deviance = 7.1233e+04  eps = 1.23e-06  iters = 2    tol = 1.0e-06  min(eta) =  -8.84   S  
+Iteration 8:   deviance = 7.1233e+04  eps = 1.26e-07  iters = 2    tol = 1.0e-06  min(eta) =  -9.58   S  
+Iteration 9:   deviance = 7.1233e+04  eps = 1.04e-08  iters = 2    tol = 1.0e-07  min(eta) = -10.03   S  
+Iteration 10:  deviance = 7.1233e+04  eps = 4.30e-10  iters = 2    tol = 1.0e-09  min(eta) = -10.17   S O
+------------------------------------------------------------------------------------------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon below tolerance)
+Converged in 10 iterations and 22 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =    113,820
+Absorbing 2 HDFE groups                           Residual df     =     11,381
+Statistics robust to heteroskedasticity           Wald chi2(18)   =      32.25
+Deviance             =  71232.50851               Prob > chi2     =     0.0205
+Log pseudolikelihood = -62488.30147               Pseudo R2       =     0.2022
+
+Number of clusters (athr_id)=     11,382
+                           (Std. err. adjusted for 11,382 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+cite_affl~st | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+   int_lead4 |   .4368144   1.016599     0.43   0.667    -1.555683    2.429312
+   int_lead3 |   .1495647   .9744493     0.15   0.878    -1.760321     2.05945
+   int_lead2 |  -.3576249    1.01822    -0.35   0.725    -2.353299    1.638049
+    int_lag0 |  -.7845862    .924517    -0.85   0.396    -2.596606    1.027434
+    int_lag1 |   1.341735   .8948735     1.50   0.134    -.4121853    3.095654
+    int_lag2 |   -1.18247   .9050307    -1.31   0.191    -2.956298    .5913577
+    int_lag3 |  -.0123703   .9007195    -0.01   0.989    -1.777748    1.753008
+    int_lag4 |   .2591953   .9190624     0.28   0.778    -1.542134    2.060525
+    int_lag5 |  -.0473078   .8746581    -0.05   0.957    -1.761606    1.666991
+  mshr_lead4 |  -.6043266   .3062409    -1.97   0.048    -1.204548   -.0041055
+  mshr_lead3 |  -.6437442   .2988967    -2.15   0.031    -1.229571   -.0579174
+  mshr_lead2 |  -.0108782   .3014895    -0.04   0.971    -.6017868    .5800305
+   mshr_lag0 |  -.4701842   .2760733    -1.70   0.089    -1.011278    .0709095
+   mshr_lag1 |  -.3322936   .2739681    -1.21   0.225    -.8692612    .2046741
+   mshr_lag2 |   .2009408   .2701862     0.74   0.457    -.3286144    .7304959
+   mshr_lag3 |   .1283458   .2691927     0.48   0.634    -.3992622    .6559539
+   mshr_lag4 |  -.0279096   .2710445    -0.10   0.918     -.559147    .5033278
+   mshr_lag5 |   -.172642   .2659805    -0.65   0.516    -.6939542    .3486701
+       _cons |  -.7548622   .0529623   -14.25   0.000    -.8586664    -.651058
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |     11382       11382           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+N = 113,820; 11,382 balanced groups of size 10
+N = 113,820; 115 unbalanced groups of sizes 20 to 4,560
+
+                    cite_affl_wt_notlast
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            0              0
+ 5%            0              0
+10%            0              0       Obs              45,528
+25%            0              0       Sum of wgt.      45,528
+
+50%            0                      Mean           .1952087
+                        Largest       Std. dev.      .5736181
+75%            0       3.551812
+90%     .6093991       3.551812       Variance       .3290378
+95%     1.277404       3.551812       Skewness       4.021005
+99%     3.551812       3.551812       Kurtosis       20.43799
+(128,430 observations deleted)
+(9 missing values generated)
+(9 real changes made)
+(7 real changes made)
+(1 real change made)
+file ../output/figures/all_jrnls/es_cite_affl_wt_notlast_r1_ppml_mshrctrl.pdf saved as PDF format
+file ../output/figures/all_jrnls/paper/es_cite_affl_wt_notlast_r1_ppml_mshrctrl.pdf saved as PDF format
+(file ../temp/es_cite_affl_wt_notlast_r1_ppml_mshrctrl.dta not found)
+file ../temp/es_cite_affl_wt_notlast_r1_ppml_mshrctrl.dta saved
+(dropped 86 observations that are either singletons or separated by a fixed effect)
