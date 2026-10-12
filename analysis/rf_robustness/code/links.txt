@@ -1,0 +1,5 @@
+./prepped_samples/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/reduced_form/rf_sample/output/prepped_samples
+./lib/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/lib
+./exposure/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/foia_similarity_wts/output
+./betas/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/analysis/first_stage/output
+./real_exposure/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/exposure_msr/output

@@ -3,7 +3,7 @@ clear all
 capture log close
 version 17
 
-use ../output/prepped_samples/es_all_jrnls_r1_r2, clear
+use ../external/prepped_samples/es_all_jrnls_r1_r2, clear
 gen post       = year >= 2014
 gen Z_it       = exposure      * post
 gen Z_share_it = mkt_spend_shr * post

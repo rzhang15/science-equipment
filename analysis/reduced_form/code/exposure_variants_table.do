@@ -7,7 +7,7 @@ local samp all_jrnls
 local suf  _r1_r2
 local hisim_pct 50
 
-use ../output/prepped_samples/es_`samp'`suf', clear
+use ../external/prepped_samples/es_`samp'`suf', clear
 gen post = year >= 2014
 gen exposure_rn = cond(mkt_spend_shr > 0, exposure / mkt_spend_shr, 0)
 gen Z_it  = exposure      * post
@@ -89,7 +89,7 @@ forval k = 1/5 {
     keep athr_id exposure_ss sum_imputed_shares
     save ../temp/exposure_k`k', replace
 
-    use ../output/prepped_samples/es_`samp'`suf', clear
+    use ../external/prepped_samples/es_`samp'`suf', clear
     merge m:1 athr_id using ../temp/exposure_k`k', keep(1 3)
     keep if foia_athr == 1 | _merge == 3
     replace exposure      = exposure_ss        if foia_athr != 1

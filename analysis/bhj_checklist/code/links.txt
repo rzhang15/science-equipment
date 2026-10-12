@@ -1,5 +1,6 @@
-./rf/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/analysis/reduced_form/output
+./rf/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/reduced_form/rf_sample/output
 ./exposure/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/foia_similarity_wts/output
 ./real_exposure/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/exposure_msr/output
 ./betas/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/analysis/first_stage/output
 ./mkt/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/first_stage/make_mkt_panel/output
+./lib/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/lib

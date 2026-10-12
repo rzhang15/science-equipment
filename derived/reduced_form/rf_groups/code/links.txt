@@ -1,0 +1,6 @@
+./prepped_samples/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/reduced_form/rf_sample/output/prepped_samples
+./college/ | /n/netscratch/pakes_lab/Lab/sci_eq/college
+./inst_chars/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/inst_chars/output
+./nih/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/nih/match_pi_athr/output
+./athr_age/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/athr_age/output
+./lib/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/lib

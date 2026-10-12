@@ -1,5 +1,34 @@
 # Bounded same-product price check
 
+## Actual 500 mL price DiD
+
+The requested fixed-package-size first-stage regression is now separate from the descriptive same-product checks below. It uses the original cleaned item-level sample and existing US-FBS comparison markets, with no new matching and no repeated-SKU requirement.
+
+Run from the repository root:
+
+```bash
+python analysis/same_product_price/code/prepare_fbs_did.py
+stata-mp -b do analysis/same_product_price/code/fbs_500ml_did.do /n/holylabs/pakes_lab/Lab/sci_eq
+python analysis/same_product_price/code/report_fbs_did.py
+```
+
+The preparation script restricts **classified US-FBS** purchases to descriptions with an unambiguous 500 mL volume and excludes recognized multipacks, media, and buffers. It uses the existing item-level cleaning and trimming. It rebuilds each university–market–year's mean transaction log price, leaves bioluminescence assay kit and dewar-flask control prices unchanged, and carries over original market/university IDs and 2013 spending weights. The original support rule (first year before 2014 and last year after 2014) is reapplied. It does not pool other FBS country categories or require SKU matching.
+
+The Stata regression is:
+
+```stata
+reghdfe avg_log_price posttreat [aw=spend_2013], ///
+    absorb(year uni_id mkt) vce(cluster mkt)
+```
+
+`posttreat` is treated × year≥2014. An otherwise identical unrestricted regression reproduces the saved original FBS coefficient and standard error. Event-study regressions replace the post interaction with treated × year indicators, omitting 2013. Missing treated years are exported as missing, not zero effects.
+
+Outputs are under `output/fbs_500ml_did/`: the actual Stata `regression.log`, coefficient and event-study CSV/DTA files, PDF/PNG event-study comparison, annual coverage, restricted purchase audit, estimation panels, and `results.txt`. The reporting script verifies the original coefficient/SE, unchanged controls, package eligibility, and purchase counts.
+
+There are only three market clusters. Reported 95% intervals use Stata's t critical value with two residual inference degrees of freedom. The original saved figures used 1.96 × SE; those normal-approximation bounds are also supplied in `estimate_summary.csv`. This check fixes recorded bottle volume, while product composition within the US-FBS category can still change.
+
+## Descriptive same-product checks
+
 Run from the repository root:
 
 ```bash

@@ -3,43 +3,9 @@ clear all
 capture log close
 program drop _all
 set scheme modern
-preliminaries
+preliminaries, loadglob(../external/lib/globals.txt)
 
-global PRES_SCALE 1.2
-
-cap program drop fig_export
-program fig_export
-    syntax, path(string) [mode(string) xsize(real 6) ysize(real 4)]
-    local p : subinstr local path "/paper/" "/", all
-    local p : subinstr local p "/pres/" "/", all
-    local k = strpos("`p'", "figures/")
-    if `k' > 0 {
-        local base = substr("`p'", 1, `k' + 7)
-        local rest = substr("`p'", `k' + 8, .)
-    }
-    else {
-        local slash = strrpos("`p'", "/")
-        local base = substr("`p'", 1, `slash')
-        local rest = substr("`p'", `slash' + 1, .)
-    }
-    local tscale = cond(`xsize' >= `ysize', (2/3) * `xsize' / min(`xsize', `ysize'), 1)
-    if "`mode'" == "presentation" local mode pres
-    foreach m in paper pres {
-        if "`mode'" != "" & "`mode'" != "`m'" continue
-        local dir "`base'`m'"
-        cap mkdir "`dir'"
-        local sub "`rest'"
-        while strpos("`sub'", "/") > 0 {
-            local seg = substr("`sub'", 1, strpos("`sub'", "/") - 1)
-            local dir "`dir'/`seg'"
-            cap mkdir "`dir'"
-            local sub = substr("`sub'", strpos("`sub'", "/") + 1, .)
-        }
-        local s = cond("`m'" == "pres", `tscale' * $PRES_SCALE, `tscale')
-        graph display, scale(`s')
-        graph export "`base'`m'/`rest'", replace
-    }
-end
+adopath ++ "../external/lib/stata"
 version 17
 
 program main
@@ -1034,9 +1000,23 @@ program boe
     local q1_hq : di %6.2f r(p25)
     local q3_hq : di %6.2f r(p75)
     local median_hq : di %6.2f r(p50)
-   tw hist hq_labspend if hq_labspend >50 & hq_labspend <= 75000,  color(edkblue) frac width(5000) xlab(0(7500)75000, angle(45)) ///
-       xtitle("Avg annual high-confidence consumables expenditure ($)") ytitle("Fraction of PIs") legend(on order(- "N = `N_hq'" "Mean = `mean_hq'" "SD = `sd_hq'" "Min = `min_hq'" "Q1 = `q1_hq'" "Median = `median_hq'" "Q3 = `q3_hq'" "Max = `max_hq'") pos(1) ring(0) region(fcolor(none)) size(small))
-   fig_export, path("../output/figures/hq_labspend_pi.pdf")
+   foreach fmode in paper pres {
+       local hcol edkblue
+       local xl xlab(0(7500)75000, angle(45))
+       local yl ytitle("Fraction of PIs")
+       local xt "Avg annual high-confidence consumables expenditure ($)"
+       local leg legend(on order(- "N = `N_hq'" "Mean = `mean_hq'" "SD = `sd_hq'" "Min = `min_hq'" "Q1 = `q1_hq'" "Median = `median_hq'" "Q3 = `q3_hq'" "Max = `max_hq'") pos(1) ring(0) region(fcolor(none)) size(small))
+       if "`fmode'" == "paper" {
+           local hcol ebblue
+           local xl xlab(0(7500)75000, angle(45) format(%9.0fc))
+           local yl ytitle("Fraction of PIs") ylab(, format(%3.1f))
+           local xt "Average annual consumables spending ($)"
+           local leg legend(off)
+       }
+       tw hist hq_labspend if hq_labspend >50 & hq_labspend <= 75000, color(`hcol') frac width(5000) `xl' ///
+           xtitle("`xt'") ysc(titlegap($FIG_YTITLEGAP) outergap(0)) `yl' `leg'
+       fig_export, path("../output/figures/hq_labspend_pi.pdf") mode(`fmode')
+   }
     graph bar lab_spend nonlab_spend, over(athr_id ,sort((mean) tot_spend) descending) stack bar(1, color(lavender%70)) bar(2, color(dkorange%70)) legend(on order(- "Lab spend" - "Non-lab spend") pos(1) ring(0) size(small) region(fcolor(none))) ytitle("Average annual spend ($)") plotregion(margin(sides))
     fig_export, path("../output/figures/avg_spend_by_athr.pdf")
    kdensity perc_lab_spend

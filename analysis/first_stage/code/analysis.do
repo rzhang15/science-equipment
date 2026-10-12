@@ -3,43 +3,9 @@ clear all
 capture log close
 program drop _all
 set scheme modern
-preliminaries
+preliminaries, loadglob(../external/lib/globals.txt)
 
-global PRES_SCALE 1.2
-
-cap program drop fig_export
-program fig_export
-    syntax, path(string) [mode(string) xsize(real 6) ysize(real 4)]
-    local p : subinstr local path "/paper/" "/", all
-    local p : subinstr local p "/pres/" "/", all
-    local k = strpos("`p'", "figures/")
-    if `k' > 0 {
-        local base = substr("`p'", 1, `k' + 7)
-        local rest = substr("`p'", `k' + 8, .)
-    }
-    else {
-        local slash = strrpos("`p'", "/")
-        local base = substr("`p'", 1, `slash')
-        local rest = substr("`p'", `slash' + 1, .)
-    }
-    local tscale = cond(`xsize' >= `ysize', (2/3) * `xsize' / min(`xsize', `ysize'), 1)
-    if "`mode'" == "presentation" local mode pres
-    foreach m in paper pres {
-        if "`mode'" != "" & "`mode'" != "`m'" continue
-        local dir "`base'`m'"
-        cap mkdir "`dir'"
-        local sub "`rest'"
-        while strpos("`sub'", "/") > 0 {
-            local seg = substr("`sub'", 1, strpos("`sub'", "/") - 1)
-            local dir "`dir'/`seg'"
-            cap mkdir "`dir'"
-            local sub = substr("`sub'", strpos("`sub'", "/") + 1, .)
-        }
-        local s = cond("`m'" == "pres", `tscale' * $PRES_SCALE, `tscale')
-        graph display, scale(`s')
-        graph export "`base'`m'/`rest'", replace
-    }
-end
+adopath ++ "../external/lib/stata"
 version 17
 global exhibit_mode both // paper | presentation | both
 
@@ -104,7 +70,7 @@ program raw_plots
         tw connected lvl year if treated == 1, lcolor(ebblue) mcolor(ebblue) || ///
            connected lvl year if treated == 0, lcolor(dkorange) mcolor(dkorange) msymbol(diamond) lpattern(dash) ///
            legend(on order(1 "Treated" 2 "Control") pos(6) rows(1) size(small)) ///
-           ytitle("`yname'") ysc(titlegap(-6) outergap(0)) ylabel(#6) xlabel(2010(1)2019) xtitle("Year") ///
+           ytitle("`yname'") ysc(titlegap($FIG_YTITLEGAP) outergap(0)) ylabel(#6) xlabel(2010(1)2019) xtitle("Year") ///
            tline(2013.5, lpattern(shortdash) lcolor(gs4%80)) plotregion(margin(sides))
         fig_export, path("../output/figures/raw/`var'_levels_pooled$suffix.pdf")
         tw rcap dev_ub dev_lb x if treated == 1 & year != 2013, lcolor(ebblue%70) msize(vsmall) || ///
@@ -112,7 +78,7 @@ program raw_plots
            connected dev x if treated == 1, lcolor(ebblue) mcolor(ebblue) || ///
            connected dev x if treated == 0, lcolor(dkorange) mcolor(dkorange) msymbol(diamond) lpattern(dash) ///
            legend(on order(3 "Treated" 4 "Control") pos(6) rows(1) size(small)) ///
-           ytitle("`yname', relative to 2013") ysc(titlegap(-6) outergap(0)) ylabel(#6) xlabel(2010(1)2019) xtitle("Year") ///
+           ytitle("`yname', relative to 2013") ysc(titlegap($FIG_YTITLEGAP) outergap(0)) ylabel(#6) xlabel(2010(1)2019) xtitle("Year") ///
            yline(0, lcolor(gs10) lpattern(solid)) tline(2013.5, lpattern(shortdash) lcolor(gs4%80)) plotregion(margin(sides))
         fig_export, path("../output/figures/raw/`var'_trends_pooled$suffix.pdf")
         restore
@@ -245,14 +211,14 @@ program process_coefs
     labmask rank, values(category)
     count
     local n = r(N)
-    tw rcap ub lb rank, msize(vsmall) || scatter b rank, msize(tiny) mcolor(lavender) yline(0) ylab(-1(0.2)1, labsize(small)) ysc(titlegap(-6) outergap(0)) ytitle("DiD estimate (log `outcome') + 95% CI", size(medsmall)) xlab(1(1)`n', angle(45) labsize(small) valuelabel) graphregion(margin(b+35 l+5)) xtitle("") legend(off)
+    tw rcap ub lb rank, msize(vsmall) || scatter b rank, msize(tiny) mcolor(lavender) yline(0) ylab(-1(0.2)1, labsize(small)) ysc(titlegap($FIG_YTITLEGAP) outergap(0)) ytitle("DiD estimate (log `outcome') + 95% CI", size(medsmall)) xlab(1(1)`n', angle(45) labsize(small) valuelabel) graphregion(margin(b+35 l+5)) xtitle("") legend(off)
     fig_export, path("../output/figures/coef_rank_`outcome'$suffix.pdf")
     hashsort spend_2013
     gen rank_spend = _n
     labmask rank_spend, values(category)
     count
     local n = r(N)
-    tw rcap ub lb rank_spend, msize(vsmall) || scatter b rank_spend, msize(tiny) mcolor(lavender) yline(0) ylab(-1(0.2)1, labsize(small)) ysc(titlegap(-6) outergap(0)) ytitle("DiD estimate (log `outcome') + 95% CI", size(medsmall)) xlab(1(1)`n', angle(45) labsize(small) valuelabel) graphregion(margin(b+35 l+5)) xtitle("") legend(off)
+    tw rcap ub lb rank_spend, msize(vsmall) || scatter b rank_spend, msize(tiny) mcolor(lavender) yline(0) ylab(-1(0.2)1, labsize(small)) ysc(titlegap($FIG_YTITLEGAP) outergap(0)) ytitle("DiD estimate (log `outcome') + 95% CI", size(medsmall)) xlab(1(1)`n', angle(45) labsize(small) valuelabel) graphregion(margin(b+35 l+5)) xtitle("") legend(off)
     fig_export, path("../output/figures/coef_spend_rank_`outcome'$suffix.pdf")
     corr b delta_hhi [aw=spend_2013]
     local corr : di %4.3f r(rho)
@@ -374,7 +340,7 @@ program process_coefs
     local n = r(N)
     tw rcap ub_eb lb_eb rank, msize(vsmall) || ///
        scatter b_eb rank, msize(tiny) mcolor(lavender) ///
-       yline(0) ylab(-1(0.2)1, labsize(small)) ysc(titlegap(-6) outergap(0)) ///
+       yline(0) ylab(-1(0.2)1, labsize(small)) ysc(titlegap($FIG_YTITLEGAP) outergap(0)) ///
        ytitle("EB DiD estimate (log `outcome') + 95% CI", size(medsmall)) ///
        xlab(1(1)`n', angle(45) labsize(small) valuelabel) ///
        graphregion(margin(b+35 l+5)) xtitle("") legend(off)
@@ -388,7 +354,7 @@ program process_coefs
     local n = r(N)
     tw rcap ub_eb lb_eb rank_spend, msize(vsmall) || ///
        scatter b_eb rank_spend, msize(tiny) mcolor(lavender) ///
-       yline(0) ylab(-1(0.2)1, labsize(small)) ysc(titlegap(-6) outergap(0)) ///
+       yline(0) ylab(-1(0.2)1, labsize(small)) ysc(titlegap($FIG_YTITLEGAP) outergap(0)) ///
        ytitle("EB DiD estimate (log `outcome') + 95% CI", size(medsmall)) ///
        xlab(1(1)`n', angle(45) labsize(small) valuelabel) ///
        graphregion(margin(b+35 l+5)) xtitle("") legend(off)
@@ -842,6 +808,8 @@ program robustness_tex
 end
 
 program event_study
+    local pymin -0.3
+    local pymax 0.8
     use ../external/samp/uni_category_yr_tfidf$suffix, clear
     apply_hhi_cut, suffix("$suffix")
     merge m:1 category using ../external/samp/category_hhi_tfidf$suffix, assert(1 2 3) keep(3) nogen
@@ -863,10 +831,10 @@ program event_study
         local ctrl_mean = round(r(mean) + 0.001, 0.001)
         if "`yvar'" == "price" {
             di "hi"
-            manual_event_study, lag(5) lead(-4) yvar(avg_log_`yvar') ymin(-0.4) ymax(0.7) ygap(0.1) trt_mean(`trt_mean') ctrl_mean(`ctrl_mean')  name(`yname') fes(`fes') wt_var(spend_2013) cluster_var(mkt) file_suf("naive")
+            manual_event_study, lag(5) lead(-4) yvar(avg_log_`yvar') ymin(-0.4) ymax(0.7) ygap(0.1) trt_mean(`trt_mean') ctrl_mean(`ctrl_mean')  name(`yname') fes(`fes') wt_var(spend_2013) cluster_var(mkt) file_suf("naive") pymin(`pymin') pymax(`pymax')
         }
         if "`yvar'" != "price" {
-            manual_event_study, lag(5) lead(-4) yvar(log_raw_`yvar') ymin(-0.4) ymax(0.7) ygap(0.1) trt_mean(`trt_mean') ctrl_mean(`ctrl_mean')  name(`yname') fes(`fes') wt_var(spend_2013) cluster_var(mkt) file_suf("naive")
+            manual_event_study, lag(5) lead(-4) yvar(log_raw_`yvar') ymin(-0.4) ymax(0.7) ygap(0.1) trt_mean(`trt_mean') ctrl_mean(`ctrl_mean')  name(`yname') fes(`fes') wt_var(spend_2013) cluster_var(mkt) file_suf("naive") pymin(`pymin') pymax(`pymax')
         }
         restore
     }
@@ -895,11 +863,11 @@ program event_study
         qui sum raw_`yvar' if treated == 0 & year == 2013
         local ctrl_mean = round(r(mean) + 0.001, 0.001)
         if "`yvar'" == "price" {
-            manual_event_study, lag(5) lead(-4) yvar(avg_log_`yvar') ymin(-0.4) ymax(0.7) ygap(0.1) trt_mean(`trt_mean') ctrl_mean(`ctrl_mean')  name(`yname') fes(`fes') wt_var(spend_2013) cluster_var(mkt) file_suf("pooled")
+            manual_event_study, lag(5) lead(-4) yvar(avg_log_`yvar') ymin(-0.4) ymax(0.7) ygap(0.1) trt_mean(`trt_mean') ctrl_mean(`ctrl_mean')  name(`yname') fes(`fes') wt_var(spend_2013) cluster_var(mkt) file_suf("pooled") pymin(`pymin') pymax(`pymax')
         }
         local fes uni_id mkt
         if "`yvar'" != "price" {
-            manual_event_study, lag(5) lead(-4) yvar(log_raw_`yvar') ymin(-0.4) ymax(0.7) ygap(0.1) trt_mean(`trt_mean') ctrl_mean(`ctrl_mean')  name(`yname') fes(`fes') wt_var(spend_2013) cluster_var(mkt) file_suf("pooled")
+            manual_event_study, lag(5) lead(-4) yvar(log_raw_`yvar') ymin(-0.4) ymax(0.7) ygap(0.1) trt_mean(`trt_mean') ctrl_mean(`ctrl_mean')  name(`yname') fes(`fes') wt_var(spend_2013) cluster_var(mkt) file_suf("pooled") pymin(`pymin') pymax(`pymax')
         }
         restore
     }
@@ -1246,7 +1214,7 @@ program uni_fes
 end
 
 program manual_event_study
-    syntax, lag(int) lead(int) yvar(str) ymin(real) ymax(real) ygap(real) trt_mean(real) ctrl_mean(real) name(str) fes(str) wt_var(str) cluster_var(str) [unwt(real 0)balance(real 0) file_suf(str) title(str)]
+    syntax, lag(int) lead(int) yvar(str) ymin(real) ymax(real) ygap(real) trt_mean(real) ctrl_mean(real) name(str) fes(str) wt_var(str) cluster_var(str) [unwt(real 0)balance(real 0) file_suf(str) title(str) pymin(real 1e9) pymax(real -1e9)]
     cap drop lag* lead* year_fes*
     local suf ""
     if `balance' == 1 local suf "bal_" 
@@ -1371,32 +1339,54 @@ program manual_event_study
         plotregion(margin(sides))
         fig_export, path("../output/figures/es/`suf'es_`yvar'_`file_suf'$suffix.pdf")
     }*/
+    qui sum lb if rel != -1 & inrange(rel, `lead', `lag')
+    local dmin = r(min)
+    qui sum ub if rel != -1 & inrange(rel, `lead', `lag')
+    local dmax = r(max)
+    foreach v in trt_coef_lb year_fes_lb {
+        qui sum `v' if rel != -1 & inrange(rel, `lead', `lag')
+        local dmin = min(`dmin', r(min))
+    }
+    foreach v in trt_coef_ub year_fes_ub {
+        qui sum `v' if rel != -1 & inrange(rel, `lead', `lag')
+        local dmax = max(`dmax', r(max))
+    }
+    local pymin = strtrim(string(min(`pymin', floor(`dmin' / `ygap') * `ygap'), "%6.2f"))
+    local pymax = strtrim(string(max(`pymax', ceil(`dmax' / `ygap') * `ygap'), "%6.2f"))
     foreach mode in `modes' {
         local figdir ../output/figures
         local legend_lvl legend(on order(- "Treated level avg. in t = -1: `trt_mean'" "Control level avg. in t = -1: `ctrl_mean'") pos(7) rows(2) bmargin(zero) size(small))
+        local legend_b `legend_split'
+        local ylab_m ylab(`ymin'(`ygap')`ymax')
+        local band_lo `ymin'
+        local band_hi `ymax'
         if "`mode'" == "paper" {
             local legend_lvl legend(off)
+            local legend_b legend(on order(3 "Treated markets" 4 "Control markets") ring(0) position(11) cols(1) region(lcolor(none)) size(small))
+            local ylab_m ylab(`pymin'(`ygap')`pymax', format(%3.1f))
+            local band_lo `pymin'
+            local band_hi `pymax'
         }
         tw rcap ub lb year if rel != -1 & inrange(rel, `lead', `lag') , lcolor(ebblue%70) msize(vsmall) || ///
         scatter b year if inrange(rel, `lead', `lag') , mcolor(ebblue) || ///
-        scatteri `ymax' 2013.75 `ymax' 2014.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
+        scatteri `band_hi' 2013.75 `band_hi' 2014.25 , bcolor(gs12%30) recast(area) base(`band_lo') ///
         xlab(`year_min'(1)`year_max') xtitle("Year") ///
-        ytitle("`name'") ysc(titlegap(-6) outergap(0)) ylab(`ymin'(`ygap')`ymax') yline(0, lcolor(gs10) lpattern(solid)) ///
+        ytitle("`name'") ysc(titlegap($FIG_YTITLEGAP) outergap(0)) `ylab_m' yline(0, lcolor(gs10) lpattern(solid)) ///
         `legend_lvl' ///
         title(`title', size(small)) plotregion(margin(sides))
         fig_export, path("`figdir'/es/`suf'es_`yvar'_`file_suf'$suffix.pdf") mode(`mode')
-    }
 
         tw rcap trt_coef_ub trt_coef_lb year if rel != -1 & inrange(rel, `lead', `lag') , lcolor(ebblue%70) msize(vsmall) || ///
         rcap year_fes_ub year_fes_lb rel_year_fes if rel != -1 & inrange(rel, `lead', `lag') , lcolor(dkorange%70) lpattern(dash) msize(vsmall) || ///
         scatter trt_coef year if inrange(rel, `lead', `lag') , mcolor(ebblue) || ///
         scatter year_fes rel_year_fes if inrange(rel, `lead', `lag') , mcolor(dkorange) msymbol(diamond) || ///
-        scatteri `ymax' 2013.75 `ymax' 2014.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
+        scatteri `band_hi' 2013.75 `band_hi' 2014.25 , bcolor(gs12%30) recast(area) base(`band_lo') ///
         xlab(`year_min'(1)`year_max') xtitle("Year") ///
-        ytitle("`name'") ysc(titlegap(-6) outergap(0)) ylab(`ymin'(`ygap')`ymax') yline(0, lcolor(gs10) lpattern(solid)) ///
-        `legend_split' ///
+        ytitle("`name'") ysc(titlegap($FIG_YTITLEGAP) outergap(0)) `ylab_m' yline(0, lcolor(gs10) lpattern(solid)) ///
+        `legend_b' ///
         title(`title', size(small)) plotregion(margin(sides))
-        fig_export, path("../output/figures/es/split_`suf'es_`yvar'_`file_suf'$suffix.pdf")
+        fig_export, path("`figdir'/es/split_`suf'es_`yvar'_`file_suf'$suffix.pdf") mode(`mode')
+    }
 
         gen trt_coef_raw_ub = trt_coef_raw + 1.96*trt_coef_se
         gen trt_coef_raw_lb = trt_coef_raw - 1.96*trt_coef_se
@@ -1416,7 +1406,7 @@ program manual_event_study
         scatter year_fes_raw rel_year_fes if inrange(rel, `lead', `lag') , mcolor(dkorange) msymbol(diamond) || ///
         scatteri `rymax' 2013.75 `rymax' 2014.25 , bcolor(gs12%30) recast(area) base(`rymin') ///
         xlab(`year_min'(1)`year_max') xtitle("Year") ///
-        ytitle("`name'") ysc(titlegap(-6) outergap(0)) ylab(`rymin'(`ygap')`rymax') yline(0, lcolor(gs10) lpattern(solid)) ///
+        ytitle("`name'") ysc(titlegap($FIG_YTITLEGAP) outergap(0)) ylab(`rymin'(`ygap')`rymax') yline(0, lcolor(gs10) lpattern(solid)) ///
         `legend_split' ///
         title(`title', size(small)) plotregion(margin(sides))
         fig_export, path("../output/figures/es/split_nodetrend_`suf'es_`yvar'_`file_suf'$suffix.pdf")

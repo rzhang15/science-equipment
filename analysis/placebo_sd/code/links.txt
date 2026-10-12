@@ -1,2 +1,3 @@
 ./samp/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/first_stage/make_mkt_panel/output
 ./real/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/analysis/first_stage/output
+./lib/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/lib

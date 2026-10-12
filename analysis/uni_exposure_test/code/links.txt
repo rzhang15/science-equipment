@@ -3,4 +3,4 @@
 ./merged/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/first_stage/matched_panel/output
 ./exposure/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/exposure_msr/output
 ./betas/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/analysis/first_stage/output
-
+./lib/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/lib

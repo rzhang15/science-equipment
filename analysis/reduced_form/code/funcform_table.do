@@ -6,7 +6,7 @@ version 17
 local samp all_jrnls
 local suf  _r1_r2
 
-use ../output/prepped_samples/es_`samp'`suf', clear
+use ../external/prepped_samples/es_`samp'`suf', clear
 gen post       = year >= 2014
 gen Z_it       = exposure      * post
 gen Z_share_it = mkt_spend_shr * post

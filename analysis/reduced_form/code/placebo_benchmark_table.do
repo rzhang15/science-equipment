@@ -10,7 +10,7 @@ local suf  _r1_r2
 import delimited ../temp/exposure_pl.csv, clear varnames(1) stringcols(1)
 save ../temp/exposure_pl, replace
 
-use ../output/prepped_samples/es_`samp'`suf', clear
+use ../external/prepped_samples/es_`samp'`suf', clear
 merge m:1 athr_id using ../temp/exposure_pl, keep(1 3) nogen
 assert !mi(exposure_pl)
 gen post  = year >= 2014

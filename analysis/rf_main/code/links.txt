@@ -1,0 +1,2 @@
+./prepped_samples/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/reduced_form/rf_sample/output/prepped_samples
+./lib/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/lib

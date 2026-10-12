@@ -3,43 +3,9 @@ clear all
 capture log close
 program drop _all
 set scheme modern
-preliminaries
+preliminaries, loadglob(../external/lib/globals.txt)
 
-global PRES_SCALE 1.2
-
-cap program drop fig_export
-program fig_export
-    syntax, path(string) [mode(string) xsize(real 6) ysize(real 4)]
-    local p : subinstr local path "/paper/" "/", all
-    local p : subinstr local p "/pres/" "/", all
-    local k = strpos("`p'", "figures/")
-    if `k' > 0 {
-        local base = substr("`p'", 1, `k' + 7)
-        local rest = substr("`p'", `k' + 8, .)
-    }
-    else {
-        local slash = strrpos("`p'", "/")
-        local base = substr("`p'", 1, `slash')
-        local rest = substr("`p'", `slash' + 1, .)
-    }
-    local tscale = cond(`xsize' >= `ysize', (2/3) * `xsize' / min(`xsize', `ysize'), 1)
-    if "`mode'" == "presentation" local mode pres
-    foreach m in paper pres {
-        if "`mode'" != "" & "`mode'" != "`m'" continue
-        local dir "`base'`m'"
-        cap mkdir "`dir'"
-        local sub "`rest'"
-        while strpos("`sub'", "/") > 0 {
-            local seg = substr("`sub'", 1, strpos("`sub'", "/") - 1)
-            local dir "`dir'/`seg'"
-            cap mkdir "`dir'"
-            local sub = substr("`sub'", strpos("`sub'", "/") + 1, .)
-        }
-        local s = cond("`m'" == "pres", `tscale' * $PRES_SCALE, `tscale')
-        graph display, scale(`s')
-        graph export "`base'`m'/`rest'", replace
-    }
-end
+adopath ++ "../external/lib/stata"
 version 17
 global exhibit_mode both // paper | presentation | both
 
@@ -132,22 +98,22 @@ program overlay_hist
         foreach mode in `modes' {
             local figdir ../output/figures
             local stats_note `"- "Randomization Inference p `p_two'""'
+            local xlab_m xlab(`xmin'(`xstep')`xmax')
+            local legend_m legend(on order(3 "Actual treatment effects (N=`N_r', mean=`mean_r', sd=`sd_r')" 4 "Placebo treatment effects (N=`N_p', mean=`mean_p', sd=`sd_p')" `stats_note') pos(7) ring(1) region(fcolor(none)) size(small))
             if "`mode'" == "paper" {
-                local stats_note
+                local xlab_m xlab(`xmin'(`xstep')`xmax', format(%3.1f))
+                local legend_m legend(on order(3 "Treated markets" 4 "Placebo") ring(0) position(1) cols(1) region(lcolor(none)) size(small))
             }
             tw rarea dens_r lo xgrid, color(ebblue%25) lwidth(none) || ///
                rarea dens_p lo xgrid, color(gs12%50) lwidth(none) || ///
                line dens_r xgrid, color(ebblue%70) lwidth(medthick) || ///
                line dens_p xgrid, color(gs10%80) lwidth(medthick) lpattern(dash) ///
                xtitle("DiD coefficient (log `outcome')") ///
-               ytitle("Density") ///
-               xlab(`xmin'(`xstep')`xmax') ///
+               ytitle("Density") ysc(titlegap($FIG_YTITLEGAP) outergap(0)) ///
+               `xlab_m' ///
                xline(0, lcolor(gs6) lpattern(dash)) ///
                xline(`mean_r_raw', lcolor(ebblue) lpattern(solid) lwidth(medthin)) ///
-               legend(on order(3 "Actual treatment effects (N=`N_r', mean=`mean_r', sd=`sd_r')" ///
-                               4 "Placebo treatment effects (N=`N_p', mean=`mean_p', sd=`sd_p')" ///
-                               `stats_note') ///
-                      pos(7) ring(1) region(fcolor(none)) size(small))
+               `legend_m'
             fig_export, path("`figdir'/did_coefs_overlay_kdens_eb`suf'$suffix.pdf") mode(`mode')
         }
     restore
@@ -157,7 +123,7 @@ program overlay_hist
         collapse (mean) iter_mean = b, by(iter)
         tw histogram iter_mean, color(gs10%80) width(0.005) ///
            xtitle("Mean DiD coefficient within placebo iteration (log `outcome')") ///
-           ytitle("Density") ///
+           ytitle("Density") ysc(titlegap($FIG_YTITLEGAP) outergap(0)) ///
            xline(`mean_r_raw', lcolor(purple) lwidth(medthick)) ///
            xline(0, lcolor(gs6) lpattern(dash)) ///
            legend(off) ///

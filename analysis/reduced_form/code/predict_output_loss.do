@@ -21,7 +21,7 @@ program fit_and_predict
         local wsuf "_msimwt"
     }
 
-    use ../output/prepped_samples/es_`samp'`suf', clear
+    use ../external/prepped_samples/es_`samp'`suf', clear
     gen post = year >= 2014
     gen Z_it       = exposure      * post
     gen Z_share_it = mkt_spend_shr * post

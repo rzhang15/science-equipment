@@ -8,3 +8,5 @@
 ./nih_grants/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/nih/match_pi_athr/output
 
 ./betas/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/analysis/first_stage/output
+./lib/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/lib
+./prepped_samples/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/reduced_form/rf_sample/output/prepped_samples

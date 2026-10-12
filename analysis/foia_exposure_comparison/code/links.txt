@@ -1,0 +1,2 @@
+./rf/ | {root}/derived/reduced_form/rf_sample/output
+./validation/ | {root}/analysis/imputation_validation/output

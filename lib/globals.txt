@@ -1,0 +1,12 @@
+* Shared settings; load with: preliminaries, loadglob(../external/lib/globals.txt)
+* FE_MODE: author | athr_clyr | inst_cluster | inst_cluster_fldyr
+EXPOSURE_VERSION hc_all3
+EXPOSURE_FILTER _cf_k3
+FE_MODE author
+FIG_MODES "pres paper"
+PRES_SCALE 1.2
+IC_ALIASES "tfnd lsf endow"
+FIG_YTITLEGAP 2
+* RUN_PUBLIC / RUN_R1_ONLY: also run the _public sample / the R1-only passes
+RUN_PUBLIC 1
+RUN_R1_ONLY 1

@@ -9,4 +9,4 @@
 ./athr_panel/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/make_athr_yr_panel/output
 ./coauthors/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/get_coauthors/output
 ./placebo_betas/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/analysis/placebo_first_stage/output
-./rf_samp/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/analysis/reduced_form/output/prepped_samples
+./rf_samp/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/reduced_form/rf_sample/output/prepped_samples

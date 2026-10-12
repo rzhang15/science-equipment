@@ -5,41 +5,7 @@ program drop _all
 set scheme modern
 preliminaries
 
-global PRES_SCALE 1.2
-
-cap program drop fig_export
-program fig_export
-    syntax, path(string) [mode(string) xsize(real 6) ysize(real 4)]
-    local p : subinstr local path "/paper/" "/", all
-    local p : subinstr local p "/pres/" "/", all
-    local k = strpos("`p'", "figures/")
-    if `k' > 0 {
-        local base = substr("`p'", 1, `k' + 7)
-        local rest = substr("`p'", `k' + 8, .)
-    }
-    else {
-        local slash = strrpos("`p'", "/")
-        local base = substr("`p'", 1, `slash')
-        local rest = substr("`p'", `slash' + 1, .)
-    }
-    local tscale = cond(`xsize' >= `ysize', (2/3) * `xsize' / min(`xsize', `ysize'), 1)
-    if "`mode'" == "presentation" local mode pres
-    foreach m in paper pres {
-        if "`mode'" != "" & "`mode'" != "`m'" continue
-        local dir "`base'`m'"
-        cap mkdir "`dir'"
-        local sub "`rest'"
-        while strpos("`sub'", "/") > 0 {
-            local seg = substr("`sub'", 1, strpos("`sub'", "/") - 1)
-            local dir "`dir'/`seg'"
-            cap mkdir "`dir'"
-            local sub = substr("`sub'", strpos("`sub'", "/") + 1, .)
-        }
-        local s = cond("`m'" == "pres", `tscale' * $PRES_SCALE, `tscale')
-        graph display, scale(`s')
-        graph export "`base'`m'/`rest'", replace
-    }
-end
+adopath ++ "../external/lib/stata"
 version 17
 
 global EXPOSURE_VERSION "hc_all3"
@@ -399,11 +365,13 @@ program overlay_fig
     foreach mode in presentation paper {
         local figdir ../output/figures
         local stats_note `"- "Randomization Inference p `p_one'""'
+        local pl_pat dash
         if "`mode'" == "paper" {
             local stats_note
+            local pl_pat solid
         }
         tw rarea dens_p zero xgrid, color(gs12%50) lwidth(none) || ///
-           line dens_p xgrid, color(gs10%80) lwidth(medthick) lpattern(dash) ///
+           line dens_p xgrid, color(gs10%80) lwidth(medthick) lpattern(`pl_pat') ///
            xtitle("`xlab'") ytitle("Density") ///
            xlab(`xmin'(`xstep')`xmax') ///
            xline(0, lcolor(gs6) lpattern(dash)) ///

@@ -3,43 +3,9 @@ clear all
 capture log close
 program drop _all
 set scheme modern
-preliminaries
+preliminaries, loadglob(../external/lib/globals.txt)
 
-global PRES_SCALE 1.2
-
-cap program drop fig_export
-program fig_export
-    syntax, path(string) [mode(string) xsize(real 6) ysize(real 4)]
-    local p : subinstr local path "/paper/" "/", all
-    local p : subinstr local p "/pres/" "/", all
-    local k = strpos("`p'", "figures/")
-    if `k' > 0 {
-        local base = substr("`p'", 1, `k' + 7)
-        local rest = substr("`p'", `k' + 8, .)
-    }
-    else {
-        local slash = strrpos("`p'", "/")
-        local base = substr("`p'", 1, `slash')
-        local rest = substr("`p'", `slash' + 1, .)
-    }
-    local tscale = cond(`xsize' >= `ysize', (2/3) * `xsize' / min(`xsize', `ysize'), 1)
-    if "`mode'" == "presentation" local mode pres
-    foreach m in paper pres {
-        if "`mode'" != "" & "`mode'" != "`m'" continue
-        local dir "`base'`m'"
-        cap mkdir "`dir'"
-        local sub "`rest'"
-        while strpos("`sub'", "/") > 0 {
-            local seg = substr("`sub'", 1, strpos("`sub'", "/") - 1)
-            local dir "`dir'/`seg'"
-            cap mkdir "`dir'"
-            local sub = substr("`sub'", strpos("`sub'", "/") + 1, .)
-        }
-        local s = cond("`m'" == "pres", `tscale' * $PRES_SCALE, `tscale')
-        graph display, scale(`s')
-        graph export "`base'`m'/`rest'", replace
-    }
-end
+adopath ++ "../external/lib/stata"
 version 17
 
 global K        3
@@ -91,11 +57,20 @@ program binscatter_pair
     mat stats_`stem' = (`n', `corr', `b', `se', `rmse', `rmse_null', `sd')
     mat colnames stats_`stem' = n corr slope_obs_on_imputed se rmse rmse_null sd_observed
 
-    binscatter `y' `x', n(20) msymbol(O) mcolors(gs6) lcolors(ebblue) ///
-        xtitle("`xtitle'") ytitle("`ytitle'") ///
-        legend(on order(- "N = `n'" - "Corr = `corr'" - "Slope = `b'" - "            (`se')") ring(0) pos(11) cols(1)) ///
-        plotregion(margin(sides))
-    fig_export, path("../output/figures/binscatter_`stem'_${VERSION}_k${K}.pdf")
+    foreach fmode in paper pres {
+        local leg legend(on order(- "N = `n'" - "Corr = `corr'" - "Slope = `b'" - "            (`se')") ring(0) pos(11) cols(1))
+        local fmt
+        local mc gs6
+        if "`fmode'" == "paper" {
+            local leg legend(off)
+            local fmt xlab(, format(%4.2f)) ylab(, format(%4.2f))
+            local mc gs9
+        }
+        binscatter `y' `x', n(20) msymbol(O) mcolors(`mc') lcolors(ebblue) ///
+            xtitle("`xtitle'") ytitle("`ytitle'") ysc(titlegap($FIG_YTITLEGAP) outergap(0)) `leg' `fmt' ///
+            plotregion(margin(sides))
+        fig_export, path("../output/figures/binscatter_`stem'_${VERSION}_k${K}.pdf") mode(`fmode')
+    }
 end
 
 program binscatter_by_sim
@@ -107,7 +82,7 @@ program binscatter_by_sim
         local n`g' = r(N)
     }
     binscatter exposure exposure_loo, by(hi_sim) n(15) msymbols(O T) mcolors(dkorange ebblue) lcolors(dkorange ebblue) ///
-        xtitle("Imputed exposure (leave-one-out, K=$K)") ytitle("Observed exposure") ///
+        xtitle("Imputed exposure (leave-one-out, K=$K)") ytitle("Observed exposure") ysc(titlegap($FIG_YTITLEGAP) outergap(0)) ///
         legend(order(1 "Nearest donor sim < $SIM_REF (N = `n0', corr = `corr0')" ///
                      2 "Nearest donor sim >= $SIM_REF (N = `n1', corr = `corr1')") ///
                ring(0) pos(11) cols(1)) ///

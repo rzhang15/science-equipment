@@ -12,5 +12,5 @@ export PY=/n/holylabs/LABS/pakes_lab/Lab/env/bin/python
 export PYTHONUNBUFFERED=1
 
 run_module() {
-    "$PY" -u "$PIPE/run_module.py" "$@"
+    "$PY" -u "$REPO/strt_to_end/run_module.py" "$@"
 }

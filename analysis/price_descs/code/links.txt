@@ -1,5 +1,4 @@
 ./matched/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/first_stage/match_control/output
 ./samp/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/first_stage/make_mkt_panel/output
 ./merged/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/first_stage/matched_panel/output
-
-
+./lib/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/lib

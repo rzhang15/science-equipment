@@ -5,3 +5,4 @@
 ./synth/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/first_stage/synthetic_ctrl/output
 
 ./placebo/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/analysis/placebo_first_stage/output
+./lib/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/lib

@@ -3,5 +3,6 @@
 ./betas/ | {root}/analysis/first_stage/output
 ./cluster/ | {root}/derived/openalex/us_cluster_fields/output
 ./samp/ | {root}/derived/openalex/make_athr_yr_panel/output
-./rf/ | {root}/analysis/reduced_form/output
+./rf/ | {root}/derived/reduced_form/rf_sample/output
 ./foias/ | {root}/derived/process_foias/merge_foias_for_expsr/output
+./lib/ | {root}/lib

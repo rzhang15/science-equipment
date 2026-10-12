@@ -1,5 +1,5 @@
 set more off
-use /n/home02/cxu75/sci_eq/analysis/rf_heterogeneity/temp/es_all_jrnls_r1_r2.dta, clear
+use /n/home02/cxu75/sci_eq/analysis/rf_het_splits/temp/es_all_jrnls_r1_r2.dta, clear
 cap drop train_yrs
 gen train_yrs = min_year - min_year_any
 merge m:1 athr_id using /n/home02/cxu75/sci_eq/derived/openalex/athr_age/output/athr_age.dta, keep(1 3) keepusing(first_pub first_last) gen(_ma)

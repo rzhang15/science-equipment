@@ -6,7 +6,7 @@ version 17
 local samp all_jrnls
 local suf  _r1_r2
 
-use ../output/prepped_samples/es_`samp'`suf', clear
+use ../external/prepped_samples/es_`samp'`suf', clear
 gen nih_cost_k = nih_total_cost / 1000
 gen yrs_lab_2014 = 2014 - min_year
 

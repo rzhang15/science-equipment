@@ -1,0 +1,7 @@
+./samp/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/make_athr_yr_panel/output
+./coathrs/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/make_athr_subsamples/output/last
+./exposure/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/foia_similarity_wts/output
+./real_exposure/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/exposure_msr/output
+./cluster/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/openalex/us_cluster_fields/output
+./nih_grants/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/nih/match_pi_athr/output
+./lib/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/lib
