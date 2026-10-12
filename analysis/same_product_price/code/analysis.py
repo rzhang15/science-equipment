@@ -20,7 +20,9 @@ FBS = re.compile(r"f(?:o|oe|e)tal.*?(?:bovine|calf).*?serum|\bfbs(?=\b|\d)", re.
 VOLUME = re.compile(r"(?<![\d.])(\d+(?:\.\d+)?)\s*m\s*l\b", re.I)
 MULTIPACK = re.compile(r"\b([2-9]|[1-9]\d+)\s*[x×]\s*500\s*ml|\b(?:case|pack|pk)\s*(?:of\s*)?(?:[2-9]|[1-9]\d+)\b|\b(?:[2-9]|[1-9]\d+)\s*/\s*(?:pk|cs|pack|case)|\b500\s*ml\s*[x×]\s*([2-9]|[1-9]\d+)\b|\b(?:[2-9]|[1-9]\d+)\s*bottles\b|\btwo\s+for\s+one\b", re.I)
 MEDIA = re.compile(r"\b(?:dmem|rpmi|medium|media|bundle|kit|buffer|buf)\b|\d+\s*%\s*(?:fbs|fetal)", re.I)
-CATALOG_PREFIX = re.compile(r"^\s*([A-Z]{1,5}\d[A-Z0-9]*(?:[-.]\d+[A-Z0-9]*)*|\d{2,}(?:[-.]\d+)+|\d{7,})(?=\s|[-:,])", re.I)
+# Preserve single-letter catalog suffixes and HI, but do not absorb a
+# following '-US certified...' description into a numeric catalog code.
+CATALOG_PREFIX = re.compile(r"^\s*((?:[A-Z]{1,5}\d[A-Z0-9]*|\d{2,}(?:[-.]\d+)+|\d{7,})(?:[-.]\d+[A-Z0-9]*)*(?:[-.](?:HI|[A-Z])(?=[\s,;:]|$))?)(?=[\s,:;-]|$)", re.I)
 KEY = ["agencyname", "supplier_key", "description_key", "purchase_id", "date_key"]
 
 
@@ -190,6 +192,8 @@ def main():
         "description_500ml_2013_2014_range_le5": (base[base.year.isin([2013, 2014]) & ~base.price_range_over5], "description"),
         "description_500ml_catalog_prefix": (base[base.embedded_sku.ne("")], "description"),
         "embedded_catalog_500ml": (base[base.embedded_sku.ne("")], "embedded_catalog"),
+        "embedded_catalog_500ml_us_fbs": (base[base.embedded_sku.ne("") & base.category.str.lower().eq("us fbs")], "embedded_catalog"),
+        "embedded_catalog_500ml_2013_2014": (base[base.embedded_sku.ne("") & base.year.isin([2013, 2014])], "embedded_catalog"),
         "catalog_500ml": (base[base.sku_match], "catalog"),
     }
     # This secondary check uses sizes recorded on either description or SKU,

@@ -44,3 +44,17 @@ Focused package-parsing and repeated-product weighting checks:
 ```bash
 python -m unittest discover -s analysis/same_product_price/code -p 'test_analysis.py'
 ```
+
+To produce the fixed-code definition audit, annual coverage, and comparison with the saved original US-FBS matched-control price series:
+
+```bash
+python analysis/same_product_price/code/compare_skus.py
+```
+
+Run the main analysis first after changing the extraction rules. The catalog extractor preserves alphabetic suffixes such as `FB5001-H`; it must not pool that code with `FB5001`. The corrected results supersede the initial 18-group/118-line embedded-code result, which incorrectly pooled that suffix.
+
+The new `output/sku_findings.txt` and `tables/sku_magnitude_comparison.csv` distinguish unique catalog codes from buyer–supplier–code groups and purchase lines from distinct purchase orders. `audit/sku_definitions.csv` lists every group's code, supplier, buyer, original descriptions, package size, and observed years. `tables/sku_coverage_by_year.csv` shows annual support. `figures/sku_vs_matched_controls.pdf` (also PNG) overlays the original category and control paths with code cohorts purchased in both 2013 and 2014. It uses the saved **undetrended** regression series (`trt_coef_raw` and `year_fes_raw`), indexed to 2013. The count panel reports changing availability of cohort members in other years; those earlier/later annual averages are not a fully balanced SKU index. `figures/sku_dollar_price_paths.pdf` shows every full-window group's actual annual prices separately.
+
+The comparison plot uses fixed 2013 SKU spending weights. Earlier/later averages include only observed cohort members, with annual counts shown below; the 2013–2014 comparison holds cohort membership fixed.
+
+An existing-control benchmark also subtracts the saved matched-control change over each group's own observed years. That comparison is descriptive: the original controls are not newly matched to the SKU buyers, and the raw same-code estimates do not share the original DiD's weights and fixed effects. It should not be reported as a new causal same-SKU merger coefficient. The separate classified-US-FBS code subset is the closest market comparison with the original US-FBS estimate.

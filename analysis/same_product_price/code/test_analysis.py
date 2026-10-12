@@ -6,10 +6,28 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from analysis import volume, MULTIPACK, MEDIA, analyze
+from analysis import volume, MULTIPACK, MEDIA, CATALOG_PREFIX, analyze
+from compare_skus import cohort_series
 
 
 class SameProductTests(unittest.TestCase):
+    def test_plot_cohort_requires_2013_and_2014_and_counts_missing_years(self):
+        annual = pd.DataFrame({"product_id": ["a", "a", "a", "b", "b", "c", "c"],
+            "year": [2013, 2014, 2016, 2013, 2014, 2012, 2014],
+            "log_price": np.log([10., 20., 25., 100., 100., 5., 50.]),
+            "spend": [10., 20., 25., 30., 100., 5., 50.],
+            "embedded_sku": ["A1"]*3 + ["B1"]*2 + ["C1"]*2})
+        cohort, series = cohort_series(annual)
+        self.assertEqual(set(cohort.product_id), {"a", "b"})
+        self.assertAlmostEqual(series.loc[series.year.eq(2014), "weighted_log_change"].iloc[0], np.log(2)/4)
+        self.assertEqual(series.loc[series.year.eq(2016), "groups"].iloc[0], 1)
+
+    def test_catalog_suffix_distinguishes_heat_treatment(self):
+        self.assertEqual(CATALOG_PREFIX.search("FB5001-H; FBS, US Source, Heat Inactivated, 500mL").group(1), "FB5001-H")
+        self.assertEqual(CATALOG_PREFIX.search("FB5001  FBS - US Source, 500mL").group(1), "FB5001")
+        self.assertEqual(CATALOG_PREFIX.search("f2442-500ml-fetal bovine serum").group(1), "f2442-500ml")
+        self.assertEqual(CATALOG_PREFIX.search("16000044-us certified fbs, 500 ml").group(1), "16000044")
+
     def test_packages_and_nonserum(self):
         self.assertEqual(volume("FBS USDA APPROVED 1X500ML"), 500)
         self.assertEqual(volume("F2442-500 ML"), 500)

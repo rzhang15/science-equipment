@@ -1,0 +1,7 @@
+./exposure/ | {root}/derived/openalex/foia_similarity_wts/output
+./real_exposure/ | {root}/derived/exposure_msr/output
+./betas/ | {root}/analysis/first_stage/output
+./cluster/ | {root}/derived/openalex/us_cluster_fields/output
+./samp/ | {root}/derived/openalex/make_athr_yr_panel/output
+./rf/ | {root}/analysis/reduced_form/output
+./foias/ | {root}/derived/process_foias/merge_foias_for_expsr/output
