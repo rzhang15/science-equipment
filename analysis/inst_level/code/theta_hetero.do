@@ -4,6 +4,42 @@ capture log close
 program drop _all
 version 16.1
 set scheme modern
+
+global PRES_SCALE 1.2
+
+cap program drop fig_export
+program fig_export
+    syntax, path(string) [mode(string) xsize(real 6) ysize(real 4)]
+    local p : subinstr local path "/paper/" "/", all
+    local p : subinstr local p "/pres/" "/", all
+    local k = strpos("`p'", "figures/")
+    if `k' > 0 {
+        local base = substr("`p'", 1, `k' + 7)
+        local rest = substr("`p'", `k' + 8, .)
+    }
+    else {
+        local slash = strrpos("`p'", "/")
+        local base = substr("`p'", 1, `slash')
+        local rest = substr("`p'", `slash' + 1, .)
+    }
+    local tscale = cond(`xsize' >= `ysize', (2/3) * `xsize' / min(`xsize', `ysize'), 1)
+    if "`mode'" == "presentation" local mode pres
+    foreach m in paper pres {
+        if "`mode'" != "" & "`mode'" != "`m'" continue
+        local dir "`base'`m'"
+        cap mkdir "`dir'"
+        local sub "`rest'"
+        while strpos("`sub'", "/") > 0 {
+            local seg = substr("`sub'", 1, strpos("`sub'", "/") - 1)
+            local dir "`dir'/`seg'"
+            cap mkdir "`dir'"
+            local sub = substr("`sub'", strpos("`sub'", "/") + 1, .)
+        }
+        local s = cond("`m'" == "pres", `tscale' * $PRES_SCALE, `tscale')
+        graph display, scale(`s')
+        graph export "`base'`m'/`rest'", replace
+    }
+end
 set linesize 200
 set maxvar 20000
 
@@ -333,9 +369,9 @@ program step5_enet
 
     cap noi lassoknots, display(nonzero)
     cap noi cvplot
-    if !_rc graph export ../output/figures/ex5_cv_curve.pdf, replace
+    if !_rc fig_export, path("../output/figures/ex5_cv_curve.pdf")
     cap noi coefpath
-    if !_rc graph export ../output/figures/ex5_coef_path.pdf, replace
+    if !_rc fig_export, path("../output/figures/ex5_coef_path.pdf")
 
     qui estimates restore enet
     enet_selected
@@ -556,15 +592,15 @@ program coefplot_grouped
             local lgd `lgd' `pos' "`gl'"
         }
         local nt ""
-        if "`note'" != "" local nt note("`note'", size(vsmall))
+        if "`note'" != "" local nt note("`note'", size(small))
         tw `pl', xline(0, lcolor(gs6) lpattern(dash)) ///
-            ylab(`ylabs', angle(0) labsize(vsmall) nogrid) ///
+            ylab(`ylabs', angle(0) labsize(small) nogrid) ///
             yscale(range(0 `=ord[_N] + 1')) ///
             ytitle("") xtitle("`xtitle'") ///
-            legend(order(`lgd') pos(6) ring(1) rows(3) size(vsmall) ///
+            legend(order(`lgd') pos(6) ring(1) rows(3) size(small) ///
                    region(lstyle(none))) ///
-            ysize(9) xsize(6.5) `nt'
-        graph export ../output/figures/`name'.pdf, replace
+            ysize(5.5) xsize(4) `nt'
+        fig_export, path("../output/figures/`name'.pdf")
         export delimited using ../output/tables/`name'.csv, replace
     restore
 end

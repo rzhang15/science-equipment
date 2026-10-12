@@ -4,6 +4,42 @@ capture log close
 program drop _all
 set scheme modern
 preliminaries
+
+global PRES_SCALE 1.2
+
+cap program drop fig_export
+program fig_export
+    syntax, path(string) [mode(string) xsize(real 6) ysize(real 4)]
+    local p : subinstr local path "/paper/" "/", all
+    local p : subinstr local p "/pres/" "/", all
+    local k = strpos("`p'", "figures/")
+    if `k' > 0 {
+        local base = substr("`p'", 1, `k' + 7)
+        local rest = substr("`p'", `k' + 8, .)
+    }
+    else {
+        local slash = strrpos("`p'", "/")
+        local base = substr("`p'", 1, `slash')
+        local rest = substr("`p'", `slash' + 1, .)
+    }
+    local tscale = cond(`xsize' >= `ysize', (2/3) * `xsize' / min(`xsize', `ysize'), 1)
+    if "`mode'" == "presentation" local mode pres
+    foreach m in paper pres {
+        if "`mode'" != "" & "`mode'" != "`m'" continue
+        local dir "`base'`m'"
+        cap mkdir "`dir'"
+        local sub "`rest'"
+        while strpos("`sub'", "/") > 0 {
+            local seg = substr("`sub'", 1, strpos("`sub'", "/") - 1)
+            local dir "`dir'/`seg'"
+            cap mkdir "`dir'"
+            local sub = substr("`sub'", strpos("`sub'", "/") + 1, .)
+        }
+        local s = cond("`m'" == "pres", `tscale' * $PRES_SCALE, `tscale')
+        graph display, scale(`s')
+        graph export "`base'`m'/`rest'", replace
+    }
+end
 version 17
 global exhibit_mode both // paper | presentation | both
 
@@ -97,7 +133,7 @@ program sd_test
                          "Placebo p `p_lab' (`n_exceed'/`n_draws' exceedances)" ///
                          "95% Monte Carlo CI `p_ci_lab'") ///
               pos(1) ring(0) region(fcolor(none)) size(small))
-    graph export ../output/figures/placebo_sd_hist_`outcome'$suffix.pdf, replace
+    fig_export, path("../output/figures/placebo_sd_hist_`outcome'$suffix.pdf")
 
     use ../output/placebo_sd_coefs$suffix, clear
     keep b_`outcome'
@@ -132,23 +168,22 @@ program sd_test
         local figdir ../output/figures
         local stats_note `"- "Placebo SD test p `p_lab' (`n_exceed'/`n_draws' exceedances)" "95% Monte Carlo CI `p_ci_lab'""'
         if "`mode'" == "paper" {
-            local figdir ../output/figures/paper
             local stats_note
         }
         tw rarea dens_r lo xgrid, color(ebblue%25) lwidth(none) || ///
            rarea dens_p lo xgrid, color(gs12%50) lwidth(none) || ///
            line dens_r xgrid, color(ebblue%70) lwidth(medthick) || ///
            line dens_p xgrid, color(gs10%80) lwidth(medthick) lpattern(dash) ///
-           xtitle("DiD Coefficient (log `outcome')") ///
+           xtitle("DiD coefficient (log `outcome')") ///
            ytitle("Density") ///
            xlab(`xmin'(`xstep')`xmax') ///
            xline(0, lcolor(gs6) lpattern(dash)) ///
            xline(`mean_r', lcolor(ebblue) lpattern(solid) lwidth(medthin)) ///
-           legend(on order(3 "Actual Treatment Effects (N=`n_r', mean=`mean_r_lab', sd=`sd_r_lab')" ///
-                           4 "Placebo Treatment Effects (N=`N_p', mean=`mean_p_lab', sd=`sd_pool_lab')" ///
+           legend(on order(3 "Actual treatment effects (N=`n_r', mean=`mean_r_lab', sd=`sd_r_lab')" ///
+                           4 "Placebo treatment effects (N=`N_p', mean=`mean_p_lab', sd=`sd_pool_lab')" ///
                            `stats_note') ///
                   pos(7) ring(1) region(fcolor(none)) size(small))
-        graph export `figdir'/did_coefs_overlay_kdens_sd_`outcome'$suffix.pdf, replace
+        fig_export, path("`figdir'/did_coefs_overlay_kdens_sd_`outcome'$suffix.pdf") mode(`mode')
     }
 end
 

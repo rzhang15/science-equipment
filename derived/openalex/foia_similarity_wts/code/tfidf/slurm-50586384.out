@@ -1,0 +1,308 @@
+Recipe: K=2  sharpen=2.0  floor=0.05  unmatched<0.05  L1_normalize=True
+Using N_JOBS=48 threads  tag=''
+Loading TF-IDF Matrices...
+Universe Authors: 1,860,867
+FOIA PIs (Targets): 208
+X_foia dense size: 21.2 MB
+Computing top-2 weights in parallel (batch=25,000)...
+[Parallel(n_jobs=48)]: Using backend ThreadingBackend with 48 concurrent workers.
+[Parallel(n_jobs=48)]: Done  12 out of  75 | elapsed:    0.9s remaining:    5.0s
+[Parallel(n_jobs=48)]: Done  28 out of  75 | elapsed:    1.1s remaining:    1.9s
+[Parallel(n_jobs=48)]: Done  44 out of  75 | elapsed:    1.2s remaining:    0.9s
+[Parallel(n_jobs=48)]: Done  60 out of  75 | elapsed:    1.5s remaining:    0.4s
+[Parallel(n_jobs=48)]: Done  75 out of  75 | elapsed:    1.7s finished
+Merging results...
+Total non-zero weights: 3,453,692
+Unmatched authors (max sim < 0.05): 77,864 (4.18%)
+Mean max-similarity:   0.1139
+Median max-similarity: 0.1030
+Saving weight matrix -> ../../output/weight_matrix_k2.npz
+Saving per-author match diagnostics...
+Done. Weights precomputed.
+Universe: 1,860,867
+FOIA anchors: 208
+Treated markets: 46
+W rows with weight: 1,783,003/1,860,867
+W row sums: mean=1.0000, p5=1.0000, p95=1.0000
+
+==============================================================================
+version=hc
+==============================================================================
+FOIA PIs with treated shares: 208/208
+FOIA row sums: mean=0.2693, sd=0.1989
+
+Universe exposure: mean=+0.02412, sd=0.03855
+Mean sum imputed shares: 0.25250
+cluster filter min FOIA=1: 1,613,853/1,860,867
+
+--- Shock balance ---
+  characteristic               beta         se       t       p
+  log_total_spend           +0.0935     0.0336   +2.78   0.005
+  log_lab_spend             +0.0868     0.0305   +2.84   0.004
+  n_cats                    +0.0029     0.0011   +2.61   0.009
+  lab_share                 +0.0571     0.3301   +0.17   0.863
+
+Saved ../../output/final_imputed_shift_share_hc_all3_cf_k2.csv
+Saved ../../output/imputed_shares_matrix_hc_all3_cf_k2.npz
+Saved ../../output/imputed_shares_markets_hc_all3_cf_k2.csv
+
+==============================================================================
+SUMMARY
+==============================================================================
+version eb_prior  eb_own_weight  eb_peer_k  n_foia_with_shares  n_foia_shrunk  foia_raw_exposure_sd  foia_eb_exposure_sd  universe_exposure_sd  mean_sum_imputed_shares  eff_n_shocks  n_universe_after_filters
+     hc     none         1.0000          5                 208              0                0.0496               0.0496                0.0386                   0.2525       18.7464                   1613853
+
+Saved ../../output/shift_share_summary_all3_cf_k2.csv
+Done!
+anchors with text: 208   with treated shares: 208   markets: 46
+                              0             1            2
+subset                      all  max_sim>=0.2  max_sim<0.2
+n_pi                        208           142           66
+n_cells                    9568          6532         3036
+cell_corr              0.223055      0.247904     0.161578
+cell_slope             0.289848      0.303759     0.244818
+cell_corr_null         0.154586       0.14553     0.173954
+cell_within_mkt_corr   0.187639      0.216069     0.110656
+cell_within_mkt_slope  0.248999      0.270087     0.172982
+mktshr_corr            0.186579      0.196462     0.162589
+mktshr_slope           0.243957      0.245914     0.242977
+mktshr_rmse            0.227003      0.235217     0.208233
+mktshr_rmse_null       0.199891      0.204878     0.188717
+expo_corr               0.21016      0.267743     0.063532
+expo_slope             0.292633      0.351304     0.104475
+expo_rmse              0.054646      0.052847      0.05833
+expo_rmse_null         0.049829      0.048992     0.051585
+expo_sd                 0.04959      0.048739     0.051262
+CIs: {'cell_corr': (0.15547263180804521, 0.30105614192163827), 'cell_within_mkt_corr': (0.12041224810513339, 0.27018099767691733), 'mktshr_corr': (0.0852556680538532, 0.2983461782069879), 'expo_corr': (0.052287030452683625, 0.39700234269222695)}
+Saved ../../output/figures/loo_shares_hc_all3_k2.pdf, loo_exposure_{simple,scatter,dist}_hc_all3_k2.pdf, ../../output/loo_shares_summary_hc_all3_k2.txt
+Recipe: K=3  sharpen=2.0  floor=0.05  unmatched<0.05  L1_normalize=True
+Using N_JOBS=48 threads  tag=''
+Loading TF-IDF Matrices...
+Universe Authors: 1,860,867
+FOIA PIs (Targets): 208
+X_foia dense size: 21.2 MB
+Computing top-3 weights in parallel (batch=25,000)...
+[Parallel(n_jobs=48)]: Using backend ThreadingBackend with 48 concurrent workers.
+[Parallel(n_jobs=48)]: Done  12 out of  75 | elapsed:    1.0s remaining:    5.4s
+[Parallel(n_jobs=48)]: Done  28 out of  75 | elapsed:    1.2s remaining:    2.1s
+[Parallel(n_jobs=48)]: Done  44 out of  75 | elapsed:    1.3s remaining:    0.9s
+[Parallel(n_jobs=48)]: Done  60 out of  75 | elapsed:    1.6s remaining:    0.4s
+[Parallel(n_jobs=48)]: Done  75 out of  75 | elapsed:    1.7s finished
+Merging results...
+Total non-zero weights: 5,011,841
+Unmatched authors (max sim < 0.05): 77,864 (4.18%)
+Mean max-similarity:   0.1139
+Median max-similarity: 0.1030
+Saving weight matrix -> ../../output/weight_matrix_k3.npz
+Saving per-author match diagnostics...
+Done. Weights precomputed.
+Universe: 1,860,867
+FOIA anchors: 208
+Treated markets: 46
+W rows with weight: 1,783,003/1,860,867
+W row sums: mean=1.0000, p5=1.0000, p95=1.0000
+
+==============================================================================
+version=hc
+==============================================================================
+FOIA PIs with treated shares: 208/208
+FOIA row sums: mean=0.2693, sd=0.1989
+
+Universe exposure: mean=+0.02399, sd=0.03342
+Mean sum imputed shares: 0.25261
+cluster filter min FOIA=1: 1,613,853/1,860,867
+
+--- Shock balance ---
+  characteristic               beta         se       t       p
+  log_total_spend           +0.0935     0.0336   +2.78   0.005
+  log_lab_spend             +0.0868     0.0305   +2.84   0.004
+  n_cats                    +0.0029     0.0011   +2.61   0.009
+  lab_share                 +0.0571     0.3301   +0.17   0.863
+
+Saved ../../output/final_imputed_shift_share_hc_all3_cf_k3.csv
+Saved ../../output/imputed_shares_matrix_hc_all3_cf_k3.npz
+Saved ../../output/imputed_shares_markets_hc_all3_cf_k3.csv
+
+==============================================================================
+SUMMARY
+==============================================================================
+version eb_prior  eb_own_weight  eb_peer_k  n_foia_with_shares  n_foia_shrunk  foia_raw_exposure_sd  foia_eb_exposure_sd  universe_exposure_sd  mean_sum_imputed_shares  eff_n_shocks  n_universe_after_filters
+     hc     none         1.0000          5                 208              0                0.0496               0.0496                0.0334                   0.2526       19.0640                   1613853
+
+Saved ../../output/shift_share_summary_all3_cf_k3.csv
+Done!
+anchors with text: 208   with treated shares: 208   markets: 46
+                              0             1            2
+subset                      all  max_sim>=0.2  max_sim<0.2
+n_pi                        208           142           66
+n_cells                    9568          6532         3036
+cell_corr              0.222582      0.252698      0.14694
+cell_slope             0.340189      0.363396     0.263754
+cell_corr_null         0.154586       0.14553     0.173954
+cell_within_mkt_corr    0.18366      0.218042     0.089469
+cell_within_mkt_slope  0.289119      0.323076     0.166937
+mktshr_corr            0.216108       0.21743     0.225113
+mktshr_slope           0.330804      0.315107     0.414401
+mktshr_rmse            0.212823      0.221377     0.193138
+mktshr_rmse_null       0.199891      0.204878     0.188717
+expo_corr              0.197795      0.274325     0.011408
+expo_slope             0.326849      0.432124     0.021548
+expo_rmse              0.052685      0.050169     0.057729
+expo_rmse_null         0.049829      0.048992     0.051585
+expo_sd                 0.04959      0.048739     0.051262
+CIs: {'cell_corr': (0.15875371836390598, 0.2986483768155878), 'cell_within_mkt_corr': (0.11805546999432837, 0.26320276801043124), 'mktshr_corr': (0.10946967174786423, 0.3294702629074464), 'expo_corr': (0.04081691173639399, 0.37733558552731455)}
+Saved ../../output/figures/loo_shares_hc_all3_k3.pdf, loo_exposure_{simple,scatter,dist}_hc_all3_k3.pdf, ../../output/loo_shares_summary_hc_all3_k3.txt
+Recipe: K=4  sharpen=2.0  floor=0.05  unmatched<0.05  L1_normalize=True
+Using N_JOBS=48 threads  tag=''
+Loading TF-IDF Matrices...
+Universe Authors: 1,860,867
+FOIA PIs (Targets): 208
+X_foia dense size: 21.2 MB
+Computing top-4 weights in parallel (batch=25,000)...
+[Parallel(n_jobs=48)]: Using backend ThreadingBackend with 48 concurrent workers.
+[Parallel(n_jobs=48)]: Done  12 out of  75 | elapsed:    1.0s remaining:    5.4s
+[Parallel(n_jobs=48)]: Done  28 out of  75 | elapsed:    1.2s remaining:    2.1s
+[Parallel(n_jobs=48)]: Done  44 out of  75 | elapsed:    1.3s remaining:    0.9s
+[Parallel(n_jobs=48)]: Done  60 out of  75 | elapsed:    1.7s remaining:    0.4s
+[Parallel(n_jobs=48)]: Done  75 out of  75 | elapsed:    1.8s finished
+Merging results...
+Total non-zero weights: 6,471,125
+Unmatched authors (max sim < 0.05): 77,864 (4.18%)
+Mean max-similarity:   0.1139
+Median max-similarity: 0.1030
+Saving weight matrix -> ../../output/weight_matrix_k4.npz
+Saving per-author match diagnostics...
+Done. Weights precomputed.
+Universe: 1,860,867
+FOIA anchors: 208
+Treated markets: 46
+W rows with weight: 1,783,003/1,860,867
+W row sums: mean=1.0000, p5=1.0000, p95=1.0000
+
+==============================================================================
+version=hc
+==============================================================================
+FOIA PIs with treated shares: 208/208
+FOIA row sums: mean=0.2693, sd=0.1989
+
+Universe exposure: mean=+0.02385, sd=0.03062
+Mean sum imputed shares: 0.25233
+cluster filter min FOIA=1: 1,613,853/1,860,867
+
+--- Shock balance ---
+  characteristic               beta         se       t       p
+  log_total_spend           +0.0935     0.0336   +2.78   0.005
+  log_lab_spend             +0.0868     0.0305   +2.84   0.004
+  n_cats                    +0.0029     0.0011   +2.61   0.009
+  lab_share                 +0.0571     0.3301   +0.17   0.863
+
+Saved ../../output/final_imputed_shift_share_hc_all3_cf_k4.csv
+Saved ../../output/imputed_shares_matrix_hc_all3_cf_k4.npz
+Saved ../../output/imputed_shares_markets_hc_all3_cf_k4.csv
+
+==============================================================================
+SUMMARY
+==============================================================================
+version eb_prior  eb_own_weight  eb_peer_k  n_foia_with_shares  n_foia_shrunk  foia_raw_exposure_sd  foia_eb_exposure_sd  universe_exposure_sd  mean_sum_imputed_shares  eff_n_shocks  n_universe_after_filters
+     hc     none         1.0000          5                 208              0                0.0496               0.0496                0.0306                   0.2523       19.2770                   1613853
+
+Saved ../../output/shift_share_summary_all3_cf_k4.csv
+Done!
+anchors with text: 208   with treated shares: 208   markets: 46
+                              0             1            2
+subset                      all  max_sim>=0.2  max_sim<0.2
+n_pi                        208           142           66
+n_cells                    9568          6532         3036
+cell_corr              0.221946      0.249398     0.152147
+cell_slope             0.374471      0.392777      0.30983
+cell_corr_null         0.154586       0.14553     0.173954
+cell_within_mkt_corr    0.17971      0.212063     0.089459
+cell_within_mkt_slope  0.315588      0.346989     0.192821
+mktshr_corr            0.194548       0.20718     0.167583
+mktshr_slope           0.332615      0.327008     0.387489
+mktshr_rmse            0.210014        0.2177      0.19244
+mktshr_rmse_null       0.199891      0.204878     0.188717
+expo_corr              0.223802      0.261441     0.124452
+expo_slope             0.403268      0.439353     0.272513
+expo_rmse              0.051092      0.049863     0.053641
+expo_rmse_null         0.049829      0.048992     0.051585
+expo_sd                 0.04959      0.048739     0.051262
+CIs: {'cell_corr': (0.16099038696978146, 0.2943854812262862), 'cell_within_mkt_corr': (0.11526455057913126, 0.25599037168235494), 'mktshr_corr': (0.0915492123826761, 0.31314825176193134), 'expo_corr': (0.05867552004778873, 0.396110125485653)}
+Saved ../../output/figures/loo_shares_hc_all3_k4.pdf, loo_exposure_{simple,scatter,dist}_hc_all3_k4.pdf, ../../output/loo_shares_summary_hc_all3_k4.txt
+Recipe: K=5  sharpen=2.0  floor=0.05  unmatched<0.05  L1_normalize=True
+Using N_JOBS=48 threads  tag=''
+Loading TF-IDF Matrices...
+Universe Authors: 1,860,867
+FOIA PIs (Targets): 208
+X_foia dense size: 21.2 MB
+Computing top-5 weights in parallel (batch=25,000)...
+[Parallel(n_jobs=48)]: Using backend ThreadingBackend with 48 concurrent workers.
+[Parallel(n_jobs=48)]: Done  12 out of  75 | elapsed:    1.0s remaining:    5.0s
+[Parallel(n_jobs=48)]: Done  28 out of  75 | elapsed:    1.2s remaining:    2.0s
+[Parallel(n_jobs=48)]: Done  44 out of  75 | elapsed:    1.2s remaining:    0.9s
+[Parallel(n_jobs=48)]: Done  60 out of  75 | elapsed:    1.6s remaining:    0.4s
+[Parallel(n_jobs=48)]: Done  75 out of  75 | elapsed:    1.7s finished
+Merging results...
+Total non-zero weights: 7,845,582
+Unmatched authors (max sim < 0.05): 77,864 (4.18%)
+Mean max-similarity:   0.1139
+Median max-similarity: 0.1030
+Saving weight matrix -> ../../output/weight_matrix_k5.npz
+Saving per-author match diagnostics...
+Done. Weights precomputed.
+Universe: 1,860,867
+FOIA anchors: 208
+Treated markets: 46
+W rows with weight: 1,783,003/1,860,867
+W row sums: mean=1.0000, p5=1.0000, p95=1.0000
+
+==============================================================================
+version=hc
+==============================================================================
+FOIA PIs with treated shares: 208/208
+FOIA row sums: mean=0.2693, sd=0.1989
+
+Universe exposure: mean=+0.02370, sd=0.02885
+Mean sum imputed shares: 0.25204
+cluster filter min FOIA=1: 1,613,853/1,860,867
+
+--- Shock balance ---
+  characteristic               beta         se       t       p
+  log_total_spend           +0.0935     0.0336   +2.78   0.005
+  log_lab_spend             +0.0868     0.0305   +2.84   0.004
+  n_cats                    +0.0029     0.0011   +2.61   0.009
+  lab_share                 +0.0571     0.3301   +0.17   0.863
+
+Saved ../../output/final_imputed_shift_share_hc_all3_cf_k5.csv
+Saved ../../output/imputed_shares_matrix_hc_all3_cf_k5.npz
+Saved ../../output/imputed_shares_markets_hc_all3_cf_k5.csv
+
+==============================================================================
+SUMMARY
+==============================================================================
+version eb_prior  eb_own_weight  eb_peer_k  n_foia_with_shares  n_foia_shrunk  foia_raw_exposure_sd  foia_eb_exposure_sd  universe_exposure_sd  mean_sum_imputed_shares  eff_n_shocks  n_universe_after_filters
+     hc     none         1.0000          5                 208              0                0.0496               0.0496                0.0289                   0.2520       19.4320                   1613853
+
+Saved ../../output/shift_share_summary_all3_cf_k5.csv
+Done!
+anchors with text: 208   with treated shares: 208   markets: 46
+                              0             1            2
+subset                      all  max_sim>=0.2  max_sim<0.2
+n_pi                        208           142           66
+n_cells                    9568          6532         3036
+cell_corr              0.226883      0.255781     0.152176
+cell_slope             0.410701      0.429179     0.341107
+cell_corr_null         0.154586       0.14553     0.173954
+cell_within_mkt_corr   0.181503      0.215727     0.083582
+cell_within_mkt_slope  0.345073      0.378882     0.201927
+mktshr_corr            0.221285      0.233097     0.203048
+mktshr_slope           0.417279      0.402337     0.546105
+mktshr_rmse            0.203516      0.210695     0.187138
+mktshr_rmse_null       0.199891      0.204878     0.188717
+expo_corr              0.258235      0.303411     0.136496
+expo_slope              0.50341      0.541561     0.344003
+expo_rmse              0.049572      0.048147     0.052509
+expo_rmse_null         0.049829      0.048992     0.051585
+expo_sd                 0.04959      0.048739     0.051262
+CIs: {'cell_corr': (0.16765170882550842, 0.2957808318050586), 'cell_within_mkt_corr': (0.11938527564277718, 0.2511359750096831), 'mktshr_corr': (0.11765690288172549, 0.33863305873677757), 'expo_corr': (0.11882726902927696, 0.4151796650856076)}
+Saved ../../output/figures/loo_shares_hc_all3_k5.pdf, loo_exposure_{simple,scatter,dist}_hc_all3_k5.pdf, ../../output/loo_shares_summary_hc_all3_k5.txt

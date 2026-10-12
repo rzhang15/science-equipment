@@ -13,3 +13,4 @@
 analysis/*/output/**
 !analysis/*/output/**/
 !analysis/*/output/**/*.pdf
+**/logs/

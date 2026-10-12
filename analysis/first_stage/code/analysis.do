@@ -4,6 +4,42 @@ capture log close
 program drop _all
 set scheme modern
 preliminaries
+
+global PRES_SCALE 1.2
+
+cap program drop fig_export
+program fig_export
+    syntax, path(string) [mode(string) xsize(real 6) ysize(real 4)]
+    local p : subinstr local path "/paper/" "/", all
+    local p : subinstr local p "/pres/" "/", all
+    local k = strpos("`p'", "figures/")
+    if `k' > 0 {
+        local base = substr("`p'", 1, `k' + 7)
+        local rest = substr("`p'", `k' + 8, .)
+    }
+    else {
+        local slash = strrpos("`p'", "/")
+        local base = substr("`p'", 1, `slash')
+        local rest = substr("`p'", `slash' + 1, .)
+    }
+    local tscale = cond(`xsize' >= `ysize', (2/3) * `xsize' / min(`xsize', `ysize'), 1)
+    if "`mode'" == "presentation" local mode pres
+    foreach m in paper pres {
+        if "`mode'" != "" & "`mode'" != "`m'" continue
+        local dir "`base'`m'"
+        cap mkdir "`dir'"
+        local sub "`rest'"
+        while strpos("`sub'", "/") > 0 {
+            local seg = substr("`sub'", 1, strpos("`sub'", "/") - 1)
+            local dir "`dir'/`seg'"
+            cap mkdir "`dir'"
+            local sub = substr("`sub'", strpos("`sub'", "/") + 1, .)
+        }
+        local s = cond("`m'" == "pres", `tscale' * $PRES_SCALE, `tscale')
+        graph display, scale(`s')
+        graph export "`base'`m'/`rest'", replace
+    }
+end
 version 17
 global exhibit_mode both // paper | presentation | both
 
@@ -41,9 +77,9 @@ program raw_plots
     bys uni_mkt: egen max_year = max(year)
     keep if min_year < 2014 & max_year > 2014
     foreach var in avg_log_price log_raw_qty log_raw_spend raw_price raw_qty raw_spend {
-        if "`var'" == "avg_log_price" local yname "Avg. Log Price"
-        if "`var'" == "log_raw_qty" local yname "Log Qty"
-        if "`var'" == "log_raw_spend" local yname "Log Spend"
+        if "`var'" == "avg_log_price" local yname "Average log price"
+        if "`var'" == "log_raw_qty" local yname "Log quantity"
+        if "`var'" == "log_raw_spend" local yname "Log spending"
         if "`var'" == "raw_price" local yname "Price"
         if "`var'" == "raw_qty" local yname "Qty"
         if "`var'" == "raw_spend" local yname "Spend"
@@ -70,15 +106,15 @@ program raw_plots
            legend(on order(1 "Treated" 2 "Control") pos(6) rows(1) size(small)) ///
            ytitle("`yname'") ysc(titlegap(-6) outergap(0)) ylabel(#6) xlabel(2010(1)2019) xtitle("Year") ///
            tline(2013.5, lpattern(shortdash) lcolor(gs4%80)) plotregion(margin(sides))
-        graph export "../output/figures/raw/`var'_levels_pooled$suffix.pdf", replace
+        fig_export, path("../output/figures/raw/`var'_levels_pooled$suffix.pdf")
         tw rcap dev_ub dev_lb x if treated == 1 & year != 2013, lcolor(ebblue%70) msize(vsmall) || ///
            rcap dev_ub dev_lb x if treated == 0 & year != 2013, lcolor(dkorange%70) lpattern(dash) msize(vsmall) || ///
            connected dev x if treated == 1, lcolor(ebblue) mcolor(ebblue) || ///
            connected dev x if treated == 0, lcolor(dkorange) mcolor(dkorange) msymbol(diamond) lpattern(dash) ///
            legend(on order(3 "Treated" 4 "Control") pos(6) rows(1) size(small)) ///
-           ytitle("`yname', Relative to 2013") ysc(titlegap(-6) outergap(0)) ylabel(#6) xlabel(2010(1)2019) xtitle("Year") ///
+           ytitle("`yname', relative to 2013") ysc(titlegap(-6) outergap(0)) ylabel(#6) xlabel(2010(1)2019) xtitle("Year") ///
            yline(0, lcolor(gs10) lpattern(solid)) tline(2013.5, lpattern(shortdash) lcolor(gs4%80)) plotregion(margin(sides))
-        graph export "../output/figures/raw/`var'_trends_pooled$suffix.pdf", replace
+        fig_export, path("../output/figures/raw/`var'_trends_pooled$suffix.pdf")
         restore
     }
 end
@@ -198,34 +234,34 @@ program process_coefs
     local mean = round(r(mean), 0.001)
     local sd   = round(r(sd), 0.001)
     tw kdensity b, color(lavender) ///
-        xtitle("DiD Coefficient (log `outcome')", size(small)) ///
-        ytitle("Density", size(small)) ///
+        xtitle("DiD coefficient (log `outcome')", size(medsmall)) ///
+        ytitle("Density", size(medsmall)) ///
         xlab(, labsize(small)) ylab(, labsize(small)) ///
         xline(0, lcolor(gs6) lpattern(dash)) ///
-        legend(on order(- "N = `N'" "mean = `mean'" "sd = `sd'") ///
+        legend(on order(- "N = `N'" "Mean = `mean'" "Sd = `sd'") ///
                pos(1) ring(0) region(fcolor(none)))
-    graph export ../output/figures/did_coefs_kdens_`outcome'$suffix.pdf, replace
+    fig_export, path("../output/figures/did_coefs_kdens_`outcome'$suffix.pdf")
     gen rank = _n
     labmask rank, values(category)
     count
     local n = r(N)
-    tw rcap ub lb rank, msize(vsmall) || scatter b rank, msize(tiny) mcolor(lavender) yline(0) ylab(-1(0.2)1, labsize(small)) ysc(titlegap(-6) outergap(0)) ytitle("DiD Estimate (log `outcome') + 95% CI", size(small)) xlab(1(1)`n', angle(45) labsize(small) valuelabel) graphregion(margin(b+35 l+5)) xtitle("") legend(off)
-    graph export ../output/figures/coef_rank_`outcome'$suffix.pdf, replace
+    tw rcap ub lb rank, msize(vsmall) || scatter b rank, msize(tiny) mcolor(lavender) yline(0) ylab(-1(0.2)1, labsize(small)) ysc(titlegap(-6) outergap(0)) ytitle("DiD estimate (log `outcome') + 95% CI", size(medsmall)) xlab(1(1)`n', angle(45) labsize(small) valuelabel) graphregion(margin(b+35 l+5)) xtitle("") legend(off)
+    fig_export, path("../output/figures/coef_rank_`outcome'$suffix.pdf")
     hashsort spend_2013
     gen rank_spend = _n
     labmask rank_spend, values(category)
     count
     local n = r(N)
-    tw rcap ub lb rank_spend, msize(vsmall) || scatter b rank_spend, msize(tiny) mcolor(lavender) yline(0) ylab(-1(0.2)1, labsize(small)) ysc(titlegap(-6) outergap(0)) ytitle("DiD Estimate (log `outcome') + 95% CI", size(small)) xlab(1(1)`n', angle(45) labsize(small) valuelabel) graphregion(margin(b+35 l+5)) xtitle("") legend(off)
-    graph export ../output/figures/coef_spend_rank_`outcome'$suffix.pdf, replace
+    tw rcap ub lb rank_spend, msize(vsmall) || scatter b rank_spend, msize(tiny) mcolor(lavender) yline(0) ylab(-1(0.2)1, labsize(small)) ysc(titlegap(-6) outergap(0)) ytitle("DiD estimate (log `outcome') + 95% CI", size(medsmall)) xlab(1(1)`n', angle(45) labsize(small) valuelabel) graphregion(margin(b+35 l+5)) xtitle("") legend(off)
+    fig_export, path("../output/figures/coef_spend_rank_`outcome'$suffix.pdf")
     corr b delta_hhi [aw=spend_2013]
     local corr : di %4.3f r(rho)
-    binscatter2 b delta_hhi [aw = spend_2013], mcolors(gs6) lcolors(ebblue) legend(on order(- "corr: `corr'") ring(0) pos(1)) xtitle("Delta HHI") ytitle("Estimated Coefficient (log `outcome')")
-    graph export ../output/figures/delta_hhi_corr_`outcome'$suffix.pdf, replace
+    binscatter2 b delta_hhi [aw = spend_2013], mcolors(gs6) lcolors(ebblue) legend(on order(- "Corr: `corr'") ring(0) pos(1)) xtitle("Delta HHI") ytitle("Estimated coefficient (log `outcome')")
+    fig_export, path("../output/figures/delta_hhi_corr_`outcome'$suffix.pdf")
     corr b simulated_hhi [aw=spend_2013]
     local corr : di %4.3f r(rho)
-    binscatter2 b simulated_hhi [aw = spend_2013], mcolors(gs6) lcolors(ebblue) legend(on order(- "corr: `corr'") ring(0) pos(1)) xtitle("Simulated HHI") ytitle("Estimated Coefficient (log `outcome')")
-    graph export ../output/figures/sim_hhi_corr_`outcome'$suffix.pdf, replace
+    binscatter2 b simulated_hhi [aw = spend_2013], mcolors(gs6) lcolors(ebblue) legend(on order(- "Corr: `corr'") ring(0) pos(1)) xtitle("Simulated HHI") ytitle("Estimated coefficient (log `outcome')")
+    fig_export, path("../output/figures/sim_hhi_corr_`outcome'$suffix.pdf")
 
     gen var_se = se^2
     qui sum var_se
@@ -241,6 +277,65 @@ program process_coefs
     gen se_eb = sqrt(w_eb * var_se)
     gen lb_eb = b_eb - 1.96 * se_eb
     gen ub_eb = b_eb + 1.96 * se_eb
+
+    local plsuf = cond("`outcome'" == "spend", "_spend", "")
+    preserve
+    use ../external/placebo/did_coefs_placebo`plsuf'$suffix, clear
+    gen var_se = se^2
+    gcollapse (sd) sd_b = b (mean) var_se, by(iter)
+    gen var_b = sd_b^2
+    qui sum var_b
+    local sigma2_pl = r(mean)
+    qui sum var_se
+    local sigma2_d = `sigma2_pl' - r(mean)
+    use ../external/placebo/did_coefs_placebo`plsuf'$suffix, clear
+    bys iter: egen b_iter = mean(b)
+    gen b_dm = b - b_iter
+    xtile se_bin = se, n(8)
+    gcollapse (sd) sd_b = b_dm (median) se, by(se_bin)
+    tw connected sd_b se, color(ebblue) || line se se, lcolor(dkorange) lpattern(dash) ///
+        xtitle("Median reported SE within bin", size(medsmall)) ///
+        ytitle("SD of placebo DiD coefficient within bin", size(medsmall)) ///
+        xlab(, labsize(small)) ylab(, labsize(small)) ///
+        legend(on order(1 "Placebo spread" 2 "45-degree line") ring(0) pos(5) region(fcolor(none)))
+    fig_export, path("../output/figures/placebo_noise_vs_se_`outcome'$suffix.pdf")
+    restore
+
+    gen var_pl = var_se + `sigma2_d'
+    qui sum var_pl
+    local tau2_pl = max(0, `sample_var' - r(mean))
+    qui sum b [aw = 1/var_pl]
+    local mu_pl = r(mean)
+    di "EB shrinkage, placebo benchmark (`outcome'): mu_pl = `mu_pl', tau2_pl = `tau2_pl', sigma2_pl = `sigma2_pl', sigma2_d = `sigma2_d'"
+    gen w_eb_pl  = `tau2_pl' / (`tau2_pl' + var_pl)
+    gen b_eb_pl  = w_eb_pl * b + (1 - w_eb_pl) * `mu_pl'
+    gen se_eb_pl = sqrt(w_eb_pl * var_pl)
+    drop var_pl
+
+    qui sum b_eb
+    local sd_eb_se = r(sd)
+    qui sum w_eb, d
+    local w_med_se = r(p50)
+    qui sum b_eb_pl
+    local sd_eb_pl = r(sd)
+    qui sum w_eb_pl, d
+    local w_med_pl = r(p50)
+    local w_min_pl = r(min)
+    qui corr b_eb_pl b_eb
+    local corr_eb = r(rho)
+    qui corr b_eb_pl b_eb [aw = spend_2013]
+    local corr_eb_w = r(rho)
+    qui spearman b_eb_pl b_eb
+    local rank_corr_eb = r(rho)
+    local n_mkts = _N
+    mat eb_placebo_`outcome' = (`sample_var' \ `mean_var2' \ `tau2' \ `tau2'/`sample_var' \ `mu_hat' \ `sd_eb_se' \ `w_med_se' \ ///
+        `sigma2_pl' \ `sigma2_d' \ `tau2_pl' \ `tau2_pl'/`sample_var' \ `mu_pl' \ `sd_eb_pl' \ `w_med_pl' \ `w_min_pl' \ ///
+        `corr_eb' \ `corr_eb_w' \ `rank_corr_eb' \ `n_mkts')
+    mat rownames eb_placebo_`outcome' = var_b mean_se2 tau2_se share_real_se mu_se sd_eb_se w_med_se ///
+        sigma2_placebo sigma2_design tau2_pl share_real_pl mu_pl sd_eb_pl w_med_pl w_min_pl ///
+        corr_eb corr_eb_spendwt rank_corr_eb N
+    mat colnames eb_placebo_`outcome' = value
+
     drop var_se
     save ../output/did_coefs_eb_`outcome'$suffix, replace
 
@@ -253,23 +348,23 @@ program process_coefs
     local tau2_lab = round(`tau2', 0.001)
     local mu_lab   = round(`mu_hat', 0.001)
     tw kdensity b_eb, color(lavender) ///
-        xtitle("DiD Coefficient (log `outcome', EB-shrunk)", size(small)) ///
-        ytitle("Density", size(small)) ///
+        xtitle("DiD coefficient (log `outcome', EB-shrunk)", size(medsmall)) ///
+        ytitle("Density", size(medsmall)) ///
         xlab(, labsize(small)) ylab(, labsize(small)) ///
         xline(0, lcolor(gs6) lpattern(dash)) ///
-        legend(on order(- "N = `N_eb'" "mean = `mean_eb'" "sd = `sd_eb'" ///
-                        "raw sd = `sd_raw'" "tau2 = `tau2_lab'" "mu_hat = `mu_lab'") ///
+        legend(on order(- "N = `N_eb'" "Mean = `mean_eb'" "Sd = `sd_eb'" ///
+                        "Raw sd = `sd_raw'" "Tau2 = `tau2_lab'" "mu_hat = `mu_lab'") ///
                pos(1) ring(0) region(fcolor(none)))
-    graph export ../output/figures/did_coefs_kdens_eb_`outcome'$suffix.pdf, replace
+    fig_export, path("../output/figures/did_coefs_kdens_eb_`outcome'$suffix.pdf")
 
     tw kdensity b, color(gs10%70) lpattern(dash) || ///
        kdensity b_eb, color(lavender) ///
-        xtitle("DiD Coefficient (log `outcome')", size(small)) ytitle("Density", size(small)) ///
+        xtitle("DiD coefficient (log `outcome')", size(medsmall)) ytitle("Density", size(medsmall)) ///
         xlab(, labsize(small)) ylab(, labsize(small)) ///
         xline(0, lcolor(gs6) lpattern(dash)) ///
         legend(on order(1 "Raw (sd=`sd_raw')" 2 "EB-shrunk (sd=`sd_eb')") ///
                ring(0) pos(1) region(fcolor(none)))
-    graph export ../output/figures/did_coefs_kdens_overlay_`outcome'$suffix.pdf, replace
+    fig_export, path("../output/figures/did_coefs_kdens_overlay_`outcome'$suffix.pdf")
 
     drop rank
     hashsort b_eb
@@ -280,10 +375,10 @@ program process_coefs
     tw rcap ub_eb lb_eb rank, msize(vsmall) || ///
        scatter b_eb rank, msize(tiny) mcolor(lavender) ///
        yline(0) ylab(-1(0.2)1, labsize(small)) ysc(titlegap(-6) outergap(0)) ///
-       ytitle("EB DiD Estimate (log `outcome') + 95% CI", size(small)) ///
+       ytitle("EB DiD estimate (log `outcome') + 95% CI", size(medsmall)) ///
        xlab(1(1)`n', angle(45) labsize(small) valuelabel) ///
        graphregion(margin(b+35 l+5)) xtitle("") legend(off)
-    graph export ../output/figures/coef_rank_eb_`outcome'$suffix.pdf, replace
+    fig_export, path("../output/figures/coef_rank_eb_`outcome'$suffix.pdf")
 
     drop rank_spend
     hashsort spend_2013
@@ -294,22 +389,22 @@ program process_coefs
     tw rcap ub_eb lb_eb rank_spend, msize(vsmall) || ///
        scatter b_eb rank_spend, msize(tiny) mcolor(lavender) ///
        yline(0) ylab(-1(0.2)1, labsize(small)) ysc(titlegap(-6) outergap(0)) ///
-       ytitle("EB DiD Estimate (log `outcome') + 95% CI", size(small)) ///
+       ytitle("EB DiD estimate (log `outcome') + 95% CI", size(medsmall)) ///
        xlab(1(1)`n', angle(45) labsize(small) valuelabel) ///
        graphregion(margin(b+35 l+5)) xtitle("") legend(off)
-    graph export ../output/figures/coef_spend_rank_eb_`outcome'$suffix.pdf, replace
+    fig_export, path("../output/figures/coef_spend_rank_eb_`outcome'$suffix.pdf")
 
     corr b_eb delta_hhi [aw=spend_2013]
     local corr_eb : di %4.3f r(rho)
     tw scatter b_eb delta_hhi [aw = spend_2013], ///
-        legend(on order(- "corr: `corr_eb'") ring(0) pos(1)) ///
-        xtitle("Delta HHI") ytitle("EB DiD Coefficient (log `outcome')")
-    graph export ../output/figures/delta_hhi_corr_eb_`outcome'$suffix.pdf, replace
+        legend(on order(- "Corr: `corr_eb'") ring(0) pos(1)) ///
+        xtitle("Delta HHI") ytitle("EB DiD coefficient (log `outcome')")
+    fig_export, path("../output/figures/delta_hhi_corr_eb_`outcome'$suffix.pdf")
 
     corr b_eb simulated_hhi [aw=spend_2013]
     local corr_eb : di %4.3f r(rho)
-    binscatter2 b_eb simulated_hhi [aw = spend_2013], mcolors(gs6) lcolors(ebblue) legend(on order(- "corr: `corr_eb'") ring(0) pos(1)) xtitle("Simulated HHI") ytitle("EB DiD Coefficient (log `outcome')")
-    graph export ../output/figures/sim_hhi_corr_eb_`outcome'$suffix.pdf, replace
+    binscatter2 b_eb simulated_hhi [aw = spend_2013], mcolors(gs6) lcolors(ebblue) legend(on order(- "Corr: `corr_eb'") ring(0) pos(1)) xtitle("Simulated HHI") ytitle("EB DiD coefficient (log `outcome')")
+    fig_export, path("../output/figures/sim_hhi_corr_eb_`outcome'$suffix.pdf")
 end
 
 program robustness
@@ -371,9 +466,9 @@ program robustness
     }
     local rhs lead4 lead3 lead2 lag0 lag1 lag2 lag3 lag4 lag5
     foreach var in avg_log_price log_raw_qty log_raw_spend {
-        if "`var'" == "avg_log_price" local yname "Avg. Log Price"
-        if "`var'" == "log_raw_qty"   local yname "Log Qty"
-        if "`var'" == "log_raw_spend" local yname "Log Spend"
+        if "`var'" == "avg_log_price" local yname "Average log price"
+        if "`var'" == "log_raw_qty"   local yname "Log quantity"
+        if "`var'" == "log_raw_spend" local yname "Log spending"
         cap mat drop es_`var'
         local s = 0
         foreach fespec in "year uni_id mkt" "uni_mkt year" "uni_year mkt" "uni_mkt uni_year" {
@@ -406,11 +501,11 @@ program robustness
            scatter b rel if spec == 4, mcolor(emerald) msymbol(smtriangle) msize(small) ///
            , xlab(-4(1)5, labsize(small)) ylab(`ymin'(0.1)`ymax', labsize(small)) ///
            yline(0, lcolor(gs10) lpattern(solid)) ///
-           xtitle("Relative Year", size(small)) ytitle("`yname'", size(small)) ///
-           legend(on order(2 "baseline" 4 "uni#mkt + year" 6 "uni#year + mkt" 8 "uni#mkt + uni#year") ///
+           xtitle("Relative year", size(medsmall)) ytitle("`yname'", size(medsmall)) ///
+           legend(on order(2 "Baseline" 4 "Uni#mkt + year" 6 "Uni#year + mkt" 8 "Uni#mkt + uni#year") ///
                   pos(6) rows(2) size(small) region(fcolor(none))) ///
            plotregion(margin(sides))
-        graph export ../output/figures/robust_es_`var'$suffix.pdf, replace
+        fig_export, path("../output/figures/robust_es_`var'$suffix.pdf")
         restore
     }
 end
@@ -499,9 +594,6 @@ program robustness_coefplot
         mat robust_`var' = robust_`var' \ (_b[posttreat], _se[posttreat], e(N), e(r2))
     }
     foreach var in avg_log_price log_raw_qty log_raw_spend {
-        if "`var'" == "avg_log_price" local tag price
-        if "`var'" == "log_raw_qty"   local tag qty
-        if "`var'" == "log_raw_spend" local tag spend
         cap confirm file ../external/synth/synth_estimates$suffix.dta
         if _rc {
             mat robust_coefs_`var' = robust_coefs_`var' \ (., .)
@@ -521,9 +613,9 @@ program robustness_coefplot
         mat rownames robust_`var' = `rownames'
     }
     foreach var in avg_log_price log_raw_qty log_raw_spend {
-        if "`var'" == "avg_log_price" local yname "Avg. Log Price"
-        if "`var'" == "log_raw_qty"   local yname "Log Qty"
-        if "`var'" == "log_raw_spend" local yname "Log Spend"
+        if "`var'" == "avg_log_price" local yname "Average log price"
+        if "`var'" == "log_raw_qty"   local yname "Log quantity"
+        if "`var'" == "log_raw_spend" local yname "Log spending"
         clear
         svmat robust_coefs_`var', names(col)
         gen lb = b - 1.96*se
@@ -547,19 +639,19 @@ program robustness_coefplot
                scatter pos b if inrange(pos, 1, 10), mcolor(ebblue) ///
                , xline(0, lcolor(gs12) lpattern(solid)) xline(`base', lcolor(dkorange) lpattern(dash)) ///
                xlab(`xmin'(`step')`xmax', labsize(small) format(%3.1f) grid glpattern(dot) glcolor(gs13)) `ylab_opt' ///
-               xtitle("`yname' (95% CI)", size(small)) ytitle("") ysc(range(0.5 11.5) noline) ///
+               xtitle("`yname' (95% CI)", size(medsmall)) ytitle("") ysc(range(0.5 11.5) noline) ///
                legend(off) plotregion(margin(sides)) name(rc_`var'_`mode', replace)
         }
-        graph export ../output/figures/robust_coefs_`var'$suffix.pdf, replace
+        fig_export, path("../output/figures/robust_coefs_`var'$suffix.pdf")
     }
     graph combine rc_avg_log_price_combined rc_log_raw_qty_combined rc_log_raw_spend_combined, ///
         rows(1) xsize(12) ysize(4) imargin(small)
-    graph export ../output/figures/robust_coefs_all$suffix.pdf, replace
+    fig_export, path("../output/figures/robust_coefs_all$suffix.pdf") xsize(12) ysize(4)
     graph drop _all
 end
 
 program output_tables
-    foreach tab in robust_avg_log_price robust_log_raw_qty robust_log_raw_spend pooled_did balance placebo_timing robust_coefs_avg_log_price robust_coefs_log_raw_qty robust_coefs_log_raw_spend {
+    foreach tab in robust_avg_log_price robust_log_raw_qty robust_log_raw_spend pooled_did balance placebo_timing robust_coefs_avg_log_price robust_coefs_log_raw_qty robust_coefs_log_raw_spend eb_placebo_price eb_placebo_spend {
         qui matrix_to_txt, saving("../output/tables/`tab'$suffix.txt") matrix(`tab') ///
             title(<tab:`tab'>) format(%20.4f) replace
     }
@@ -762,9 +854,9 @@ program event_study
     foreach yvar in price qty spend {
         preserve
         mat drop _all
-        if "`yvar'" == "price" local yname "Avg. Log Price"
-        if "`yvar'" == "qty" local yname "Log Qty"
-        if "`yvar'" == "spend" local yname "Log Spend"
+        if "`yvar'" == "price" local yname "Average log price"
+        if "`yvar'" == "qty" local yname "Log quantity"
+        if "`yvar'" == "spend" local yname "Log spending"
         qui sum raw_`yvar' if treated == 1 & year == 2013
         local trt_mean = round(r(mean), 0.001)
         qui sum raw_`yvar' if treated == 0 & year == 2013
@@ -795,9 +887,9 @@ program event_study
     foreach yvar in price qty spend {
         preserve
         mat drop _all
-        if "`yvar'" == "price" local yname "Avg. Log Price"
-        if "`yvar'" == "qty" local yname "Log Qty"
-        if "`yvar'" == "spend" local yname "Log Spend"
+        if "`yvar'" == "price" local yname "Average log price"
+        if "`yvar'" == "qty" local yname "Log quantity"
+        if "`yvar'" == "spend" local yname "Log spending"
         qui sum raw_`yvar' if treated == 1 & year == 2013
         local trt_mean = round(r(mean), 0.001)
         qui sum raw_`yvar' if treated == 0 & year == 2013
@@ -859,14 +951,14 @@ program event_study
             preserve
             keep if hhi`i' == 1
             mat drop _all 
-            if "`yvar'" == "price" local yname "Avg. Log Price"
-            if "`yvar'" == "qty" local yname "Avg. Log Qty"
-            if "`yvar'" == "spend" local yname "Avg. Log Spend"
+            if "`yvar'" == "price" local yname "Average log price"
+            if "`yvar'" == "qty" local yname "Average log quantity"
+            if "`yvar'" == "spend" local yname "Average log spending"
             qui sum raw_`yvar' if treated == 1 & year == 2013 
             local trt_mean :  dis %6.3f r(mean)
             qui sum raw_`yvar' if treated == 0 & year == 2013 
             local ctrl_mean : dis %6.3f r(mean)
-            manual_event_study, lag(5) lead(-4) yvar(avg_log_`yvar') ymin(-0.2) ymax(0.6) ygap(0.1) trt_mean(`trt_mean') ctrl_mean(`ctrl_mean')  name("`yname' HHI Quartile `i'") fes(`fes') wt_var(spend_2013) cluster_var(mkt) file_suf("hhi`i'")
+            manual_event_study, lag(5) lead(-4) yvar(avg_log_`yvar') ymin(-0.2) ymax(0.6) ygap(0.1) trt_mean(`trt_mean') ctrl_mean(`ctrl_mean')  name("`yname' HHI quartile `i'") fes(`fes') wt_var(spend_2013) cluster_var(mkt) file_suf("hhi`i'")
             restore
         }
     }*/
@@ -894,9 +986,9 @@ program event_study
         foreach yvar in price qty spend { 
             preserve
             mat drop _all 
-            if "`yvar'" == "price" local yname "Avg. Log Price"
-            if "`yvar'" == "qty" local yname "Log Qty"
-            if "`yvar'" == "spend" local yname "Log Spend"
+            if "`yvar'" == "price" local yname "Average log price"
+            if "`yvar'" == "qty" local yname "Log quantity"
+            if "`yvar'" == "spend" local yname "Log spending"
             qui sum raw_`yvar' if treated == 1 & year == 2013
             local trt_mean = round(r(mean), 0.001)
             qui sum raw_`yvar' if treated == 0 & year == 2013
@@ -932,10 +1024,10 @@ program event_study
        rcap ub lb rel if rel != -0.76 & group == 4,  lcolor(cranberry%70) msize(small) || ///
        scatter b rel if group == 4, mcolor(cranberry%70) msymbol(smtriangle) msize(small) || /// 
        scatteri 0.6 -0.3 0.6 0.3 , bcolor(gs12%30) recast(area) base(-0.6) ///
-       xlab(-4(1)5, labsize(small)) ylab(-0.6(0.1)0.6, labsize(vsmall)) ///
+       xlab(-4(1)5, labsize(small)) ylab(-0.6(0.1)0.6, labsize(small)) ///
           yline(0, lcolor(black) lpattern(solid)) ///
-          legend(on order(2 "Delta HHI Q1" 4 "Delta HHI Q2" 6 "Delta HHI Q3" 8 "Delta HHI Q4") pos(11) rows(2) ring(0) size(vsmall) region(fcolor(none))) xtitle("Relative Year", size(small)) ytitle("Avg. Log Price", size(small)) plotregion(margin(sides))
-    graph export ../output/figures/es_estimates_hhi$suffix.pdf, replace
+          legend(on order(2 "Delta HHI Q1" 4 "Delta HHI Q2" 6 "Delta HHI Q3" 8 "Delta HHI Q4") pos(11) rows(2) ring(0) size(small) region(fcolor(none))) xtitle("Relative year", size(medsmall)) ytitle("Average log price", size(medsmall)) plotregion(margin(sides))
+    fig_export, path("../output/figures/es_estimates_hhi$suffix.pdf")
     */
     use "../temp/es_log_raw_spend_estimatespooled$suffix", clear
     gen group = "spend"
@@ -958,10 +1050,10 @@ program event_study
        rcap ub lb rel if rel != -0.8 & group == "qty",  lcolor(ebblue%70) msize(small) || ///
        scatter b rel if group == "qty", mcolor(ebblue%70) msymbol(smsquare) msize(small) || /// 
        scatteri 0.6 -0.3 0.6 0.3 , bcolor(gs12%30) recast(area) base(-0.2) ///
-       xlab(-4(1)5, labsize(small)) ylab(-0.2(0.1)0.6, labsize(vsmall)) ///
+       xlab(-4(1)5, labsize(small)) ylab(-0.2(0.1)0.6, labsize(small)) ///
           yline(0, lcolor(black) lpattern(solid)) ///
-          legend(on order(2 "Spending (Post Period Avg: `spend_mean')" 4 "Price (Post Period Avg: `price_mean')" 6 "Quantity (Post Period Avg: `qty_mean')") pos(11) ring(0) size(small) region(fcolor(none))) xtitle("Relative Year", size(small)) ytitle("Log Estimates", size(small)) plotregion(margin(sides))
-    graph export ../output/figures/es_estimatespooled$suffix.pdf, replace
+          legend(on order(2 "Spending (post period avg: `spend_mean')" 4 "Price (post period avg: `price_mean')" 6 "Quantity (post period avg: `qty_mean')") pos(11) ring(0) size(small) region(fcolor(none))) xtitle("Relative year", size(medsmall)) ytitle("Log estimates", size(medsmall)) plotregion(margin(sides))
+    fig_export, path("../output/figures/es_estimatespooled$suffix.pdf")
 
 end
 
@@ -1061,8 +1153,8 @@ program uni_fes
     local max : dis %6.3f r(max)
     local sd : dis %6.3f r(sd)
     drop if mi(beta_u)
-    tw hist beta_u  , freq ytitle("% of Unis", size(small)) bin(50) xlab(, labsize(vsmall)) ylab(, labsize(vsmall)) xtitle("Beta_u", size(small)) legend(on order(- "N = `N'" "min = `min'" "p25 = `p25'" "p50 = `p50'" "mean = `mean'" "p75 = `p75'" "max = `max'" "sd =`sd'") pos(1) ring(0))
-    graph export ../output/figures/beta_u_dist$suffix.pdf, replace
+    tw hist beta_u  , freq ytitle("% of unis", size(medsmall)) bin(50) xlab(, labsize(small)) ylab(, labsize(small)) xtitle("Beta_u", size(medsmall)) legend(on order(- "N = `N'" "Min = `min'" "P25 = `p25'" "P50 = `p50'" "Mean = `mean'" "P75 = `p75'" "Max = `max'" "Sd =`sd'") pos(1) ring(0))
+    fig_export, path("../output/figures/beta_u_dist$suffix.pdf")
     gen lb = beta_u - 1.96*se
     gen ub = beta_u + 1.96*se
     save ../output/beta_u$suffix, replace
@@ -1079,10 +1171,10 @@ program uni_fes
     tw rcap ub lb id if r1 == 1 , lcolor(midgreen) msize(vsmall) || scatter beta_u id if r1 == 1, mcolor(midgreen) msize(tiny) ///
      || rcap ub lb id if r2 == 1 ,  lcolor(dkorange) msize(vsmall) || scatter beta_u id if r2 == 1, mcolor(dkorange) msize(tiny) ///
      || rcap ub lb id if r1 == .  & r2 == . , lcolor(eltblue%90)  msize(vsmall) || scatter beta_u id if r1 == . & r2 == . , mcolor(eltblue%90) msize(tiny) ///
-      xtitle("") ytitle("Beta_u + 95% CI", size(vsmall))  ///
-      xlab(, nolabel notick labsize(tiny) valuelabel angle(45) nogrid) ylab(`ymin'(0.5)`ymax', labsize(vsmall) nogrid)  yline(0, lcolor(gs12) lwidth(vthin)) ///
-      legend(on order(1 "R1 Universities" 3 "R2 Universities" 5 "Other Universities") pos(5) ring(0) size(vsmall))
-    graph export ../output/figures/beta_u_ci$suffix.pdf, replace
+      xtitle("") ytitle("Beta_u + 95% CI", size(medsmall))  ///
+      xlab(, nolabel notick labsize(tiny) valuelabel angle(45) nogrid) ylab(`ymin'(0.5)`ymax', labsize(small) nogrid)  yline(0, lcolor(gs12) lwidth(vthin)) ///
+      legend(on order(1 "R1 universities" 3 "R2 universities" 5 "Other universities") pos(5) ring(0) size(small))
+    fig_export, path("../output/figures/beta_u_ci$suffix.pdf")
     restore
 
     reghdfe avg_log_price posttreatlr_*  posttreatsr_* [aw = spend_2013], absorb(uni_id mkt year) cluster(mkt) 
@@ -1113,8 +1205,8 @@ program uni_fes
         local p75_`v' : dis %6.3f r(p75)
         local max_`v' : dis %6.3f r(max)
         local sd_`v' : dis %6.3f r(sd)
-        tw hist beta`v'_u  , freq bin(50) xlab(,labsize(small)) ylab(, labsize(vsmall)) ytitle("% of Unis") xtitle("Beta`v'_u") legend(on order(- "N = `N_`v''" "min = `min_`v''" "p25 = `p25_`v''" "p50 = `p50_`v''" "mean = `mean_`v''" "p75 = `p75_`v''" "max = `max_`v''" "sd =`sd_`v''") pos(1) ring(0))
-        graph export ../output/figures/beta`v'_u_dist$suffix.pdf, replace
+        tw hist beta`v'_u  , freq bin(50) xlab(,labsize(small)) ylab(, labsize(small)) ytitle("% of unis") xtitle("Beta`v'_u") legend(on order(- "N = `N_`v''" "Min = `min_`v''" "P25 = `p25_`v''" "P50 = `p50_`v''" "Mean = `mean_`v''" "P75 = `p75_`v''" "Max = `max_`v''" "Sd =`sd_`v''") pos(1) ring(0))
+        fig_export, path("../output/figures/beta`v'_u_dist$suffix.pdf")
         gen ub_`v' = beta`v'_u + 1.96 * se_`v'
         gen lb_`v' = beta`v'_u - 1.96 * se_`v'
         gen sig_`v' = ub_`v' < 0 | lb_`v' > 0
@@ -1122,8 +1214,8 @@ program uni_fes
         gen id = _n 
         count if sig_`v'==1
         local sig_`v' = r(N)
-        tw rcap ub_`v' lb_`v' id if sig_`v' == 0 , lcolor(gs5%70) lwidth(vvthin) msize(vsmall) || rcap ub_`v' lb_`v' id if sig_`v' == 1 , lcolor(emerald) msize(vsmall) lwidth(vthin) , xlab(1(2)82, labsize(tiny) angle(45) nogrid) ylab(-2(0.2)2, labsize(tiny) nogrid)  yline(0, lcolor(blue) lwidth(vthin)) legend(on order(- "# Sig. = `sig_`v''" "Mean = `mean_`v''" "sd = `sd_`v''") pos(5) ring(0) size(vsmall))
-        graph export ../output/figures/beta`v'_u_ci$suffix.pdf, replace
+        tw rcap ub_`v' lb_`v' id if sig_`v' == 0 , lcolor(gs5%70) lwidth(vvthin) msize(vsmall) || rcap ub_`v' lb_`v' id if sig_`v' == 1 , lcolor(emerald) msize(vsmall) lwidth(vthin) , xlab(1(2)82, labsize(tiny) angle(45) nogrid) ylab(-2(0.2)2, labsize(small) nogrid)  yline(0, lcolor(blue) lwidth(vthin)) legend(on order(- "# sig. = `sig_`v''" "Mean = `mean_`v''" "Sd = `sd_`v''") pos(5) ring(0) size(small))
+        fig_export, path("../output/figures/beta`v'_u_ci$suffix.pdf")
         drop id
     }
     drop sig*
@@ -1134,23 +1226,23 @@ program uni_fes
     merge 1:1 uni_id using ../output/beta_sr_lr_u$suffix, assert(3) keep(3) nogen
     merge 1:1 uni_id using ../output/beta_u_placebo$suffix, assert(1 3) keep(3) nogen
     tw kdensity betalr_u, color(ebblue%90) || kdensity betasr_u, color(orange%90)  || ///
-        kdensity beta_u ,   color(lavender%80) || kdensity beta_u_pl, color(gs12) ytitle("% of Unis") xtitle("Beta_u") ///
+        kdensity beta_u ,   color(lavender%80) || kdensity beta_u_pl, color(gs12) ytitle("% of unis") xtitle("Beta_u") ///
         legend(on order(1 "Long run (mean): `mean_lr'" 2  "Short run (mean): `mean_sr'" 3 "All (mean):  `mean'" 4 "Placebo (mean): `mean_pl'") ring(0) pos(11) region(fcolor(none)))  ///
-        xlab(, labsize(small)) xtitle("University Price Estimates", size(small)) 
-    graph export ../output/figures/overlaid_beta_u$suffix.pdf, replace
+        xlab(, labsize(small)) xtitle("University price estimates", size(medsmall)) 
+    fig_export, path("../output/figures/overlaid_beta_u$suffix.pdf")
     keep uni_id beta_u betasr_u betalr_u 
     save ../output/betas$suffix, replace
     use ../output/beta_u$suffix, clear
     merge 1:1 uni_id using ../output/beta_u_placebo$suffix, assert(1 3) keep(3) nogen
-    tw kdensity beta_u ,   color(lavender) || kdensity beta_u_pl, color(dkorange) ytitle("% of Unis") xtitle("Beta_u") ///
-        legend(on order(1 "University Price Effect Mean: `mean'" 2 "Placebo Treated Year (mean): `mean_pl'") ring(0) pos(11) region(fcolor(none)))  ///
-        xlab(, labsize(small)) xtitle("University Price Estimates", size(small)) 
-    graph export ../output/figures/overlaid_beta_u_simple$suffix.pdf, replace
+    tw kdensity beta_u ,   color(lavender) || kdensity beta_u_pl, color(dkorange) ytitle("% of unis") xtitle("Beta_u") ///
+        legend(on order(1 "University price effect mean: `mean'" 2 "Placebo treated year (mean): `mean_pl'") ring(0) pos(11) region(fcolor(none)))  ///
+        xlab(, labsize(small)) xtitle("University price estimates", size(medsmall)) 
+    fig_export, path("../output/figures/overlaid_beta_u_simple$suffix.pdf")
     use ../output/beta_u$suffix, clear
-    tw kdensity beta_u ,   color(lavender%80) ytitle("% of Unis", size(small)) xtitle("Beta_u", size(small)) ///
+    tw kdensity beta_u ,   color(lavender%80) ytitle("% of unis", size(medsmall)) xtitle("Beta_u", size(medsmall)) ///
         legend(on order(1 "Mean: `mean'") ring(0) pos(11) region(fcolor(none)))  ///
         xlab(, labsize(small))  
-    graph export ../output/figures/overlaid_beta_u_single$suffix.pdf, replace
+    fig_export, path("../output/figures/overlaid_beta_u_single$suffix.pdf")
 end
 
 program manual_event_study
@@ -1266,24 +1358,23 @@ program manual_event_study
     sum year , d
     local year_min = r(min)
     local year_max = r(max)
-    local legend_split legend(on order(3 "Treated Level Avg. in t = -1: `trt_mean'" 4 "Control Level Avg. in t = -1: `ctrl_mean'") pos(7) rows(2) bmargin(zero) size(small))
+    local legend_split legend(on order(3 "Treated level avg. in t = -1: `trt_mean'" 4 "Control level avg. in t = -1: `ctrl_mean'") pos(7) rows(2) bmargin(zero) size(small))
     local modes $exhibit_mode
     if "$exhibit_mode" == "both" local modes presentation paper
    /* if "`title'" == "" {
         tw rcap ub lb rel if rel != -1 & inrange(rel, `lead', `lag') , lcolor(ebblue%70) msize(vsmall) || ///
         scatter b rel if inrange(rel, `lead', `lag') , mcolor(ebblue) || ///
         scatteri `ymax' -0.25 `ymax' 0.25 , bcolor(gs12%30) recast(area) base(`ymin') ///
-        xlab(`lead'(1)`lag', labsize(vsmall)) xtitle("Relative Year", size(small)) ///
-        ytitle("`name'", size(small)) ylab(`ymin'(`ygap')`ymax', labsize(vsmall)) yline(0, lcolor(gs10) lpattern(solid))  ///
-        legend(on order(- "Treated Level Avg. in t = -1: `trt_mean'" "Control Level Avg. in t = -1: `ctrl_mean'") pos(6) rows(2))  ///
+        xlab(`lead'(1)`lag', labsize(small)) xtitle("Relative year", size(medsmall)) ///
+        ytitle("`name'", size(medsmall)) ylab(`ymin'(`ygap')`ymax', labsize(small)) yline(0, lcolor(gs10) lpattern(solid))  ///
+        legend(on order(- "Treated level avg. in t = -1: `trt_mean'" "Control level avg. in t = -1: `ctrl_mean'") pos(6) rows(2))  ///
         plotregion(margin(sides))
-        graph export "../output/figures/es/`suf'es_`yvar'_`file_suf'$suffix.pdf", replace
+        fig_export, path("../output/figures/es/`suf'es_`yvar'_`file_suf'$suffix.pdf")
     }*/
     foreach mode in `modes' {
         local figdir ../output/figures
-        local legend_lvl legend(on order(- "Treated Level Avg. in t = -1: `trt_mean'" "Control Level Avg. in t = -1: `ctrl_mean'") pos(7) rows(2) bmargin(zero) size(small))
+        local legend_lvl legend(on order(- "Treated level avg. in t = -1: `trt_mean'" "Control level avg. in t = -1: `ctrl_mean'") pos(7) rows(2) bmargin(zero) size(small))
         if "`mode'" == "paper" {
-            local figdir ../output/figures/paper
             local legend_lvl legend(off)
         }
         tw rcap ub lb year if rel != -1 & inrange(rel, `lead', `lag') , lcolor(ebblue%70) msize(vsmall) || ///
@@ -1293,7 +1384,7 @@ program manual_event_study
         ytitle("`name'") ysc(titlegap(-6) outergap(0)) ylab(`ymin'(`ygap')`ymax') yline(0, lcolor(gs10) lpattern(solid)) ///
         `legend_lvl' ///
         title(`title', size(small)) plotregion(margin(sides))
-        graph export "`figdir'/es/`suf'es_`yvar'_`file_suf'$suffix.pdf", replace
+        fig_export, path("`figdir'/es/`suf'es_`yvar'_`file_suf'$suffix.pdf") mode(`mode')
     }
 
         tw rcap trt_coef_ub trt_coef_lb year if rel != -1 & inrange(rel, `lead', `lag') , lcolor(ebblue%70) msize(vsmall) || ///
@@ -1305,7 +1396,7 @@ program manual_event_study
         ytitle("`name'") ysc(titlegap(-6) outergap(0)) ylab(`ymin'(`ygap')`ymax') yline(0, lcolor(gs10) lpattern(solid)) ///
         `legend_split' ///
         title(`title', size(small)) plotregion(margin(sides))
-        graph export "../output/figures/es/split_`suf'es_`yvar'_`file_suf'$suffix.pdf", replace
+        fig_export, path("../output/figures/es/split_`suf'es_`yvar'_`file_suf'$suffix.pdf")
 
         gen trt_coef_raw_ub = trt_coef_raw + 1.96*trt_coef_se
         gen trt_coef_raw_lb = trt_coef_raw - 1.96*trt_coef_se
@@ -1328,7 +1419,7 @@ program manual_event_study
         ytitle("`name'") ysc(titlegap(-6) outergap(0)) ylab(`rymin'(`ygap')`rymax') yline(0, lcolor(gs10) lpattern(solid)) ///
         `legend_split' ///
         title(`title', size(small)) plotregion(margin(sides))
-        graph export "../output/figures/es/split_nodetrend_`suf'es_`yvar'_`file_suf'$suffix.pdf", replace
+        fig_export, path("../output/figures/es/split_nodetrend_`suf'es_`yvar'_`file_suf'$suffix.pdf")
     restore
 end
 main

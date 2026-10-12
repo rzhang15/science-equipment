@@ -30,7 +30,7 @@ def eb_shrink(df):
     return df, tau2, mu_hat
 
 
-def load_all_shares(path, foia_ids):
+def load_all_shares(path, foia_ids, extra_cats):
     df = pd.read_stata(path)
     df["athr_id"] = df["athr_id"].astype(str)
     df["category"] = df["category"].astype(str).replace(CATEGORY_RENAMES)
@@ -38,7 +38,7 @@ def load_all_shares(path, foia_ids):
     df = df[(df["spend"] > 0) & (df["tot_shr_spend"] > 0)]
     df = df[df["athr_id"].isin(set(foia_ids))].copy()
     df["share"] = df["spend"].astype(float) / df["tot_shr_spend"].astype(float)
-    cats = sorted(df["category"].unique())
+    cats = sorted(set(df["category"]) | set(extra_cats))
     ipos = {a: i for i, a in enumerate(foia_ids)}
     kpos = {c: k for k, c in enumerate(cats)}
     S = np.zeros((len(foia_ids), len(cats)))
@@ -75,6 +75,8 @@ def main():
     ap.add_argument("--roster-samp", default="all_jrnls_r1_r2")
     ap.add_argument("--iters", type=int, nargs="*", default=None)
     ap.add_argument("--no-anchor-renorm", action="store_true")
+    ap.add_argument("--mode", choices=["placebo", "transplant"], default="placebo")
+    ap.add_argument("--seed", type=int, default=8975)
     args = ap.parse_args()
 
     sample_sfx = "_all3" if args.all3 else ""
@@ -85,6 +87,9 @@ def main():
     )
     _, filter_sfx, k_sfx = impute.build_suffixes(sfx_args)
     stem = f"_{args.version}{sample_sfx}{filter_sfx}{k_sfx}"
+    mode_sfx = "_transplant" if args.mode == "transplant" else ""
+    rng = np.random.default_rng(args.seed)
+    real_markets, real_g = impute.load_shocks(impute.DEFAULT_BETAS_FILE.format(sample=sample_sfx))
 
     df_univ = pd.read_parquet(f"{OUT_DIR}/universe_ids.parquet")
     univ_ids = df_univ["athr_id"].astype(str).to_numpy()
@@ -93,13 +98,13 @@ def main():
     if W.shape != (len(univ_ids), len(foia_ids)):
         raise SystemExit(f"W shape {W.shape} != ({len(univ_ids)}, {len(foia_ids)})")
 
-    S_all, kpos = load_all_shares(CATEGORY_SHARE_FILE.format(version=args.version, sample=sample_sfx), foia_ids)
-
     betas = pd.read_stata(PLACEBO_BETAS_FILE.format(sample=sample_sfx))
     betas["category"] = betas["category"].astype(str).replace(CATEGORY_RENAMES)
-    missing = set(betas["category"]) - set(kpos)
-    if missing:
-        raise SystemExit(f"placebo markets absent from share file: {sorted(missing)}")
+    S_all, kpos = load_all_shares(
+        CATEGORY_SHARE_FILE.format(version=args.version, sample=sample_sfx),
+        foia_ids,
+        betas["category"].unique(),
+    )
     betas["iter"] = betas["iter"].astype(int)
     iters = sorted(betas["iter"].unique().tolist()) if args.iters is None else args.iters
 
@@ -123,9 +128,19 @@ def main():
     long_rows, eb_rows, summary = [], [], []
 
     for it in iters:
-        bi, tau2, mu_hat = eb_shrink(betas[betas["iter"] == it])
-        bi = bi.drop_duplicates("category")
-        eb_rows.append(bi.assign(iter=it)[["iter", "category", "b", "se", "w_eb", "b_eb", "se_eb"]])
+        bi = betas[betas["iter"] == it].drop_duplicates("category")
+        if args.mode == "transplant":
+            if len(bi) != len(real_g):
+                raise SystemExit(f"iter {it}: {len(bi)} placebo markets vs {len(real_g)} real betas")
+            perm = rng.permutation(len(real_g))
+            bi = bi[["iter", "category"]].copy()
+            bi["b_eb"] = real_g[perm]
+            bi["source_market"] = np.array(real_markets)[perm]
+            tau2, mu_hat = np.nan, np.nan
+            eb_rows.append(bi[["iter", "category", "b_eb", "source_market"]])
+        else:
+            bi, tau2, mu_hat = eb_shrink(bi)
+            eb_rows.append(bi.assign(iter=it)[["iter", "category", "b", "se", "w_eb", "b_eb", "se_eb"]])
         cols = bi["category"].map(kpos).to_numpy()
         g = bi["b_eb"].to_numpy(float)
         S = S_all[:, cols]
@@ -184,10 +199,10 @@ def main():
         print(f"iter {it:3d}: anchors {active.sum():3d} | mean z {zf.mean():+.5f} sd {zf.std():.5f}"
               + (f" | corr real {row['corr_with_real']:+.3f}" if real is not None else ""))
 
-    pd.concat(long_rows, ignore_index=True).to_csv(f"{OUT_DIR}/placebo_shift_share{stem}.csv", index=False)
-    pd.concat(eb_rows, ignore_index=True).to_csv(f"{OUT_DIR}/placebo_betas_eb{sample_sfx}.csv", index=False)
-    pd.DataFrame(summary).to_csv(f"{OUT_DIR}/placebo_shift_share_summary{stem}.csv", index=False)
-    print(f"saved placebo_shift_share{stem}.csv")
+    pd.concat(long_rows, ignore_index=True).to_csv(f"{OUT_DIR}/placebo_shift_share{stem}{mode_sfx}.csv", index=False)
+    pd.concat(eb_rows, ignore_index=True).to_csv(f"{OUT_DIR}/placebo_betas_eb{sample_sfx}{mode_sfx}.csv", index=False)
+    pd.DataFrame(summary).to_csv(f"{OUT_DIR}/placebo_shift_share_summary{stem}{mode_sfx}.csv", index=False)
+    print(f"saved placebo_shift_share{stem}{mode_sfx}.csv")
 
 
 if __name__ == "__main__":

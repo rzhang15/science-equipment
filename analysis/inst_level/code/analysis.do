@@ -4,6 +4,42 @@ capture log close
 program drop _all
 version 16.1
 set scheme modern
+
+global PRES_SCALE 1.2
+
+cap program drop fig_export
+program fig_export
+    syntax, path(string) [mode(string) xsize(real 6) ysize(real 4)]
+    local p : subinstr local path "/paper/" "/", all
+    local p : subinstr local p "/pres/" "/", all
+    local k = strpos("`p'", "figures/")
+    if `k' > 0 {
+        local base = substr("`p'", 1, `k' + 7)
+        local rest = substr("`p'", `k' + 8, .)
+    }
+    else {
+        local slash = strrpos("`p'", "/")
+        local base = substr("`p'", 1, `slash')
+        local rest = substr("`p'", `slash' + 1, .)
+    }
+    local tscale = cond(`xsize' >= `ysize', (2/3) * `xsize' / min(`xsize', `ysize'), 1)
+    if "`mode'" == "presentation" local mode pres
+    foreach m in paper pres {
+        if "`mode'" != "" & "`mode'" != "`m'" continue
+        local dir "`base'`m'"
+        cap mkdir "`dir'"
+        local sub "`rest'"
+        while strpos("`sub'", "/") > 0 {
+            local seg = substr("`sub'", 1, strpos("`sub'", "/") - 1)
+            local dir "`dir'/`seg'"
+            cap mkdir "`dir'"
+            local sub = substr("`sub'", strpos("`sub'", "/") + 1, .)
+        }
+        local s = cond("`m'" == "pres", `tscale' * $PRES_SCALE, `tscale')
+        graph display, scale(`s')
+        graph export "`base'`m'/`rest'", replace
+    }
+end
 set linesize 200
 set maxvar 20000
 
@@ -294,11 +330,11 @@ program figures
     global XLAB $XLAB $XMAX
 
     caterpillar, y(pi1) lo(pi1_lo) hi(pi1_hi) se(se_pi1) ///
-        ytitle("Post x Institution") name(caterpillar_pi_spec1)
+        ytitle("Post x institution") name(caterpillar_pi_spec1)
     caterpillar, y(pi_j) lo(pi2_lo) hi(pi2_hi) se(se_pi) ///
-        ytitle("Post x Institution") name(caterpillar_pi_spec2)
+        ytitle("Post x institution") name(caterpillar_pi_spec2)
     caterpillar, y(beta_j) lo(beta_j_lo) hi(beta_j_hi) se(se_beta) ///
-        ytitle("Post x Exposure x Institution") name(caterpillar_beta_spec2)
+        ytitle("Post x exposure x institution") name(caterpillar_beta_spec2)
 
     preserve
         keep if report
@@ -312,10 +348,10 @@ program figures
              xscale(range(1 $XMAX) noextend) xlab($XLAB) ///
              plotregion(margin(l = 1 r = 1)) ///
              xtitle("Institution (ranked within specification)") ///
-             ytitle("Post x Institution") ///
-             legend(order(1 "Spec 1: Post x Inst" 2 "Spec 2: + Post x Exposure x Inst") ///
+             ytitle("Post x institution") ///
+             legend(order(1 "Spec 1: post x inst" 2 "Spec 2: + post x exposure x inst") ///
                     pos(11) ring(0) size(medsmall))
-        graph export ../output/figures/pi_both_specs_sorted.pdf, replace
+        fig_export, path("../output/figures/pi_both_specs_sorted.pdf")
     restore
 
     preserve
@@ -329,11 +365,11 @@ program figures
         di as text "pi_j vs beta_j: slope = `fsl' (se `fse'), corr = `frho', N = `fn'"
         tw (scatter beta_j pi_j, mcolor(ebblue) msize(small)) ///
            (lfit beta_j pi_j, lcolor(gs9)) ///
-           , xtitle("Post x Institution") ///
-             ytitle("Post x Exposure x Institution") legend(off) ///
+           , xtitle("Post x institution") ///
+             ytitle("Post x exposure x institution") legend(off) ///
              note("Slope = `=trim("`fsl'")' (se `=trim("`fse'")');" ///
                   " correlation = `=trim("`frho'")'; N = `fn'")
-        graph export ../output/figures/pi_vs_beta.pdf, replace
+        fig_export, path("../output/figures/pi_vs_beta.pdf")
     restore
 end
 
@@ -355,7 +391,7 @@ program caterpillar
              plotregion(margin(l = 1 r = 1)) ///
              xtitle("Institution (ranked by coefficient)") ytitle("`ytitle'") ///
              legend(off)
-        graph export ../output/figures/`name'.pdf, replace
+        fig_export, path("../output/figures/`name'.pdf")
     restore
 end
 

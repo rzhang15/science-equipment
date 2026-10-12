@@ -12,5 +12,6 @@ start_makelog(paths)
 
 link_externals(paths, ['links.txt'])
 run_stata(paths, program = 'analysis.do')
+run_stata(paths, program = 'het_table.do')
 end_makelog(paths)
 input('\n Press <Enter> to exit.')

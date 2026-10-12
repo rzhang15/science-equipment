@@ -4,6 +4,42 @@ capture log close
 program drop _all
 set scheme modern
 preliminaries
+
+global PRES_SCALE 1.2
+
+cap program drop fig_export
+program fig_export
+    syntax, path(string) [mode(string) xsize(real 6) ysize(real 4)]
+    local p : subinstr local path "/paper/" "/", all
+    local p : subinstr local p "/pres/" "/", all
+    local k = strpos("`p'", "figures/")
+    if `k' > 0 {
+        local base = substr("`p'", 1, `k' + 7)
+        local rest = substr("`p'", `k' + 8, .)
+    }
+    else {
+        local slash = strrpos("`p'", "/")
+        local base = substr("`p'", 1, `slash')
+        local rest = substr("`p'", `slash' + 1, .)
+    }
+    local tscale = cond(`xsize' >= `ysize', (2/3) * `xsize' / min(`xsize', `ysize'), 1)
+    if "`mode'" == "presentation" local mode pres
+    foreach m in paper pres {
+        if "`mode'" != "" & "`mode'" != "`m'" continue
+        local dir "`base'`m'"
+        cap mkdir "`dir'"
+        local sub "`rest'"
+        while strpos("`sub'", "/") > 0 {
+            local seg = substr("`sub'", 1, strpos("`sub'", "/") - 1)
+            local dir "`dir'/`seg'"
+            cap mkdir "`dir'"
+            local sub = substr("`sub'", strpos("`sub'", "/") + 1, .)
+        }
+        local s = cond("`m'" == "pres", `tscale' * $PRES_SCALE, `tscale')
+        graph display, scale(`s')
+        graph export "`base'`m'/`rest'", replace
+    }
+end
 version 17
 
 cap mkdir ../output
@@ -316,7 +352,7 @@ end
 program plot_one
     syntax, yvar(string) samp(string) pre_mean(string) [suf(string) n_athrs(string)]
     local ytit "`yvar'"
-    if strpos("`suf'", "_ppml") local ytit "Output-Cost Elasticity"
+    if strpos("`suf'", "_ppml") local ytit "Output-cost elasticity"
     sum ub, d
     local ymax = r(max)
     sum lb, d
@@ -327,8 +363,8 @@ program plot_one
     local ymin = floor(`ymin' / `gap') * `gap'
 
     local legend_extra ""
-    if "`n_athrs'" != "" local legend_extra `"order(- "Num. PIs: `n_athrs'" "Pre-Period Avg : `pre_mean'")"'
-    else                 local legend_extra `"order(- "Pre-Period Avg : `pre_mean'")"'
+    if "`n_athrs'" != "" local legend_extra `"order(- "Num. PIs: `n_athrs'" "Pre-period avg : `pre_mean'")"'
+    else                 local legend_extra `"order(- "Pre-period avg : `pre_mean'")"'
 
     cap graph drop _all
     local stats_leg `"legend(on `legend_extra' pos(7) ring(1) rows(2) bmargin(zero) size(small))"'
@@ -336,7 +372,6 @@ program plot_one
     foreach fmode of global FIG_MODES {
         if "`fmode'" == "paper" {
             local stats_leg legend(off)
-            local fdir ../output/figures/`samp'/paper
             cap mkdir "`fdir'"
         }
         tw rcap ub lb year if year != 2013 , lcolor(ebblue%70) msize(vsmall) || ///
@@ -346,7 +381,7 @@ program plot_one
           ytitle("`ytit'") ylab(`ymin'(`gap')`ymax') ///
           yline(0, lcolor(gs10) lpattern(solid)) ///
           `stats_leg' plotregion(margin(sides))
-        graph export `fdir'/es_`yvar'`suf'.pdf, replace
+        fig_export, path("`fdir'/es_`yvar'`suf'.pdf") mode(`fmode')
     }
 end
 
@@ -403,8 +438,8 @@ program combine_pred_real_plot
           xlab(2010(1)2019) xtitle("Year") ///
           ytitle("Coefficient") ylab(`ymin'(`gap')`ymax') ///
           yline(0, lcolor(gs10) lpattern(solid)) ///
-          legend(on order(2 "high tier" 4 "low tier") pos(7) ring(1) size(small) bmargin(zero)) plotregion(margin(sides))
-        graph export ../output/figures/`samp'/es_`pair'_`samp'`suf'.pdf, replace
+          legend(on order(2 "High tier" 4 "Low tier") pos(7) ring(1) size(small) bmargin(zero)) plotregion(margin(sides))
+        fig_export, path("../output/figures/`samp'/es_`pair'_`samp'`suf'.pdf")
     }
 
     cap confirm file ../temp/es_n_pred_low_`samp'`suf'.dta
@@ -441,8 +476,8 @@ program combine_pred_real_plot
       xlab(2010(1)2019) xtitle("Year") ///
       ytitle("Coefficient (n_low)") ylab(`ymin'(`gap')`ymax') ///
       yline(0, lcolor(gs10) lpattern(solid)) ///
-      legend(on order(2 "predicted low" 4 "realized low") pos(7) ring(1) size(small) bmargin(zero)) plotregion(margin(sides))
-    graph export ../output/figures/`samp'/es_pred_vs_real`suf'.pdf, replace
+      legend(on order(2 "Predicted low" 4 "Realized low") pos(7) ring(1) size(small) bmargin(zero)) plotregion(margin(sides))
+    fig_export, path("../output/figures/`samp'/es_pred_vs_real`suf'.pdf")
 end
 
 program pooled_did

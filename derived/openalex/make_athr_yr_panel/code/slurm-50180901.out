@@ -595,3 +595,550 @@ file ../temp/unique_coauthors_all_jrnls_last.dta saved
     Matched                         2,472,129  
     -----------------------------------------
 (384,881 real changes made)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                   166,965,683
+        from master                         0  
+        from using                166,965,683  
+
+    Matched                         2,857,010  
+    -----------------------------------------
+(169,822,693 real changes made)
+(166,965,683 missing values generated)
+(2,857,010 real changes made)
+(166,965,683 observations deleted)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                         2,857,010  
+    -----------------------------------------
+file ../output/athr_panel_full_comb_year_last_all_jrnls.dta saved
+(0 real changes made)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                       384,881
+        from master                   384,881  
+        from using                          0  
+
+    Matched                         2,472,129  
+    -----------------------------------------
+(384,881 real changes made)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                   166,965,683
+        from master                         0  
+        from using                166,965,683  
+
+    Matched                         2,857,010  
+    -----------------------------------------
+(169,822,693 real changes made)
+(166,965,683 missing values generated)
+(2,857,010 real changes made)
+(166,965,683 observations deleted)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                         2,857,010  
+    -----------------------------------------
+file ../output/athr_panel_full_year_last_all_jrnls.dta saved
+(encoding automatically selected: ISO-8859-1)
+(4 vars, 266 obs)
+(4 observations deleted)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                               262  
+    -----------------------------------------
+file ../temp/ipeds_inst_id.dta saved
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                         1,597,130  
+    -----------------------------------------
+file ../output/athr_panel_full_year_last_all_jrnls_r1_r2.dta saved
+(653,074 observations deleted)
+file ../output/athr_panel_full_year_last_all_jrnls_r1_r2_public.dta saved
+(encoding automatically selected: ISO-8859-2)
+(2 vars, 5,287,996 obs)
+file ../temp/clusters.dta saved
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                        71,658,372  
+    -----------------------------------------
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                        71,658,372  
+    -----------------------------------------
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                        71,658,372  
+    -----------------------------------------
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                        71,658,372  
+    -----------------------------------------
+(28,026,889 real changes made)
+(53,634,394 real changes made, 53,634,394 to missing)
+(53,634,394 real changes made, 53,634,394 to missing)
+(53,634,394 real changes made, 53,634,394 to missing)
+(53,634,394 real changes made, 53,634,394 to missing)
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+    avg_cite | 18,023,978     2.38376    10.33486          0   17930.17
+(53,634,394 missing values generated)
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+     avg_pat | 18,023,978    .0410179    .8014774          0   1055.595
+(53,634,394 missing values generated)
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+    avg_frnt | 18,023,978    .0254481    .3241767          0    318.054
+(53,634,394 missing values generated)
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+    avg_body | 18,023,978    .0115881    .5128056          0   637.1081
+(53,634,394 missing values generated)
+N = 71,658,372; 18,023,978 unbalanced groups of sizes 1 to 100
+(52,905,152 observations deleted)
+(17,173,238 observations deleted)
+file ../temp/athr_names_all_jrnls.dta saved
+file ../temp/focal_list_all_jrnls.dta saved
+file ../temp/coauthors_all_jrnls.dta saved
+(18,753,220 observations deleted)
+file ../temp/unique_coauthors_all_jrnls.dta saved
+(18,753,220 observations deleted)
+(28,480,524 observations deleted)
+file ../temp/coauthor_in_msa_year_all_jrnls.dta saved
+(18,753,220 observations deleted)
+(5,541,862 real changes made)
+file ../output/num_fund_coauthors_all_jrnls.dta saved
+(18,753,220 real changes made)
+(14,180,675 missing values generated)
+(4,572,545 missing values generated)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                     1,839,594
+        from master                 1,839,594  
+        from using                          0  
+
+    Matched                         7,299,540  
+    -----------------------------------------
+(1,839,594 real changes made)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                       265,287
+        from master                   265,287  
+        from using                          0  
+
+    Matched                         8,873,847  
+    -----------------------------------------
+(265,287 real changes made)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                   160,683,559
+        from master                         0  
+        from using                160,683,559  
+
+    Matched                         9,139,134  
+    -----------------------------------------
+(169,822,693 real changes made)
+(160,683,559 missing values generated)
+(9,139,134 real changes made)
+(160,683,559 observations deleted)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                         9,139,134  
+    -----------------------------------------
+file ../output/athr_panel_full_comb_year_all_jrnls.dta saved
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                     1,839,594
+        from master                 1,839,594  
+        from using                          0  
+
+    Matched                         7,299,540  
+    -----------------------------------------
+(1,839,594 real changes made)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                       265,287
+        from master                   265,287  
+        from using                          0  
+
+    Matched                         8,873,847  
+    -----------------------------------------
+(265,287 real changes made)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                   160,683,559
+        from master                         0  
+        from using                160,683,559  
+
+    Matched                         9,139,134  
+    -----------------------------------------
+(169,822,693 real changes made)
+(160,683,559 missing values generated)
+(9,139,134 real changes made)
+(160,683,559 observations deleted)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                         9,139,134  
+    -----------------------------------------
+file ../output/athr_panel_full_year_all_jrnls.dta saved
+(encoding automatically selected: ISO-8859-1)
+(4 vars, 266 obs)
+(4 observations deleted)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                               262  
+    -----------------------------------------
+file ../temp/ipeds_inst_id.dta saved
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                         4,911,968  
+    -----------------------------------------
+file ../output/athr_panel_full_year_all_jrnls_r1_r2.dta saved
+(2,061,648 observations deleted)
+file ../output/athr_panel_full_year_all_jrnls_r1_r2_public.dta saved
+(encoding automatically selected: ISO-8859-2)
+(2 vars, 5,287,996 obs)
+file ../temp/clusters.dta saved
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                        15,971,875  
+    -----------------------------------------
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                        15,971,875  
+    -----------------------------------------
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                        15,971,875  
+    -----------------------------------------
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                        15,971,875  
+    -----------------------------------------
+(1,882,541 observations deleted)
+(0 real changes made)
+(0 real changes made)
+(0 real changes made)
+(0 real changes made)
+(0 real changes made)
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+    avg_cite | 14,089,334      2.6415    11.12735          0   17930.17
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+     avg_pat | 14,089,334    .0461698     .848703          0   1055.595
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+    avg_frnt | 14,089,334    .0289023    .3474123          0    318.054
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+    avg_body | 14,089,334    .0128042    .5418785          0   637.1081
+N = 14,089,334; 14,089,334 balanced groups of size 1
+(10,098,362 observations deleted)
+(3,378,733 observations deleted)
+file ../temp/athr_names_all_jrnls_last_no_solo.dta saved
+file ../temp/focal_list_all_jrnls_last_no_solo.dta saved
+file ../temp/coauthors_all_jrnls_last_no_solo.dta saved
+(3,990,972 observations deleted)
+file ../temp/unique_coauthors_all_jrnls_last_no_solo.dta saved
+(3,990,972 real changes made)
+(3,990,972 missing values generated)
+(0 real changes made)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                         2,472,129  
+    -----------------------------------------
+(0 real changes made)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                   167,350,564
+        from master                         0  
+        from using                167,350,564  
+
+    Matched                         2,472,129  
+    -----------------------------------------
+(169,822,693 real changes made)
+(167,350,564 missing values generated)
+(2,472,129 real changes made)
+(167,350,564 observations deleted)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                         2,472,129  
+    -----------------------------------------
+file ../output/athr_panel_full_comb_year_last_no_solo_all_jrnls.dta saved
+(0 real changes made)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                         2,472,129  
+    -----------------------------------------
+(0 real changes made)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                   167,350,564
+        from master                         0  
+        from using                167,350,564  
+
+    Matched                         2,472,129  
+    -----------------------------------------
+(169,822,693 real changes made)
+(167,350,564 missing values generated)
+(2,472,129 real changes made)
+(167,350,564 observations deleted)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                         2,472,129  
+    -----------------------------------------
+file ../output/athr_panel_full_year_last_no_solo_all_jrnls.dta saved
+(encoding automatically selected: ISO-8859-1)
+(4 vars, 266 obs)
+(4 observations deleted)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                               262  
+    -----------------------------------------
+file ../temp/ipeds_inst_id.dta saved
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                         1,401,147  
+    -----------------------------------------
+file ../output/athr_panel_full_year_last_no_solo_all_jrnls_r1_r2.dta saved
+(565,023 observations deleted)
+file ../output/athr_panel_full_year_last_no_solo_all_jrnls_r1_r2_public.dta
+    saved
+(encoding automatically selected: ISO-8859-2)
+(2 vars, 5,287,996 obs)
+file ../temp/clusters.dta saved
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                        71,658,372  
+    -----------------------------------------
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                        71,658,372  
+    -----------------------------------------
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                        71,658,372  
+    -----------------------------------------
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                        71,658,372  
+    -----------------------------------------
+(1,882,541 observations deleted)
+(28,026,889 real changes made)
+(53,634,394 real changes made, 53,634,394 to missing)
+(53,634,394 real changes made, 53,634,394 to missing)
+(53,634,394 real changes made, 53,634,394 to missing)
+(53,634,394 real changes made, 53,634,394 to missing)
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+    avg_cite | 16,141,437    2.577346     10.7509          0   17930.17
+(53,634,394 missing values generated)
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+     avg_pat | 16,141,437    .0439164    .8326527          0   1055.595
+(53,634,394 missing values generated)
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+    avg_frnt | 16,141,437    .0273747    .3374281          0    318.054
+(53,634,394 missing values generated)
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+    avg_body | 16,141,437    .0122763    .5322548          0   637.1081
+(53,634,394 missing values generated)
+N = 69,775,831; 16,141,437 unbalanced groups of sizes 1 to 100
+(51,604,184 observations deleted)
+(16,617,483 observations deleted)
+file ../temp/athr_names_all_jrnls_no_solo.dta saved
+file ../temp/focal_list_all_jrnls_no_solo.dta saved
+file ../temp/coauthors_all_jrnls_no_solo.dta saved
+(18,171,647 observations deleted)
+file ../temp/unique_coauthors_all_jrnls_no_solo.dta saved
+(18,171,647 observations deleted)
+(28,480,524 observations deleted)
+file ../temp/coauthor_in_msa_year_all_jrnls_no_solo.dta saved
+(18,171,647 observations deleted)
+(5,541,862 real changes made)
+file ../output/num_fund_coauthors_all_jrnls_no_solo.dta saved
+(18,171,647 real changes made)
+(14,180,675 missing values generated)
+(3,990,972 missing values generated)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                     1,574,307
+        from master                 1,574,307  
+        from using                          0  
+
+    Matched                         7,299,540  
+    -----------------------------------------
+(1,574,307 real changes made)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                         8,873,847  
+    -----------------------------------------
+(0 real changes made)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                   160,948,846
+        from master                         0  
+        from using                160,948,846  
+
+    Matched                         8,873,847  
+    -----------------------------------------
+(169,822,693 real changes made)
+(160,948,846 missing values generated)
+(8,873,847 real changes made)
+(160,948,846 observations deleted)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                         8,873,847  
+    -----------------------------------------
+(file ../output/athr_panel_full_comb_year_no_solo_all_jrnls.dta not found)
+file ../output/athr_panel_full_comb_year_no_solo_all_jrnls.dta saved
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                     1,574,307
+        from master                 1,574,307  
+        from using                          0  
+
+    Matched                         7,299,540  
+    -----------------------------------------
+(1,574,307 real changes made)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                         8,873,847  
+    -----------------------------------------
+(0 real changes made)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                   160,948,846
+        from master                         0  
+        from using                160,948,846  
+
+    Matched                         8,873,847  
+    -----------------------------------------
+(169,822,693 real changes made)
+(160,948,846 missing values generated)
+(8,873,847 real changes made)
+(160,948,846 observations deleted)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                         8,873,847  
+    -----------------------------------------
+(file ../output/athr_panel_full_year_no_solo_all_jrnls.dta not found)
+file ../output/athr_panel_full_year_no_solo_all_jrnls.dta saved
+(encoding automatically selected: ISO-8859-1)
+(4 vars, 266 obs)
+(4 observations deleted)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                               262  
+    -----------------------------------------
+file ../temp/ipeds_inst_id.dta saved
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                         4,779,387  
+    -----------------------------------------
+(file ../output/athr_panel_full_year_no_solo_all_jrnls_r1_r2.dta not found)
+file ../output/athr_panel_full_year_no_solo_all_jrnls_r1_r2.dta saved
+(2,002,661 observations deleted)
+(file ../output/athr_panel_full_year_no_solo_all_jrnls_r1_r2_public.dta not
+    found)
+file ../output/athr_panel_full_year_no_solo_all_jrnls_r1_r2_public.dta saved
+
+. 
+end of do-file
+
+
+. [?1l>

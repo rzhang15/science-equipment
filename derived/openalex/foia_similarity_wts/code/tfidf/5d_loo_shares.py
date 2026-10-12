@@ -288,10 +288,11 @@ def main():
     ci = boot_ci(S, P, g, args.boot, args.seed)
 
     res.to_csv(f"{OUT_DIR}/loo_shares_summary_{stem}.csv", index=False)
-    pd.DataFrame({"athr_id": ids, "max_sim": max_sim,
-                  "exposure": S @ g, "exposure_loo": P @ g, "exposure_null": P0 @ g,
-                  "mkt_spend_shr": S.sum(1), "mkt_spend_shr_loo": P.sum(1)}
-                 ).to_csv(f"{OUT_DIR}/loo_shares_pi_{stem}.csv", index=False)
+    pi_df = pd.DataFrame({"athr_id": ids, "max_sim": max_sim,
+                          "exposure": S @ g, "exposure_loo": P @ g, "exposure_null": P0 @ g,
+                          "mkt_spend_shr": S.sum(1), "mkt_spend_shr_loo": P.sum(1)})
+    pi_df.to_csv(f"{OUT_DIR}/loo_shares_pi_{stem}.csv", index=False)
+    pi_df.to_stata(f"{OUT_DIR}/loo_shares_pi_{stem}.dta", write_index=False, version=118)
     cells = pd.DataFrame({"athr_id": np.repeat(ids, len(markets)),
                           "category": np.tile(markets, len(ids)),
                           "share": S.ravel(), "share_loo": P.ravel(), "share_null": P0.ravel()})

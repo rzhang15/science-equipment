@@ -4,6 +4,42 @@ capture log close
 program drop _all
 set scheme modern
 preliminaries
+
+global PRES_SCALE 1.2
+
+cap program drop fig_export
+program fig_export
+    syntax, path(string) [mode(string) xsize(real 6) ysize(real 4)]
+    local p : subinstr local path "/paper/" "/", all
+    local p : subinstr local p "/pres/" "/", all
+    local k = strpos("`p'", "figures/")
+    if `k' > 0 {
+        local base = substr("`p'", 1, `k' + 7)
+        local rest = substr("`p'", `k' + 8, .)
+    }
+    else {
+        local slash = strrpos("`p'", "/")
+        local base = substr("`p'", 1, `slash')
+        local rest = substr("`p'", `slash' + 1, .)
+    }
+    local tscale = cond(`xsize' >= `ysize', (2/3) * `xsize' / min(`xsize', `ysize'), 1)
+    if "`mode'" == "presentation" local mode pres
+    foreach m in paper pres {
+        if "`mode'" != "" & "`mode'" != "`m'" continue
+        local dir "`base'`m'"
+        cap mkdir "`dir'"
+        local sub "`rest'"
+        while strpos("`sub'", "/") > 0 {
+            local seg = substr("`sub'", 1, strpos("`sub'", "/") - 1)
+            local dir "`dir'/`seg'"
+            cap mkdir "`dir'"
+            local sub = substr("`sub'", strpos("`sub'", "/") + 1, .)
+        }
+        local s = cond("`m'" == "pres", `tscale' * $PRES_SCALE, `tscale')
+        graph display, scale(`s')
+        graph export "`base'`m'/`rest'", replace
+    }
+end
 version 17
 global exhibit_mode both // paper | presentation | both
 
@@ -61,11 +97,6 @@ program overlay_hist
     local mean_p : di %6.3f r(mean)
     local sd_p   : di %6.3f r(sd)
 
-    ksmirnov b, by(sample)
-    local ks_d  : di %6.3f r(D)
-    if r(p) < 0.001 local ks_p "< 0.001"
-    else local ks_p : di "= " %5.3f r(p)
-
     preserve
         keep if sample == 2
         collapse (mean) iter_mean = b, by(iter)
@@ -100,25 +131,24 @@ program overlay_hist
         if "$exhibit_mode" == "both" local modes presentation paper
         foreach mode in `modes' {
             local figdir ../output/figures
-            local stats_note `"- "Randomization Inference p `p_two'; Kolmogorov-Smirnov p `ks_p'""'
+            local stats_note `"- "Randomization Inference p `p_two'""'
             if "`mode'" == "paper" {
-                local figdir ../output/figures/paper
                 local stats_note
             }
             tw rarea dens_r lo xgrid, color(ebblue%25) lwidth(none) || ///
                rarea dens_p lo xgrid, color(gs12%50) lwidth(none) || ///
                line dens_r xgrid, color(ebblue%70) lwidth(medthick) || ///
                line dens_p xgrid, color(gs10%80) lwidth(medthick) lpattern(dash) ///
-               xtitle("DiD Coefficient (log `outcome')") ///
+               xtitle("DiD coefficient (log `outcome')") ///
                ytitle("Density") ///
                xlab(`xmin'(`xstep')`xmax') ///
                xline(0, lcolor(gs6) lpattern(dash)) ///
                xline(`mean_r_raw', lcolor(ebblue) lpattern(solid) lwidth(medthin)) ///
-               legend(on order(3 "Actual Treatment Effects (N=`N_r', mean=`mean_r', sd=`sd_r')" ///
-                               4 "Placebo Treatment Effects (N=`N_p', mean=`mean_p', sd=`sd_p')" ///
+               legend(on order(3 "Actual treatment effects (N=`N_r', mean=`mean_r', sd=`sd_r')" ///
+                               4 "Placebo treatment effects (N=`N_p', mean=`mean_p', sd=`sd_p')" ///
                                `stats_note') ///
                       pos(7) ring(1) region(fcolor(none)) size(small))
-            graph export `figdir'/did_coefs_overlay_kdens_eb`suf'$suffix.pdf, replace
+            fig_export, path("`figdir'/did_coefs_overlay_kdens_eb`suf'$suffix.pdf") mode(`mode')
         }
     restore
 
@@ -132,8 +162,8 @@ program overlay_hist
            xline(0, lcolor(gs6) lpattern(dash)) ///
            legend(off) ///
            title("Placebo iteration means (N=`n_iter'); purple = observed mean (`mean_r')", size(small)) ///
-           note("One-sided RI p `p_one'; two-sided RI p `p_two'; KS D = `ks_d', p `ks_p'", size(vsmall))
-        graph export ../output/figures/placebo_iter_means_ri_eb`suf'$suffix.pdf, replace
+           note("One-sided RI p `p_one'; two-sided RI p `p_two'", size(small))
+        fig_export, path("../output/figures/placebo_iter_means_ri_eb`suf'$suffix.pdf")
     restore
 
 end

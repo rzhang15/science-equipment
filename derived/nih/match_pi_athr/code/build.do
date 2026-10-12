@@ -17,6 +17,32 @@ program prep_grants
     classify_grants
     count
     local n_raw = r(N)
+    * Keep excluded umbrella budgets available for inspection. Identify them
+    * before PI matching and activity filtering, so unmatched/excluded component
+    * leaders cannot cause the full parent budget to be credited to another PI.
+    preserve
+        keep if multi_project_parent
+        save ../output/nih_excluded_parent_records, replace
+    restore
+    count if multi_project_parent
+    di as text "  excluding `r(N)' parent rows with reported subprojects"
+    drop if multi_project_parent
+    preserve
+        keep if !nih_award | shared_core
+        save ../output/nih_excluded_agency_core_records, replace
+    restore
+    count if !nih_award
+    di as text "  excluding `r(N)' non-NIH or unrecognized awarding-component rows"
+    count if shared_core & nih_award
+    di as text "  excluding `r(N)' NIH shared/admin core rows"
+    keep if nih_award & !shared_core
+    preserve
+        keep if institutional_award
+        save ../output/nih_excluded_program_center_records, replace
+    restore
+    count if institutional_award
+    di as text "  excluding `r(N)' P01/P50 program/center and UM1 complex-program rows"
+    drop if institutional_award
     keep if research | training | r50
     count
     di as text "  kept `r(N)' of `n_raw' grant rows (research/training/R50)"
@@ -31,17 +57,19 @@ program prep_grants
         keep grant_id fy total_cost project_start project_end budget_start ///
              budget_end full_project_num org_ipf_code org_name project_terms ///
              project_title research training r50 ctr_subproject ///
-             appl_type supplement grant_key row_key `extra'
+             appl_type supplement grant_key row_key nih_ic nih_award shared_core institutional_award `extra'
         save ../temp/grant_attrs, replace
     restore
 
     keep grant_id org_ipf_code pi_names
+    * Count all nonblank listed PIs before matching, including unmatched PIs.
     split pi_names, parse(";") gen(pi_)
     drop pi_names
     reshape long pi_, i(grant_id) string
     rename pi_ pi_name
     replace pi_name = strtrim(pi_name)
     drop if mi(pi_name)
+    bysort grant_id: gen int n_listed_pis = _N
     gen str244 pi_name_s = pi_name
     drop pi_name
     rename pi_name_s pi_name
@@ -64,6 +92,9 @@ program apply_crosswalk
 
     keep if !mi(athr_id)
     merge m:1 grant_id using ../temp/grant_attrs, keep(3) nogen
+    gen double total_cost_pi = total_cost / n_listed_pis
+    label var total_cost_pi "total award cost divided by all listed PIs"
+    label var n_listed_pis "number of nonblank PIs listed before author matching"
     gen int year = fy
     gen int start_year = year(project_start)
     label var year       "fiscal year of the grant-year record"
@@ -127,7 +158,7 @@ program classify_grants
 
     local res_core  R01 R37 R56 RF1 R35
     local res_dp    DP1 DP2 DP5
-    local res_coop  U01 UM1 UG1 UG3 UH2 UH3
+    local res_coop  U01 UG1 UG3 UH2 UH3
     local res_small R21 R33 R61 R03 R34
     local res_indep R00 R15 R16
     local train_k   K01 K08 K22 K23 K25 K76 K99
@@ -146,11 +177,16 @@ program classify_grants
     capture confirm variable subproject_id
     if !_rc {
         replace ctr_subproject = inlist(activity,"P01","P50") & !mi(subproject_id)
-        replace research = 1 if ctr_subproject == 1
     }
     else {
         di as text "  note: no subproject_id; P01/P50 subprojects not identified"
     }
+
+    * PI research-project funding excludes program/center awards, including
+    * their research components, and complex UM1 programs. Retained multi-PI
+    * research projects still give each named PI full credit.
+    gen byte institutional_award = inlist(activity, "P01", "P50", "UM1")
+    label var institutional_award "excluded program/center or complex-program mechanism"
 
     capture confirm variable core_project_num
     if _rc {
@@ -161,6 +197,49 @@ program classify_grants
     }
     capture confirm variable subproject_id
     if _rc gen str8 subproject_id = ""
+
+    * NIH-only awarding components, including historical NCRR (RR) and
+    * NCCAM (AT). RePORTER also contains AHRQ, CDC, FDA, VA, etc.; activity
+    * codes alone do not identify NIH awards. The core number is ACTIVITY+IC+SERIAL.
+    gen str2 nih_ic = upper(substr(strtrim(core_project_num), 4, 2))
+    gen byte nih_award = 0
+    local nih_ics AA AG AI AR AT CA CL DA DC DE DK EB ES EY GM HD HG HL LM MD MH NR NS OD RR TR TW
+    foreach ic of local nih_ics {
+        replace nih_award = 1 if nih_ic == "`ic'"
+    }
+    label var nih_ic "awarding component parsed from core project number"
+    label var nih_award "NIH awarding component (historical codes included)"
+
+    * Shared service/admin budgets are not individual research-project budgets.
+    * Restrict this screen to component records. Recognize role labels rather
+    * than any occurrence of CORE (e.g., 'catalytic core' is research).
+    tempvar core_title
+    gen strL `core_title' = upper(itrim(strtrim(ustrregexra(project_title, "[^A-Za-z0-9 ]", " "))))
+    gen byte shared_core = !mi(strtrim(subproject_id)) & ( ///
+        regexm(`core_title', "(^| )CORES?( ([A-Z][0-9]?[0-9]?|[0-9][0-9]?[0-9]?))?$") | ///
+        regexm(`core_title', "^CORES?( |$)") | ///
+        regexm(`core_title', "(^| )CORES? [A-Z0-9]( |$)") | ///
+        regexm(`core_title', "(^| )CORES? (FACILITY|FACILITIES|LABORATORY|LABORATORIES|RESOURCE|RESOURCES|SUPPORT|SUBCONTRACT|FOR|AND|INSTITUTE|SITE|SITES|COMPONENT|COMPONENTS|UNIT|UNITS|BUDGET|PATIENT|WILL|EXPANSION|CLINICAL TRIAL SITE|RESEARCH LAB|P[0-9]+)( |$)") | ///
+        regexm(`core_title', "(^| )(RESEARCH|TRAINING|EDUCATION|PILOT|DEVELOPMENT|PROTEOMICS) CORES?( |$)") | ///
+        regexm(upper(project_title), "(^|[^A-Z0-9])CORES? *[-:/(),&]") | ///
+        regexm(`core_title', "(^| )(ADMINISTRATIVE|ADMINSTRATIVE|ADMINITRATIVE|ADMIN)( |$)") | ///
+        regexm(`core_title', "(^ADMINISTRATION$)|( (CENTER|CENTRE) ADMINISTRATION$)|(^ADMINISTRATION (AND|OF THE (CENTER|CENTRE|PROGRAM))( |$))") | ///
+        regexm(`core_title', "(^| )SHARED RESOURCES?( |$)"))
+    replace shared_core = 0 if ///
+        regexm(`core_title', "^CORE (PROTEIN|PROMOTER|PARTICLE|HISTONE|BINDING|DOMAIN|STRUCTURE|SIGNAL)( |$)") & ///
+        !regexm(`core_title', "(^| )CORES?( ([A-Z][0-9]?[0-9]?|[0-9][0-9]?[0-9]?))?$")
+    label var shared_core "shared/admin component identified from project title"
+
+    * A parent's TOTAL_COST already contains its component budgets. For each
+    * award-fiscal-year, retain components rather than the umbrella record.
+    * Use all source rows here, including components outside the activity list.
+    * Leave standalone awards intact; never infer a PI budget from the residual.
+    tempvar has_subprojects
+    egen byte `has_subprojects' = max(!mi(strtrim(subproject_id))), ///
+        by(fy core_project_num)
+    gen byte multi_project_parent = `has_subprojects' & ///
+        mi(strtrim(subproject_id)) & !mi(strtrim(core_project_num)) & !mi(fy)
+    label var multi_project_parent "parent excluded: components reported for this core project and FY"
 
     gen str48 grant_key = strtrim(core_project_num) + "_" + strtrim(subproject_id)
     gen str64 row_key   = strtrim(full_project_num) + "_" + strtrim(subproject_id)
@@ -224,6 +303,7 @@ program collapse_athr_year
     gen byte new_grant   = res_grant & award_start_year == year
 
     gen double res_cost   = total_cost    if research
+    gen double res_cost_pi = total_cost_pi if research
     gen double train_cost = total_cost    if training
     gen double res_start  = project_start if research
     gen double res_end    = project_end   if research
@@ -231,6 +311,7 @@ program collapse_athr_year
     gcollapse (sum) n_grants            = res_grant ///
               (sum) n_new_grants        = new_grant ///
               (sum) nih_total_cost      = res_cost ///
+              (sum) nih_total_cost_pi   = res_cost_pi ///
               (min) first_project_start = res_start ///
               (max) last_project_end    = res_end ///
               (sum) n_train_grants      = train_grant ///
@@ -247,6 +328,7 @@ program collapse_athr_year
     label var n_new_grants       "research awards whose AWARD start year is this year"
     label var n_grants           "distinct research awards active this year (supplements incl.)"
     label var nih_total_cost     "total cost, research rows incl. supplements"
+    label var nih_total_cost_pi  "research cost divided by all listed PIs, incl. supplements"
     label var n_train_grants     "individual K training awards"
     label var n_r50_grants       "R50 awards (borderline, excluded from n_grants)"
     label var n_grants_all       "all retained grants (research + training + R50)"
@@ -257,6 +339,21 @@ program collapse_athr_year
     save ../temp/nih_by_athr_year, replace
 
     save ../output/nih_athr_year, replace
+    * Fix baseline resources before any publication-panel/sample restrictions.
+    * Sum FY2010-2013 and divide by four, including absent years as zero.
+    gen double n_grants_pre = cond(inrange(year, 2010, 2013), n_grants, 0)
+    gen double nih_cost_pre = cond(inrange(year, 2010, 2013), nih_total_cost, 0)
+    gen double nih_cost_pre_pi = cond(inrange(year, 2010, 2013), nih_total_cost_pi, 0)
+    collapse (sum) n_grants_pre nih_cost_pre nih_cost_pre_pi, by(athr_id)
+    gen double nih_grants_baseline = n_grants_pre / 4
+    gen double nih_funding_baseline = nih_cost_pre / 4
+    gen double nih_funding_baseline_pi = nih_cost_pre_pi / 4
+    label var n_grants_pre "sum of research award counts, FY2010-2013"
+    label var nih_cost_pre "total research funding, FY2010-2013"
+    label var nih_grants_baseline "mean annual research award count, FY2010-2013 (zeros included)"
+    label var nih_funding_baseline "mean annual research funding, FY2010-2013 (zeros included)"
+    label var nih_funding_baseline_pi "mean annual research funding per listed PI, FY2010-2013 (zeros included)"
+    save ../output/nih_baseline_by_athr, replace
     use ../temp/nih_names_by_athr, clear
     save ../output/nih_names_by_athr, replace
     use ../temp/nih_totals_by_athr, clear

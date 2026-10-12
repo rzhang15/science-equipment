@@ -4,3 +4,4 @@
 ./exposure/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/exposure_msr/output
 ./synth/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/first_stage/synthetic_ctrl/output
 
+./placebo/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/analysis/placebo_first_stage/output

@@ -1,0 +1,1382 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 120,000; see help set_maxvar.
+
+. do exposure_variants_table.do 
+
+. set more off
+
+. clear all
+
+. capture log close
+
+. version 17
+
+. 
+. local samp all_jrnls
+
+. local suf  _r1_r2
+
+. local hisim_pct 50
+
+. 
+. use ../output/prepped_samples/es_`samp'`suf', clear
+
+. gen post = year >= 2014
+
+. gen exposure_rn = cond(mkt_spend_shr > 0, exposure / mkt_spend_shr, 0)
+
+. gen Z_it  = exposure      * post
+
+. gen Zs_it = mkt_spend_shr * post
+
+. gen Z_rn  = exposure_rn   * post
+
+. 
+. bys athr_id: gen byte _hs_one = _n == 1
+
+. qui _pctile max_sim if _hs_one == 1 & foia_athr != 1, p(`=100 - `hisim_pct'')
+
+. local hs_cut = r(r1)
+
+. gen byte hisim = max_sim >= `hs_cut'
+
+. di as text "hisim cutoff (top `hisim_pct'% of imputed PIs): max_sim >= " %6.4
+> f `hs_cut'
+hisim cutoff (top 50% of imputed PIs): max_sim >= 0.2028
+
+. 
+. mat expvar = J(9,5,.)
+
+. local xvar1 Z_it
+
+. local svar1 Zs_it
+
+. local cond1
+
+. local wt1
+
+. local xvar2 Z_rn
+
+. local svar2
+
+. local cond2
+
+. local wt2
+
+. local xvar3 Z_it
+
+. local svar3 Zs_it
+
+. local cond3 & exposure > 0
+
+. local wt3
+
+. local xvar4 Z_it
+
+. local svar4 Zs_it
+
+. local cond4
+
+. local wt4 [pw=max_sim]
+
+. local xvar5 Z_it
+
+. local svar5 Zs_it
+
+. local cond5 & hisim == 1
+
+. local wt5
+
+. 
+. forval c = 1/5 {
+  2.     local mean1 exposure
+  3.     if `c' == 2 local mean1 exposure_rn
+  4.     local meanwt ""
+  5.     if "`wt`c''" != "" local meanwt [aw=max_sim]
+  6. 
+.     ppmlhdfe ppr_cnt `xvar`c'' `svar`c'' `wt`c'' if 1 `cond`c'', ///
+>         absorb(athr_id year) vce(cluster athr_id)
+  7.     mat expvar[1,`c'] = _b[`xvar`c'']
+  8.     mat expvar[2,`c'] = _se[`xvar`c'']
+  9.     local b = _b[`xvar`c'']
+ 10.     qui sum `mean1' `meanwt' if e(sample)
+ 11.     local xbar = r(mean)
+ 12.     qui sum ppr_cnt if year < 2014 & e(sample)
+ 13.     local ymn = r(mean)
+ 14.     mat expvar[5,`c'] = 100 * (1 - exp(`b'*`xbar'))
+ 15.     mat expvar[6,`c'] = `ymn'
+ 16.     mat expvar[7,`c'] = e(N)
+ 17.     mat expvar[8,`c'] = `xbar'
+ 18. 
+.     if "`svar`c''" != "" {
+ 19.         ppmlhdfe ppr_cnt `xvar`c'' `wt`c'' if 1 `cond`c'', ///
+>             absorb(athr_id year) vce(cluster athr_id)
+ 20.         mat expvar[3,`c'] = _b[`xvar`c'']
+ 21.         mat expvar[4,`c'] = _se[`xvar`c'']
+ 22.         mat expvar[9,`c'] = e(N)
+ 23.     }
+ 24. }
+Iteration 1:   deviance = 1.5094e+05  eps = .         iters = 4    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.52  P   
+Iteration 2:   deviance = 1.4677e+05  eps = 2.84e-02  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.83      
+Iteration 3:   deviance = 1.4673e+05  eps = 2.54e-04  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.90      
+Iteration 4:   deviance = 1.4673e+05  eps = 2.41e-07  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.90      
+Iteration 5:   deviance = 1.4673e+05  eps = 1.19e-11  iters = 2    tol = 1.0e-0
+> 5                                                                            
+>    min(eta) =  -1.90   S O
+-------------------------------------------------------------------------------
+> -----------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon 
+> below tolerance)
+Converged in 5 iterations and 12 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =    135,150
+Absorbing 2 HDFE groups                           Residual df     =     13,514
+Statistics robust to heteroskedasticity           Wald chi2(2)    =       6.03
+Deviance             =  146732.2141               Prob > chi2     =     0.0491
+Log pseudolikelihood = -203630.0289               Pseudo R2       =     0.1951
+
+Number of clusters (athr_id)=     13,515
+                           (Std. err. adjusted for 13,515 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+        Z_it |  -.4209689   .1716841    -2.45   0.014    -.7574635   -.0844742
+       Zs_it |   .0073363   .0522372     0.14   0.888    -.0950468    .1097194
+       _cons |   .7778993    .007433   104.66   0.000     .7633309    .7924677
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |     13515       13515           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+Iteration 1:   deviance = 1.5094e+05  eps = .         iters = 3    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.51  P   
+Iteration 2:   deviance = 1.4677e+05  eps = 2.84e-02  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.83      
+Iteration 3:   deviance = 1.4673e+05  eps = 2.54e-04  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.90      
+Iteration 4:   deviance = 1.4673e+05  eps = 2.41e-07  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.90      
+Iteration 5:   deviance = 1.4673e+05  eps = 1.19e-11  iters = 2    tol = 1.0e-0
+> 5                                                                            
+>    min(eta) =  -1.90   S O
+-------------------------------------------------------------------------------
+> -----------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon 
+> below tolerance)
+Converged in 5 iterations and 11 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =    135,150
+Absorbing 2 HDFE groups                           Residual df     =     13,514
+Statistics robust to heteroskedasticity           Wald chi2(1)    =       5.92
+Deviance             =  146732.2525               Prob > chi2     =     0.0149
+Log pseudolikelihood = -203630.0481               Pseudo R2       =     0.1951
+
+Number of clusters (athr_id)=     13,515
+                           (Std. err. adjusted for 13,515 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+        Z_it |  -.4166212   .1711873    -2.43   0.015    -.7521421   -.0811003
+       _cons |   .7788567   .0025016   311.34   0.000     .7739537    .7837597
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |     13515       13515           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+Iteration 1:   deviance = 1.5093e+05  eps = .         iters = 3    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.52  P   
+Iteration 2:   deviance = 1.4677e+05  eps = 2.84e-02  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.83      
+Iteration 3:   deviance = 1.4673e+05  eps = 2.54e-04  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.89      
+Iteration 4:   deviance = 1.4673e+05  eps = 2.41e-07  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.89      
+Iteration 5:   deviance = 1.4673e+05  eps = 1.19e-11  iters = 1    tol = 1.0e-0
+> 5                                                                            
+>    min(eta) =  -1.89   S  
+Iteration 6:   deviance = 1.4673e+05  eps = 1.83e-16  iters = 2    tol = 1.0e-0
+> 8                                                                            
+>    min(eta) =  -1.89   S O
+-------------------------------------------------------------------------------
+> -----------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon 
+> below tolerance)
+Converged in 6 iterations and 12 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =    135,150
+Absorbing 2 HDFE groups                           Residual df     =     13,514
+Statistics robust to heteroskedasticity           Wald chi2(1)    =       6.95
+Deviance             =  146730.3542               Prob > chi2     =     0.0084
+Log pseudolikelihood =  -203629.099               Pseudo R2       =     0.1951
+
+Number of clusters (athr_id)=     13,515
+                           (Std. err. adjusted for 13,515 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+        Z_rn |   -.139349   .0528632    -2.64   0.008     -.242959   -.0357391
+       _cons |   .7805705   .0029582   263.87   0.000     .7747725    .7863685
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |     13515       13515           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+Iteration 1:   deviance = 1.3489e+05  eps = .         iters = 4    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.52  P   
+Iteration 2:   deviance = 1.3114e+05  eps = 2.87e-02  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.84      
+Iteration 3:   deviance = 1.3110e+05  eps = 2.63e-04  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.90      
+Iteration 4:   deviance = 1.3110e+05  eps = 2.68e-07  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.90      
+Iteration 5:   deviance = 1.3110e+05  eps = 1.37e-11  iters = 2    tol = 1.0e-0
+> 5                                                                            
+>    min(eta) =  -1.90   S O
+-------------------------------------------------------------------------------
+> -----------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon 
+> below tolerance)
+Converged in 5 iterations and 12 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =    120,700
+Absorbing 2 HDFE groups                           Residual df     =     12,069
+Statistics robust to heteroskedasticity           Wald chi2(2)    =       1.81
+Deviance             =  131102.4085               Prob > chi2     =     0.4049
+Log pseudolikelihood = -181708.5032               Pseudo R2       =     0.1962
+
+Number of clusters (athr_id)=     12,070
+                           (Std. err. adjusted for 12,070 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+        Z_it |  -.2519276   .2482589    -1.01   0.310    -.7385061    .2346509
+       Zs_it |  -.0233306   .0643633    -0.36   0.717    -.1494803    .1028192
+       _cons |   .7802334   .0078977    98.79   0.000     .7647542    .7957125
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |     12070       12070           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+Iteration 1:   deviance = 1.3489e+05  eps = .         iters = 3    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.52  P   
+Iteration 2:   deviance = 1.3114e+05  eps = 2.86e-02  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.84      
+Iteration 3:   deviance = 1.3110e+05  eps = 2.62e-04  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.90      
+Iteration 4:   deviance = 1.3110e+05  eps = 2.68e-07  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.90      
+Iteration 5:   deviance = 1.3110e+05  eps = 1.38e-11  iters = 2    tol = 1.0e-0
+> 5                                                                            
+>    min(eta) =  -1.90   S O
+-------------------------------------------------------------------------------
+> -----------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon 
+> below tolerance)
+Converged in 5 iterations and 11 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =    120,700
+Absorbing 2 HDFE groups                           Residual df     =     12,069
+Statistics robust to heteroskedasticity           Wald chi2(1)    =       1.66
+Deviance             =  131102.6935               Prob > chi2     =     0.1976
+Log pseudolikelihood = -181708.6457               Pseudo R2       =     0.1962
+
+Number of clusters (athr_id)=     12,070
+                           (Std. err. adjusted for 12,070 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+        Z_it |  -.2889994   .2243111    -1.29   0.198     -.728641    .1506422
+       _cons |   .7777325   .0039748   195.67   0.000     .7699422    .7855229
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |     12070       12070           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+Iteration 1:   deviance = 3.2183e+04  eps = .         iters = 4    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.49  P   
+Iteration 2:   deviance = 3.1310e+04  eps = 2.79e-02  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.83      
+Iteration 3:   deviance = 3.1302e+04  eps = 2.29e-04  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.90      
+Iteration 4:   deviance = 3.1302e+04  eps = 1.40e-07  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.90      
+Iteration 5:   deviance = 3.1302e+04  eps = 3.76e-12  iters = 2    tol = 1.0e-0
+> 5                                                                            
+>    min(eta) =  -1.90   S O
+-------------------------------------------------------------------------------
+> -----------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon 
+> below tolerance)
+Converged in 5 iterations and 12 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =    135,150
+Absorbing 2 HDFE groups                           Residual df     =     13,514
+Statistics robust to heteroskedasticity           Wald chi2(2)    =       2.86
+Deviance             =  31302.40442               Prob > chi2     =     0.2394
+Log pseudolikelihood = -44190.77001               Pseudo R2       =     0.2000
+
+Number of clusters (athr_id)=     13,515
+                           (Std. err. adjusted for 13,515 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+        Z_it |  -.2725274   .1773212    -1.54   0.124    -.6200705    .0750158
+       Zs_it |  -.0320612   .0549356    -0.58   0.559     -.139733    .0756107
+       _cons |   .8201427   .0078691   104.22   0.000     .8047196    .8355658
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |     13515       13515           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+Iteration 1:   deviance = 3.2183e+04  eps = .         iters = 3    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.49  P   
+Iteration 2:   deviance = 3.1310e+04  eps = 2.79e-02  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.82      
+Iteration 3:   deviance = 3.1303e+04  eps = 2.28e-04  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.89      
+Iteration 4:   deviance = 3.1303e+04  eps = 1.40e-07  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.90      
+Iteration 5:   deviance = 3.1303e+04  eps = 3.82e-12  iters = 1    tol = 1.0e-0
+> 5                                                                            
+>    min(eta) =  -1.90   S  
+Iteration 6:   deviance = 3.1303e+04  eps = 0.00e+00  iters = 1    tol = 1.0e-0
+> 8                                                                            
+>    min(eta) =  -1.90   S  
+Iteration 7:   deviance = 3.1303e+04  eps = 0.00e+00  iters = 1    tol = 1.0e-0
+> 9                                                                            
+>    min(eta) =  -1.90   S O
+-------------------------------------------------------------------------------
+> -----------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon 
+> below tolerance)
+Converged in 7 iterations and 12 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =    135,150
+Absorbing 2 HDFE groups                           Residual df     =     13,514
+Statistics robust to heteroskedasticity           Wald chi2(1)    =       2.67
+Deviance             =  31302.58059               Prob > chi2     =     0.1022
+Log pseudolikelihood =  -44190.8581               Pseudo R2       =     0.2000
+
+Number of clusters (athr_id)=     13,515
+                           (Std. err. adjusted for 13,515 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+        Z_it |  -.2900262   .1774701    -1.63   0.102    -.6378613    .0578089
+       _cons |   .8159228   .0025188   323.93   0.000      .810986    .8208596
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |     13515       13515           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+Iteration 1:   deviance = 7.5205e+04  eps = .         iters = 3    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.54  P   
+Iteration 2:   deviance = 7.3215e+04  eps = 2.72e-02  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.90      
+Iteration 3:   deviance = 7.3200e+04  eps = 1.95e-04  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.98      
+Iteration 4:   deviance = 7.3200e+04  eps = 5.60e-08  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.99      
+Iteration 5:   deviance = 7.3200e+04  eps = 5.47e-14  iters = 1    tol = 1.0e-0
+> 5                                                                            
+>    min(eta) =  -1.99   S  
+Iteration 6:   deviance = 7.3200e+04  eps = 0.00e+00  iters = 2    tol = 1.0e-0
+> 9                                                                            
+>    min(eta) =  -1.99   S O
+-------------------------------------------------------------------------------
+> -----------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon 
+> below tolerance)
+Converged in 6 iterations and 12 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =     67,980
+Absorbing 2 HDFE groups                           Residual df     =      6,797
+Statistics robust to heteroskedasticity           Wald chi2(2)    =       3.98
+Deviance             =  73200.46367               Prob > chi2     =     0.1366
+Log pseudolikelihood = -106102.6649               Pseudo R2       =     0.2074
+
+Number of clusters (athr_id)=      6,798
+                            (Std. err. adjusted for 6,798 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+        Z_it |  -.4189463   .2110266    -1.99   0.047    -.8325508   -.0053418
+       Zs_it |  -.0099416   .0604658    -0.16   0.869    -.1284523    .1085692
+       _cons |   .8876756   .0088252   100.58   0.000     .8703785    .9049727
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      6798        6798           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+Iteration 1:   deviance = 7.5205e+04  eps = .         iters = 3    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.54  P   
+Iteration 2:   deviance = 7.3215e+04  eps = 2.72e-02  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.90      
+Iteration 3:   deviance = 7.3201e+04  eps = 1.95e-04  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.98      
+Iteration 4:   deviance = 7.3201e+04  eps = 5.60e-08  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.99      
+Iteration 5:   deviance = 7.3201e+04  eps = 5.45e-14  iters = 1    tol = 1.0e-0
+> 5                                                                            
+>    min(eta) =  -1.99   S  
+Iteration 6:   deviance = 7.3201e+04  eps = 0.00e+00  iters = 2    tol = 1.0e-0
+> 9                                                                            
+>    min(eta) =  -1.99   S O
+-------------------------------------------------------------------------------
+> -----------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon 
+> below tolerance)
+Converged in 6 iterations and 12 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =     67,980
+Absorbing 2 HDFE groups                           Residual df     =      6,797
+Statistics robust to heteroskedasticity           Wald chi2(1)    =       3.98
+Deviance             =  73200.50865               Prob > chi2     =     0.0461
+Log pseudolikelihood = -106102.6874               Pseudo R2       =     0.2074
+
+Number of clusters (athr_id)=      6,798
+                            (Std. err. adjusted for 6,798 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+        Z_it |  -.4235522   .2123202    -1.99   0.046    -.8396921   -.0074124
+       _cons |    .886355   .0028528   310.69   0.000     .8807635    .8919465
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      6798        6798           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. mat rownames expvar = b_wshare se_wshare b_base se_base decline_pct ///
+>                       pre_mean N_wshare avg_exposure N_base
+
+. mat colnames expvar = baseline renorm positive precision hisim`hisim_pct'
+
+. mat list expvar, format(%9.4f)
+
+expvar[9,5]
+               baseline     renorm   positive  precision    hisim50
+    b_wshare    -0.4210    -0.1393    -0.2519    -0.2725    -0.4189
+   se_wshare     0.1717     0.0529     0.2483     0.1773     0.2110
+      b_base    -0.4166          .    -0.2890    -0.2900    -0.4236
+     se_base     0.1712          .     0.2243     0.1775     0.2123
+ decline_pct     1.1891     1.5199     0.8574     0.7462     1.0757
+    pre_mean     2.1616     2.1616     2.1641     2.1616     2.4266
+    N_wshare   1.35e+05   1.35e+05   1.21e+05   1.35e+05   6.80e+04
+avg_exposure     0.0284     0.1099     0.0342     0.0275     0.0258
+      N_base   1.35e+05          .   1.21e+05   1.35e+05   6.80e+04
+
+. 
+. cap mkdir ../output/tables
+
+. cap mkdir ../output/tables/`samp'
+
+. cap mkdir ../output/tables/`samp'/robustness
+
+. matrix_to_txt, saving("../output/tables/`samp'/robustness/exposure_variants`s
+> uf'.txt") ///
+>     matrix(expvar) title(<tab:exposure_variants`suf'>) format(%20.4f) replace
+(file ../output/tables/all_jrnls/robustness/exposure_variants_r1_r2.txt not
+    found)
+
+. 
+. * Panel B: number of nearest FOIA PIs used in the imputation (baseline k = 3)
+> .
+. * Imputed PIs take exposure and S_i from the _cf_k`k' file; FOIA PIs keep obs
+> erved values.
+. mat expk = J(9,5,.)
+
+. forval k = 1/5 {
+  2.     import delimited "../external/exposure/final_imputed_shift_share_hc_al
+> l3_cf_k`k'.csv", clear
+  3.     keep athr_id exposure_ss sum_imputed_shares
+  4.     save ../temp/exposure_k`k', replace
+  5. 
+.     use ../output/prepped_samples/es_`samp'`suf', clear
+  6.     merge m:1 athr_id using ../temp/exposure_k`k', keep(1 3)
+  7.     keep if foia_athr == 1 | _merge == 3
+  8.     replace exposure      = exposure_ss        if foia_athr != 1
+  9.     replace mkt_spend_shr = sum_imputed_shares if foia_athr != 1
+ 10.     drop _merge exposure_ss sum_imputed_shares
+ 11.     gen post  = year >= 2014
+ 12.     gen Z_it  = exposure      * post
+ 13.     gen Zs_it = mkt_spend_shr * post
+ 14. 
+.     ppmlhdfe ppr_cnt Z_it Zs_it, absorb(athr_id year) vce(cluster athr_id)
+ 15.     mat expk[1,`k'] = _b[Z_it]
+ 16.     mat expk[2,`k'] = _se[Z_it]
+ 17.     local b = _b[Z_it]
+ 18.     qui sum exposure if e(sample)
+ 19.     local xbar = r(mean)
+ 20.     qui sum ppr_cnt if year < 2014 & e(sample)
+ 21.     mat expk[5,`k'] = 100 * (1 - exp(`b'*`xbar'))
+ 22.     mat expk[6,`k'] = r(mean)
+ 23.     mat expk[7,`k'] = e(N)
+ 24.     mat expk[8,`k'] = `xbar'
+ 25. 
+.     ppmlhdfe ppr_cnt Z_it, absorb(athr_id year) vce(cluster athr_id)
+ 26.     mat expk[3,`k'] = _b[Z_it]
+ 27.     mat expk[4,`k'] = _se[Z_it]
+ 28.     mat expk[9,`k'] = e(N)
+ 29. }
+(encoding automatically selected: ISO-8859-2)
+(3 vars, 1,613,853 obs)
+(file ../temp/exposure_k1.dta not found)
+file ../temp/exposure_k1.dta saved
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                           135,150  (_merge==3)
+    -----------------------------------------
+(0 observations deleted)
+(134,330 real changes made)
+(134,330 real changes made)
+Iteration 1:   deviance = 1.5094e+05  eps = .         iters = 3    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.51  P   
+Iteration 2:   deviance = 1.4677e+05  eps = 2.84e-02  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.83      
+Iteration 3:   deviance = 1.4674e+05  eps = 2.54e-04  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.89      
+Iteration 4:   deviance = 1.4674e+05  eps = 2.41e-07  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.89      
+Iteration 5:   deviance = 1.4674e+05  eps = 1.20e-11  iters = 2    tol = 1.0e-0
+> 5                                                                            
+>    min(eta) =  -1.89   S O
+-------------------------------------------------------------------------------
+> -----------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon 
+> below tolerance)
+Converged in 5 iterations and 11 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =    135,150
+Absorbing 2 HDFE groups                           Residual df     =     13,514
+Statistics robust to heteroskedasticity           Wald chi2(2)    =       3.23
+Deviance             =    146737.01               Prob > chi2     =     0.1987
+Log pseudolikelihood = -203632.4269               Pseudo R2       =     0.1951
+
+Number of clusters (athr_id)=     13,515
+                           (Std. err. adjusted for 13,515 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+        Z_it |  -.1855159   .1073395    -1.73   0.084    -.3958974    .0248656
+       Zs_it |  -.0132231   .0302944    -0.44   0.662    -.0725991    .0461529
+       _cons |   .7772462   .0043378   179.18   0.000     .7687442    .7857482
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |     13515       13515           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+Iteration 1:   deviance = 1.5094e+05  eps = .         iters = 3    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.51  P   
+Iteration 2:   deviance = 1.4677e+05  eps = 2.84e-02  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.83      
+Iteration 3:   deviance = 1.4674e+05  eps = 2.54e-04  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.89      
+Iteration 4:   deviance = 1.4674e+05  eps = 2.41e-07  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.89      
+Iteration 5:   deviance = 1.4674e+05  eps = 1.21e-11  iters = 1    tol = 1.0e-0
+> 5                                                                            
+>    min(eta) =  -1.89   S  
+Iteration 6:   deviance = 1.4674e+05  eps = 0.00e+00  iters = 2    tol = 1.0e-0
+> 8                                                                            
+>    min(eta) =  -1.89   S O
+-------------------------------------------------------------------------------
+> -----------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon 
+> below tolerance)
+Converged in 6 iterations and 12 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =    135,150
+Absorbing 2 HDFE groups                           Residual df     =     13,514
+Statistics robust to heteroskedasticity           Wald chi2(1)    =       3.15
+Deviance             =   146737.356               Prob > chi2     =     0.0761
+Log pseudolikelihood = -203632.5999               Pseudo R2       =     0.1951
+
+Number of clusters (athr_id)=     13,515
+                           (Std. err. adjusted for 13,515 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+        Z_it |  -.1906282   .1074761    -1.77   0.076    -.4012775    .0200211
+       _cons |   .7755299   .0015629   496.20   0.000     .7724666    .7785933
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |     13515       13515           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+(encoding automatically selected: ISO-8859-2)
+(3 vars, 1,613,853 obs)
+(file ../temp/exposure_k2.dta not found)
+file ../temp/exposure_k2.dta saved
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                           135,150  (_merge==3)
+    -----------------------------------------
+(0 observations deleted)
+(134,320 real changes made)
+(134,320 real changes made)
+Iteration 1:   deviance = 1.5093e+05  eps = .         iters = 4    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.52  P   
+Iteration 2:   deviance = 1.4676e+05  eps = 2.84e-02  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.85      
+Iteration 3:   deviance = 1.4673e+05  eps = 2.54e-04  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.91      
+Iteration 4:   deviance = 1.4673e+05  eps = 2.38e-07  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.91      
+Iteration 5:   deviance = 1.4673e+05  eps = 1.17e-11  iters = 2    tol = 1.0e-0
+> 5                                                                            
+>    min(eta) =  -1.91   S O
+-------------------------------------------------------------------------------
+> -----------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon 
+> below tolerance)
+Converged in 5 iterations and 12 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =    135,150
+Absorbing 2 HDFE groups                           Residual df     =     13,514
+Statistics robust to heteroskedasticity           Wald chi2(2)    =       9.45
+Deviance             =  146725.5353               Prob > chi2     =     0.0089
+Log pseudolikelihood = -203626.6895               Pseudo R2       =     0.1951
+
+Number of clusters (athr_id)=     13,515
+                           (Std. err. adjusted for 13,515 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+        Z_it |  -.4039798   .1448523    -2.79   0.005    -.6878851   -.1200745
+       Zs_it |  -.0415142   .0439348    -0.94   0.345    -.1276249    .0445965
+       _cons |   .7844019    .006163   127.28   0.000     .7723225    .7964812
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |     13515       13515           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+Iteration 1:   deviance = 1.5093e+05  eps = .         iters = 3    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.52  P   
+Iteration 2:   deviance = 1.4676e+05  eps = 2.84e-02  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.84      
+Iteration 3:   deviance = 1.4673e+05  eps = 2.54e-04  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.91      
+Iteration 4:   deviance = 1.4673e+05  eps = 2.40e-07  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.91      
+Iteration 5:   deviance = 1.4673e+05  eps = 1.19e-11  iters = 1    tol = 1.0e-0
+> 5                                                                            
+>    min(eta) =  -1.91   S  
+Iteration 6:   deviance = 1.4673e+05  eps = 1.83e-16  iters = 2    tol = 1.0e-0
+> 8                                                                            
+>    min(eta) =  -1.91   S O
+-------------------------------------------------------------------------------
+> -----------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon 
+> below tolerance)
+Converged in 6 iterations and 12 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =    135,150
+Absorbing 2 HDFE groups                           Residual df     =     13,514
+Statistics robust to heteroskedasticity           Wald chi2(1)    =       8.78
+Deviance             =  146727.3448               Prob > chi2     =     0.0030
+Log pseudolikelihood = -203627.5943               Pseudo R2       =     0.1951
+
+Number of clusters (athr_id)=     13,515
+                           (Std. err. adjusted for 13,515 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+        Z_it |  -.4260105   .1437542    -2.96   0.003    -.7077635   -.1442575
+       _cons |   .7790035   .0021005   370.87   0.000     .7748866    .7831203
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |     13515       13515           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+(encoding automatically selected: ISO-8859-2)
+(3 vars, 1,613,853 obs)
+(file ../temp/exposure_k3.dta not found)
+file ../temp/exposure_k3.dta saved
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                           135,150  (_merge==3)
+    -----------------------------------------
+(0 observations deleted)
+(0 real changes made)
+(0 real changes made)
+Iteration 1:   deviance = 1.5094e+05  eps = .         iters = 4    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.52  P   
+Iteration 2:   deviance = 1.4677e+05  eps = 2.84e-02  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.83      
+Iteration 3:   deviance = 1.4673e+05  eps = 2.54e-04  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.90      
+Iteration 4:   deviance = 1.4673e+05  eps = 2.41e-07  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.90      
+Iteration 5:   deviance = 1.4673e+05  eps = 1.19e-11  iters = 2    tol = 1.0e-0
+> 5                                                                            
+>    min(eta) =  -1.90   S O
+-------------------------------------------------------------------------------
+> -----------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon 
+> below tolerance)
+Converged in 5 iterations and 12 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =    135,150
+Absorbing 2 HDFE groups                           Residual df     =     13,514
+Statistics robust to heteroskedasticity           Wald chi2(2)    =       6.03
+Deviance             =  146732.2141               Prob > chi2     =     0.0491
+Log pseudolikelihood = -203630.0289               Pseudo R2       =     0.1951
+
+Number of clusters (athr_id)=     13,515
+                           (Std. err. adjusted for 13,515 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+        Z_it |  -.4209689   .1716841    -2.45   0.014    -.7574635   -.0844742
+       Zs_it |   .0073363   .0522372     0.14   0.888    -.0950468    .1097194
+       _cons |   .7778993    .007433   104.66   0.000     .7633309    .7924677
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |     13515       13515           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+Iteration 1:   deviance = 1.5094e+05  eps = .         iters = 3    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.51  P   
+Iteration 2:   deviance = 1.4677e+05  eps = 2.84e-02  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.83      
+Iteration 3:   deviance = 1.4673e+05  eps = 2.54e-04  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.90      
+Iteration 4:   deviance = 1.4673e+05  eps = 2.41e-07  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.90      
+Iteration 5:   deviance = 1.4673e+05  eps = 1.19e-11  iters = 2    tol = 1.0e-0
+> 5                                                                            
+>    min(eta) =  -1.90   S O
+-------------------------------------------------------------------------------
+> -----------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon 
+> below tolerance)
+Converged in 5 iterations and 11 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =    135,150
+Absorbing 2 HDFE groups                           Residual df     =     13,514
+Statistics robust to heteroskedasticity           Wald chi2(1)    =       5.92
+Deviance             =  146732.2525               Prob > chi2     =     0.0149
+Log pseudolikelihood = -203630.0481               Pseudo R2       =     0.1951
+
+Number of clusters (athr_id)=     13,515
+                           (Std. err. adjusted for 13,515 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+        Z_it |  -.4166212   .1711873    -2.43   0.015    -.7521421   -.0811003
+       _cons |   .7788567   .0025016   311.34   0.000     .7739537    .7837597
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |     13515       13515           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+(encoding automatically selected: ISO-8859-2)
+(3 vars, 1,613,853 obs)
+(file ../temp/exposure_k4.dta not found)
+file ../temp/exposure_k4.dta saved
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                           135,150  (_merge==3)
+    -----------------------------------------
+(0 observations deleted)
+(134,260 real changes made)
+(134,260 real changes made)
+Iteration 1:   deviance = 1.5094e+05  eps = .         iters = 4    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.51  P   
+Iteration 2:   deviance = 1.4677e+05  eps = 2.84e-02  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.83      
+Iteration 3:   deviance = 1.4674e+05  eps = 2.54e-04  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.89      
+Iteration 4:   deviance = 1.4674e+05  eps = 2.40e-07  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.89      
+Iteration 5:   deviance = 1.4674e+05  eps = 1.18e-11  iters = 2    tol = 1.0e-0
+> 5                                                                            
+>    min(eta) =  -1.89   S O
+-------------------------------------------------------------------------------
+> -----------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon 
+> below tolerance)
+Converged in 5 iterations and 12 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =    135,150
+Absorbing 2 HDFE groups                           Residual df     =     13,514
+Statistics robust to heteroskedasticity           Wald chi2(2)    =       3.76
+Deviance             =  146735.5479               Prob > chi2     =     0.1528
+Log pseudolikelihood = -203631.6958               Pseudo R2       =     0.1951
+
+Number of clusters (athr_id)=     13,515
+                           (Std. err. adjusted for 13,515 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+        Z_it |  -.3763305   .2025754    -1.86   0.063    -.7733711      .02071
+       Zs_it |  -.0210603    .058985    -0.36   0.721    -.1366687    .0945481
+       _cons |   .7811432   .0084147    92.83   0.000     .7646507    .7976357
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |     13515       13515           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+Iteration 1:   deviance = 1.5094e+05  eps = .         iters = 3    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.51  P   
+Iteration 2:   deviance = 1.4677e+05  eps = 2.84e-02  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.83      
+Iteration 3:   deviance = 1.4674e+05  eps = 2.54e-04  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.89      
+Iteration 4:   deviance = 1.4674e+05  eps = 2.41e-07  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.89      
+Iteration 5:   deviance = 1.4674e+05  eps = 1.19e-11  iters = 2    tol = 1.0e-0
+> 5                                                                            
+>    min(eta) =  -1.89   S O
+-------------------------------------------------------------------------------
+> -----------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon 
+> below tolerance)
+Converged in 5 iterations and 11 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =    135,150
+Absorbing 2 HDFE groups                           Residual df     =     13,514
+Statistics robust to heteroskedasticity           Wald chi2(1)    =       3.71
+Deviance             =  146735.7903               Prob > chi2     =     0.0541
+Log pseudolikelihood =  -203631.817               Pseudo R2       =     0.1951
+
+Number of clusters (athr_id)=     13,515
+                           (Std. err. adjusted for 13,515 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+        Z_it |  -.3889471   .2019176    -1.93   0.054    -.7846984    .0068041
+       _cons |   .7783988   .0029267   265.96   0.000     .7726625    .7841351
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |     13515       13515           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+(encoding automatically selected: ISO-8859-2)
+(3 vars, 1,613,853 obs)
+(file ../temp/exposure_k5.dta not found)
+file ../temp/exposure_k5.dta saved
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                           135,150  (_merge==3)
+    -----------------------------------------
+(0 observations deleted)
+(134,260 real changes made)
+(134,260 real changes made)
+Iteration 1:   deviance = 1.5094e+05  eps = .         iters = 4    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.52  P   
+Iteration 2:   deviance = 1.4677e+05  eps = 2.84e-02  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.83      
+Iteration 3:   deviance = 1.4673e+05  eps = 2.55e-04  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.89      
+Iteration 4:   deviance = 1.4673e+05  eps = 2.41e-07  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.89      
+Iteration 5:   deviance = 1.4673e+05  eps = 1.17e-11  iters = 2    tol = 1.0e-0
+> 5                                                                            
+>    min(eta) =  -1.89   S O
+-------------------------------------------------------------------------------
+> -----------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon 
+> below tolerance)
+Converged in 5 iterations and 12 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =    135,150
+Absorbing 2 HDFE groups                           Residual df     =     13,514
+Statistics robust to heteroskedasticity           Wald chi2(2)    =       3.77
+Deviance             =  146734.9638               Prob > chi2     =     0.1519
+Log pseudolikelihood = -203631.4038               Pseudo R2       =     0.1951
+
+Number of clusters (athr_id)=     13,515
+                           (Std. err. adjusted for 13,515 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+        Z_it |  -.4011563     .22909    -1.75   0.080    -.8501645    .0478519
+       Zs_it |  -.0448244   .0652601    -0.69   0.492    -.1727317     .083083
+       _cons |   .7846552   .0093292    84.11   0.000     .7663703    .8029402
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |     13515       13515           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+Iteration 1:   deviance = 1.5094e+05  eps = .         iters = 3    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.51  P   
+Iteration 2:   deviance = 1.4677e+05  eps = 2.84e-02  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.83      
+Iteration 3:   deviance = 1.4674e+05  eps = 2.55e-04  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.89      
+Iteration 4:   deviance = 1.4674e+05  eps = 2.42e-07  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.89      
+Iteration 5:   deviance = 1.4674e+05  eps = 1.19e-11  iters = 2    tol = 1.0e-0
+> 5                                                                            
+>    min(eta) =  -1.89   S O
+-------------------------------------------------------------------------------
+> -----------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon 
+> below tolerance)
+Converged in 5 iterations and 11 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =    135,150
+Absorbing 2 HDFE groups                           Residual df     =     13,514
+Statistics robust to heteroskedasticity           Wald chi2(1)    =       3.50
+Deviance             =  146735.8509               Prob > chi2     =     0.0612
+Log pseudolikelihood = -203631.8473               Pseudo R2       =     0.1951
+
+Number of clusters (athr_id)=     13,515
+                           (Std. err. adjusted for 13,515 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+        Z_it |  -.4287843   .2290616    -1.87   0.061    -.8777368    .0201682
+       _cons |   .7788475   .0032515   239.54   0.000     .7724747    .7852203
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |     13515       13515           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. mat rownames expk = b_wshare se_wshare b_base se_base decline_pct ///
+>                     pre_mean N_wshare avg_exposure N_base
+
+. mat colnames expk = k1 k2 k3 k4 k5
+
+. mat list expk, format(%9.4f)
+
+expk[9,5]
+                    k1        k2        k3        k4        k5
+    b_wshare   -0.1855   -0.4040   -0.4210   -0.3763   -0.4012
+   se_wshare    0.1073    0.1449    0.1717    0.2026    0.2291
+      b_base   -0.1906   -0.4260   -0.4166   -0.3889   -0.4288
+     se_base    0.1075    0.1438    0.1712    0.2019    0.2291
+ decline_pct    0.5235    1.1398    1.1891    1.0544    1.1002
+    pre_mean    2.1616    2.1616    2.1616    2.1616    2.1616
+    N_wshare  1.35e+05  1.35e+05  1.35e+05  1.35e+05  1.35e+05
+avg_exposure    0.0283    0.0284    0.0284    0.0282    0.0276
+      N_base  1.35e+05  1.35e+05  1.35e+05  1.35e+05  1.35e+05
+
+. matrix_to_txt, saving("../output/tables/`samp'/robustness/exposure_variants_k
+> `suf'.txt") ///
+>     matrix(expk) title(<tab:exposure_variants_k`suf'>) format(%20.4f) replace
+(file ../output/tables/all_jrnls/robustness/exposure_variants_k_r1_r2.txt not
+    found)
+
+. 
+. forval c = 1/5 {
+  2.     foreach p in w n {
+  3.         local r  = cond("`p'" == "w", 1, 3)
+  4.         local b  = expvar[`r',`c']
+  5.         local se = expvar[`r'+1,`c']
+  6.         if `b' == . {
+  7.             local b`p'`c' ""
+  8.             continue
+  9.         }
+ 10.         local t  = abs(`b'/`se')
+ 11.         local st`p'`c' = cond(`t' >= 2.576, "^{***}", cond(`t' >= 1.960, "
+> ^{**}", cond(`t' >= 1.645, "^{*}", "")))
+ 12.         local b`p'`c'  = trim(string(`b', "%6.3f"))
+ 13.         local se`p'`c' = trim(string(`se', "%6.3f"))
+ 14.     }
+ 15.     local dc`c' = trim(string(expvar[5,`c'], "%4.1f"))
+ 16.     local pm`c' = trim(string(expvar[6,`c'], "%5.2f"))
+ 17.     local nn`c' = subinstr(trim(string(expvar[7,`c'], "%12.0fc")), ",", "{
+> ,}", .)
+ 18. }
+
+. forval k = 1/5 {
+  2.     foreach p in w n {
+  3.         local r  = cond("`p'" == "w", 1, 3)
+  4.         local b  = expk[`r',`k']
+  5.         local se = expk[`r'+1,`k']
+  6.         local t  = abs(`b'/`se')
+  7.         local kst`p'`k' = cond(`t' >= 2.576, "^{***}", cond(`t' >= 1.960, 
+> "^{**}", cond(`t' >= 1.645, "^{*}", "")))
+  8.         local kb`p'`k'  = trim(string(`b', "%6.3f"))
+  9.         local kse`p'`k' = trim(string(`se', "%6.3f"))
+ 10.     }
+ 11.     local kdc`k' = trim(string(expk[5,`k'], "%4.1f"))
+ 12.     local kpm`k' = trim(string(expk[6,`k'], "%5.2f"))
+ 13.     local knn`k' = subinstr(trim(string(expk[7,`k'], "%12.0fc")), ",", "{,
+> }", .)
+ 14. }
+
+. 
+. local out ../output/tables/`samp'/robustness/rf_exposure_variants`suf'.tex
+
+. * char(36): "\$" fails to escape right after an empty macro
+. local d = char(36)
+
+. tempname fh
+
+. file open `fh' using "`out'", write replace
+(file ../output/tables/all_jrnls/robustness/rf_exposure_variants_r1_r2.tex
+    not found)
+
+. file write `fh' "\begin{table}[H]" _n
+
+. file write `fh' "\centering" _n
+
+. file write `fh' "\caption{Robustness of the Output Effect to the Exposure Mea
+> sure}" _n
+
+. file write `fh' "\label{tab:rf_exposure_variants}" _n
+
+. file write `fh' "\begin{tabular}{l ccccc}" _n
+
+. file write `fh' "\toprule" _n
+
+. file write `fh' " & (1) & (2) & (3) & (4) & (5) \\" _n
+
+. file write `fh' " & Baseline & Renormalized & Positive & Precision- & High- \
+> \" _n
+
+. file write `fh' " &          & shares       & exposure & weighted   & similar
+> ity \\" _n
+
+. file write `fh' "\midrule" _n
+
+. file write `fh' "\multicolumn{6}{l}{\textit{Panel A: Exposure construction}} 
+> \\[2pt]" _n
+
+. file write `fh' "\multicolumn{6}{l}{\textit{Post \$\times\$ Exposure}} \\[2pt
+> ]" _n
+
+. file write `fh' "\quad With \$S_i\$ control   & \$\RFCoef`stw1'`d' & \$`bw2'`
+> stw2'`d' & \$`bw3'`stw3'`d' & \$`bw4'`stw4'`d' & \$`bw5'`stw5'`d' \\" _n
+
+. file write `fh' "                          & \$(\RFCoefSd)\$ & \$(`sew2')\$ &
+>  \$(`sew3')\$ & \$(`sew4')\$ & \$(`sew5')\$ \\" _n
+
+. file write `fh' "\quad No \$S_i\$ control     & \$\RFCoefRaw`stn1'`d' & --- &
+>  \$`bn3'`stn3'`d' & \$`bn4'`stn4'`d' & \$`bn5'`stn5'`d' \\" _n
+
+. file write `fh' "                          & \$(\RFCoefRawSd)\$ &  & \$(`sen3
+> ')\$ & \$(`sen4')\$ & \$(`sen5')\$ \\" _n
+
+. file write `fh' "\addlinespace" _n
+
+. file write `fh' "Implied output decline (\%) & \OutputDecline & `dc2' & `dc3'
+>  & `dc4' & `dc5' \\" _n
+
+. file write `fh' "\midrule" _n
+
+. file write `fh' "Pre-period mean             & \PoisMean & `pm2' & `pm3' & `p
+> m4' & `pm5' \\" _n
+
+. file write `fh' "Observations                & \RFObs & `nn2' & `nn3' & `nn4'
+>  & `nn5' \\" _n
+
+. file write `fh' "\midrule" _n
+
+. file write `fh' "\multicolumn{6}{l}{\textit{Panel B: Number of nearest FOIA P
+> Is in the imputation}} \\[2pt]" _n
+
+. file write `fh' " & \$k=1\$ & \$k=2\$ & \$k=3\$ & \$k=4\$ & \$k=5\$ \\" _n
+
+. file write `fh' " &  &  & (baseline) &  &  \\" _n
+
+. file write `fh' "\multicolumn{6}{l}{\textit{Post \$\times\$ Exposure}} \\[2pt
+> ]" _n
+
+. file write `fh' "\quad With \$S_i\$ control   & \$`kbw1'`kstw1'`d' & \$`kbw2'
+> `kstw2'`d' & \$`kbw3'`kstw3'`d' & \$`kbw4'`kstw4'`d' & \$`kbw5'`kstw5'`d' \\"
+>  _n
+
+. file write `fh' "                          & \$(`ksew1')\$ & \$(`ksew2')\$ & 
+> \$(`ksew3')\$ & \$(`ksew4')\$ & \$(`ksew5')\$ \\" _n
+
+. file write `fh' "\quad No \$S_i\$ control     & \$`kbn1'`kstn1'`d' & \$`kbn2'
+> `kstn2'`d' & \$`kbn3'`kstn3'`d' & \$`kbn4'`kstn4'`d' & \$`kbn5'`kstn5'`d' \\"
+>  _n
+
+. file write `fh' "                          & \$(`ksen1')\$ & \$(`ksen2')\$ & 
+> \$(`ksen3')\$ & \$(`ksen4')\$ & \$(`ksen5')\$ \\" _n
+
+. file write `fh' "\addlinespace" _n
+
+. file write `fh' "Implied output decline (\%) & `kdc1' & `kdc2' & `kdc3' & `kd
+> c4' & `kdc5' \\" _n
+
+. file write `fh' "\midrule" _n
+
+. file write `fh' "Pre-period mean             & `kpm1' & `kpm2' & `kpm3' & `kp
+> m4' & `kpm5' \\" _n
+
+. file write `fh' "Observations                & `knn1' & `knn2' & `knn3' & `kn
+> n4' & `knn5' \\" _n
+
+. file write `fh' "\bottomrule" _n
+
+. file write `fh' "\end{tabular}" _n
+
+. file write `fh' "\floatfoot{\textit{Notes:} Each column is a Poisson (PPML) d
+> ifference-in-differences regression of annual publication counts on the inter
+> action of post-merger timing with PI exposure, with author and year fixed eff
+> ects and standard errors clustered at the PI level." _n
+
+. file write `fh' "Panel A varies how exposure is constructed. Column (1) is th
+> e baseline exposure measure of Table~\ref{tab:rf_main}." _n
+
+. file write `fh' "Column (2) renormalizes each PI's market shares to sum to on
+> e (exposure divided by the treated-market share \$S_i\$); renormalization is 
+> the \citet{borusyak_quasi-experimental_2022} alternative to including \$S_i\$
+>  as a control, so the no-control row does not apply." _n
+
+. file write `fh' "Column (3) restricts the panel to PIs with strictly positive
+>  exposure." _n
+
+. file write `fh' "Column (4) weights each PI by the maximum text similarity of
+>  their publications to a FOIA PI, so that precisely imputed exposures receive
+>  more weight; the implied decline is evaluated at the similarity-weighted ave
+> rage exposure." _n
+
+. file write `fh' "Column (5) restricts to the top `hisim_pct'\% of imputed PIs
+>  by maximum similarity (FOIA PIs, whose exposure is observed, are always reta
+> ined)." _n
+
+. file write `fh' "Panel B varies the number of nearest FOIA PIs (by text simil
+> arity) whose observed spending shares are averaged to impute each non-FOIA PI
+> 's exposure and treated-market share \$S_i\$; the baseline uses \$k=3\$, and 
+> FOIA PIs keep their observed values in every column." _n
+
+. file write `fh' "The implied output decline is the reduction for the average 
+> PI implied by the with-\$S_i\$ coefficient (for column (2), the renormalized 
+> coefficient) at that column's average exposure, expressed as a percent of the
+>  pre-period mean." _n
+
+. file write `fh' "Significance: \$^{*}\$ \$p<0.10\$, \$^{**}\$ \$p<0.05\$, \$^
+> {***}\$ \$p<0.01\$.}" _n
+
+. file write `fh' "\end{table}" _n
+
+. file close `fh'
+
+. di as text "wrote `out'"
+wrote ../output/tables/all_jrnls/robustness/rf_exposure_variants_r1_r2.tex
+
+. 
+end of do-file

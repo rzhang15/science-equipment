@@ -7,3 +7,4 @@
 ./categories/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/first_stage/select_categories/output
 ./nih_grants/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/derived/nih/match_pi_athr/output
 
+./betas/ | /n/holylabs/LABS/pakes_lab/Lab/sci_eq/analysis/first_stage/output

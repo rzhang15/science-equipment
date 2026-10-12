@@ -4,6 +4,42 @@ capture log close
 program drop _all
 set scheme modern
 preliminaries
+
+global PRES_SCALE 1.2
+
+cap program drop fig_export
+program fig_export
+    syntax, path(string) [mode(string) xsize(real 6) ysize(real 4)]
+    local p : subinstr local path "/paper/" "/", all
+    local p : subinstr local p "/pres/" "/", all
+    local k = strpos("`p'", "figures/")
+    if `k' > 0 {
+        local base = substr("`p'", 1, `k' + 7)
+        local rest = substr("`p'", `k' + 8, .)
+    }
+    else {
+        local slash = strrpos("`p'", "/")
+        local base = substr("`p'", 1, `slash')
+        local rest = substr("`p'", `slash' + 1, .)
+    }
+    local tscale = cond(`xsize' >= `ysize', (2/3) * `xsize' / min(`xsize', `ysize'), 1)
+    if "`mode'" == "presentation" local mode pres
+    foreach m in paper pres {
+        if "`mode'" != "" & "`mode'" != "`m'" continue
+        local dir "`base'`m'"
+        cap mkdir "`dir'"
+        local sub "`rest'"
+        while strpos("`sub'", "/") > 0 {
+            local seg = substr("`sub'", 1, strpos("`sub'", "/") - 1)
+            local dir "`dir'/`seg'"
+            cap mkdir "`dir'"
+            local sub = substr("`sub'", strpos("`sub'", "/") + 1, .)
+        }
+        local s = cond("`m'" == "pres", `tscale' * $PRES_SCALE, `tscale')
+        graph display, scale(`s')
+        graph export "`base'`m'/`rest'", replace
+    }
+end
 version 17
 
 program main
@@ -158,7 +194,7 @@ program make_placebo_plots
        xtitle("Iteration") ///
        xlab(1(1)`n_iter') ///
        legend(off)
-    graph export ../output/figures/did_coefs_placebo`suf'_top_cats$suffix.pdf, replace
+    fig_export, path("../output/figures/did_coefs_placebo`suf'_top_cats$suffix.pdf")
     restore
 
     preserve
@@ -168,7 +204,7 @@ program make_placebo_plots
        ytitle("`ylabel'") ///
        xtitle("Within-iter rank (1 = highest)") ///
        yline(0, lcolor(gs6) lpattern(dash))
-    graph export ../output/figures/did_coefs_placebo`suf'_rank_profile$suffix.pdf, replace
+    fig_export, path("../output/figures/did_coefs_placebo`suf'_rank_profile$suffix.pdf")
     restore
 
     sum b, d
@@ -185,19 +221,19 @@ program make_placebo_plots
         xtitle("`ylabel'") ///
         ytitle("# of (iter, market) pairs") ///
         xline(0, lcolor(gs6) lpattern(dash)) ///
-        legend(on order(- "N = `N'" "iters = `n_iter'" "mean = `mean'" "sd = `sd'" ///
-                          "p25 = `p25'" "p50 = `p50'" "p75 = `p75'" ///
-                          "min = `minv'" "max = `maxv'") ///
+        legend(on order(- "N = `N'" "Iters = `n_iter'" "Mean = `mean'" "Sd = `sd'" ///
+                          "P25 = `p25'" "P50 = `p50'" "P75 = `p75'" ///
+                          "Min = `minv'" "Max = `maxv'") ///
                pos(1) ring(0) region(fcolor(none)) size(small))
-    graph export ../output/figures/did_coefs_placebo`suf'_hist$suffix.pdf, replace
+    fig_export, path("../output/figures/did_coefs_placebo`suf'_hist$suffix.pdf")
 
     tw kdensity b, color(lavender) ///
         xtitle("`ylabel'") ///
         ytitle("Density") ///
         xline(0, lcolor(gs6) lpattern(dash)) ///
-        legend(on order(- "N = `N'" "iters = `n_iter'" "mean = `mean'" "sd = `sd'") ///
+        legend(on order(- "N = `N'" "Iters = `n_iter'" "Mean = `mean'" "Sd = `sd'") ///
                pos(1) ring(0) region(fcolor(none)) size(small))
-    graph export ../output/figures/did_coefs_placebo`suf'_kdens$suffix.pdf, replace
+    fig_export, path("../output/figures/did_coefs_placebo`suf'_kdens$suffix.pdf")
 
     preserve
     gcollapse (mean) b_mean = b (sd) b_sd = b (count) n_cats = b, by(iter)
@@ -212,7 +248,7 @@ program make_placebo_plots
        yline(0) ytitle("Mean `ylabel' (per iter)") ///
        xlab(1(1)`nr') xtitle("Placebo iteration (ranked)") ///
        legend(off)
-    graph export ../output/figures/did_coefs_placebo`suf'_by_iter$suffix.pdf, replace
+    fig_export, path("../output/figures/did_coefs_placebo`suf'_by_iter$suffix.pdf")
     restore
 end
 

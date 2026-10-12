@@ -4,6 +4,42 @@ capture log close
 program drop _all
 set scheme modern
 preliminaries
+
+global PRES_SCALE 1.2
+
+cap program drop fig_export
+program fig_export
+    syntax, path(string) [mode(string) xsize(real 6) ysize(real 4)]
+    local p : subinstr local path "/paper/" "/", all
+    local p : subinstr local p "/pres/" "/", all
+    local k = strpos("`p'", "figures/")
+    if `k' > 0 {
+        local base = substr("`p'", 1, `k' + 7)
+        local rest = substr("`p'", `k' + 8, .)
+    }
+    else {
+        local slash = strrpos("`p'", "/")
+        local base = substr("`p'", 1, `slash')
+        local rest = substr("`p'", `slash' + 1, .)
+    }
+    local tscale = cond(`xsize' >= `ysize', (2/3) * `xsize' / min(`xsize', `ysize'), 1)
+    if "`mode'" == "presentation" local mode pres
+    foreach m in paper pres {
+        if "`mode'" != "" & "`mode'" != "`m'" continue
+        local dir "`base'`m'"
+        cap mkdir "`dir'"
+        local sub "`rest'"
+        while strpos("`sub'", "/") > 0 {
+            local seg = substr("`sub'", 1, strpos("`sub'", "/") - 1)
+            local dir "`dir'/`seg'"
+            cap mkdir "`dir'"
+            local sub = substr("`sub'", strpos("`sub'", "/") + 1, .)
+        }
+        local s = cond("`m'" == "pres", `tscale' * $PRES_SCALE, `tscale')
+        graph display, scale(`s')
+        graph export "`base'`m'/`rest'", replace
+    }
+end
 version 17
 set maxvar 120000, perm
 
@@ -441,7 +477,7 @@ program plot_time_series
            xline(2014, lpattern(dash) lcolor(gs10)) ///
            legend(order(1 "FOIA PIs" 2 "Non-FOIA PIs") pos(6) ring(1) rows(1)) ///
            plotregion(margin(sides))
-        graph export ../output/figures/`samp'/ts_`y'.pdf, replace
+        fig_export, path("../output/figures/`samp'/ts_`y'.pdf")
 
         if "`y'" != "n_pi_active" {
             tw (line `y'_c year if foia_athr == 1, lcolor(dkorange) lwidth(medthick)) ///
@@ -451,7 +487,7 @@ program plot_time_series
                yline(0, lcolor(gs10) lpattern(solid)) ///
                legend(order(1 "FOIA PIs" 2 "Non-FOIA PIs") pos(6) ring(1) rows(1)) ///
                plotregion(margin(sides))
-            graph export ../output/figures/`samp'/ts_recentered_`y'.pdf, replace
+            fig_export, path("../output/figures/`samp'/ts_recentered_`y'.pdf")
         }
     }
 
@@ -488,7 +524,7 @@ program plot_time_series
             xlab(2010(1)2019) xtitle("Year") ytitle("`ytitle'") ///
             xline(2014, lpattern(dash) lcolor(gs10)) ///
             legend(off) plotregion(margin(sides))
-        graph export ../output/figures/`samp'/ts_pooled_`y'.pdf, replace
+        fig_export, path("../output/figures/`samp'/ts_pooled_`y'.pdf")
     }
 end
 
@@ -582,7 +618,7 @@ program plot_ts_by_exposure
                             2 "Top quartile exposure (`title_grp')") ///
                       pos(6) ring(1) rows(1) size(small)) ///
                plotregion(margin(sides))
-            graph export ../output/figures/`samp'/ts_`suf'_topbot_`y'.pdf, replace
+            fig_export, path("../output/figures/`samp'/ts_`suf'_topbot_`y'.pdf")
 
             tw (line `y' year if `grpvar' == 1, lcolor(ebblue) lwidth(medthick)) ///
                (line `y' year if `grpvar' == 2, lcolor(ebblue%55) lwidth(medthick) lpattern(dash)) ///
@@ -593,7 +629,7 @@ program plot_ts_by_exposure
                legend(order(1 "Q1 (lowest)" 2 "Q2" 3 "Q3" 4 "Q4 (highest)") ///
                       pos(6) ring(1) rows(1) size(small)) ///
                plotregion(margin(sides))
-            graph export ../output/figures/`samp'/ts_`suf'_all_`y'.pdf, replace
+            fig_export, path("../output/figures/`samp'/ts_`suf'_all_`y'.pdf")
 
             tw (line `y'_c year if `grpvar' == 1, lcolor(ebblue) lwidth(medthick)) ///
                (line `y'_c year if `grpvar' == 4, lcolor(dkorange) lwidth(medthick)), ///
@@ -604,7 +640,7 @@ program plot_ts_by_exposure
                             2 "Top quartile exposure (`title_grp')") ///
                       pos(6) ring(1) rows(1) size(small)) ///
                plotregion(margin(sides))
-            graph export ../output/figures/`samp'/ts_`suf'_topbot_recentered_`y'.pdf, replace
+            fig_export, path("../output/figures/`samp'/ts_`suf'_topbot_recentered_`y'.pdf")
 
             tw (line `y'_c year if `grpvar' == 1, lcolor(ebblue) lwidth(medthick)) ///
                (line `y'_c year if `grpvar' == 2, lcolor(ebblue%55) lwidth(medthick) lpattern(dash)) ///
@@ -616,7 +652,7 @@ program plot_ts_by_exposure
                legend(order(1 "Q1 (lowest)" 2 "Q2" 3 "Q3" 4 "Q4 (highest)") ///
                       pos(6) ring(1) rows(1) size(small)) ///
                plotregion(margin(sides))
-            graph export ../output/figures/`samp'/ts_`suf'_all_recentered_`y'.pdf, replace
+            fig_export, path("../output/figures/`samp'/ts_`suf'_all_recentered_`y'.pdf")
         }
 
         preserve
@@ -650,7 +686,7 @@ program plot_ts_by_exposure
                    xline(2014, lpattern(dash) lcolor(gs10)) ///
                    yline(0, lcolor(gs10) lpattern(solid)) ///
                    legend(off) plotregion(margin(sides))
-                graph export ../output/figures/`samp'/ts_`suf'_gap_`y'.pdf, replace
+                fig_export, path("../output/figures/`samp'/ts_`suf'_gap_`y'.pdf")
             }
         restore
     }
@@ -695,14 +731,14 @@ program plot_grant_trends
                         2 "Raw RePORTER (no pub-panel filter)") ///
                   pos(6) ring(1) rows(1) size(small)) ///
            plotregion(margin(sides))
-        graph export ../output/figures/`samp'/grants_ship_vs_raw.pdf, replace
+        fig_export, path("../output/figures/`samp'/grants_ship_vs_raw.pdf")
 
         tw (line cov year, lcolor(ebblue) lwidth(medthick)), ///
            xlab(2010(1)2019) xtitle("Year") ///
            ytitle("Share of PI-years in the publication panel") ///
            xline(2014, lpattern(dash) lcolor(gs10)) ///
            legend(off) plotregion(margin(sides))
-        graph export ../output/figures/`samp'/grants_panel_coverage.pdf, replace
+        fig_export, path("../output/figures/`samp'/grants_panel_coverage.pdf")
         export delimited using ../output/tables/`samp'/grants_ship_vs_raw.csv, replace
     restore
 
@@ -729,7 +765,7 @@ program plot_grant_trends
                           pos(6) ring(1) rows(1) size(small)) ///
                    title("`rlab'", size(small)) ///
                    plotregion(margin(sides))
-                graph export ../output/figures/`samp'/grants_`rule'_`y'.pdf, replace
+                fig_export, path("../output/figures/`samp'/grants_`rule'_`y'.pdf")
             }
             export delimited using ../output/tables/`samp'/grants_`rule'_trends.csv, replace
         restore
@@ -743,27 +779,27 @@ program plot_distributions
     tw hist pre_ppr_cnt_sum, bin(60) color(ebblue%70) ///
         xtitle("Pre-2014 total publications") ytitle("Density") ///
         plotregion(margin(sides))
-    graph export ../output/figures/`samp'/hist_pre_ppr_cnt_sum.pdf, replace
+    fig_export, path("../output/figures/`samp'/hist_pre_ppr_cnt_sum.pdf")
 
     tw hist pre_ppr_cnt_avg, bin(60) color(ebblue%70) ///
         xtitle("Pre-2014 avg publications per year") ytitle("Density") ///
         plotregion(margin(sides))
-    graph export ../output/figures/`samp'/hist_pre_ppr_cnt_avg.pdf, replace
+    fig_export, path("../output/figures/`samp'/hist_pre_ppr_cnt_avg.pdf")
 
     tw hist tot_ppr, bin(60) color(ebblue%70) ///
         xtitle("Total last-author pubs 2010-2019") ytitle("Density") ///
         plotregion(margin(sides))
-    graph export ../output/figures/`samp'/hist_tot_ppr.pdf, replace
+    fig_export, path("../output/figures/`samp'/hist_tot_ppr.pdf")
 
     tw hist tot_ppr_any, bin(60) color(ebblue%70) ///
         xtitle("Total pubs (any position) 2010-2019") ytitle("Density") ///
         plotregion(margin(sides))
-    graph export ../output/figures/`samp'/hist_tot_ppr_any.pdf, replace
+    fig_export, path("../output/figures/`samp'/hist_tot_ppr_any.pdf")
 
     tw hist tot_n_grants if tot_n_grants > 0, bin(40) color(dkorange%70) ///
         xtitle("# NIH grants 2010-2019 (NIH-matched PIs)") ytitle("Density") ///
         plotregion(margin(sides))
-    graph export ../output/figures/`samp'/hist_tot_n_grants.pdf, replace
+    fig_export, path("../output/figures/`samp'/hist_tot_n_grants.pdf")
 
     qui sum tot_nih_cost if tot_nih_cost > 0, d
     local cost_p99 = r(p99)
@@ -771,12 +807,12 @@ program plot_distributions
         bin(40) color(dkorange%70) ///
         xtitle("Total NIH funding 2010-2019 (USD, p99-cut)") ytitle("Density") ///
         plotregion(margin(sides))
-    graph export ../output/figures/`samp'/hist_tot_nih_cost.pdf, replace
+    fig_export, path("../output/figures/`samp'/hist_tot_nih_cost.pdf")
 
     tw hist age_2014, bin(30) color(ebblue%70) ///
         xtitle("Approx career age at 2014 (yrs since first pub + 30)") ytitle("Density") ///
         plotregion(margin(sides))
-    graph export ../output/figures/`samp'/hist_age_2014.pdf, replace
+    fig_export, path("../output/figures/`samp'/hist_age_2014.pdf")
 
     qui sum pre_ppr_cnt_sum if foia_athr == 1, d
     local mean_f : di %5.2f r(mean)
@@ -788,7 +824,7 @@ program plot_distributions
        legend(order(1 "FOIA PIs (mean=`mean_f')" 2 "Non-FOIA PIs (mean=`mean_n')") ///
            pos(6) ring(1) rows(1) size(small)) ///
        plotregion(margin(sides))
-    graph export ../output/figures/`samp'/kd_pre_ppr_cnt_sum.pdf, replace
+    fig_export, path("../output/figures/`samp'/kd_pre_ppr_cnt_sum.pdf")
 
     qui sum tot_n_grants if foia_athr == 1, d
     local mean_f : di %5.2f r(mean)
@@ -800,7 +836,7 @@ program plot_distributions
        legend(order(1 "FOIA PIs (mean=`mean_f')" 2 "Non-FOIA PIs (mean=`mean_n')") ///
            pos(6) ring(1) rows(1) size(small)) ///
        plotregion(margin(sides))
-    graph export ../output/figures/`samp'/kd_tot_n_grants.pdf, replace
+    fig_export, path("../output/figures/`samp'/kd_tot_n_grants.pdf")
 end
 
 program plot_raw_overall
@@ -838,13 +874,13 @@ program plot_raw_overall
                xlab(2010(1)2019) xtitle("Year") ytitle("`yt'") ///
                xline(2014, lpattern(dash) lcolor(gs10)) ///
                legend(off) plotregion(margin(sides))
-            graph export ../output/figures/`samp'/raw_ts_`v'.pdf, replace
+            fig_export, path("../output/figures/`samp'/raw_ts_`v'.pdf")
         }
         tw (line n_obs year, lcolor(ebblue) lwidth(medthick)), ///
            xlab(2010(1)2019) xtitle("Year") ytitle("# PI-year observations") ///
            xline(2014, lpattern(dash) lcolor(gs10)) ///
            legend(off) plotregion(margin(sides))
-        graph export ../output/figures/`samp'/raw_ts_n_obs.pdf, replace
+        fig_export, path("../output/figures/`samp'/raw_ts_n_obs.pdf")
     restore
 
     cap mat drop raw_yr_dist
@@ -878,13 +914,13 @@ program plot_raw_overall
         tw hist `v', bin(60) percent color(ebblue%70) ///
             xtitle("`yt'") ytitle("Percent of PI-years") ///
             plotregion(margin(sides))
-        graph export ../output/figures/`samp'/raw_dist_`v'.pdf, replace
+        fig_export, path("../output/figures/`samp'/raw_dist_`v'.pdf")
 
         if `p99' > 0 & `vmax' > 2 * `p99' {
             tw hist `v' if `v' <= `p99', bin(60) percent color(ebblue%70) ///
                 xtitle("`yt' (p99-cut)") ytitle("Percent of PI-years") ///
                 plotregion(margin(sides))
-            graph export ../output/figures/`samp'/raw_dist_`v'_p99.pdf, replace
+            fig_export, path("../output/figures/`samp'/raw_dist_`v'_p99.pdf")
         }
     }
 
@@ -912,13 +948,13 @@ program plot_raw_overall
         tw hist `v', bin(60) percent color(ebblue%70) ///
             xtitle("`yt'") ytitle("Percent of PIs") ///
             plotregion(margin(sides))
-        graph export ../output/figures/`samp'/raw_dist_pi_`v'.pdf, replace
+        fig_export, path("../output/figures/`samp'/raw_dist_pi_`v'.pdf")
 
         if `p99' > 0 & `vmax' > 2 * `p99' {
             tw hist `v' if `v' <= `p99', bin(60) percent color(ebblue%70) ///
                 xtitle("`yt' (p99-cut)") ytitle("Percent of PIs") ///
                 plotregion(margin(sides))
-            graph export ../output/figures/`samp'/raw_dist_pi_`v'_p99.pdf, replace
+            fig_export, path("../output/figures/`samp'/raw_dist_pi_`v'_p99.pdf")
         }
     }
     mat colnames raw_pi_dist = mean sd min p10 p25 p50 p75 p90 p99 max N

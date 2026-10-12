@@ -4,6 +4,42 @@ capture log close
 program drop _all
 set scheme modern
 preliminaries
+
+global PRES_SCALE 1.2
+
+cap program drop fig_export
+program fig_export
+    syntax, path(string) [mode(string) xsize(real 6) ysize(real 4)]
+    local p : subinstr local path "/paper/" "/", all
+    local p : subinstr local p "/pres/" "/", all
+    local k = strpos("`p'", "figures/")
+    if `k' > 0 {
+        local base = substr("`p'", 1, `k' + 7)
+        local rest = substr("`p'", `k' + 8, .)
+    }
+    else {
+        local slash = strrpos("`p'", "/")
+        local base = substr("`p'", 1, `slash')
+        local rest = substr("`p'", `slash' + 1, .)
+    }
+    local tscale = cond(`xsize' >= `ysize', (2/3) * `xsize' / min(`xsize', `ysize'), 1)
+    if "`mode'" == "presentation" local mode pres
+    foreach m in paper pres {
+        if "`mode'" != "" & "`mode'" != "`m'" continue
+        local dir "`base'`m'"
+        cap mkdir "`dir'"
+        local sub "`rest'"
+        while strpos("`sub'", "/") > 0 {
+            local seg = substr("`sub'", 1, strpos("`sub'", "/") - 1)
+            local dir "`dir'/`seg'"
+            cap mkdir "`dir'"
+            local sub = substr("`sub'", strpos("`sub'", "/") + 1, .)
+        }
+        local s = cond("`m'" == "pres", `tscale' * $PRES_SCALE, `tscale')
+        graph display, scale(`s')
+        graph export "`base'`m'/`rest'", replace
+    }
+end
 version 17
 
 program main
@@ -13,6 +49,7 @@ program main
         local sufopt = cond("`ds'" == "r1_r2", "", "suf(_public)")
         spend_by_age, `sufopt'
         spend_by_age_piyr, `sufopt'
+        consumables_intensity, `sufopt'
         gather_pubs, `sufopt'
         foreach s in foia all {
             nih_by_age,      samp(`s') `sufopt'
@@ -74,7 +111,8 @@ program kd_young_old
     else                 local ptxt "Early-career - late-career = `diff'; t-test p = `pt_s'; K-S p = `pks_s'"
     di as text "`v': `ptxt'"
 
-    cap drop _kx _kd_y _kd_o _kp_y _kp_o _kp_c
+    preserve
+    if _N < 200 qui set obs 200
     gen _kx = `xcap' * (_n - 1) / 199 if _n <= 200
     kdensity `v' if young == 1 & `v' <= `xcap', at(_kx) gen(_kd_y) nograph
     kdensity `v' if young == 0 & `v' <= `xcap', at(_kx) gen(_kd_o) nograph
@@ -86,20 +124,20 @@ program kd_young_old
        (line _kp_y _kx, lcolor(ebblue)) ///
        (line _kp_o _kx, lcolor(dkorange)), ///
        xtitle("`xtitle'") ytitle("Percent of `unit' (per `wlab' bin)") ///
-       legend(order(3 "Early-Career (N=`n_y'): mean=`mean_y'" ///
-                    4 "Late-Career (N=`n_o'): mean=`mean_o'") ///
+       legend(order(3 "Early-career (N=`n_y'): mean=`mean_y'" ///
+                    4 "Late-career (N=`n_o'): mean=`mean_o'") ///
            pos(1) ring(0) cols(1) size(small) region(fcolor(none))) ///
        note("`ptxt'", size(small)) ///
        plotregion(margin(sides))
-    graph export `out', replace
-    cap drop _kx _kd_y _kd_o _kp_y _kp_o _kp_c
+    fig_export, path("`out'")
+    restore
 end
 
 program gather_nih
-    use athr_id grant_id full_project_num fy total_cost project_start ///
+    use athr_id grant_id full_project_num fy total_cost_pi project_start ///
         using ../external/nih/nih_grants_by_athr_id, clear
     duplicates drop athr_id grant_id, force
-    gen double amt = total_cost
+    gen double amt = total_cost_pi
     bys athr_id fy full_project_num: gen byte proj = _n == 1
     gen byte new_grant = proj & year(project_start) == fy
     gcollapse (sum) nih_amt        = amt ///
@@ -413,6 +451,23 @@ program prod_per_dollar
         local vars `vars' ppr_per_10k_spend spend_per_ppr ppr_per_100k_comb comb_per_ppr
     }
 
+    * Section 5.1: pooled dollars/publications and the untrimmed PI ratio tail.
+    quietly summarize nih_amt_yr
+    local funding = r(sum)
+    quietly summarize pre_ppr_avg
+    local nih_per_paper = `funding' / r(sum)
+    quietly summarize nih_per_ppr, detail
+    local p1 = r(p1)
+    local n_ratios = r(N)
+    quietly count if nih_per_ppr > 10500 & !mi(nih_per_ppr)
+    local share_above = r(N) / `n_ratios'
+    tempname stats
+    file open `stats' using ../output/tables/section51_`samp'`suf'.csv, write replace
+    file write `stats' "nih_per_paper,p1,share_above_10500,n_ratios" _n
+    file write `stats' %21.10f (`nih_per_paper') "," %21.10f (`p1') "," ///
+        %21.10f (`share_above') "," %9.0f (`n_ratios') _n
+    file close `stats'
+
     save ../output/prod_per_dollar_pis_`samp'`suf', replace
 
     local aggnm  ppr_per_100k_nih ppr_any_per_100k_nih
@@ -515,10 +570,10 @@ program bs_stats
     local n_s = r(N)
     binscatter `y' `x', n(20) msymbol(O) mcolors(gs6) lcolors(ebblue) ///
         xtitle("`xtitle'") ytitle("`ytitle'") ///
-        legend(on order(- "slope = `b_s' (SE: `se_s')" "corr = `r_s', N = `n_s'") ///
+        legend(on order(- "Slope = `b_s' (SE: `se_s')" "Corr = `r_s', N = `n_s'") ///
             pos(1) ring(0) region(fcolor(none)) size(small)) ///
         plotregion(margin(sides))
-    graph export `out', replace
+    fig_export, path("`out'")
 end
 
 program spend_by_age
@@ -627,7 +682,8 @@ program spend_by_age
         local ptxt "Early-career - late-career = `diff'; t-test p = `pt_s'; K-S p = `pks_s'"
         di as text "`v': `ptxt'"
 
-        cap drop _kx _kd_y _kd_o _kp_y _kp_o _kp_c
+        preserve
+        if _N < 200 qui set obs 200
         gen _kx = `xcap' * (_n - 1) / 199 if _n <= 200
         kdensity `v' if young == 1 & `v' <= `xcap', at(_kx) gen(_kd_y) nograph
         kdensity `v' if young == 0 & `v' <= `xcap', at(_kx) gen(_kd_o) nograph
@@ -639,13 +695,13 @@ program spend_by_age
            (line _kp_y _kx, lcolor(ebblue)) ///
            (line _kp_o _kx, lcolor(dkorange)), ///
            xtitle("`xtitle'") ytitle("Percent of PIs (per `wlab' bin)") ///
-           legend(order(3 "Early-Career (N=`n_y'): mean=`mean_y'" ///
-                        4 "Late-Career (N=`n_o'): mean=`mean_o'") ///
+           legend(order(3 "Early-career (N=`n_y'): mean=`mean_y'" ///
+                        4 "Late-career (N=`n_o'): mean=`mean_o'") ///
                pos(1) ring(0) cols(1) size(small) region(fcolor(none))) ///
            note("`ptxt'", size(small)) ///
            plotregion(margin(sides))
-        graph export ../output/figures/kd_`v'_by_age`suf'.pdf, replace
-        cap drop _kx _kd_y _kd_o _kp_y _kp_o _kp_c
+        fig_export, path("../output/figures/kd_`v'_by_age`suf'.pdf")
+        restore
     }
 
     gen double ln_lab_spend = ln(lab_spend) if lab_spend > 0
@@ -742,7 +798,8 @@ program spend_by_age_piyr
         local ptxt "Early-career - late-career = `diff'; t-test p = `pt_s' (PI-clustered); K-S p = `pks_s'"
         di as text "`v': `ptxt'"
 
-        cap drop _kx _kd_y _kd_o _kp_y _kp_o
+        preserve
+        if _N < 200 qui set obs 200
         gen _kx = `xcap' * (_n - 1) / 199 if _n <= 200
         kdensity `v' if young == 1 & `v' <= `xcap', at(_kx) gen(_kd_y) nograph
         kdensity `v' if young == 0 & `v' <= `xcap', at(_kx) gen(_kd_o) nograph
@@ -751,13 +808,168 @@ program spend_by_age_piyr
         tw (line _kp_y _kx, lcolor(ebblue)) ///
            (line _kp_o _kx, lcolor(dkorange)), ///
            xtitle("`xtitle'") ytitle("Percent of PI-years (per `wlab' bin)") ///
-           legend(order(1 "Early-Career (N=`n_y', PIs=`npi_y'): mean=`mean_y'" ///
-                        2 "Late-Career (N=`n_o', PIs=`npi_o'): mean=`mean_o'") ///
+           legend(order(1 "Early-career (N=`n_y', PIs=`npi_y'): mean=`mean_y'" ///
+                        2 "Late-career (N=`n_o', PIs=`npi_o'): mean=`mean_o'") ///
                pos(1) ring(0) cols(1) size(small) region(fcolor(none))) ///
            note("`ptxt'", size(small)) ///
            plotregion(margin(sides))
-        graph export ../output/figures/kd_`v'_by_age_piyr`suf'.pdf, replace
-        cap drop _kx _kd_y _kd_o _kp_y _kp_o
+        fig_export, path("../output/figures/kd_`v'_by_age_piyr`suf'.pdf")
+        restore
+    }
+end
+
+program consumables_intensity
+    syntax [, suf(string)]
+    cap mkdir ../output/tables
+    cap mkdir ../output/figures
+
+    use athr_id athr_indicator foia_athr nih_pi_name ///
+        using ../external/pi_samp/pi_desc_all_jrnls_r1_r2`suf', clear
+    keep if athr_indicator == 1 & foia_athr == 1
+    gen byte nih_matched = !mi(nih_pi_name)
+    keep athr_id nih_matched
+    save ../temp/foia_pi_nih`suf', replace
+
+    use ../temp/spend_athr_yr, clear
+    keep if inrange(year, 2010, 2013)
+    merge m:1 athr_id using ../temp/foia_pi_age`suf', keep(3) nogen
+    merge m:1 athr_id using ../temp/foia_pi_nih`suf', keep(3) nogen
+    merge 1:1 athr_id year using ../temp/nih_athr_yr, keep(1 3) nogen
+    replace nih_amt = 0 if mi(nih_amt)
+    egen _tag = tag(athr_id)
+    qui count if _tag
+    local n_foia = r(N)
+    keep if nih_matched == 1
+    qui count if _tag
+    local n_match = r(N)
+    qui sum min_year if _tag, d
+    local med_yr = r(p50)
+    gen young = min_year > `med_yr' if !mi(min_year)
+    qui count if _tag & young == 1
+    local npi_y = r(N)
+    qui count if _tag & young == 0
+    local npi_o = r(N)
+    drop _tag
+    foreach v in lab_spend hq_labspend tot_spend {
+        gen double `v'_pct_nih = `v' / nih_amt * 100 if nih_amt > 0
+    }
+    di as text "consumables_intensity`suf': `n_foia' FOIA PIs with 2010-2013 spend -> " ///
+        "`n_match' matched to RePORTER; median min_year = `med_yr'; PIs young/old = `npi_y'/`npi_o'"
+    keep athr_id year min_year lab_age_2014 young tot_spend lab_spend hq_labspend ///
+         nih_amt nih_active *_pct_nih
+    save ../output/consumables_intensity_piyrs`suf', replace
+
+    cap mat drop cons_piyr
+    qui count if young == 1
+    local nyr_y = r(N)
+    qui count if young == 0
+    local nyr_o = r(N)
+    foreach g in 1 0 {
+        qui count if young == `g' & nih_amt == 0
+        local nzero_`g' = r(N)
+        foreach v in lab_spend hq_labspend tot_spend {
+            qui sum `v' if young == `g' & nih_amt > 0
+            local num = r(sum)
+            qui sum nih_amt if young == `g' & nih_amt > 0
+            local agg_`v'_`g' = `num' / r(sum) * 100
+        }
+    }
+    mat cons_piyr = (`npi_y', ., `npi_y', `npi_o', ., `npi_o')
+    mat cons_piyr = cons_piyr \ (`nyr_y', ., `nyr_y', `nyr_o', ., `nyr_o')
+    mat cons_piyr = cons_piyr \ (`nzero_1', ., `nzero_1', `nzero_0', ., `nzero_0')
+    local rownames "n_pis n_pi_yrs n_pi_yrs_zero_nih"
+    foreach v in lab_spend hq_labspend tot_spend nih_amt ///
+                 lab_spend_pct_nih hq_labspend_pct_nih tot_spend_pct_nih {
+        qui sum `v' if young == 1, d
+        local y_mean = r(mean)
+        local y_p50  = r(p50)
+        local y_N    = r(N)
+        qui sum `v' if young == 0, d
+        mat cons_piyr = cons_piyr \ (`y_mean', `y_p50', `y_N', r(mean), r(p50), r(N))
+        local rownames "`rownames' `v'"
+    }
+    foreach v in lab_spend hq_labspend tot_spend {
+        mat cons_piyr = cons_piyr \ (`agg_`v'_1', ., ., `agg_`v'_0', ., .)
+        local rownames "`rownames' agg_`v'_pct_nih"
+    }
+    mat colnames cons_piyr = young_mean young_p50 young_N old_mean old_p50 old_N
+    mat rownames cons_piyr = `rownames'
+    qui matrix_to_txt, saving("../output/tables/consumables_intensity_piyr`suf'.txt") ///
+        matrix(cons_piyr) title(<tab:consumables_intensity_piyr`suf'>) format(%14.4f) replace
+
+    kd_young_old lab_spend_pct_nih, xtitle(Lab consumables spend as % of NIH funding (PI-year)) ///
+        w(1) wlab("1pp") unit(PI-years) fmt(%9.2f) cluster(athr_id) ///
+        out(../output/figures/kd_lab_spend_pct_nih_by_age_piyr`suf'.pdf)
+    kd_young_old hq_labspend_pct_nih, ///
+        xtitle(High-confidence lab spend as % of NIH funding (PI-year)) ///
+        w(1) wlab("1pp") unit(PI-years) fmt(%9.2f) cluster(athr_id) ///
+        out(../output/figures/kd_hq_labspend_pct_nih_by_age_piyr`suf'.pdf)
+
+    collapse (mean) tot_spend lab_spend hq_labspend nih_amt nih_active ///
+             (count) n_yrs = year (first) min_year lab_age_2014 young, by(athr_id)
+    qui count
+    local n_pis = r(N)
+    keep if nih_amt >= 10000
+    qui count
+    local n_kept = r(N)
+    di as text "consumables_intensity`suf': `n_pis' PIs -> `n_kept' above the $10k/yr NIH floor"
+    foreach v in lab_spend hq_labspend tot_spend {
+        gen double `v'_pct_nih = `v' / nih_amt * 100
+    }
+    save ../output/consumables_intensity_pis`suf', replace
+
+    cap mat drop cons_pi
+    qui count if young == 1
+    local n_young = r(N)
+    qui count if young == 0
+    local n_old = r(N)
+    foreach g in 1 0 {
+        foreach v in lab_spend hq_labspend tot_spend {
+            qui sum `v' if young == `g'
+            local num = r(sum)
+            qui sum nih_amt if young == `g'
+            local agg_`v'_`g' = `num' / r(sum) * 100
+        }
+    }
+    mat cons_pi = (`n_young', ., `n_young', `n_old', ., `n_old')
+    local rownames "n_pis"
+    foreach v in min_year n_yrs lab_spend hq_labspend tot_spend nih_amt nih_active ///
+                 lab_spend_pct_nih hq_labspend_pct_nih tot_spend_pct_nih {
+        qui sum `v' if young == 1, d
+        local y_mean = r(mean)
+        local y_p50  = r(p50)
+        local y_N    = r(N)
+        qui sum `v' if young == 0, d
+        mat cons_pi = cons_pi \ (`y_mean', `y_p50', `y_N', r(mean), r(p50), r(N))
+        local rownames "`rownames' `v'"
+    }
+    foreach v in lab_spend hq_labspend tot_spend {
+        mat cons_pi = cons_pi \ (`agg_`v'_1', ., ., `agg_`v'_0', ., .)
+        local rownames "`rownames' agg_`v'_pct_nih"
+    }
+    mat colnames cons_pi = young_mean young_p50 young_N old_mean old_p50 old_N
+    mat rownames cons_pi = `rownames'
+    qui matrix_to_txt, saving("../output/tables/consumables_intensity`suf'.txt") ///
+        matrix(cons_pi) title(<tab:consumables_intensity`suf'>) format(%14.4f) replace
+
+    kd_young_old lab_spend_pct_nih, ///
+        xtitle(Avg annual lab consumables spend as % of NIH funding, 2010-2013) ///
+        w(1) wlab("1pp") unit(PIs) fmt(%9.2f) ///
+        out(../output/figures/kd_lab_spend_pct_nih_by_age`suf'.pdf)
+    kd_young_old hq_labspend_pct_nih, ///
+        xtitle(Avg annual high-confidence lab spend as % of NIH funding, 2010-2013) ///
+        w(1) wlab("1pp") unit(PIs) fmt(%9.2f) ///
+        out(../output/figures/kd_hq_labspend_pct_nih_by_age`suf'.pdf)
+
+    gen double ln_lab_spend_pct_nih = ln(lab_spend_pct_nih) if lab_spend_pct_nih > 0
+    foreach v in lab_spend_pct_nih hq_labspend_pct_nih ln_lab_spend_pct_nih {
+        if "`v'" == "lab_spend_pct_nih"    local ytitle "Lab consumables spend as % of NIH funding"
+        if "`v'" == "hq_labspend_pct_nih"  local ytitle "High-confidence lab spend as % of NIH funding"
+        if "`v'" == "ln_lab_spend_pct_nih" local ytitle "Log lab consumables spend as % of NIH funding"
+        bs_stats, y(`v') x(lab_age_2014) ///
+            xtitle(Lab age in 2014 (yrs since first last-author pub)) ///
+            ytitle(`ytitle') ///
+            out(../output/figures/bs_`v'_by_age`suf'.pdf)
     }
 end
 
@@ -798,8 +1010,8 @@ program boe
     local q3_lab_spend : di %6.2f r(p75)
     local median_lab_spend : di %6.2f r(p50)
    tw hist lab_spend if lab_spend >50,  color(edkblue) frac width(5000) xlab(0(7500)150000, angle(45)) ///
-       xtitle("Consumables Expenditure ($)") ytitle("Fraction of PI-Years") legend(on order(- "N = `N_lab_spend'" "Mean = `mean_lab_spend'" "SD = `sd_lab_spend'" "Min = `min_lab_spend'" "Q1 = `q1_lab_spend'" "Median = `median_lab_spend'" "Q3 = `q3_lab_spend'" "Max = `max_lab_spend'") pos(1) ring(0) region(fcolor(none)) size(small))
-   graph export ../output/figures/lab_spend.pdf, replace
+       xtitle("Consumables expenditure ($)") ytitle("Fraction of PI-years") legend(on order(- "N = `N_lab_spend'" "Mean = `mean_lab_spend'" "SD = `sd_lab_spend'" "Min = `min_lab_spend'" "Q1 = `q1_lab_spend'" "Median = `median_lab_spend'" "Q3 = `q3_lab_spend'" "Max = `max_lab_spend'") pos(1) ring(0) region(fcolor(none)) size(small))
+   fig_export, path("../output/figures/lab_spend.pdf")
     sum hq_labspend if hq_labspend >50, d
     local mean_hq : di %6.2f r(mean)
     local sd_hq : di %6.2f r(sd)
@@ -810,8 +1022,8 @@ program boe
     local q3_hq : di %6.2f r(p75)
     local median_hq : di %6.2f r(p50)
    tw hist hq_labspend if hq_labspend >50 & hq_labspend <= 75000,  color(edkblue) frac width(5000) xlab(0(7500)75000, angle(45)) ///
-       xtitle("High-Confidence Consumables Expenditure ($)") ytitle("Fraction of PI-Years") legend(on order(- "N = `N_hq'" "Mean = `mean_hq'" "SD = `sd_hq'" "Min = `min_hq'" "Q1 = `q1_hq'" "Median = `median_hq'" "Q3 = `q3_hq'" "Max = `max_hq'") pos(1) ring(0) region(fcolor(none)) size(small))
-   graph export ../output/figures/hq_labspend.pdf, replace
+       xtitle("High-confidence consumables expenditure ($)") ytitle("Fraction of PI-years") legend(on order(- "N = `N_hq'" "Mean = `mean_hq'" "SD = `sd_hq'" "Min = `min_hq'" "Q1 = `q1_hq'" "Median = `median_hq'" "Q3 = `q3_hq'" "Max = `max_hq'") pos(1) ring(0) region(fcolor(none)) size(small))
+   fig_export, path("../output/figures/hq_labspend.pdf")
     collapse (mean) tot_spend nonlab_spend lab_spend hq_labspend lq_labspend perc_lab_spend perc_nonlab_spend, by(athr_id)
     sum hq_labspend if hq_labspend >50, d
     local mean_hq : di %6.2f r(mean)
@@ -823,14 +1035,14 @@ program boe
     local q3_hq : di %6.2f r(p75)
     local median_hq : di %6.2f r(p50)
    tw hist hq_labspend if hq_labspend >50 & hq_labspend <= 75000,  color(edkblue) frac width(5000) xlab(0(7500)75000, angle(45)) ///
-       xtitle("Avg Annual High-Confidence Consumables Expenditure ($)") ytitle("Fraction of PIs") legend(on order(- "N = `N_hq'" "Mean = `mean_hq'" "SD = `sd_hq'" "Min = `min_hq'" "Q1 = `q1_hq'" "Median = `median_hq'" "Q3 = `q3_hq'" "Max = `max_hq'") pos(1) ring(0) region(fcolor(none)) size(small))
-   graph export ../output/figures/hq_labspend_pi.pdf, replace
-    graph bar lab_spend nonlab_spend, over(athr_id ,sort((mean) tot_spend) descending) stack bar(1, color(lavender%70)) bar(2, color(dkorange%70)) legend(on order(- "Lab Spend" - "Non-Lab Spend") pos(1) ring(0) size(small) region(fcolor(none))) ytitle("Average Annual Spend ($)") plotregion(margin(sides))
-    graph export ../output/figures/avg_spend_by_athr.pdf, replace
+       xtitle("Avg annual high-confidence consumables expenditure ($)") ytitle("Fraction of PIs") legend(on order(- "N = `N_hq'" "Mean = `mean_hq'" "SD = `sd_hq'" "Min = `min_hq'" "Q1 = `q1_hq'" "Median = `median_hq'" "Q3 = `q3_hq'" "Max = `max_hq'") pos(1) ring(0) region(fcolor(none)) size(small))
+   fig_export, path("../output/figures/hq_labspend_pi.pdf")
+    graph bar lab_spend nonlab_spend, over(athr_id ,sort((mean) tot_spend) descending) stack bar(1, color(lavender%70)) bar(2, color(dkorange%70)) legend(on order(- "Lab spend" - "Non-lab spend") pos(1) ring(0) size(small) region(fcolor(none))) ytitle("Average annual spend ($)") plotregion(margin(sides))
+    fig_export, path("../output/figures/avg_spend_by_athr.pdf")
    kdensity perc_lab_spend
-   graph export ../output/figures/perc_lab_spend.pdf, replace
+   fig_export, path("../output/figures/perc_lab_spend.pdf")
    kdensity perc_nonlab_spend
-   graph export ../output/figures/perc_nonlab_spend.pdf, replace
+   fig_export, path("../output/figures/perc_nonlab_spend.pdf")
    bs_stats, y(perc_lab_spend) x(lab_spend) ///
        ytitle(Lab share of spend (%)) xtitle(Avg annual lab spend ($)) ///
        out(../output/figures/bs_perc_lab_spend_by_lab_spend.pdf)

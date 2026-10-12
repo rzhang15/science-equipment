@@ -4,6 +4,42 @@ capture log close
 program drop _all
 set scheme modern
 preliminaries
+
+global PRES_SCALE 1.2
+
+cap program drop fig_export
+program fig_export
+    syntax, path(string) [mode(string) xsize(real 6) ysize(real 4)]
+    local p : subinstr local path "/paper/" "/", all
+    local p : subinstr local p "/pres/" "/", all
+    local k = strpos("`p'", "figures/")
+    if `k' > 0 {
+        local base = substr("`p'", 1, `k' + 7)
+        local rest = substr("`p'", `k' + 8, .)
+    }
+    else {
+        local slash = strrpos("`p'", "/")
+        local base = substr("`p'", 1, `slash')
+        local rest = substr("`p'", `slash' + 1, .)
+    }
+    local tscale = cond(`xsize' >= `ysize', (2/3) * `xsize' / min(`xsize', `ysize'), 1)
+    if "`mode'" == "presentation" local mode pres
+    foreach m in paper pres {
+        if "`mode'" != "" & "`mode'" != "`m'" continue
+        local dir "`base'`m'"
+        cap mkdir "`dir'"
+        local sub "`rest'"
+        while strpos("`sub'", "/") > 0 {
+            local seg = substr("`sub'", 1, strpos("`sub'", "/") - 1)
+            local dir "`dir'/`seg'"
+            cap mkdir "`dir'"
+            local sub = substr("`sub'", strpos("`sub'", "/") + 1, .)
+        }
+        local s = cond("`m'" == "pres", `tscale' * $PRES_SCALE, `tscale')
+        graph display, scale(`s')
+        graph export "`base'`m'/`rest'", replace
+    }
+end
 version 17
 
 *  EXPOSURE_VERSION : hc | all | treated_hc
@@ -294,13 +330,13 @@ program cont_es
        scatter b rel, mcolor(ebblue) msize(small) || ///
        scatteri `ymax' -0.25 `ymax' 0.25, bcolor(gs12%30) recast(area) base(`ymin') ///
        xlab(`xmin'(1)`xmax', labsize(small)) ///
-       xtitle("Years Relative to 2014", size(small)) ///
-       ytitle("Coefficient on Year {&times} Exposure", size(small)) ///
+       xtitle("Years relative to 2014", size(medsmall)) ///
+       ytitle("Coefficient on year {&times} exposure", size(medsmall)) ///
        ylab(, labsize(small)) ///
        yline(0, lcolor(gs10) lpattern(solid)) ///
        title("`ytit'", size(small)) ///
        legend(off) plotregion(margin(sides))
-    graph export ../output/figures/es/es_`yvar'_`spec'.pdf, replace
+    fig_export, path("../output/figures/es/es_`yvar'_`spec'.pdf")
     restore
 end
 
@@ -498,9 +534,9 @@ program uc_es
             local xmin = r(min)
             local xmax = r(max)
 
-            local ytitle = cond("`series'"=="exp", "Coefficient on Year {&times} Exposure (Control Cells)", ///
-                          cond("`series'"=="tr",  "Coefficient on Year {&times} Treated", ///
-                                                  "Coefficient on Year {&times} Exposure {&times} Treated"))
+            local ytitle = cond("`series'"=="exp", "Coefficient on year {&times} exposure (control cells)", ///
+                          cond("`series'"=="tr",  "Coefficient on year {&times} treated", ///
+                                                  "Coefficient on year {&times} exposure {&times} treated"))
 
             _pretty_label, name(`yvar')
             local ttit "`r(label)'"
@@ -509,13 +545,13 @@ program uc_es
                scatter b rel, mcolor(ebblue) msize(small) || ///
                scatteri `ymax' -0.25 `ymax' 0.25, bcolor(gs12%30) recast(area) base(`ymin') ///
                xlab(`xmin'(1)`xmax', labsize(small)) ///
-               xtitle("Years Relative to 2014", size(small)) ///
-               ytitle("`ytitle'", size(small)) ///
+               xtitle("Years relative to 2014", size(medsmall)) ///
+               ytitle("`ytitle'", size(medsmall)) ///
                ylab(, labsize(small)) ///
                yline(0, lcolor(gs10) lpattern(solid)) ///
                title("`ttit'", size(small)) ///
                legend(off) plotregion(margin(sides))
-            graph export ../output/figures/es/es_uc_`yvar'_`series'_`spec'.pdf, replace
+            fig_export, path("../output/figures/es/es_uc_`yvar'_`series'_`spec'.pdf")
         }
         restore
     }
@@ -586,7 +622,7 @@ program _bin_did
                    pos(7) ring(1) size(small) region(lwidth(none))) ///
             plotregion(margin(sides))
     }
-    graph export `outfile', replace
+    fig_export, path("`outfile'")
     restore
 end
 
@@ -742,13 +778,13 @@ program hi_ctrl_uc_es_inner
        scatter b rel, mcolor(ebblue) msize(small) || ///
        scatteri `ymax' -0.25 `ymax' 0.25, bcolor(gs12%30) recast(area) base(`ymin') ///
        xlab(`xmin'(1)`xmax', labsize(small)) ///
-       xtitle("Years Relative to 2014", size(small)) ///
-       ytitle("Coefficient on Year {&times} Exposure", size(small)) ///
+       xtitle("Years relative to 2014", size(medsmall)) ///
+       ytitle("Coefficient on year {&times} exposure", size(medsmall)) ///
        ylab(, labsize(small)) ///
        yline(0, lcolor(gs10) lpattern(solid)) ///
        title("`ttit'", size(small)) ///
        legend(off) plotregion(margin(sides))
-    graph export ../output/figures/es/es_hi_ctrl_uc_`yvar'_`spec'.pdf, replace
+    fig_export, path("../output/figures/es/es_hi_ctrl_uc_`yvar'_`spec'.pdf")
     restore
 end
 

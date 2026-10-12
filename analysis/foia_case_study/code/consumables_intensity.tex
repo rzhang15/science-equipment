@@ -1,0 +1,68 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1.1in]{geometry}
+\usepackage{amsmath, amssymb, booktabs}
+
+\begin{document}
+
+\begin{table}[htbp]
+\centering
+\caption{Consumables intensity by career stage: lab consumables spending relative to NIH funding, 2010--2013}
+\label{tab:consumables_intensity}
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+ & Early-career & Late-career & Difference & $p$-value \\
+\midrule
+\multicolumn{5}{@{}l}{\textit{Panel A. PI level (averages over 2010--2013)}} \\
+\addlinespace
+Lab consumables spend / NIH funding (\%), mean   & 7.1  & 5.7  & 1.4  & 0.25 \\
+\quad median                                      & 7.3  & 4.7  &      &      \\
+\quad pooled (sum of spend / sum of NIH)          & 6.2  & 4.8  &      &      \\
+High-confidence lab spend / NIH funding (\%), mean & 4.2  & 3.4  & 0.8  & 0.27 \\
+\quad pooled                                      & 3.7  & 2.8  &      &      \\
+Total FOIA spend / NIH funding (\%), mean         & 12.9 & 9.1  &      &      \\
+\addlinespace
+Avg.\ annual lab consumables spend (\$)           & 22,799  & 27,136  &      &      \\
+Avg.\ annual NIH funding (\$)                     & 365,080 & 569,530 &      &      \\
+Median first last-author year                     & 2006    & 1991    &      &      \\
+PIs                                               & 25      & 29      &      &      \\
+\midrule
+\multicolumn{5}{@{}l}{\textit{Panel B. PI-year level}} \\
+\addlinespace
+Lab consumables spend / NIH funding (\%), mean   & 6.4  & 5.5  & 0.9  & 0.41 \\
+\quad median                                      & 5.2  & 4.4  &      &      \\
+\quad pooled (sum of spend / sum of NIH)          & 6.0  & 4.7  &      &      \\
+High-confidence lab spend / NIH funding (\%), mean & 3.8  & 3.3  & 0.5  & 0.43 \\
+\addlinespace
+PI-years with positive NIH funding                & 74   & 105  &      &      \\
+PI-years with zero NIH funding                    & 20   & 15   &      &      \\
+PIs                                               & 28   & 32   &      &      \\
+\bottomrule
+\end{tabular}
+\par\vspace{0.5em}
+\begin{minipage}{\textwidth}
+\footnotesize
+\textit{Notes:} The sample is the FOIA PIs in the main analysis sample
+(all journals, rounds 1 and 2) with procurement records in 2010--2013 who are
+matched to an NIH RePORTER PI (60 of 77). Lab consumables spend is annual FOIA
+procurement spending in categories classified as lab consumables; the
+high-confidence measure keeps only categories whose classifier passes the
+precision and recall thresholds used in the first stage. NIH funding is the
+sum of total costs across the PI's active RePORTER projects in the fiscal
+year. Career stage splits PIs at the sample median year of first last-author
+publication (2000); early-career PIs are those whose first last-author
+publication is after 2000. Panel A averages each PI's spend and NIH funding
+over 2010--2013 and reports the ratio of the averages; PIs averaging under
+\$10,000 of NIH funding per year are dropped (54 of 60 remain). Panel B uses
+PI-years with positive NIH funding. The pooled rows divide the group's total
+spend by its total NIH funding. $p$-values are from a two-sided $t$-test of
+the early--late difference, clustered by PI in Panel B; Kolmogorov--Smirnov
+tests of the distributions give $p = 0.32$ (Panel A) and $p = 0.11$ (Panel B).
+Regressing the PI-level intensity on lab age (2014 minus first last-author
+year) gives a slope of $-0.11$ percentage points per year (robust SE $0.05$,
+$N = 54$). This is a check on consumables intensity, not a budget constraint:
+NIH funding understates total research resources, so the ratios are intensity
+measures rather than budget shares.
+\end{minipage}
+\end{table}
+
+\end{document}

@@ -4,6 +4,42 @@ capture log close
 program drop _all
 set scheme modern
 preliminaries
+
+global PRES_SCALE 1.2
+
+cap program drop fig_export
+program fig_export
+    syntax, path(string) [mode(string) xsize(real 6) ysize(real 4)]
+    local p : subinstr local path "/paper/" "/", all
+    local p : subinstr local p "/pres/" "/", all
+    local k = strpos("`p'", "figures/")
+    if `k' > 0 {
+        local base = substr("`p'", 1, `k' + 7)
+        local rest = substr("`p'", `k' + 8, .)
+    }
+    else {
+        local slash = strrpos("`p'", "/")
+        local base = substr("`p'", 1, `slash')
+        local rest = substr("`p'", `slash' + 1, .)
+    }
+    local tscale = cond(`xsize' >= `ysize', (2/3) * `xsize' / min(`xsize', `ysize'), 1)
+    if "`mode'" == "presentation" local mode pres
+    foreach m in paper pres {
+        if "`mode'" != "" & "`mode'" != "`m'" continue
+        local dir "`base'`m'"
+        cap mkdir "`dir'"
+        local sub "`rest'"
+        while strpos("`sub'", "/") > 0 {
+            local seg = substr("`sub'", 1, strpos("`sub'", "/") - 1)
+            local dir "`dir'/`seg'"
+            cap mkdir "`dir'"
+            local sub = substr("`sub'", strpos("`sub'", "/") + 1, .)
+        }
+        local s = cond("`m'" == "pres", `tscale' * $PRES_SCALE, `tscale')
+        graph display, scale(`s')
+        graph export "`base'`m'/`rest'", replace
+    }
+end
 version 17
 
 * Borusyak-Hull-Jaravel (JEP 2025) exogenous-shifts checklist for the PI exposure design
@@ -14,6 +50,7 @@ global VERSION "hc"
 global SUF     "_all3"
 global SAMP    "all_jrnls_r1_r2"
 global N_PERM  200
+global N_STRATA 3
 
 program main
     build_shares
@@ -21,8 +58,10 @@ program main
     shift_balance
     share_timing
     unit_balance
+    shift_balance_pi
     incomplete_share
     shift_controls
+    recentered_exposure
     exposure_robust_se
     permutation_inference
     output_tables
@@ -37,6 +76,8 @@ program build_shares
     drop g_imp
     sort market_idx
     assert market_idx == _n
+    assert !mi(spend_2013)
+    xtile stratum = spend_2013, nq($N_STRATA)
     qui count
     global K = r(N)
     save ../temp/shifts, replace
@@ -157,13 +198,13 @@ program shift_descriptives
        (scatter b_eb rank_g [aw=w_k], mcolor(ebblue%70) msymbol(circle)), ///
         xtitle("Product market, ranked by shift") ytitle("Shift g{sub:k} (log price effect)") ///
         yline(0, lcolor(gs10) lpattern(dash)) legend(off) ///
-        note("Marker size proportional to importance weight s{sub:k} = mean{sub:i} s{sub:ik}", size(vsmall))
-    graph export ../output/figures/shifts_by_rank.pdf, replace
+        note("Marker size proportional to importance weight s{sub:k} = mean{sub:i} s{sub:ik}", size(small))
+    fig_export, path("../output/figures/shifts_by_rank.pdf")
 
     tw (kdensity b_eb, lcolor(ebblue)) (kdensity b_eb [aw=w_k], lcolor(dkorange)), ///
         xtitle("Shift g{sub:k}") ytitle("Density") ///
         legend(on order(1 "Unweighted" 2 "Importance-weighted (s{sub:k})") pos(1) ring(0) size(small))
-    graph export ../output/figures/shifts_density.pdf, replace
+    fig_export, path("../output/figures/shifts_density.pdf")
 end
 
 program shift_balance
@@ -195,29 +236,28 @@ program shift_balance
     mat shift_bal = J(`ncov', 6, .)
     local r = 1
     foreach v of local covs {
-        egen z_`v' = std(`v')
-        qui reg b_eb z_`v' [aw=w_k], r
-        mat shift_bal[`r',1] = _b[z_`v']
-        mat shift_bal[`r',2] = _se[z_`v']
-        mat shift_bal[`r',3] = 2 * ttail(e(df_r), abs(_b[z_`v'] / _se[z_`v']))
-        qui reg b_eb z_`v', r
-        mat shift_bal[`r',4] = _b[z_`v']
-        mat shift_bal[`r',5] = _se[z_`v']
-        mat shift_bal[`r',6] = 2 * ttail(e(df_r), abs(_b[z_`v'] / _se[z_`v']))
+        qui reg b_eb `v' [aw=w_k], r
+        mat shift_bal[`r',1] = _b[`v']
+        mat shift_bal[`r',2] = _se[`v']
+        mat shift_bal[`r',3] = 2 * ttail(e(df_r), abs(_b[`v'] / _se[`v']))
+        qui reg b_eb `v', r
+        mat shift_bal[`r',4] = _b[`v']
+        mat shift_bal[`r',5] = _se[`v']
+        mat shift_bal[`r',6] = 2 * ttail(e(df_r), abs(_b[`v'] / _se[`v']))
         local ++r
     }
     mat rownames shift_bal = `covs'
     mat colnames shift_bal = b_wt se_wt p_wt b_unwt se_unwt p_unwt
     mat list shift_bal, format(%12.4f)
 
-    qui reg b_eb z_* [aw=w_k], r
-    qui testparm z_*
+    qui reg b_eb `covs' [aw=w_k], r
+    qui testparm `covs'
     mat shift_bal_joint = J(3, 2, .)
     mat shift_bal_joint[1,1] = r(F)
     mat shift_bal_joint[2,1] = r(p)
     mat shift_bal_joint[3,1] = e(N)
-    qui reg b_eb z_*, r
-    qui testparm z_*
+    qui reg b_eb `covs', r
+    qui testparm `covs'
     mat shift_bal_joint[1,2] = r(F)
     mat shift_bal_joint[2,2] = r(p)
     mat shift_bal_joint[3,2] = e(N)
@@ -228,7 +268,7 @@ program shift_balance
     tw (scatter b_eb pre_trend [aw=w_k], mcolor(ebblue%60) msymbol(circle)) ///
        (lfit b_eb pre_trend [aw=w_k], lcolor(dkorange)), ///
         xtitle("Pre-period log price trend, 2010-2013 (per year)") ytitle("Shift g{sub:k}") legend(off)
-    graph export ../output/figures/shift_balance_pretrend.pdf, replace
+    fig_export, path("../output/figures/shift_balance_pretrend.pdf")
 end
 
 program share_timing
@@ -274,7 +314,7 @@ program share_timing
     tw (scatter ds b_eb, mcolor(ebblue%70)) (lfit ds b_eb, lcolor(dkorange)), ///
         xtitle("Shift g{sub:k}") ytitle("Mean change in spend share, post minus pre") ///
         yline(0, lcolor(gs10) lpattern(dash)) legend(off)
-    graph export ../output/figures/share_change_vs_shift.pdf, replace
+    fig_export, path("../output/figures/share_change_vs_shift.pdf")
 end
 
 program build_pi_xs
@@ -291,15 +331,13 @@ program build_pi_xs
     }
     gen team_pre = avg_team_size_last if pre
     replace foia_athr = 0 if mi(foia_athr)
-    gcollapse (mean) *_pre *_post *_early *_late team_pre ///
+    gcollapse (mean) *_pre *_post *_early *_late ///
               (first) exposure mkt_spend_shr age_2014 public nih_athr foia_athr, by(athr_id)
     foreach v in ppr_cnt cite_affl_wt {
         gen `v'_dy       = `v'_post - `v'_pre
         gen `v'_pretrend = `v'_late - `v'_early
     }
     rename (exposure mkt_spend_shr) (z S)
-    qui sum z
-    gen z_sd = z / r(sd)
     save ../temp/pi_xs_full, replace
 end
 
@@ -322,24 +360,97 @@ program unit_balance
     local r = 1
     foreach v of local chars {
         use ../temp/pi_xs_full, clear
-        keep athr_id z_sd S `v'
+        keep athr_id z S `v'
         drop if mi(`v')
         qui sum `v'
         mat unit_bal[`r',1] = r(mean)
-        qui reg `v' z_sd S, r
-        mat unit_bal[`r',2] = _b[z_sd]
-        mat unit_bal[`r',3] = _se[z_sd]
-        mat unit_bal[`r',4] = 2 * ttail(e(df_r), abs(_b[z_sd] / _se[z_sd]))
+        qui reg `v' z S, r
+        mat unit_bal[`r',2] = _b[z]
+        mat unit_bal[`r',3] = _se[z]
+        mat unit_bal[`r',4] = 2 * ttail(e(df_r), abs(_b[z] / _se[z]))
         mat unit_bal[`r',7] = e(N)
-        shift_level_reg `v' z_sd
-        mat unit_bal[`r',5] = _se[z_sd]
-        mat unit_bal[`r',6] = 2 * normal(-abs(_b[z_sd] / _se[z_sd]))
-        di as text "unit_balance `v': unit-level b=" %8.4f unit_bal[`r',2] "  shift-level b=" %8.4f _b[z_sd]
+        shift_level_reg `v' z
+        mat unit_bal[`r',5] = _se[z]
+        mat unit_bal[`r',6] = 2 * normal(-abs(_b[z] / _se[z]))
+        di as text "unit_balance `v': unit-level b=" %8.4f unit_bal[`r',2] "  shift-level b=" %8.4f _b[z]
         local ++r
     }
     mat rownames unit_bal = `chars'
-    mat colnames unit_bal = mean b_per_sd_z se_robust p_robust se_exposure_robust p_exposure_robust N
+    mat colnames unit_bal = mean b_exposure se_robust p_robust se_exposure_robust p_exposure_robust N
     mat list unit_bal, format(%12.4f)
+end
+
+program shift_balance_pi
+    use ../temp/pi_xs_full, clear
+    foreach v in ppr_cnt cite_affl_wt {
+        gen `v'_prelgr = log(1 + `v'_late) - log(1 + `v'_early)
+    }
+    save ../temp/pi_xs_full, replace
+
+    local covs ppr_cnt_pretrend cite_affl_wt_pretrend ppr_cnt_prelgr cite_affl_wt_prelgr
+    keep athr_id S `covs'
+    foreach v of local covs {
+        drop if mi(`v')
+    }
+    qui count
+    local n_pis = r(N)
+    ssaggregate `covs', n(category) s(s) l(athr_id) sfilename(../temp/pi_market_shares) controls("S")
+    merge 1:1 category using ../temp/shifts, assert(2 3) keep(3) keepusing(b_eb) nogen
+    egen hhi_s = total(s_n^2)
+    local eff_k = 1 / hhi_s[1]
+    local k_used = _N
+    save ../temp/shift_bal_pi, replace
+    di as text "shift_balance_pi: `k_used' markets, effective number of shocks = " %6.2f `eff_k' ", `n_pis' PIs"
+
+    local ncov : word count `covs'
+    mat shift_bal_pi = J(`ncov', 7, .)
+    local r = 1
+    foreach v of local covs {
+        qui sum `v'
+        mat shift_bal_pi[`r',7] = r(sd)
+        qui reg b_eb `v' [aw=s_n], r
+        mat shift_bal_pi[`r',1] = _b[`v']
+        mat shift_bal_pi[`r',2] = _se[`v']
+        mat shift_bal_pi[`r',3] = 2 * ttail(e(df_r), abs(_b[`v'] / _se[`v']))
+        qui reg b_eb `v', r
+        mat shift_bal_pi[`r',4] = _b[`v']
+        mat shift_bal_pi[`r',5] = _se[`v']
+        mat shift_bal_pi[`r',6] = 2 * ttail(e(df_r), abs(_b[`v'] / _se[`v']))
+        local ++r
+    }
+    mat rownames shift_bal_pi = `covs'
+    mat colnames shift_bal_pi = b_wt se_wt p_wt b_unwt se_unwt p_unwt sd_x
+    mat list shift_bal_pi, format(%12.4f)
+
+    mat shift_bal_pi_joint = J(5, 2, .)
+    qui reg b_eb `covs' [aw=s_n], r
+    qui testparm `covs'
+    mat shift_bal_pi_joint[1,1] = r(F)
+    mat shift_bal_pi_joint[2,1] = r(p)
+    qui reg b_eb `covs', r
+    qui testparm `covs'
+    mat shift_bal_pi_joint[1,2] = r(F)
+    mat shift_bal_pi_joint[2,2] = r(p)
+    mat shift_bal_pi_joint[3,1] = `k_used'
+    mat shift_bal_pi_joint[3,2] = `k_used'
+    mat shift_bal_pi_joint[4,1] = `eff_k'
+    mat shift_bal_pi_joint[4,2] = `eff_k'
+    mat shift_bal_pi_joint[5,1] = `n_pis'
+    mat shift_bal_pi_joint[5,2] = `n_pis'
+    mat rownames shift_bal_pi_joint = F p K eff_K n_pis
+    mat colnames shift_bal_pi_joint = weighted unweighted
+    mat list shift_bal_pi_joint, format(%12.4f)
+
+    local lab_ppr_cnt      "publications"
+    local lab_cite_affl_wt "citation-weighted publications"
+    foreach v in ppr_cnt cite_affl_wt {
+        tw (scatter b_eb `v'_pretrend [aw=s_n], mcolor(ebblue%60) msymbol(circle)) ///
+           (lfit b_eb `v'_pretrend [aw=s_n], lcolor(dkorange)), ///
+            xtitle("Exposure-weighted pre-period growth in `lab_`v'', 2012-13 minus 2010-11") ///
+            ytitle("Shift g{sub:k}") yline(0, lcolor(gs10) lpattern(dash)) legend(off) ///
+            note("Market-level average of PI growth weighted by s{sub:ik}, residualized on S{sub:i}; marker size proportional to s{sub:k}", size(small))
+        fig_export, path("../output/figures/shift_balance_pi_`v'.pdf")
+    }
 end
 
 program run_ppml, rclass
@@ -436,6 +547,44 @@ program shift_controls
     }
 end
 
+program recentered_exposure
+    use ../temp/pi_market_shares, clear
+    merge m:1 category using ../temp/shifts, assert(2 3) keep(3) keepusing(stratum) nogen
+    gcollapse (sum) s, by(athr_id stratum)
+    reshape wide s, i(athr_id) j(stratum)
+    forval q = 1/$N_STRATA {
+        cap gen s`q' = 0
+        replace s`q' = 0 if mi(s`q')
+        rename s`q' S_strat`q'
+    }
+    save ../temp/pi_stratum_shares, replace
+
+    use ../external/rf/prepped_samples/es_$SAMP, clear
+    merge m:1 athr_id using ../temp/pi_stratum_shares, assert(3) nogen
+    gen post       = year >= 2014
+    gen Z_it       = exposure * post
+    gen Z_share_it = mkt_spend_shr * post
+    local strat_ctrl ""
+    forval q = 1/$N_STRATA {
+        gen Zs`q'_it = S_strat`q' * post
+        local strat_ctrl `strat_ctrl' Zs`q'_it
+    }
+    foreach yvar in ppr_cnt cite_affl_wt {
+        mat recenter_`yvar' = J(3, 2, .)
+        run_ppml `yvar' Z_it Z_share_it, absorb(athr_id year) cl(athr_id)
+        mat recenter_`yvar'[1,1] = r(b)
+        mat recenter_`yvar'[2,1] = r(se)
+        mat recenter_`yvar'[3,1] = r(N)
+        run_ppml `yvar' Z_it `strat_ctrl', absorb(athr_id year) cl(athr_id)
+        mat recenter_`yvar'[1,2] = r(b)
+        mat recenter_`yvar'[2,2] = r(se)
+        mat recenter_`yvar'[3,2] = r(N)
+        mat rownames recenter_`yvar' = b_exposure se_exposure N
+        mat colnames recenter_`yvar' = sum_of_shares stratum_shares
+        mat list recenter_`yvar', format(%12.4f)
+    }
+end
+
 program exposure_robust_se
     foreach yvar in ppr_cnt cite_affl_wt {
         use ../external/rf/prepped_samples/es_$SAMP, clear
@@ -474,37 +623,47 @@ program exposure_robust_se
         tw (scatter `yvar'_dy b_eb if category != "" [aw=s_n], mcolor(ebblue%60) msymbol(circle)) ///
            (lfit `yvar'_dy b_eb if category != "" [aw=s_n], lcolor(dkorange)), ///
             xtitle("Shift g{sub:k}") ytitle("Exposure-weighted change in `yvar' (residualized on S{sub:i})") ///
-            legend(off) note("Marker size proportional to s{sub:k}; missing-industry observation omitted from plot", size(vsmall))
-        graph export ../output/figures/shift_level_rf_`yvar'.pdf, replace
+            legend(off) note("Marker size proportional to s{sub:k}; missing-industry observation omitted from plot", size(small))
+        fig_export, path("../output/figures/shift_level_rf_`yvar'.pdf")
     }
 end
 
 program permutation_inference
-    use athr_id year ppr_cnt cite_affl_wt exposure mkt_spend_shr using ../external/rf/prepped_samples/es_$SAMP, clear
-    gen post       = year >= 2014
-    gen Z_it       = exposure * post
-    gen Z_share_it = mkt_spend_shr * post
+    use athr_id year ppr_cnt cite_affl_wt exposure using ../external/rf/prepped_samples/es_$SAMP, clear
+    merge m:1 athr_id using ../temp/pi_stratum_shares, assert(3) nogen
+    gen post = year >= 2014
+    gen Z_it = exposure * post
+    local strat_ctrl ""
+    forval q = 1/$N_STRATA {
+        gen Zs`q'_it = S_strat`q' * post
+        local strat_ctrl `strat_ctrl' Zs`q'_it
+    }
     merge m:1 athr_id using ../temp/pi_market_shares_wide, assert(3) nogen
     save ../temp/perm_panel, replace
 
-    use market_idx b_eb using ../temp/shifts, clear
-    sort market_idx
-    mkmat b_eb, matrix(G)
+    use market_idx b_eb stratum using ../temp/shifts, clear
+    sort stratum market_idx
+    by stratum: gen j = _n
+    keep stratum j b_eb
+    rename b_eb g_perm
+    save ../temp/perm_lookup, replace
 
     foreach yvar in ppr_cnt cite_affl_wt {
         use ../temp/perm_panel, clear
-        ppmlhdfe `yvar' Z_it Z_share_it, absorb(athr_id year) vce(cluster athr_id)
+        ppmlhdfe `yvar' Z_it `strat_ctrl', absorb(athr_id year) vce(cluster athr_id)
         local b_hat  = _b[Z_it]
         local se_hat = _se[Z_it]
+        local t_hat  = `b_hat' / `se_hat'
 
         set seed 8975
         cap postutil clear
-        postfile perm_h int(draw) double(b) using ../temp/perm_`yvar', replace
+        postfile perm_h int(draw) double(b se) using ../temp/perm_`yvar', replace
         forval d = 1/$N_PERM {
-            use market_idx using ../temp/shifts, clear
+            use market_idx stratum using ../temp/shifts, clear
             gen u = runiform()
-            sort u
-            gen g_perm = G[_n, 1]
+            sort stratum u
+            by stratum: gen j = _n
+            merge 1:1 stratum j using ../temp/perm_lookup, assert(3) nogen
             sort market_idx
             forval k = 1/$K {
                 local gp`k' = g_perm[`k']
@@ -515,39 +674,51 @@ program permutation_inference
                 replace z_perm = z_perm + s`k' * `gp`k''
             }
             gen Zp_it = z_perm * post
-            cap qui ppmlhdfe `yvar' Zp_it Z_share_it, absorb(athr_id year)
-            if !_rc post perm_h (`d') (_b[Zp_it])
+            cap qui ppmlhdfe `yvar' Zp_it `strat_ctrl', absorb(athr_id year) vce(cluster athr_id)
+            if !_rc post perm_h (`d') (_b[Zp_it]) (_se[Zp_it])
             if mod(`d', 25) == 0 di as text "permutation_inference `yvar': draw `d' of $N_PERM"
         }
         postclose perm_h
 
         use ../temp/perm_`yvar', clear
-        gen byte extreme = abs(b) >= abs(`b_hat')
-        qui sum extreme
-        local p_perm = r(mean)
+        gen t = b / se
+        gen byte extreme_b = abs(b) >= abs(`b_hat')
+        gen byte extreme_t = abs(t) >= abs(`t_hat')
+        qui sum extreme_b
+        local p_b = r(mean)
+        qui sum extreme_t
+        local p_t = r(mean)
         qui sum b
-        mat perm_`yvar' = J(6, 1, .)
+        local mean_b = r(mean)
+        local sd_b   = r(sd)
+        qui sum t
+        local sd_t   = r(sd)
+        mat perm_`yvar' = J(9, 1, .)
         mat perm_`yvar'[1,1] = `b_hat'
         mat perm_`yvar'[2,1] = `se_hat'
-        mat perm_`yvar'[3,1] = r(sd)
-        mat perm_`yvar'[4,1] = r(mean)
-        mat perm_`yvar'[5,1] = `p_perm'
-        mat perm_`yvar'[6,1] = r(N)
-        mat rownames perm_`yvar' = b_hat se_cluster_pi sd_perm mean_perm p_perm n_draws
+        mat perm_`yvar'[3,1] = `t_hat'
+        mat perm_`yvar'[4,1] = `mean_b'
+        mat perm_`yvar'[5,1] = `sd_b'
+        mat perm_`yvar'[6,1] = `sd_t'
+        mat perm_`yvar'[7,1] = `p_b'
+        mat perm_`yvar'[8,1] = `p_t'
+        mat perm_`yvar'[9,1] = r(N)
+        mat rownames perm_`yvar' = b_recentered se_cluster_pi t_recentered mean_perm_b sd_perm_b sd_perm_t p_perm_b p_perm_t n_draws
         mat colnames perm_`yvar' = value
         mat list perm_`yvar', format(%12.5f)
 
-        hist b, color(ebblue%70) lcolor(white) xline(`b_hat', lcolor(dkorange) lpattern(dash) lwidth(medthick)) ///
-            xtitle("PPML coefficient on permuted exposure x post") ytitle("Density") ///
-            note("Shifts g{sub:k} permuted across the $K markets, shares held fixed; dashed line = actual estimate", size(vsmall))
-        graph export ../output/figures/perm_`yvar'.pdf, replace
+        hist t, color(ebblue%70) lcolor(white) xline(`t_hat', lcolor(dkorange) lpattern(dash) lwidth(medthick)) ///
+            xtitle("t-statistic on permuted exposure x post") ytitle("Density") ///
+            note("Shifts g{sub:k} permuted within $N_STRATA strata of 2013 market spending, shares held fixed; stratum shares controlled; dashed line = actual t", size(small))
+        fig_export, path("../output/figures/perm_`yvar'.pdf")
     }
 end
 
 program output_tables
-    local mats shift_desc shift_bal shift_bal_joint share_timing unit_bal ///
+    local mats shift_desc shift_bal shift_bal_joint share_timing unit_bal shift_bal_pi shift_bal_pi_joint ///
                inc_share_ppr_cnt inc_share_cite_affl_wt ///
                shift_ctrl_ppr_cnt shift_ctrl_cite_affl_wt ///
+               recenter_ppr_cnt recenter_cite_affl_wt ///
                expo_se_ppr_cnt expo_se_cite_affl_wt ///
                perm_ppr_cnt perm_cite_affl_wt
     foreach m of local mats {

@@ -31,6 +31,46 @@ Notes:
 
 . set scheme modern
 
+. 
+. global PRES_SCALE 1.2
+
+. 
+. cap program drop fig_export
+
+. program fig_export
+  1.     syntax, path(string) [mode(string) xsize(real 6) ysize(real 4)]
+  2.     local p : subinstr local path "/paper/" "/", all
+  3.     local p : subinstr local p "/pres/" "/", all
+  4.     local k = strpos("`p'", "figures/")
+  5.     if `k' > 0 {
+  6.         local base = substr("`p'", 1, `k' + 7)
+  7.         local rest = substr("`p'", `k' + 8, .)
+  8.     }
+  9.     else {
+ 10.         local slash = strrpos("`p'", "/")
+ 11.         local base = substr("`p'", 1, `slash')
+ 12.         local rest = substr("`p'", `slash' + 1, .)
+ 13.     }
+ 14.     local tscale = cond(`xsize' >= `ysize', (2/3) * `xsize' / min(`xsize',
+>  `ysize'), 1)
+ 15.     if "`mode'" == "presentation" local mode pres
+ 16.     foreach m in paper pres {
+ 17.         if "`mode'" != "" & "`mode'" != "`m'" continue
+ 18.         local dir "`base'`m'"
+ 19.         cap mkdir "`dir'"
+ 20.         local sub "`rest'"
+ 21.         while strpos("`sub'", "/") > 0 {
+ 22.             local seg = substr("`sub'", 1, strpos("`sub'", "/") - 1)
+ 23.             local dir "`dir'/`seg'"
+ 24.             cap mkdir "`dir'"
+ 25.             local sub = substr("`sub'", strpos("`sub'", "/") + 1, .)
+ 26.         }
+ 27.         local s = cond("`m'" == "pres", `tscale' * $PRES_SCALE, `tscale')
+ 28.         graph display, scale(`s')
+ 29.         graph export "`base'`m'/`rest'", replace
+ 30.     }
+ 31. end
+
 . version 17
 
 . 
@@ -41,10 +81,10 @@ Notes:
 . local hisim_pct 50
 
 . 
-. local specs base noshare clyr hisim precision positive ols olsln
+. local specs base noshare clyr stageyr hisim precision positive ols olsln
 
 . local rows  h_top base ///
->             h_ident noshare clyr ///
+>             h_ident noshare clyr stageyr ///
 >             h_expo  hisim precision positive ///
 >             h_form  ols olsln
 
@@ -58,6 +98,8 @@ Notes:
 . local lab_noshare   "No treated-share control"
 
 . local lab_clyr      "Research cluster × year FEs"
+
+. local lab_stageyr   "Career stage × year FEs"
 
 . local lab_h_expo    "{bf:Exposure measurement}"
 
@@ -83,8 +125,10 @@ Notes:
   6.     bys athr_id: gen byte _one = _n == 1
   7.     qui _pctile max_sim if _one == 1 & foia_athr != 1, p(`=100 - `hisim'')
   8.     gen byte hisim = max_sim >= r(r1)
-  9.     drop _one
- 10. end
+  9.     qui sum min_year if _one == 1, d
+ 10.     gen byte early = min_year > r(p50) if !mi(min_year)
+ 11.     drop _one
+ 12. end
 
 . 
 . local n : word count `specs'
@@ -107,53 +151,54 @@ Notes:
  12.     local form ppml
  13.     if "`s'" == "noshare"   local ctrl ""
  14.     if "`s'" == "clyr"      local fes athr_id i.cluster_30#i.year
- 15.     if "`s'" == "hisim"     local cond hisim == 1
- 16.     if "`s'" == "precision" local wt [pw=max_sim]
- 17.     if "`s'" == "positive"  local cond exposure > 0
- 18.     if "`s'" == "ols" {
- 19.         local cmd  reghdfe
- 20.         local form ols
- 21.     }
- 22.     if "`s'" == "olsln" {
- 23.         local cmd  reghdfe
- 24.         local yvar ln_ppr_cnt
- 25.         local form olsln
- 26.     }
- 27. 
+ 15.     if "`s'" == "stageyr"   local fes athr_id i.early#i.year
+ 16.     if "`s'" == "hisim"     local cond hisim == 1
+ 17.     if "`s'" == "precision" local wt [pw=max_sim]
+ 18.     if "`s'" == "positive"  local cond exposure > 0
+ 19.     if "`s'" == "ols" {
+ 20.         local cmd  reghdfe
+ 21.         local form ols
+ 22.     }
+ 23.     if "`s'" == "olsln" {
+ 24.         local cmd  reghdfe
+ 25.         local yvar ln_ppr_cnt
+ 26.         local form olsln
+ 27.     }
+ 28. 
 .     use ../output/prepped_samples/`file', clear
- 28.     prep_panel, hisim(`hisim_pct')
- 29.     di as text _newline "robustness_summary `s': `cmd' `yvar' `xvar' `ctrl
+ 29.     prep_panel, hisim(`hisim_pct')
+ 30.     di as text _newline "robustness_summary `s': `cmd' `yvar' `xvar' `ctrl
 > ' if `cond' `wt', absorb(`fes')"
- 30.     `cmd' `yvar' `xvar' `ctrl' if `cond' `wt', absorb(`fes') vce(cluster `
+ 31.     `cmd' `yvar' `xvar' `ctrl' if `cond' `wt', absorb(`fes') vce(cluster `
 > vce')
- 31.     local b  = _b[`xvar']
- 32.     local se = _se[`xvar']
- 33.     local meanwt = cond("`wt'" != "", "[aw=max_sim]", "")
- 34.     qui sum exposure `meanwt' if e(sample)
- 35.     local xbar = r(mean)
- 36.     qui sum ppr_cnt if year < 2014 & e(sample)
- 37.     local ymn = r(mean)
- 38.     if "`form'" == "ppml" {
- 39.         local scale 1
- 40.         local decl = 100 * (1 - exp(`b'*`xbar'))
- 41.     }
- 42.     if "`form'" == "ols" {
- 43.         local scale = 1/`ymn'
- 44.         local decl = -100 * `b' * `xbar' / `ymn'
- 45.     }
- 46.     if "`form'" == "olsln" {
- 47.         local scale = (1 + `ymn')/`ymn'
- 48.         local decl = 100 * (1 - exp(`b'*`xbar')) * (1 + `ymn') / `ymn'
- 49.     }
- 50.     mat rs[`i',1] = `b'
- 51.     mat rs[`i',2] = `se'
- 52.     mat rs[`i',3] = `b'*`scale'
- 53.     mat rs[`i',4] = `se'*`scale'
- 54.     mat rs[`i',5] = `decl'
- 55.     mat rs[`i',6] = `xbar'
- 56.     mat rs[`i',7] = `ymn'
- 57.     mat rs[`i',8] = e(N)
- 58. }
+ 32.     local b  = _b[`xvar']
+ 33.     local se = _se[`xvar']
+ 34.     local meanwt = cond("`wt'" != "", "[aw=max_sim]", "")
+ 35.     qui sum exposure `meanwt' if e(sample)
+ 36.     local xbar = r(mean)
+ 37.     qui sum ppr_cnt if year < 2014 & e(sample)
+ 38.     local ymn = r(mean)
+ 39.     if "`form'" == "ppml" {
+ 40.         local scale 1
+ 41.         local decl = 100 * (1 - exp(`b'*`xbar'))
+ 42.     }
+ 43.     if "`form'" == "ols" {
+ 44.         local scale = 1/`ymn'
+ 45.         local decl = -100 * `b' * `xbar' / `ymn'
+ 46.     }
+ 47.     if "`form'" == "olsln" {
+ 48.         local scale = (1 + `ymn')/`ymn'
+ 49.         local decl = 100 * (1 - exp(`b'*`xbar')) * (1 + `ymn') / `ymn'
+ 50.     }
+ 51.     mat rs[`i',1] = `b'
+ 52.     mat rs[`i',2] = `se'
+ 53.     mat rs[`i',3] = `b'*`scale'
+ 54.     mat rs[`i',4] = `se'*`scale'
+ 55.     mat rs[`i',5] = `decl'
+ 56.     mat rs[`i',6] = `xbar'
+ 57.     mat rs[`i',7] = `ymn'
+ 58.     mat rs[`i',8] = e(N)
+ 59. }
 
 robustness_summary base: ppmlhdfe ppr_cnt Z_it Zs_it if 1 , absorb(athr_id year
 > )
@@ -298,6 +343,55 @@ Absorbed degrees of freedom:
            athr_id |     13515       13515           0    *|
    cluster_30#year |       250           1         249     |
 -----------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+robustness_summary stageyr: ppmlhdfe ppr_cnt Z_it Zs_it if 1 , absorb(athr_id i
+> .early#i.year)
+Iteration 1:   deviance = 1.5052e+05  eps = .         iters = 4    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.56  P   
+Iteration 2:   deviance = 1.4637e+05  eps = 2.84e-02  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.88      
+Iteration 3:   deviance = 1.4633e+05  eps = 2.50e-04  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.94      
+Iteration 4:   deviance = 1.4633e+05  eps = 2.23e-07  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.94      
+Iteration 5:   deviance = 1.4633e+05  eps = 1.02e-11  iters = 2    tol = 1.0e-0
+> 5                                                                            
+>    min(eta) =  -1.94   S O
+-------------------------------------------------------------------------------
+> -----------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon 
+> below tolerance)
+Converged in 5 iterations and 12 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =    135,150
+Absorbing 2 HDFE groups                           Residual df     =     13,514
+Statistics robust to heteroskedasticity           Wald chi2(2)    =       7.99
+Deviance             =  146329.0555               Prob > chi2     =     0.0184
+Log pseudolikelihood = -203428.4496               Pseudo R2       =     0.1959
+
+Number of clusters (athr_id)=     13,515
+                           (Std. err. adjusted for 13,515 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+        Z_it |  -.4725446   .1705935    -2.77   0.006    -.8069018   -.1381875
+       Zs_it |   -.013646   .0517791    -0.26   0.792    -.1151312    .0878392
+       _cons |   .7824208   .0073698   106.17   0.000     .7679763    .7968652
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+      athr_id |     13515       13515           0    *|
+   early#year |        20           1          19     |
+------------------------------------------------------+
 * = FE nested within cluster; treated as redundant for DoF computation
 
 robustness_summary hisim: ppmlhdfe ppr_cnt Z_it Zs_it if hisim == 1 , absorb(at
@@ -518,11 +612,12 @@ Absorbed degrees of freedom:
 
 . mat list rs, format(%9.4f)
 
-rs[8,8]
+rs[9,8]
                       b            se    elasticity  se_elastic~y
      base       -0.4210        0.1717       -0.4210        0.1717
   noshare       -0.4166        0.1712       -0.4166        0.1712
      clyr       -0.4034        0.2085       -0.4034        0.2085
+  stageyr       -0.4725        0.1706       -0.4725        0.1706
     hisim       -0.4193        0.2110       -0.4193        0.2110
 precision       -0.2725        0.1773       -0.2725        0.1773
  positive       -0.2519        0.2483       -0.2519        0.2483
@@ -533,6 +628,7 @@ precision       -0.2725        0.1773       -0.2725        0.1773
      base        1.1891        0.0284        2.1616      1.35e+05
   noshare        1.1768        0.0284        2.1616      1.35e+05
      clyr        1.1398        0.0284        2.1616      1.35e+05
+  stageyr        1.3338        0.0284        2.1616      1.35e+05
     hisim        1.0764        0.0258        2.4265      6.80e+04
 precision        0.7462        0.0275        2.1616      1.35e+05
  positive        0.8574        0.0342        2.1641      1.21e+05
@@ -554,12 +650,12 @@ precision        0.7462        0.0275        2.1616      1.35e+05
 . clear
 
 . svmat double rs, names(col)
-number of observations will be reset to 8
+number of observations will be reset to 9
 Press any key to continue, or Break to abort
-Number of observations (_N) was 0, now 8.
+Number of observations (_N) was 0, now 9.
 
 . gen spec = ""
-(8 missing values generated)
+(9 missing values generated)
 
 . forval i = 1/`n' {
   2.     replace spec = "`: word `i' of `specs''" if _n == `i'
@@ -567,6 +663,7 @@ Number of observations (_N) was 0, now 8.
 variable spec was str1 now str4
 (1 real change made)
 variable spec was str4 now str7
+(1 real change made)
 (1 real change made)
 (1 real change made)
 (1 real change made)
@@ -585,16 +682,16 @@ file ../temp/robust_summary_r1_r2.dta saved
 . local nrows : word count `rows'
 
 . set obs `nrows'
-Number of observations (_N) was 0, now 12.
+Number of observations (_N) was 0, now 13.
 
 . gen spec = ""
-(12 missing values generated)
+(13 missing values generated)
 
 . gen double y = .
-(12 missing values generated)
+(13 missing values generated)
 
 . gen lab = ""
-(12 missing values generated)
+(13 missing values generated)
 
 . local yy = 0
 
@@ -635,6 +732,9 @@ variable lab was str24 now str28
 (1 real change made)
 (1 real change made)
 (1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
 variable lab was str28 now str32
 (1 real change made)
 variable spec was str7 now str9
@@ -657,7 +757,7 @@ variable spec was str7 now str9
 . qui sum y
 
 . replace y = y - r(min) + 1
-(12 real changes made)
+(13 real changes made)
 
 . merge 1:1 spec using ../temp/robust_summary`suf', keep(1 3) nogen
 
@@ -667,7 +767,7 @@ variable spec was str7 now str9
         from master                         4  
         from using                          0  
 
-    Matched                                 8  
+    Matched                                 9  
     -----------------------------------------
 
 . sort y
@@ -734,9 +834,9 @@ variable decl_s was str4 now str27
 >      yscale(noline range(`ylo' `yhi') axis(1)) ///
 >      yscale(noline range(`ylo' `yhi') axis(2)) ///
 >      ytitle("", axis(1)) ytitle("", axis(2)) ///
->      xtitle("Output-cost elasticity (95% CI)", size(small)) ///
+>      xtitle("Output-cost elasticity (95% CI)", size(medsmall)) ///
 >      xlabel(`xmin'(0.2)`xmax', labsize(small) format(%3.1f)) ///
->      legend(off) ysize(4.5) xsize(7) plotregion(margin(l=zero r=zero b=zero t
+>      legend(off) ysize(4) xsize(6.2) plotregion(margin(l=zero r=zero b=zero t
 > =zero))
 (note:  named style cme not found in class gsize, default attributes used)
 (note:  named style o not found in class gsize, default attributes used)
@@ -753,10 +853,12 @@ variable decl_s was str4 now str27
 
 . cap mkdir ../output/figures/`samp'/robustness
 
-. graph export ../output/figures/`samp'/robustness/robust_summary`suf'.pdf, rep
-> lace
-file ../output/figures/all_jrnls/robustness/robust_summary_r1_r2.pdf saved as
-    PDF format
+. fig_export, path("../output/figures/`samp'/robustness/robust_summary`suf'.pdf
+> ") xsize(6.2) ysize(4)
+file ../output/figures/paper/all_jrnls/robustness/robust_summary_r1_r2.pdf
+    saved as PDF format
+file ../output/figures/pres/all_jrnls/robustness/robust_summary_r1_r2.pdf
+    saved as PDF format
 
 . di as text "wrote ../output/figures/`samp'/robustness/robust_summary`suf'.pdf
 > "

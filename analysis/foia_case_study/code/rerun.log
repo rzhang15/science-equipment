@@ -1,0 +1,1391 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 120,000; see help set_maxvar.
+
+. do /tmp/nih_pi_allocation_n_zmoq6m/rerun.do 
+
+. * Run from analysis/foia_case_study/code; preserves full-credit funding.
+. set more off
+
+. clear all
+
+. capture log close
+
+. log using ../output/pi_allocation_rerun.log, text replace
+-------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  /n/holylabs/pakes_lab/Lab/sci_eq/analysis/foia_case_study/code/../
+> output/pi_allocation_rerun.log
+  log type:  text
+ opened on:  10 Oct 2026, 14:02:36
+
+. use ../../../derived/nih/match_pi_athr/temp/pi_grant_long.dta, clear
+
+. assert !mi(strtrim(pi_name))
+
+. gen byte listed_pi = 1
+
+. collapse (sum) n_listed_pis=listed_pi, by(grant_id)
+
+. isid grant_id
+
+. assert n_listed_pis >= 1
+
+. tempfile counts
+
+. save `counts'
+file /tmp/St00003.000001 saved as .dta format
+
+. use ../external/nih/nih_grants_by_athr_id.dta, clear
+
+. capture drop n_listed_pis total_cost_pi
+
+. merge m:1 grant_id using `counts', keep(1 3) assert(2 3) nogen
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                           439,714  
+    -----------------------------------------
+
+. assert n_listed_pis >= 1 & !mi(n_listed_pis)
+
+. gen double total_cost_pi = total_cost / n_listed_pis
+
+. assert total_cost_pi <= total_cost if !mi(total_cost) & total_cost >= 0
+
+. assert abs(total_cost_pi*n_listed_pis-total_cost) < 0.00001 if !mi(total_cost
+> )
+
+. label var total_cost_pi "total award cost divided by all listed PIs"
+
+. label var n_listed_pis "number of nonblank PIs listed before author matching"
+
+. save ../external/nih/nih_grants_by_athr_id.dta, replace
+file ../external/nih/nih_grants_by_athr_id.dta saved
+
+. * Load program definitions without running the full analysis.
+. set more off
+
+. clear all
+
+. program drop _all
+
+. set scheme modern
+
+. preliminaries
+
+. 
+. global PRES_SCALE 1.2
+
+. 
+. cap program drop fig_export
+
+. program fig_export
+  1.     syntax, path(string) [mode(string) xsize(real 6) ysize(real 4)]
+  2.     local p : subinstr local path "/paper/" "/", all
+  3.     local p : subinstr local p "/pres/" "/", all
+  4.     local k = strpos("`p'", "figures/")
+  5.     if `k' > 0 {
+  6.         local base = substr("`p'", 1, `k' + 7)
+  7.         local rest = substr("`p'", `k' + 8, .)
+  8.     }
+  9.     else {
+ 10.         local slash = strrpos("`p'", "/")
+ 11.         local base = substr("`p'", 1, `slash')
+ 12.         local rest = substr("`p'", `slash' + 1, .)
+ 13.     }
+ 14.     local tscale = cond(`xsize' >= `ysize', (2/3) * `xsize' / min(`xsize', `ysize'), 1)
+ 15.     if "`mode'" == "presentation" local mode pres
+ 16.     foreach m in paper pres {
+ 17.         if "`mode'" != "" & "`mode'" != "`m'" continue
+ 18.         local dir "`base'`m'"
+ 19.         cap mkdir "`dir'"
+ 20.         local sub "`rest'"
+ 21.         while strpos("`sub'", "/") > 0 {
+ 22.             local seg = substr("`sub'", 1, strpos("`sub'", "/") - 1)
+ 23.             local dir "`dir'/`seg'"
+ 24.             cap mkdir "`dir'"
+ 25.             local sub = substr("`sub'", strpos("`sub'", "/") + 1, .)
+ 26.         }
+ 27.         local s = cond("`m'" == "pres", `tscale' * $PRES_SCALE, `tscale')
+ 28.         graph display, scale(`s')
+ 29.         graph export "`base'`m'/`rest'", replace
+ 30.     }
+ 31. end
+
+. version 17
+
+. 
+. program main
+  1.     boe
+  2.     gather_nih
+  3.     foreach ds in r1_r2 r1_r2_public {
+  4.         local sufopt = cond("`ds'" == "r1_r2", "", "suf(_public)")
+  5.         spend_by_age, `sufopt'
+  6.         spend_by_age_piyr, `sufopt'
+  7.         consumables_intensity, `sufopt'
+  8.         gather_pubs, `sufopt'
+  9.         foreach s in foia all {
+ 10.             nih_by_age,      samp(`s') `sufopt'
+ 11.             nih_by_age_piyr, samp(`s') `sufopt'
+ 12.             pubs_by_age,     samp(`s') `sufopt'
+ 13.             prod_per_dollar, samp(`s') `sufopt'
+ 14.         }
+ 15.     }
+ 16. end
+
+. 
+. program kd_tests, rclass
+  1.     syntax varname [, cluster(varname)]
+  2.     local v `varlist'
+  3.     if "`cluster'" == "" {
+  4.         qui ttest `v', by(young) unequal
+  5.         return scalar diff = r(mu_2) - r(mu_1)
+  6.         return scalar p_t  = r(p)
+  7.     }
+  8.     else {
+  9.         qui reg `v' young, cluster(`cluster')
+ 10.         return scalar diff = _b[young]
+ 11.         return scalar p_t  = 2 * ttail(e(df_r), abs(_b[young] / _se[young]))
+ 12.     }
+ 13.     qui ksmirnov `v', by(young)
+ 14.     return scalar p_ks = cond(mi(r(p_exact)), r(p), r(p_exact))
+ 15. end
+
+. 
+. program pfmt, rclass
+  1.     syntax anything(name=p)
+  2.     return local s = cond(`p' < 0.001, "<0.001", string(`p', "%5.3f"))
+  3. end
+
+. 
+. program kd_young_old
+  1.     syntax varname, xtitle(string) w(real) wlab(string) unit(string) ///
+>         out(string) [xcap(real -1) fmt(string) cluster(varname)]
+  2.     local v `varlist'
+  3.     if "`fmt'" == "" local fmt %9.0fc
+  4.     if `xcap' < 0 {
+  5.         qui sum `v', d
+  6.         local xcap = r(p95)
+  7.     }
+  8.     qui sum `v' if young == 1, d
+  9.     local mean_y = strtrim("`: di `fmt' r(mean)'")
+ 10.     local n_y    = r(N)
+ 11.     qui sum `v' if young == 0, d
+ 12.     local mean_o = strtrim("`: di `fmt' r(mean)'")
+ 13.     local n_o    = r(N)
+ 14. 
+.     if "`cluster'" != "" local clopt cluster(`cluster')
+ 15.     kd_tests `v', `clopt'
+ 16.     local diff = strtrim("`: di `fmt' r(diff)'")
+ 17.     local p_t  = r(p_t)
+ 18.     local p_ks = r(p_ks)
+ 19.     pfmt `p_t'
+ 20.     local pt_s `r(s)'
+ 21.     pfmt `p_ks'
+ 22.     local pks_s `r(s)'
+ 23.     if "`cluster'" != "" local ptxt "Early-career - late-career = `diff'; t-test p = `pt_s' (`cluster'-clustered); K-S p = `pks_s'"
+ 24.     else                 local ptxt "Early-career - late-career = `diff'; t-test p = `pt_s'; K-S p = `pks_s'"
+ 25.     di as text "`v': `ptxt'"
+ 26. 
+.     preserve
+ 27.     if _N < 200 qui set obs 200
+ 28.     gen _kx = `xcap' * (_n - 1) / 199 if _n <= 200
+ 29.     kdensity `v' if young == 1 & `v' <= `xcap', at(_kx) gen(_kd_y) nograph
+ 30.     kdensity `v' if young == 0 & `v' <= `xcap', at(_kx) gen(_kd_o) nograph
+ 31.     gen _kp_y = _kd_y * `w' * 100
+ 32.     gen _kp_o = _kd_o * `w' * 100
+ 33.     gen _kp_c = min(_kp_y, _kp_o)
+ 34.     tw (rarea _kp_c _kp_y _kx, color(ebblue*0.3) lwidth(none)) ///
+>        (rarea _kp_c _kp_o _kx, color(dkorange*0.3) lwidth(none)) ///
+>        (line _kp_y _kx, lcolor(ebblue)) ///
+>        (line _kp_o _kx, lcolor(dkorange)), ///
+>        xtitle("`xtitle'") ytitle("Percent of `unit' (per `wlab' bin)") ///
+>        legend(order(3 "Early-career (N=`n_y'): mean=`mean_y'" ///
+>                     4 "Late-career (N=`n_o'): mean=`mean_o'") ///
+>            pos(1) ring(0) cols(1) size(small) region(fcolor(none))) ///
+>        note("`ptxt'", size(small)) ///
+>        plotregion(margin(sides))
+ 35.     fig_export, path("`out'")
+ 36.     restore
+ 37. end
+
+. 
+. program gather_nih
+  1.     use athr_id grant_id full_project_num fy total_cost_pi project_start ///
+>         using ../external/nih/nih_grants_by_athr_id, clear
+  2.     duplicates drop athr_id grant_id, force
+  3.     gen double amt = total_cost_pi
+  4.     bys athr_id fy full_project_num: gen byte proj = _n == 1
+  5.     gen byte new_grant = proj & year(project_start) == fy
+  6.     gcollapse (sum) nih_amt        = amt ///
+>               (sum) nih_active     = proj ///
+>               (sum) nih_new_grants = new_grant, by(athr_id fy) fast
+  7.     rename fy year
+  8.     save ../temp/nih_athr_yr, replace
+  9. 
+.     keep if inrange(year, 2010, 2013)
+ 10.     preserve
+ 11.         collapse (sum) nih_amt nih_active nih_new_grants, by(athr_id)
+ 12.         gen double nih_amt_yr    = nih_amt        / 4
+ 13.         gen double nih_active_yr = nih_active     / 4
+ 14.         gen double nih_new_yr    = nih_new_grants / 4
+ 15.         keep athr_id nih_amt_yr nih_active_yr nih_new_yr
+ 16.         save ../temp/nih_pre_amt, replace
+ 17.     restore
+ 18.     bys athr_id: keep if _n == 1
+ 19.     keep athr_id
+ 20.     save ../temp/nih_pre_pis, replace
+ 21. end
+
+. 
+. program nih_by_age
+  1.     syntax, samp(string) [suf(string)]
+  2.     cap mkdir ../output/tables
+  3.     cap mkdir ../output/figures
+  4. 
+.     use ../external/pi_samp/pi_desc_all_jrnls_r1_r2`suf', clear
+  5.     keep if athr_indicator == 1
+  6.     if "`samp'" == "foia" keep if foia_athr == 1
+  7.     gen byte nih_matched = !mi(nih_pi_name)
+  8.     gen lab_age_2014 = 2014 - min_year
+  9.     keep athr_id min_year lab_age_2014 nih_matched
+ 10.     save ../temp/nih_age_pis_`samp'`suf', replace
+ 11. 
+.     use ../temp/nih_pre_amt, clear
+ 12.     merge 1:1 athr_id using ../temp/nih_age_pis_`samp'`suf', keep(2 3)
+ 13.     qui count
+ 14.     local n_pis = r(N)
+ 15.     qui count if nih_matched == 1
+ 16.     local n_match = r(N)
+ 17.     qui count if _merge == 3
+ 18.     local n_grants_pi = r(N)
+ 19.     di as text "nih_by_age `samp'`suf': `n_pis' PIs, `n_match' matched to RePORTER, " ///
+>         "`n_grants_pi' with grant records in 2010-2013"
+ 20. 
+.     qui sum min_year, d
+ 21.     local med_yr = r(p50)
+ 22.     gen young = min_year > `med_yr' if !mi(min_year)
+ 23.     di as text "nih_by_age `samp'`suf': median min_year (first last-author yr) = `med_yr' (young = after median)"
+ 24. 
+.     foreach g in 1 0 {
+ 25.         qui count if young == `g'
+ 26.         local n_samp_`g' = r(N)
+ 27.         qui count if young == `g' & nih_matched == 0
+ 28.         local n_drop_`g' = r(N)
+ 29.         qui count if young == `g' & nih_matched == 1 & _merge == 2
+ 30.         local n_nogrant_`g' = r(N)
+ 31.     }
+ 32. 
+.     keep if nih_matched == 1 & _merge == 3
+ 33.     drop _merge
+ 34.     save ../output/nih_by_age_pis_`samp'`suf', replace
+ 35. 
+.     cap mat drop nih_age
+ 36.     qui count if young == 1
+ 37.     local n_young = r(N)
+ 38.     qui count if young == 0
+ 39.     local n_old = r(N)
+ 40.     foreach g in 1 0 {
+ 41.         qui count if young == `g' & nih_amt_yr == 0
+ 42.         local n_zero_`g' = r(N)
+ 43.     }
+ 44.     mat nih_age = (`n_samp_1', ., `n_samp_1', `n_samp_0', ., `n_samp_0')
+ 45.     mat nih_age = nih_age \ (`n_drop_1', ., `n_drop_1', `n_drop_0', ., `n_drop_0')
+ 46.     mat nih_age = nih_age \ ///
+>         (`n_nogrant_1', ., `n_nogrant_1', `n_nogrant_0', ., `n_nogrant_0')
+ 47.     mat nih_age = nih_age \ (`n_young', ., `n_young', `n_old', ., `n_old')
+ 48.     mat nih_age = nih_age \ (`n_zero_1', ., `n_zero_1', `n_zero_0', ., `n_zero_0')
+ 49.     local rownames "n_pis_sample n_pis_unmatched_dropped n_pis_nopregrant_dropped"
+ 50.     local rownames "`rownames' n_pis_kept n_pis_zero_amt"
+ 51.     foreach v in min_year nih_amt_yr nih_active_yr nih_new_yr {
+ 52.         qui sum `v' if young == 1, d
+ 53.         local y_mean = r(mean)
+ 54.         local y_p50  = r(p50)
+ 55.         local y_N    = r(N)
+ 56.         qui sum `v' if young == 0, d
+ 57.         mat nih_age = nullmat(nih_age) \ ///
+>             (`y_mean', `y_p50', `y_N', r(mean), r(p50), r(N))
+ 58.         local rownames "`rownames' `v'"
+ 59.     }
+ 60.     mat colnames nih_age = young_mean young_p50 young_N old_mean old_p50 old_N
+ 61.     mat rownames nih_age = `rownames'
+ 62.     qui matrix_to_txt, saving("../output/tables/nih_by_age_`samp'`suf'.txt") ///
+>         matrix(nih_age) title(<tab:nih_by_age_`samp'`suf'>) format(%14.2f) replace
+ 63. 
+.     kd_young_old nih_amt_yr, xtitle(Avg annual NIH funding, 2010-2013 ($)) ///
+>         w(100000) wlab("$100,000") unit(PIs) ///
+>         out(../output/figures/kd_nih_amt_by_age_`samp'`suf'.pdf)
+ 64.     kd_young_old nih_active_yr, xtitle(Avg # active NIH grants per year, 2010-2013) ///
+>         w(0.5) wlab("0.5 grants") unit(PIs) fmt(%9.2f) ///
+>         out(../output/figures/kd_nih_active_by_age_`samp'`suf'.pdf)
+ 65. 
+.     bs_stats, y(nih_amt_yr) x(lab_age_2014) ///
+>         xtitle(Lab age in 2014 (yrs since first last-author pub)) ///
+>         ytitle(Avg annual NIH funding, 2010-2013 ($)) ///
+>         out(../output/figures/bs_nih_amt_by_age_`samp'`suf'.pdf)
+ 66.     bs_stats, y(nih_active_yr) x(lab_age_2014) ///
+>         xtitle(Lab age in 2014 (yrs since first last-author pub)) ///
+>         ytitle(Avg # active NIH grants per year, 2010-2013) ///
+>         out(../output/figures/bs_nih_active_by_age_`samp'`suf'.pdf)
+ 67. end
+
+. 
+. program nih_by_age_piyr
+  1.     syntax, samp(string) [suf(string)]
+  2. 
+.     use ../temp/nih_age_pis_`samp'`suf', clear
+  3.     qui sum min_year, d
+  4.     local med_yr = r(p50)
+  5.     keep if nih_matched == 1
+  6.     merge 1:1 athr_id using ../temp/nih_pre_pis, keep(3) nogen
+  7.     expand 4
+  8.     bys athr_id: gen int year = 2009 + _n
+  9.     merge 1:1 athr_id year using ../temp/nih_athr_yr, keep(1 3) nogen
+ 10.     foreach v in nih_amt nih_active nih_new_grants {
+ 11.         replace `v' = 0 if mi(`v')
+ 12.     }
+ 13. 
+.     gen young = min_year > `med_yr' if !mi(min_year)
+ 14.     egen _tag = tag(athr_id)
+ 15.     qui count if _tag & young == 1
+ 16.     local npi_y = r(N)
+ 17.     qui count if _tag & young == 0
+ 18.     local npi_o = r(N)
+ 19.     drop _tag
+ 20.     di as text "nih_by_age_piyr `samp'`suf': median min_year = `med_yr'; PIs young/old = `npi_y'/`npi_o'"
+ 21. 
+.     keep athr_id year min_year lab_age_2014 young nih_amt nih_active nih_new_grants
+ 22.     save ../output/nih_by_age_piyrs_`samp'`suf', replace
+ 23. 
+.     cap mat drop nih_age_piyr
+ 24.     qui count if young == 1
+ 25.     local nyr_y = r(N)
+ 26.     qui count if young == 0
+ 27.     local nyr_o = r(N)
+ 28.     foreach g in 1 0 {
+ 29.         qui count if young == `g' & nih_amt == 0
+ 30.         local nzero_`g' = r(N)
+ 31.     }
+ 32.     mat nih_age_piyr = (`npi_y', ., `npi_y', `npi_o', ., `npi_o')
+ 33.     mat nih_age_piyr = nih_age_piyr \ (`nyr_y', ., `nyr_y', `nyr_o', ., `nyr_o')
+ 34.     mat nih_age_piyr = nih_age_piyr \ (`nzero_1', ., `nzero_1', `nzero_0', ., `nzero_0')
+ 35.     local rownames "n_pis n_pi_yrs n_pi_yrs_zero"
+ 36.     foreach v in nih_amt nih_active nih_new_grants {
+ 37.         qui sum `v' if young == 1, d
+ 38.         local y_mean = r(mean)
+ 39.         local y_p50  = r(p50)
+ 40.         local y_N    = r(N)
+ 41.         qui sum `v' if young == 0, d
+ 42.         mat nih_age_piyr = nih_age_piyr \ ///
+>             (`y_mean', `y_p50', `y_N', r(mean), r(p50), r(N))
+ 43.         local rownames "`rownames' `v'"
+ 44.     }
+ 45.     mat colnames nih_age_piyr = young_mean young_p50 young_N old_mean old_p50 old_N
+ 46.     mat rownames nih_age_piyr = `rownames'
+ 47.     qui matrix_to_txt, saving("../output/tables/nih_by_age_piyr_`samp'`suf'.txt") ///
+>         matrix(nih_age_piyr) title(<tab:nih_by_age_piyr_`samp'`suf'>) format(%14.2f) replace
+ 48. 
+.     kd_young_old nih_amt, xtitle(Annual NIH funding ($, PI-year)) ///
+>         w(100000) wlab("$100,000") unit(PI-years) cluster(athr_id) ///
+>         out(../output/figures/kd_nih_amt_by_age_piyr_`samp'`suf'.pdf)
+ 49.     kd_young_old nih_active, xtitle(# active NIH grants (PI-year)) ///
+>         w(1) wlab("1 grant") unit(PI-years) fmt(%9.2f) cluster(athr_id) ///
+>         out(../output/figures/kd_nih_active_by_age_piyr_`samp'`suf'.pdf)
+ 50. end
+
+. 
+. program gather_pubs
+  1.     syntax [, suf(string)]
+  2.     use athr_id year min_year athr_indicator foia_athr nih_pi_name ppr_cnt_any ///
+>         pre_ppr_cnt_sum pre_ppr_cnt_avg ///
+>         using ../external/pi_samp/pi_desc_all_jrnls_r1_r2`suf', clear
+  3.     gen lab_age_2014 = 2014 - min_year
+  4.     gen pre_any = ppr_cnt_any if year < 2014
+  5.     bys athr_id: egen pre_ppr_any_sum = total(pre_any)
+  6.     bys athr_id: egen pre_ppr_any_avg = mean(pre_any)
+  7.     keep if athr_indicator == 1
+  8.     replace foia_athr = 0 if mi(foia_athr)
+  9.     gen byte nih_matched = !mi(nih_pi_name)
+ 10.     rename (pre_ppr_cnt_sum pre_ppr_cnt_avg) (pre_ppr_sum pre_ppr_avg)
+ 11.     keep athr_id min_year lab_age_2014 foia_athr nih_matched ///
+>          pre_ppr_sum pre_ppr_avg pre_ppr_any_sum pre_ppr_any_avg
+ 12.     save ../temp/pubs_pre_pis`suf', replace
+ 13. end
+
+. 
+. program pubs_by_age
+  1.     syntax, samp(string) [suf(string)]
+  2.     cap mkdir ../output/tables
+  3.     cap mkdir ../output/figures
+  4. 
+.     use ../temp/pubs_pre_pis`suf', clear
+  5.     if "`samp'" == "foia" keep if foia_athr == 1
+  6.     drop foia_athr nih_matched
+  7. 
+.     qui sum min_year, d
+  8.     local med_yr = r(p50)
+  9.     gen young = min_year > `med_yr' if !mi(min_year)
+ 10.     qui count
+ 11.     di as text "pubs_by_age `samp'`suf': `r(N)' PIs, median min_year = `med_yr' (young = after median)"
+ 12. 
+.     save ../output/pubs_by_age_pis_`samp'`suf', replace
+ 13. 
+.     cap mat drop pubs_age
+ 14.     qui count if young == 1
+ 15.     local n_young = r(N)
+ 16.     qui count if young == 0
+ 17.     local n_old = r(N)
+ 18.     mat pubs_age = (`n_young', ., `n_young', `n_old', ., `n_old')
+ 19.     local rownames "n_pis"
+ 20.     foreach v in min_year pre_ppr_sum pre_ppr_avg pre_ppr_any_sum pre_ppr_any_avg {
+ 21.         qui sum `v' if young == 1, d
+ 22.         local y_mean = r(mean)
+ 23.         local y_p50  = r(p50)
+ 24.         local y_N    = r(N)
+ 25.         qui sum `v' if young == 0, d
+ 26.         mat pubs_age = nullmat(pubs_age) \ ///
+>             (`y_mean', `y_p50', `y_N', r(mean), r(p50), r(N))
+ 27.         local rownames "`rownames' `v'"
+ 28.     }
+ 29.     mat colnames pubs_age = young_mean young_p50 young_N old_mean old_p50 old_N
+ 30.     mat rownames pubs_age = `rownames'
+ 31.     qui matrix_to_txt, saving("../output/tables/pubs_by_age_`samp'`suf'.txt") ///
+>         matrix(pubs_age) title(<tab:pubs_by_age_`samp'`suf'>) format(%14.2f) replace
+ 32. 
+.     kd_young_old pre_ppr_sum, xtitle(Total pubs 2010-2013) ///
+>         w(2) wlab("2 pubs") unit(PIs) fmt(%9.1f) ///
+>         out(../output/figures/kd_pre_ppr_sum_by_age_`samp'`suf'.pdf)
+ 33.     kd_young_old pre_ppr_avg, xtitle(Avg pubs per year, 2010-2013) ///
+>         w(0.5) wlab("0.5 pubs") unit(PIs) fmt(%9.2f) ///
+>         out(../output/figures/kd_pre_ppr_avg_by_age_`samp'`suf'.pdf)
+ 34.     kd_young_old pre_ppr_any_sum, xtitle(Total pubs 2010-2013 (any position)) ///
+>         w(5) wlab("5 pubs") unit(PIs) fmt(%9.1f) ///
+>         out(../output/figures/kd_pre_ppr_any_sum_by_age_`samp'`suf'.pdf)
+ 35.     kd_young_old pre_ppr_any_avg, xtitle(Avg pubs per year, 2010-2013 (any position)) ///
+>         w(1) wlab("1 pub") unit(PIs) fmt(%9.2f) ///
+>         out(../output/figures/kd_pre_ppr_any_avg_by_age_`samp'`suf'.pdf)
+ 36. 
+.     foreach v in pre_ppr_sum pre_ppr_avg pre_ppr_any_sum pre_ppr_any_avg {
+ 37.         if "`v'" == "pre_ppr_sum"      local ytitle "Total pubs 2010-2013 (last author)"
+ 38.         if "`v'" == "pre_ppr_avg"      local ytitle "Avg pubs per year, 2010-2013 (last author)"
+ 39.         if "`v'" == "pre_ppr_any_sum"  local ytitle "Total pubs 2010-2013 (any position)"
+ 40.         if "`v'" == "pre_ppr_any_avg"  local ytitle "Avg pubs per year, 2010-2013 (any position)"
+ 41.         bs_stats, y(`v') x(lab_age_2014) ///
+>             xtitle(Lab age in 2014 (yrs since first last-author pub)) ///
+>             ytitle(`ytitle') ///
+>             out(../output/figures/bs_`v'_by_age_`samp'`suf'.pdf)
+ 42.     }
+ 43. end
+
+. 
+. program prod_per_dollar
+  1.     syntax, samp(string) [suf(string)]
+  2.     cap mkdir ../output/tables
+  3.     cap mkdir ../output/figures
+  4. 
+.     use ../temp/pubs_pre_pis`suf', clear
+  5.     if "`samp'" == "foia" keep if foia_athr == 1
+  6.     qui count
+  7.     local n_start = r(N)
+  8. 
+.     qui sum min_year, d
+  9.     local med_yr = r(p50)
+ 10.     gen young = min_year > `med_yr' if !mi(min_year)
+ 11. 
+.     keep if nih_matched == 1
+ 12.     qui count
+ 13.     local n_match = r(N)
+ 14.     merge 1:1 athr_id using ../temp/nih_pre_amt, keep(1 3)
+ 15.     qui count if _merge == 3
+ 16.     local n_grant = r(N)
+ 17.     keep if _merge == 3 & nih_amt_yr > 0
+ 18.     drop _merge
+ 19.     qui count
+ 20.     local n_pos = r(N)
+ 21. 
+.     keep if nih_amt_yr >= 10000
+ 22.     qui count
+ 23.     local n_floor = r(N)
+ 24. 
+.     local dvars nih_amt_yr
+ 25.     if "`samp'" == "foia" {
+ 26.         merge 1:1 athr_id using ../temp/spend_pi_avg, keep(3) nogen
+ 27.         keep if tot_spend >= 1000
+ 28.         gen double comb_dollars_yr = nih_amt_yr + tot_spend
+ 29.         local dvars nih_amt_yr tot_spend comb_dollars_yr
+ 30.     }
+ 31.     qui count
+ 32.     local n_kept = r(N)
+ 33.     di as text "prod_per_dollar `samp'`suf': `n_start' PIs -> `n_match' NIH-matched -> " ///
+>         "`n_grant' with 2010-2013 grants -> `n_pos' with positive funding -> " ///
+>         "`n_floor' above the $10k/yr floor -> `n_kept' kept"
+ 34.     di as text "prod_per_dollar `samp'`suf': median min_year = `med_yr' (young = after median)"
+ 35. 
+.     gen double ppr_per_100k_nih     = pre_ppr_avg     / (nih_amt_yr / 100000)
+ 36.     gen double ppr_any_per_100k_nih = pre_ppr_any_avg / (nih_amt_yr / 100000)
+ 37.     gen double nih_per_ppr          = nih_amt_yr / pre_ppr_avg if pre_ppr_avg > 0
+ 38.     local vars ppr_per_100k_nih ppr_any_per_100k_nih nih_per_ppr
+ 39.     if "`samp'" == "foia" {
+ 40.         gen double ppr_per_10k_spend  = pre_ppr_avg / (tot_spend / 10000)
+ 41.         gen double spend_per_ppr      = tot_spend   / pre_ppr_avg if pre_ppr_avg > 0
+ 42.         gen double ppr_per_100k_comb  = pre_ppr_avg / (comb_dollars_yr / 100000)
+ 43.         gen double comb_per_ppr       = comb_dollars_yr / pre_ppr_avg if pre_ppr_avg > 0
+ 44.         local vars `vars' ppr_per_10k_spend spend_per_ppr ppr_per_100k_comb comb_per_ppr
+ 45.     }
+ 46. 
+.     * Section 5.1: pooled dollars/publications and the untrimmed PI ratio tail.
+.     quietly summarize nih_amt_yr
+ 47.     local funding = r(sum)
+ 48.     quietly summarize pre_ppr_avg
+ 49.     local nih_per_paper = `funding' / r(sum)
+ 50.     quietly summarize nih_per_ppr, detail
+ 51.     local p1 = r(p1)
+ 52.     local n_ratios = r(N)
+ 53.     quietly count if nih_per_ppr > 10500 & !mi(nih_per_ppr)
+ 54.     local share_above = r(N) / `n_ratios'
+ 55.     tempname stats
+ 56.     file open `stats' using ../output/tables/section51_`samp'`suf'.csv, write replace
+ 57.     file write `stats' "nih_per_paper,p1,share_above_10500,n_ratios" _n
+ 58.     file write `stats' %21.10f (`nih_per_paper') "," %21.10f (`p1') "," ///
+>         %21.10f (`share_above') "," %9.0f (`n_ratios') _n
+ 59.     file close `stats'
+ 60. 
+.     save ../output/prod_per_dollar_pis_`samp'`suf', replace
+ 61. 
+.     local aggnm  ppr_per_100k_nih ppr_any_per_100k_nih
+ 62.     local aggnum pre_ppr_avg      pre_ppr_any_avg
+ 63.     local aggden nih_amt_yr       nih_amt_yr
+ 64.     local aggscl 100000           100000
+ 65.     if "`samp'" == "foia" {
+ 66.         local aggnm  `aggnm'  ppr_per_10k_spend ppr_per_100k_comb
+ 67.         local aggnum `aggnum' pre_ppr_avg       pre_ppr_avg
+ 68.         local aggden `aggden' tot_spend         comb_dollars_yr
+ 69.         local aggscl `aggscl' 10000             100000
+ 70.     }
+ 71.     local nagg : word count `aggnm'
+ 72.     forvalues i = 1/`nagg' {
+ 73.         local nm : word `i' of `aggnm'
+ 74.         local nu : word `i' of `aggnum'
+ 75.         local de : word `i' of `aggden'
+ 76.         local sc : word `i' of `aggscl'
+ 77.         foreach g in 1 0 {
+ 78.             qui sum `nu' if young == `g'
+ 79.             local num = r(sum)
+ 80.             qui sum `de' if young == `g'
+ 81.             local agg_`nm'_`g' = `num' / r(sum) * `sc'
+ 82.         }
+ 83.     }
+ 84. 
+.     foreach v of local vars {
+ 85.         qui sum `v', d
+ 86.         qui replace `v' = r(p99) if `v' > r(p99) & !mi(`v')
+ 87.     }
+ 88. 
+.     cap mat drop prod
+ 89.     qui count if young == 1
+ 90.     local n_young = r(N)
+ 91.     qui count if young == 0
+ 92.     local n_old = r(N)
+ 93.     mat prod = (`n_young', ., `n_young', `n_old', ., `n_old')
+ 94.     local rownames "n_pis"
+ 95.     foreach v in min_year pre_ppr_avg pre_ppr_any_avg `dvars' `vars' {
+ 96.         qui sum `v' if young == 1, d
+ 97.         local y_mean = r(mean)
+ 98.         local y_p50  = r(p50)
+ 99.         local y_N    = r(N)
+100.         qui sum `v' if young == 0, d
+101.         mat prod = nullmat(prod) \ ///
+>             (`y_mean', `y_p50', `y_N', r(mean), r(p50), r(N))
+102.         local rownames "`rownames' `v'"
+103.     }
+104.     forvalues i = 1/`nagg' {
+105.         local nm : word `i' of `aggnm'
+106.         mat prod = prod \ (`agg_`nm'_1', ., ., `agg_`nm'_0', ., .)
+107.         local rownames "`rownames' agg_`nm'"
+108.     }
+109.     mat colnames prod = young_mean young_p50 young_N old_mean old_p50 old_N
+110.     mat rownames prod = `rownames'
+111.     qui matrix_to_txt, saving("../output/tables/prod_per_dollar_`samp'`suf'.txt") ///
+>         matrix(prod) title(<tab:prod_per_dollar_`samp'`suf'>) format(%14.4f) replace
+112. 
+.     kd_young_old ppr_per_100k_nih, ///
+>         xtitle(Pubs per year per $100k NIH funding, 2010-2013) ///
+>         w(0.5) wlab("0.5 pubs") unit(PIs) fmt(%9.2f) ///
+>         out(../output/figures/kd_ppr_per_100k_nih_`samp'`suf'.pdf)
+113.     kd_young_old ppr_any_per_100k_nih, ///
+>         xtitle(Pubs per year per $100k NIH funding, 2010-2013 (any position)) ///
+>         w(1) wlab("1 pub") unit(PIs) fmt(%9.2f) ///
+>         out(../output/figures/kd_ppr_any_per_100k_nih_`samp'`suf'.pdf)
+114.     if "`samp'" == "foia" {
+115.         kd_young_old ppr_per_10k_spend, ///
+>             xtitle(Pubs per year per $10k FOIA spend, 2010-2013) ///
+>             w(0.5) wlab("0.5 pubs") unit(PIs) fmt(%9.2f) ///
+>             out(../output/figures/kd_ppr_per_10k_spend_`samp'`suf'.pdf)
+116.         kd_young_old ppr_per_100k_comb, ///
+>             xtitle(Pubs per year per $100k NIH + FOIA, 2010-2013) ///
+>             w(0.5) wlab("0.5 pubs") unit(PIs) fmt(%9.2f) ///
+>             out(../output/figures/kd_ppr_per_100k_comb_`samp'`suf'.pdf)
+117.     }
+118. 
+.     foreach v of local vars {
+119.         if "`v'" == "ppr_per_100k_nih"     local ytitle "Pubs per yr per $100k NIH (last author)"
+120.         if "`v'" == "ppr_any_per_100k_nih" local ytitle "Pubs per yr per $100k NIH (any position)"
+121.         if "`v'" == "nih_per_ppr"          local ytitle "NIH $ per pub"
+122.         if "`v'" == "ppr_per_10k_spend"     local ytitle "Pubs per yr per $10k FOIA spend"
+123.         if "`v'" == "spend_per_ppr"         local ytitle "FOIA $ per pub"
+124.         if "`v'" == "ppr_per_100k_comb"     local ytitle "Pubs per yr per $100k NIH + FOIA"
+125.         if "`v'" == "comb_per_ppr"          local ytitle "NIH + FOIA $ per pub"
+126.         bs_stats, y(`v') x(lab_age_2014) ///
+>             xtitle(Lab age in 2014 (yrs since first last-author pub)) ///
+>             ytitle(`ytitle') ///
+>             out(../output/figures/bs_`v'_by_age_`samp'`suf'.pdf)
+127.     }
+128. end
+
+. 
+. program bs_stats
+  1.     syntax, y(string) x(string) ytitle(string) xtitle(string) out(string)
+  2.     qui reg `y' `x'
+  3.     local b_s  = strtrim("`: di %12.4g _b[`x']'")
+  4.     local se_s = strtrim("`: di %12.4g _se[`x']'")
+  5.     qui corr `y' `x'
+  6.     local r_s = strtrim("`: di %5.3f r(rho)'")
+  7.     local n_s = r(N)
+  8.     binscatter `y' `x', n(20) msymbol(O) mcolors(gs6) lcolors(ebblue) ///
+>         xtitle("`xtitle'") ytitle("`ytitle'") ///
+>         legend(on order(- "Slope = `b_s' (SE: `se_s')" "Corr = `r_s', N = `n_s'") ///
+>             pos(1) ring(0) region(fcolor(none)) size(small)) ///
+>         plotregion(margin(sides))
+  9.     fig_export, path("`out'")
+ 10. end
+
+. 
+. program spend_by_age
+  1.     syntax [, suf(string)]
+  2.     cap mkdir ../output/tables
+  3.     cap mkdir ../output/figures
+  4. 
+.     use ../external/pi_samp/pi_desc_all_jrnls_r1_r2`suf', clear
+  5.     keep if athr_indicator == 1 & foia_athr == 1
+  6.     gen lab_age_2014 = 2014 - min_year
+  7.     keep athr_id min_year lab_age_2014
+  8.     save ../temp/foia_pi_age`suf', replace
+  9. 
+.     use ../external/samp/merged_foias_with_pis, clear
+ 10.     drop if mi(athr_id)
+ 11.     gen year = year(date(date, "YMD"))
+ 12.     drop if year > 2013
+ 13.     merge m:1 category using ../external/categories/categories_tfidf, keep(1 3)
+ 14.     rename _merge nonlab
+ 15.     replace nonlab = 0 if nonlab == 3
+ 16.     replace keep = 2 if keep == .
+ 17.     gen hq = keep == 1 | (bad_control == 1 & support >= 25 & precision >= 0.8 & recall >= 0.8)
+ 18.     gen nonlab_spend = spend if nonlab == 1
+ 19.     gen lab_spend    = spend if nonlab == 0
+ 20.     gen hq_labspend  = lab_spend if hq == 1
+ 21.     collapse (sum) tot_spend = spend nonlab_spend lab_spend hq_labspend, by(athr_id year)
+ 22.     gen perc_lab_spend = lab_spend / tot_spend * 100
+ 23.     save ../temp/spend_athr_yr, replace
+ 24.     collapse (mean) tot_spend nonlab_spend lab_spend hq_labspend perc_lab_spend ///
+>              (count) n_yrs = year, by(athr_id)
+ 25.     save ../temp/spend_pi_avg, replace
+ 26. 
+.     merge 1:1 athr_id using ../temp/foia_pi_age`suf', keep(1 3)
+ 27.     qui count
+ 28.     local n_all = r(N)
+ 29.     qui count if _merge == 3
+ 30.     local n_aged = r(N)
+ 31.     di as text "spend_by_age`suf': `n_aged' of `n_all' FOIA PIs with spend data matched to analysis-sample age"
+ 32.     keep if _merge == 3
+ 33.     drop _merge
+ 34. 
+.     qui sum min_year, d
+ 35.     local med_yr = r(p50)
+ 36.     gen young = min_year > `med_yr' if !mi(min_year)
+ 37.     di as text "spend_by_age`suf': median min_year = `med_yr' (young = after median)"
+ 38. 
+.     preserve
+ 39.         keep athr_id min_year lab_age_2014 young tot_spend lab_spend nonlab_spend ///
+>              hq_labspend perc_lab_spend n_yrs
+ 40.         save ../output/spend_by_age_pis`suf', replace
+ 41.     restore
+ 42. 
+.     cap mat drop spend_age
+ 43.     qui count if young == 1
+ 44.     local n_young = r(N)
+ 45.     qui count if young == 0
+ 46.     local n_old = r(N)
+ 47.     mat spend_age = (`n_young', ., `n_young', `n_old', ., `n_old')
+ 48.     local rownames "n_pis"
+ 49.     foreach v in min_year tot_spend lab_spend nonlab_spend hq_labspend perc_lab_spend n_yrs {
+ 50.         qui sum `v' if young == 1, d
+ 51.         local y_mean = r(mean)
+ 52.         local y_p50  = r(p50)
+ 53.         local y_N    = r(N)
+ 54.         qui sum `v' if young == 0, d
+ 55.         mat spend_age = nullmat(spend_age) \ ///
+>             (`y_mean', `y_p50', `y_N', r(mean), r(p50), r(N))
+ 56.         local rownames "`rownames' `v'"
+ 57.     }
+ 58.     mat colnames spend_age = young_mean young_p50 young_N old_mean old_p50 old_N
+ 59.     mat rownames spend_age = `rownames'
+ 60.     qui matrix_to_txt, saving("../output/tables/spend_by_age`suf'.txt") ///
+>         matrix(spend_age) title(<tab:spend_by_age`suf'>) format(%14.2f) replace
+ 61. 
+.     foreach v in tot_spend lab_spend hq_labspend nonlab_spend perc_lab_spend {
+ 62.         if "`v'" == "tot_spend"      local xtitle "Avg annual total spend ($)"
+ 63.         if "`v'" == "lab_spend"      local xtitle "Avg annual lab spend ($)"
+ 64.         if "`v'" == "hq_labspend"    local xtitle "Avg annual high-confidence lab spend ($)"
+ 65.         if "`v'" == "nonlab_spend"   local xtitle "Avg annual non-lab spend ($)"
+ 66.         if "`v'" == "perc_lab_spend" local xtitle "Lab share of spend (%)"
+ 67.         local w 5000
+ 68.         local wlab "$5,000"
+ 69.         if "`v'" == "perc_lab_spend" {
+ 70.             local w 5
+ 71.             local wlab "5pp"
+ 72.         }
+ 73.         qui sum `v', d
+ 74.         local xcap = r(p95)
+ 75.         if "`v'" == "perc_lab_spend" local xcap = 100
+ 76. 
+.         qui sum `v' if young == 1, d
+ 77.         local mean_y = strtrim("`: di %9.0fc r(mean)'")
+ 78.         local n_y    = r(N)
+ 79.         qui sum `v' if young == 0, d
+ 80.         local mean_o = strtrim("`: di %9.0fc r(mean)'")
+ 81.         local n_o    = r(N)
+ 82. 
+.         kd_tests `v'
+ 83.         local diff = strtrim("`: di %9.0fc r(diff)'")
+ 84.         local p_t  = r(p_t)
+ 85.         local p_ks = r(p_ks)
+ 86.         pfmt `p_t'
+ 87.         local pt_s `r(s)'
+ 88.         pfmt `p_ks'
+ 89.         local pks_s `r(s)'
+ 90.         local ptxt "Early-career - late-career = `diff'; t-test p = `pt_s'; K-S p = `pks_s'"
+ 91.         di as text "`v': `ptxt'"
+ 92. 
+.         preserve
+ 93.         if _N < 200 qui set obs 200
+ 94.         gen _kx = `xcap' * (_n - 1) / 199 if _n <= 200
+ 95.         kdensity `v' if young == 1 & `v' <= `xcap', at(_kx) gen(_kd_y) nograph
+ 96.         kdensity `v' if young == 0 & `v' <= `xcap', at(_kx) gen(_kd_o) nograph
+ 97.         gen _kp_y = _kd_y * `w' * 100
+ 98.         gen _kp_o = _kd_o * `w' * 100
+ 99.         gen _kp_c = min(_kp_y, _kp_o)
+100.         tw (rarea _kp_c _kp_y _kx, color(ebblue*0.3) lwidth(none)) ///
+>            (rarea _kp_c _kp_o _kx, color(dkorange*0.3) lwidth(none)) ///
+>            (line _kp_y _kx, lcolor(ebblue)) ///
+>            (line _kp_o _kx, lcolor(dkorange)), ///
+>            xtitle("`xtitle'") ytitle("Percent of PIs (per `wlab' bin)") ///
+>            legend(order(3 "Early-career (N=`n_y'): mean=`mean_y'" ///
+>                         4 "Late-career (N=`n_o'): mean=`mean_o'") ///
+>                pos(1) ring(0) cols(1) size(small) region(fcolor(none))) ///
+>            note("`ptxt'", size(small)) ///
+>            plotregion(margin(sides))
+101.         fig_export, path("../output/figures/kd_`v'_by_age`suf'.pdf")
+102.         restore
+103.     }
+104. 
+.     gen double ln_lab_spend = ln(lab_spend) if lab_spend > 0
+105.     gen double ln_tot_spend = ln(tot_spend) if tot_spend > 0
+106.     foreach v in lab_spend hq_labspend tot_spend ln_lab_spend ln_tot_spend {
+107.         if "`v'" == "lab_spend"    local ytitle "Avg annual lab spend ($)"
+108.         if "`v'" == "hq_labspend"  local ytitle "Avg annual high-confidence lab spend ($)"
+109.         if "`v'" == "tot_spend"    local ytitle "Avg annual total spend ($)"
+110.         if "`v'" == "ln_lab_spend" local ytitle "Log avg annual lab spend"
+111.         if "`v'" == "ln_tot_spend" local ytitle "Log avg annual total spend"
+112.         bs_stats, y(`v') x(lab_age_2014) ///
+>             xtitle(Lab age in 2014 (yrs since first last-author pub)) ///
+>             ytitle(`ytitle') ///
+>             out(../output/figures/bs_`v'_by_age`suf'.pdf)
+113.     }
+114. end
+
+. 
+. program spend_by_age_piyr
+  1.     syntax [, suf(string)]
+  2.     use ../temp/spend_athr_yr, clear
+  3.     merge m:1 athr_id using ../temp/foia_pi_age`suf', keep(3) nogen
+  4. 
+.     egen _tag = tag(athr_id)
+  5.     qui sum min_year if _tag, d
+  6.     local med_yr = r(p50)
+  7.     gen young = min_year > `med_yr' if !mi(min_year)
+  8.     qui count if _tag & young == 1
+  9.     local npi_y = r(N)
+ 10.     qui count if _tag & young == 0
+ 11.     local npi_o = r(N)
+ 12.     drop _tag
+ 13.     di as text "spend_by_age_piyr`suf': median min_year = `med_yr'; PIs young/old = `npi_y'/`npi_o'"
+ 14. 
+.     preserve
+ 15.         keep athr_id year min_year lab_age_2014 young tot_spend lab_spend nonlab_spend ///
+>              hq_labspend perc_lab_spend
+ 16.         save ../output/spend_by_age_piyrs`suf', replace
+ 17.     restore
+ 18. 
+.     cap mat drop spend_age_piyr
+ 19.     qui count if young == 1
+ 20.     local nyr_y = r(N)
+ 21.     qui count if young == 0
+ 22.     local nyr_o = r(N)
+ 23.     mat spend_age_piyr = (`npi_y', ., `npi_y', `npi_o', ., `npi_o')
+ 24.     mat spend_age_piyr = spend_age_piyr \ (`nyr_y', ., `nyr_y', `nyr_o', ., `nyr_o')
+ 25.     local rownames "n_pis n_pi_yrs"
+ 26.     foreach v in tot_spend lab_spend nonlab_spend hq_labspend perc_lab_spend {
+ 27.         qui sum `v' if young == 1, d
+ 28.         local y_mean = r(mean)
+ 29.         local y_p50  = r(p50)
+ 30.         local y_N    = r(N)
+ 31.         qui sum `v' if young == 0, d
+ 32.         mat spend_age_piyr = spend_age_piyr \ ///
+>             (`y_mean', `y_p50', `y_N', r(mean), r(p50), r(N))
+ 33.         local rownames "`rownames' `v'"
+ 34.     }
+ 35.     mat colnames spend_age_piyr = young_mean young_p50 young_N old_mean old_p50 old_N
+ 36.     mat rownames spend_age_piyr = `rownames'
+ 37.     qui matrix_to_txt, saving("../output/tables/spend_by_age_piyr`suf'.txt") ///
+>         matrix(spend_age_piyr) title(<tab:spend_by_age_piyr`suf'>) format(%14.2f) replace
+ 38. 
+.     foreach v in tot_spend lab_spend hq_labspend nonlab_spend perc_lab_spend {
+ 39.         if "`v'" == "tot_spend"      local xtitle "Annual total spend ($, PI-year)"
+ 40.         if "`v'" == "lab_spend"      local xtitle "Annual lab spend ($, PI-year)"
+ 41.         if "`v'" == "hq_labspend"    local xtitle "Annual high-confidence lab spend ($, PI-year)"
+ 42.         if "`v'" == "nonlab_spend"   local xtitle "Annual non-lab spend ($, PI-year)"
+ 43.         if "`v'" == "perc_lab_spend" local xtitle "Lab share of spend (%, PI-year)"
+ 44.         local w 5000
+ 45.         local wlab "$5,000"
+ 46.         if "`v'" == "perc_lab_spend" {
+ 47.             local w 5
+ 48.             local wlab "5pp"
+ 49.         }
+ 50.         qui sum `v', d
+ 51.         local xcap = r(p95)
+ 52.         if "`v'" == "perc_lab_spend" local xcap = 100
+ 53. 
+.         qui sum `v' if young == 1, d
+ 54.         local mean_y = strtrim("`: di %9.0fc r(mean)'")
+ 55.         local n_y    = r(N)
+ 56.         qui sum `v' if young == 0, d
+ 57.         local mean_o = strtrim("`: di %9.0fc r(mean)'")
+ 58.         local n_o    = r(N)
+ 59. 
+.         kd_tests `v', cluster(athr_id)
+ 60.         local diff = strtrim("`: di %9.0fc r(diff)'")
+ 61.         local p_t  = r(p_t)
+ 62.         local p_ks = r(p_ks)
+ 63.         pfmt `p_t'
+ 64.         local pt_s `r(s)'
+ 65.         pfmt `p_ks'
+ 66.         local pks_s `r(s)'
+ 67.         local ptxt "Early-career - late-career = `diff'; t-test p = `pt_s' (PI-clustered); K-S p = `pks_s'"
+ 68.         di as text "`v': `ptxt'"
+ 69. 
+.         preserve
+ 70.         if _N < 200 qui set obs 200
+ 71.         gen _kx = `xcap' * (_n - 1) / 199 if _n <= 200
+ 72.         kdensity `v' if young == 1 & `v' <= `xcap', at(_kx) gen(_kd_y) nograph
+ 73.         kdensity `v' if young == 0 & `v' <= `xcap', at(_kx) gen(_kd_o) nograph
+ 74.         gen _kp_y = _kd_y * `w' * 100
+ 75.         gen _kp_o = _kd_o * `w' * 100
+ 76.         tw (line _kp_y _kx, lcolor(ebblue)) ///
+>            (line _kp_o _kx, lcolor(dkorange)), ///
+>            xtitle("`xtitle'") ytitle("Percent of PI-years (per `wlab' bin)") ///
+>            legend(order(1 "Early-career (N=`n_y', PIs=`npi_y'): mean=`mean_y'" ///
+>                         2 "Late-career (N=`n_o', PIs=`npi_o'): mean=`mean_o'") ///
+>                pos(1) ring(0) cols(1) size(small) region(fcolor(none))) ///
+>            note("`ptxt'", size(small)) ///
+>            plotregion(margin(sides))
+ 77.         fig_export, path("../output/figures/kd_`v'_by_age_piyr`suf'.pdf")
+ 78.         restore
+ 79.     }
+ 80. end
+
+. 
+. program consumables_intensity
+  1.     syntax [, suf(string)]
+  2.     cap mkdir ../output/tables
+  3.     cap mkdir ../output/figures
+  4. 
+.     use athr_id athr_indicator foia_athr nih_pi_name ///
+>         using ../external/pi_samp/pi_desc_all_jrnls_r1_r2`suf', clear
+  5.     keep if athr_indicator == 1 & foia_athr == 1
+  6.     gen byte nih_matched = !mi(nih_pi_name)
+  7.     keep athr_id nih_matched
+  8.     save ../temp/foia_pi_nih`suf', replace
+  9. 
+.     use ../temp/spend_athr_yr, clear
+ 10.     keep if inrange(year, 2010, 2013)
+ 11.     merge m:1 athr_id using ../temp/foia_pi_age`suf', keep(3) nogen
+ 12.     merge m:1 athr_id using ../temp/foia_pi_nih`suf', keep(3) nogen
+ 13.     merge 1:1 athr_id year using ../temp/nih_athr_yr, keep(1 3) nogen
+ 14.     replace nih_amt = 0 if mi(nih_amt)
+ 15.     egen _tag = tag(athr_id)
+ 16.     qui count if _tag
+ 17.     local n_foia = r(N)
+ 18.     keep if nih_matched == 1
+ 19.     qui count if _tag
+ 20.     local n_match = r(N)
+ 21.     qui sum min_year if _tag, d
+ 22.     local med_yr = r(p50)
+ 23.     gen young = min_year > `med_yr' if !mi(min_year)
+ 24.     qui count if _tag & young == 1
+ 25.     local npi_y = r(N)
+ 26.     qui count if _tag & young == 0
+ 27.     local npi_o = r(N)
+ 28.     drop _tag
+ 29.     foreach v in lab_spend hq_labspend tot_spend {
+ 30.         gen double `v'_pct_nih = `v' / nih_amt * 100 if nih_amt > 0
+ 31.     }
+ 32.     di as text "consumables_intensity`suf': `n_foia' FOIA PIs with 2010-2013 spend -> " ///
+>         "`n_match' matched to RePORTER; median min_year = `med_yr'; PIs young/old = `npi_y'/`npi_o'"
+ 33.     keep athr_id year min_year lab_age_2014 young tot_spend lab_spend hq_labspend ///
+>          nih_amt nih_active *_pct_nih
+ 34.     save ../output/consumables_intensity_piyrs`suf', replace
+ 35. 
+.     cap mat drop cons_piyr
+ 36.     qui count if young == 1
+ 37.     local nyr_y = r(N)
+ 38.     qui count if young == 0
+ 39.     local nyr_o = r(N)
+ 40.     foreach g in 1 0 {
+ 41.         qui count if young == `g' & nih_amt == 0
+ 42.         local nzero_`g' = r(N)
+ 43.         foreach v in lab_spend hq_labspend tot_spend {
+ 44.             qui sum `v' if young == `g' & nih_amt > 0
+ 45.             local num = r(sum)
+ 46.             qui sum nih_amt if young == `g' & nih_amt > 0
+ 47.             local agg_`v'_`g' = `num' / r(sum) * 100
+ 48.         }
+ 49.     }
+ 50.     mat cons_piyr = (`npi_y', ., `npi_y', `npi_o', ., `npi_o')
+ 51.     mat cons_piyr = cons_piyr \ (`nyr_y', ., `nyr_y', `nyr_o', ., `nyr_o')
+ 52.     mat cons_piyr = cons_piyr \ (`nzero_1', ., `nzero_1', `nzero_0', ., `nzero_0')
+ 53.     local rownames "n_pis n_pi_yrs n_pi_yrs_zero_nih"
+ 54.     foreach v in lab_spend hq_labspend tot_spend nih_amt ///
+>                  lab_spend_pct_nih hq_labspend_pct_nih tot_spend_pct_nih {
+ 55.         qui sum `v' if young == 1, d
+ 56.         local y_mean = r(mean)
+ 57.         local y_p50  = r(p50)
+ 58.         local y_N    = r(N)
+ 59.         qui sum `v' if young == 0, d
+ 60.         mat cons_piyr = cons_piyr \ (`y_mean', `y_p50', `y_N', r(mean), r(p50), r(N))
+ 61.         local rownames "`rownames' `v'"
+ 62.     }
+ 63.     foreach v in lab_spend hq_labspend tot_spend {
+ 64.         mat cons_piyr = cons_piyr \ (`agg_`v'_1', ., ., `agg_`v'_0', ., .)
+ 65.         local rownames "`rownames' agg_`v'_pct_nih"
+ 66.     }
+ 67.     mat colnames cons_piyr = young_mean young_p50 young_N old_mean old_p50 old_N
+ 68.     mat rownames cons_piyr = `rownames'
+ 69.     qui matrix_to_txt, saving("../output/tables/consumables_intensity_piyr`suf'.txt") ///
+>         matrix(cons_piyr) title(<tab:consumables_intensity_piyr`suf'>) format(%14.4f) replace
+ 70. 
+.     kd_young_old lab_spend_pct_nih, xtitle(Lab consumables spend as % of NIH funding (PI-year)) ///
+>         w(1) wlab("1pp") unit(PI-years) fmt(%9.2f) cluster(athr_id) ///
+>         out(../output/figures/kd_lab_spend_pct_nih_by_age_piyr`suf'.pdf)
+ 71.     kd_young_old hq_labspend_pct_nih, ///
+>         xtitle(High-confidence lab spend as % of NIH funding (PI-year)) ///
+>         w(1) wlab("1pp") unit(PI-years) fmt(%9.2f) cluster(athr_id) ///
+>         out(../output/figures/kd_hq_labspend_pct_nih_by_age_piyr`suf'.pdf)
+ 72. 
+.     collapse (mean) tot_spend lab_spend hq_labspend nih_amt nih_active ///
+>              (count) n_yrs = year (first) min_year lab_age_2014 young, by(athr_id)
+ 73.     qui count
+ 74.     local n_pis = r(N)
+ 75.     keep if nih_amt >= 10000
+ 76.     qui count
+ 77.     local n_kept = r(N)
+ 78.     di as text "consumables_intensity`suf': `n_pis' PIs -> `n_kept' above the $10k/yr NIH floor"
+ 79.     foreach v in lab_spend hq_labspend tot_spend {
+ 80.         gen double `v'_pct_nih = `v' / nih_amt * 100
+ 81.     }
+ 82.     save ../output/consumables_intensity_pis`suf', replace
+ 83. 
+.     cap mat drop cons_pi
+ 84.     qui count if young == 1
+ 85.     local n_young = r(N)
+ 86.     qui count if young == 0
+ 87.     local n_old = r(N)
+ 88.     foreach g in 1 0 {
+ 89.         foreach v in lab_spend hq_labspend tot_spend {
+ 90.             qui sum `v' if young == `g'
+ 91.             local num = r(sum)
+ 92.             qui sum nih_amt if young == `g'
+ 93.             local agg_`v'_`g' = `num' / r(sum) * 100
+ 94.         }
+ 95.     }
+ 96.     mat cons_pi = (`n_young', ., `n_young', `n_old', ., `n_old')
+ 97.     local rownames "n_pis"
+ 98.     foreach v in min_year n_yrs lab_spend hq_labspend tot_spend nih_amt nih_active ///
+>                  lab_spend_pct_nih hq_labspend_pct_nih tot_spend_pct_nih {
+ 99.         qui sum `v' if young == 1, d
+100.         local y_mean = r(mean)
+101.         local y_p50  = r(p50)
+102.         local y_N    = r(N)
+103.         qui sum `v' if young == 0, d
+104.         mat cons_pi = cons_pi \ (`y_mean', `y_p50', `y_N', r(mean), r(p50), r(N))
+105.         local rownames "`rownames' `v'"
+106.     }
+107.     foreach v in lab_spend hq_labspend tot_spend {
+108.         mat cons_pi = cons_pi \ (`agg_`v'_1', ., ., `agg_`v'_0', ., .)
+109.         local rownames "`rownames' agg_`v'_pct_nih"
+110.     }
+111.     mat colnames cons_pi = young_mean young_p50 young_N old_mean old_p50 old_N
+112.     mat rownames cons_pi = `rownames'
+113.     qui matrix_to_txt, saving("../output/tables/consumables_intensity`suf'.txt") ///
+>         matrix(cons_pi) title(<tab:consumables_intensity`suf'>) format(%14.4f) replace
+114. 
+.     kd_young_old lab_spend_pct_nih, ///
+>         xtitle(Avg annual lab consumables spend as % of NIH funding, 2010-2013) ///
+>         w(1) wlab("1pp") unit(PIs) fmt(%9.2f) ///
+>         out(../output/figures/kd_lab_spend_pct_nih_by_age`suf'.pdf)
+115.     kd_young_old hq_labspend_pct_nih, ///
+>         xtitle(Avg annual high-confidence lab spend as % of NIH funding, 2010-2013) ///
+>         w(1) wlab("1pp") unit(PIs) fmt(%9.2f) ///
+>         out(../output/figures/kd_hq_labspend_pct_nih_by_age`suf'.pdf)
+116. 
+.     gen double ln_lab_spend_pct_nih = ln(lab_spend_pct_nih) if lab_spend_pct_nih > 0
+117.     foreach v in lab_spend_pct_nih hq_labspend_pct_nih ln_lab_spend_pct_nih {
+118.         if "`v'" == "lab_spend_pct_nih"    local ytitle "Lab consumables spend as % of NIH funding"
+119.         if "`v'" == "hq_labspend_pct_nih"  local ytitle "High-confidence lab spend as % of NIH funding"
+120.         if "`v'" == "ln_lab_spend_pct_nih" local ytitle "Log lab consumables spend as % of NIH funding"
+121.         bs_stats, y(`v') x(lab_age_2014) ///
+>             xtitle(Lab age in 2014 (yrs since first last-author pub)) ///
+>             ytitle(`ytitle') ///
+>             out(../output/figures/bs_`v'_by_age`suf'.pdf)
+122.     }
+123. end
+
+. 
+. program boe
+  1.     use ../external/samp/merged_foias_with_pis,  clear
+  2.     keep if inlist(uni , "utdallas", "umich")
+  3.     drop if mi(athr_id)
+  4.     gen year = year(date(date, "YMD"))
+  5.     drop if year > 2013
+  6.     merge m:1 category using ../external/categories/categories_tfidf, keep(1 3) 
+  7.     rename _merge nonlab
+  8.     replace nonlab = 0 if nonlab == 3
+  9.     sum spend, d
+ 10.     local total_spend = r(sum)
+ 11.     sum spend if nonlab == 0
+ 12.     local lab_spend = r(sum)
+ 13.     di "% lab spend = " `lab_spend'/`total_spend'*100
+ 14.     sum spend if keep == 1 & nonlab == 0 | bad_control == 1
+ 15.     local spend_in_sample = r(sum)
+ 16.     di "%lab spend classified as high quality= "  `spend_in_sample'/`lab_spend'*100
+ 17.     replace keep = 2 if keep ==.
+ 18.     gen nonlab_spend = spend if nonlab == 1 
+ 19.     gen lab_spend = spend if nonlab == 0
+ 20.     gen hq = keep == 1 | (bad_control == 1 & support >= 25 & precision >= 0.8 & recall >= 0.8)
+ 21.     collapse (sum) spend nonlab_spend lab_spend , by(athr_id year hq)
+ 22.     gen hq_labspend = lab_spend if hq == 1
+ 23.     gen lq_labspend = lab_spend if hq == 0
+ 24.     collapse (sum) tot_spend = spend nonlab_spend lab_spend hq_labspend lq_labspend  , by(athr_id year)
+ 25.     gen perc_lab_spend = lab_spend/tot_spend* 100
+ 26.     gen perc_nonlab_spend = nonlab_spend/tot_spend* 100
+ 27.     sum lab_spend if lab_spend >50, d
+ 28.     local mean_lab_spend : di %6.2f r(mean)
+ 29.     local sd_lab_spend : di %6.2f r(sd)
+ 30.     local min_lab_spend : di %6.2f r(min)
+ 31.     local max_lab_spend : di %10.2f r(max)
+ 32.     local N_lab_spend : di %6.0f r(N)
+ 33.     local q1_lab_spend : di %6.2f r(p25)
+ 34.     local q3_lab_spend : di %6.2f r(p75)
+ 35.     local median_lab_spend : di %6.2f r(p50)
+ 36.    tw hist lab_spend if lab_spend >50,  color(edkblue) frac width(5000) xlab(0(7500)150000, angle(45)) ///
+>        xtitle("Consumables expenditure ($)") ytitle("Fraction of PI-years") legend(on order(- "N = `N_lab_spend'" "Mean = `mean_lab_spend'" "SD = `sd_lab_spend'" "Min = `min_lab_spend'" "Q1 = `q1_lab_spend'" "Median = `median_lab_spend'" "Q3 = `q3_lab_s
+> pend'" "Max = `max_lab_spend'") pos(1) ring(0) region(fcolor(none)) size(small))
+ 37.    fig_export, path("../output/figures/lab_spend.pdf")
+ 38.     sum hq_labspend if hq_labspend >50, d
+ 39.     local mean_hq : di %6.2f r(mean)
+ 40.     local sd_hq : di %6.2f r(sd)
+ 41.     local min_hq : di %6.2f r(min)
+ 42.     local max_hq : di %10.2f r(max)
+ 43.     local N_hq : di %6.0f r(N)
+ 44.     local q1_hq : di %6.2f r(p25)
+ 45.     local q3_hq : di %6.2f r(p75)
+ 46.     local median_hq : di %6.2f r(p50)
+ 47.    tw hist hq_labspend if hq_labspend >50 & hq_labspend <= 75000,  color(edkblue) frac width(5000) xlab(0(7500)75000, angle(45)) ///
+>        xtitle("High-confidence consumables expenditure ($)") ytitle("Fraction of PI-years") legend(on order(- "N = `N_hq'" "Mean = `mean_hq'" "SD = `sd_hq'" "Min = `min_hq'" "Q1 = `q1_hq'" "Median = `median_hq'" "Q3 = `q3_hq'" "Max = `max_hq'") pos(1) r
+> ing(0) region(fcolor(none)) size(small))
+ 48.    fig_export, path("../output/figures/hq_labspend.pdf")
+ 49.     collapse (mean) tot_spend nonlab_spend lab_spend hq_labspend lq_labspend perc_lab_spend perc_nonlab_spend, by(athr_id)
+ 50.     sum hq_labspend if hq_labspend >50, d
+ 51.     local mean_hq : di %6.2f r(mean)
+ 52.     local sd_hq : di %6.2f r(sd)
+ 53.     local min_hq : di %6.2f r(min)
+ 54.     local max_hq : di %10.2f r(max)
+ 55.     local N_hq : di %6.0f r(N)
+ 56.     local q1_hq : di %6.2f r(p25)
+ 57.     local q3_hq : di %6.2f r(p75)
+ 58.     local median_hq : di %6.2f r(p50)
+ 59.    tw hist hq_labspend if hq_labspend >50 & hq_labspend <= 75000,  color(edkblue) frac width(5000) xlab(0(7500)75000, angle(45)) ///
+>        xtitle("Avg annual high-confidence consumables expenditure ($)") ytitle("Fraction of PIs") legend(on order(- "N = `N_hq'" "Mean = `mean_hq'" "SD = `sd_hq'" "Min = `min_hq'" "Q1 = `q1_hq'" "Median = `median_hq'" "Q3 = `q3_hq'" "Max = `max_hq'") po
+> s(1) ring(0) region(fcolor(none)) size(small))
+ 60.    fig_export, path("../output/figures/hq_labspend_pi.pdf")
+ 61.     graph bar lab_spend nonlab_spend, over(athr_id ,sort((mean) tot_spend) descending) stack bar(1, color(lavender%70)) bar(2, color(dkorange%70)) legend(on order(- "Lab spend" - "Non-lab spend") pos(1) ring(0) size(small) region(fcolor(none))) ytitl
+> e("Average annual spend ($)") plotregion(margin(sides))
+ 62.     fig_export, path("../output/figures/avg_spend_by_athr.pdf")
+ 63.    kdensity perc_lab_spend
+ 64.    fig_export, path("../output/figures/perc_lab_spend.pdf")
+ 65.    kdensity perc_nonlab_spend
+ 66.    fig_export, path("../output/figures/perc_nonlab_spend.pdf")
+ 67.    bs_stats, y(perc_lab_spend) x(lab_spend) ///
+>        ytitle(Lab share of spend (%)) xtitle(Avg annual lab spend ($)) ///
+>        out(../output/figures/bs_perc_lab_spend_by_lab_spend.pdf)
+ 68.    bs_stats, y(perc_lab_spend) x(tot_spend) ///
+>        ytitle(Lab share of spend (%)) xtitle(Avg annual total spend ($)) ///
+>        out(../output/figures/bs_perc_lab_spend_by_tot_spend.pdf)
+ 69.    bs_stats, y(perc_nonlab_spend) x(nonlab_spend) ///
+>        ytitle(Non-lab share of spend (%)) xtitle(Avg annual non-lab spend ($)) ///
+>        out(../output/figures/bs_perc_nonlab_spend_by_lab_spend.pdf)
+ 70.    bs_stats, y(lab_spend) x(tot_spend) ///
+>        ytitle(Avg annual lab spend ($)) xtitle(Avg annual total spend ($)) ///
+>        out(../output/figures/bs_lab_spend_by_tot_spend.pdf)
+ 71. end
+
+. 
+. gather_nih
+
+Duplicates in terms of athr_id grant_id
+
+(2 observations deleted)
+file ../temp/nih_athr_yr.dta saved
+(181,509 observations deleted)
+file ../temp/nih_pre_amt.dta saved
+(73,866 observations deleted)
+file ../temp/nih_pre_pis.dta saved
+
+. foreach suf in "" "_public" {
+  2.     local opt = cond("`suf'" == "", "", "suf(_public)")
+  3.     foreach samp in all foia {
+  4.         prod_per_dollar, samp(`samp') `opt'
+  5.     }
+  6. }
+(5,953 observations deleted)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                           862
+        from master                       862  (_merge==1)
+        from using                          0  (_merge==2)
+
+    Matched                             6,700  (_merge==3)
+    -----------------------------------------
+(862 observations deleted)
+(9 observations deleted)
+prod_per_dollar all: 13515 PIs -> 7562 NIH-matched -> 6700 with 2010-2013 grants -> 6700 with positive funding -> 6691 above the $10k/yr floor -> 6691 kept
+prod_per_dollar all: median min_year = 2000 (young = after median)
+(file ../output/tables/section51_all.csv not found)
+file ../output/prod_per_dollar_pis_all.dta saved
+ppr_per_100k_nih: Early-career - late-career = 0.22; t-test p = <0.001; K-S p = <0.001
+(6,491 missing values generated)
+(6,491 missing values generated)
+(6,491 missing values generated)
+(6,491 missing values generated)
+file ../output/figures/paper/kd_ppr_per_100k_nih_all.pdf saved as PDF format
+file ../output/figures/pres/kd_ppr_per_100k_nih_all.pdf saved as PDF format
+ppr_any_per_100k_nih: Early-career - late-career = 0.41; t-test p = <0.001; K-S p = <0.001
+(6,491 missing values generated)
+(6,491 missing values generated)
+(6,491 missing values generated)
+(6,491 missing values generated)
+file ../output/figures/paper/kd_ppr_any_per_100k_nih_all.pdf saved as PDF format
+file ../output/figures/pres/kd_ppr_any_per_100k_nih_all.pdf saved as PDF format
+file ../output/figures/paper/bs_ppr_per_100k_nih_by_age_all.pdf saved as PDF format
+file ../output/figures/pres/bs_ppr_per_100k_nih_by_age_all.pdf saved as PDF format
+file ../output/figures/paper/bs_ppr_any_per_100k_nih_by_age_all.pdf saved as PDF format
+file ../output/figures/pres/bs_ppr_any_per_100k_nih_by_age_all.pdf saved as PDF format
+file ../output/figures/paper/bs_nih_per_ppr_by_age_all.pdf saved as PDF format
+file ../output/figures/pres/bs_nih_per_ppr_by_age_all.pdf saved as PDF format
+(13,438 observations deleted)
+(17 observations deleted)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             5
+        from master                         5  (_merge==1)
+        from using                          0  (_merge==2)
+
+    Matched                                55  (_merge==3)
+    -----------------------------------------
+(5 observations deleted)
+(0 observations deleted)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                                55  
+    -----------------------------------------
+(1 observation deleted)
+prod_per_dollar foia: 77 PIs -> 60 NIH-matched -> 55 with 2010-2013 grants -> 55 with positive funding -> 55 above the $10k/yr floor -> 54 kept
+prod_per_dollar foia: median min_year = 1999 (young = after median)
+(file ../output/tables/section51_foia.csv not found)
+file ../output/prod_per_dollar_pis_foia.dta saved
+ppr_per_100k_nih: Early-career - late-career = 0.17; t-test p = 0.420; K-S p = 0.187
+file ../output/figures/paper/kd_ppr_per_100k_nih_foia.pdf saved as PDF format
+file ../output/figures/pres/kd_ppr_per_100k_nih_foia.pdf saved as PDF format
+ppr_any_per_100k_nih: Early-career - late-career = 0.36; t-test p = 0.222; K-S p = 0.049
+file ../output/figures/paper/kd_ppr_any_per_100k_nih_foia.pdf saved as PDF format
+file ../output/figures/pres/kd_ppr_any_per_100k_nih_foia.pdf saved as PDF format
+ppr_per_10k_spend: Early-career - late-career = -0.04; t-test p = 0.892; K-S p = 0.744
+file ../output/figures/paper/kd_ppr_per_10k_spend_foia.pdf saved as PDF format
+file ../output/figures/pres/kd_ppr_per_10k_spend_foia.pdf saved as PDF format
+ppr_per_100k_comb: Early-career - late-career = 0.13; t-test p = 0.486; K-S p = 0.518
+file ../output/figures/paper/kd_ppr_per_100k_comb_foia.pdf saved as PDF format
+file ../output/figures/pres/kd_ppr_per_100k_comb_foia.pdf saved as PDF format
+warning: nquantiles(20) was specified, but only 17 were generated. see help file under nquantiles() for explanation.
+file ../output/figures/paper/bs_ppr_per_100k_nih_by_age_foia.pdf saved as PDF format
+file ../output/figures/pres/bs_ppr_per_100k_nih_by_age_foia.pdf saved as PDF format
+warning: nquantiles(20) was specified, but only 17 were generated. see help file under nquantiles() for explanation.
+file ../output/figures/paper/bs_ppr_any_per_100k_nih_by_age_foia.pdf saved as PDF format
+file ../output/figures/pres/bs_ppr_any_per_100k_nih_by_age_foia.pdf saved as PDF format
+warning: nquantiles(20) was specified, but only 17 were generated. see help file under nquantiles() for explanation.
+file ../output/figures/paper/bs_nih_per_ppr_by_age_foia.pdf saved as PDF format
+file ../output/figures/pres/bs_nih_per_ppr_by_age_foia.pdf saved as PDF format
+warning: nquantiles(20) was specified, but only 17 were generated. see help file under nquantiles() for explanation.
+file ../output/figures/paper/bs_ppr_per_10k_spend_by_age_foia.pdf saved as PDF format
+file ../output/figures/pres/bs_ppr_per_10k_spend_by_age_foia.pdf saved as PDF format
+warning: nquantiles(20) was specified, but only 17 were generated. see help file under nquantiles() for explanation.
+file ../output/figures/paper/bs_spend_per_ppr_by_age_foia.pdf saved as PDF format
+file ../output/figures/pres/bs_spend_per_ppr_by_age_foia.pdf saved as PDF format
+warning: nquantiles(20) was specified, but only 17 were generated. see help file under nquantiles() for explanation.
+file ../output/figures/paper/bs_ppr_per_100k_comb_by_age_foia.pdf saved as PDF format
+file ../output/figures/pres/bs_ppr_per_100k_comb_by_age_foia.pdf saved as PDF format
+warning: nquantiles(20) was specified, but only 17 were generated. see help file under nquantiles() for explanation.
+file ../output/figures/paper/bs_comb_per_ppr_by_age_foia.pdf saved as PDF format
+file ../output/figures/pres/bs_comb_per_ppr_by_age_foia.pdf saved as PDF format
+(3,952 observations deleted)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                           543
+        from master                       543  (_merge==1)
+        from using                          0  (_merge==2)
+
+    Matched                             3,890  (_merge==3)
+    -----------------------------------------
+(543 observations deleted)
+(6 observations deleted)
+prod_per_dollar all_public: 8385 PIs -> 4433 NIH-matched -> 3890 with 2010-2013 grants -> 3890 with positive funding -> 3884 above the $10k/yr floor -> 3884 kept
+prod_per_dollar all_public: median min_year = 2002 (young = after median)
+(file ../output/tables/section51_all_public.csv not found)
+file ../output/prod_per_dollar_pis_all_public.dta saved
+ppr_per_100k_nih: Early-career - late-career = 0.25; t-test p = <0.001; K-S p = <0.001
+(3,684 missing values generated)
+(3,684 missing values generated)
+(3,684 missing values generated)
+(3,684 missing values generated)
+file ../output/figures/paper/kd_ppr_per_100k_nih_all_public.pdf saved as PDF format
+file ../output/figures/pres/kd_ppr_per_100k_nih_all_public.pdf saved as PDF format
+ppr_any_per_100k_nih: Early-career - late-career = 0.43; t-test p = <0.001; K-S p = <0.001
+(3,684 missing values generated)
+(3,684 missing values generated)
+(3,684 missing values generated)
+(3,684 missing values generated)
+file ../output/figures/paper/kd_ppr_any_per_100k_nih_all_public.pdf saved as PDF format
+file ../output/figures/pres/kd_ppr_any_per_100k_nih_all_public.pdf saved as PDF format
+warning: nquantiles(20) was specified, but only 19 were generated. see help file under nquantiles() for explanation.
+file ../output/figures/paper/bs_ppr_per_100k_nih_by_age_all_public.pdf saved as PDF format
+file ../output/figures/pres/bs_ppr_per_100k_nih_by_age_all_public.pdf saved as PDF format
+warning: nquantiles(20) was specified, but only 19 were generated. see help file under nquantiles() for explanation.
+file ../output/figures/paper/bs_ppr_any_per_100k_nih_by_age_all_public.pdf saved as PDF format
+file ../output/figures/pres/bs_ppr_any_per_100k_nih_by_age_all_public.pdf saved as PDF format
+warning: nquantiles(20) was specified, but only 19 were generated. see help file under nquantiles() for explanation.
+file ../output/figures/paper/bs_nih_per_ppr_by_age_all_public.pdf saved as PDF format
+file ../output/figures/pres/bs_nih_per_ppr_by_age_all_public.pdf saved as PDF format
+(8,307 observations deleted)
+(17 observations deleted)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             5
+        from master                         5  (_merge==1)
+        from using                          0  (_merge==2)
+
+    Matched                                56  (_merge==3)
+    -----------------------------------------
+(5 observations deleted)
+(0 observations deleted)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                                56  
+    -----------------------------------------
+(1 observation deleted)
+prod_per_dollar foia_public: 78 PIs -> 61 NIH-matched -> 56 with 2010-2013 grants -> 56 with positive funding -> 56 above the $10k/yr floor -> 55 kept
+prod_per_dollar foia_public: median min_year = 1999.5 (young = after median)
+(file ../output/tables/section51_foia_public.csv not found)
+file ../output/prod_per_dollar_pis_foia_public.dta saved
+ppr_per_100k_nih: Early-career - late-career = 0.15; t-test p = 0.466; K-S p = 0.075
+file ../output/figures/paper/kd_ppr_per_100k_nih_foia_public.pdf saved as PDF format
+file ../output/figures/pres/kd_ppr_per_100k_nih_foia_public.pdf saved as PDF format
+ppr_any_per_100k_nih: Early-career - late-career = 0.35; t-test p = 0.229; K-S p = 0.039
+file ../output/figures/paper/kd_ppr_any_per_100k_nih_foia_public.pdf saved as PDF format
+file ../output/figures/pres/kd_ppr_any_per_100k_nih_foia_public.pdf saved as PDF format
+ppr_per_10k_spend: Early-career - late-career = -0.03; t-test p = 0.914; K-S p = 0.952
+file ../output/figures/paper/kd_ppr_per_10k_spend_foia_public.pdf saved as PDF format
+file ../output/figures/pres/kd_ppr_per_10k_spend_foia_public.pdf saved as PDF format
+ppr_per_100k_comb: Early-career - late-career = 0.11; t-test p = 0.527; K-S p = 0.260
+file ../output/figures/paper/kd_ppr_per_100k_comb_foia_public.pdf saved as PDF format
+file ../output/figures/pres/kd_ppr_per_100k_comb_foia_public.pdf saved as PDF format
+warning: nquantiles(20) was specified, but only 15 were generated. see help file under nquantiles() for explanation.
+file ../output/figures/paper/bs_ppr_per_100k_nih_by_age_foia_public.pdf saved as PDF format
+file ../output/figures/pres/bs_ppr_per_100k_nih_by_age_foia_public.pdf saved as PDF format
+warning: nquantiles(20) was specified, but only 15 were generated. see help file under nquantiles() for explanation.
+file ../output/figures/paper/bs_ppr_any_per_100k_nih_by_age_foia_public.pdf saved as PDF format
+file ../output/figures/pres/bs_ppr_any_per_100k_nih_by_age_foia_public.pdf saved as PDF format
+warning: nquantiles(20) was specified, but only 15 were generated. see help file under nquantiles() for explanation.
+file ../output/figures/paper/bs_nih_per_ppr_by_age_foia_public.pdf saved as PDF format
+file ../output/figures/pres/bs_nih_per_ppr_by_age_foia_public.pdf saved as PDF format
+warning: nquantiles(20) was specified, but only 15 were generated. see help file under nquantiles() for explanation.
+file ../output/figures/paper/bs_ppr_per_10k_spend_by_age_foia_public.pdf saved as PDF format
+file ../output/figures/pres/bs_ppr_per_10k_spend_by_age_foia_public.pdf saved as PDF format
+warning: nquantiles(20) was specified, but only 15 were generated. see help file under nquantiles() for explanation.
+file ../output/figures/paper/bs_spend_per_ppr_by_age_foia_public.pdf saved as PDF format
+file ../output/figures/pres/bs_spend_per_ppr_by_age_foia_public.pdf saved as PDF format
+warning: nquantiles(20) was specified, but only 15 were generated. see help file under nquantiles() for explanation.
+file ../output/figures/paper/bs_ppr_per_100k_comb_by_age_foia_public.pdf saved as PDF format
+file ../output/figures/pres/bs_ppr_per_100k_comb_by_age_foia_public.pdf saved as PDF format
+warning: nquantiles(20) was specified, but only 15 were generated. see help file under nquantiles() for explanation.
+file ../output/figures/paper/bs_comb_per_ppr_by_age_foia_public.pdf saved as PDF format
+file ../output/figures/pres/bs_comb_per_ppr_by_age_foia_public.pdf saved as PDF format
+
+. di "PI_ALLOCATION_RERUN_PASSED"
+PI_ALLOCATION_RERUN_PASSED
+
+. log close
+      name:  <unnamed>
+       log:  /n/holylabs/pakes_lab/Lab/sci_eq/analysis/foia_case_study/code/../output/pi_allocation_rerun.log
+  log type:  text
+ closed on:  10 Oct 2026, 14:04:23
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+. 
+end of do-file

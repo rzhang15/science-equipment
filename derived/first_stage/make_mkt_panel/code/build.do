@@ -293,6 +293,7 @@ program make_panels
     bys category pre_period (life_tech): replace life_tech = life_tech[_n-1] if mi(life_tech)
     bys category pre_period (thermo): replace thermo = thermo[_n-1] if mi(thermo)
     gen simulated_hhi = 2 * life_tech * thermo if pre_period == 1
+    replace simulated_hhi = 0 if pre_period == 1 & (mi(life_tech) | mi(thermo))
     bys category (simulated_hhi): replace simulated_hhi = simulated_hhi[_n-1] if mi(simulated_hhi) & pre_period == 0
     replace suppliername = "thermo fisher scientific" if suppliername == "life technologies" & pre_period == 0 
     // Combine the merged firm's spending before squaring supplier shares.
@@ -308,7 +309,8 @@ program make_panels
     drop _freq
     gisid category
     // Shared sample definition for matching and all first-stage estimators.
-    gen byte first_stage_sample = delta_hhi > -2000 & !missing(delta_hhi)
+    *gen byte first_stage_sample = delta_hhi > -2000 & !missing(delta_hhi)
+    gen byte first_stage_sample = !missing(delta_hhi)
     save ../output/category_hhi_`embed'`suffix', replace
     restore
 

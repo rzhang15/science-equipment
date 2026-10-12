@@ -4,6 +4,42 @@ capture log close
 program drop _all
 set scheme modern
 preliminaries
+
+global PRES_SCALE 1.2
+
+cap program drop fig_export
+program fig_export
+    syntax, path(string) [mode(string) xsize(real 6) ysize(real 4)]
+    local p : subinstr local path "/paper/" "/", all
+    local p : subinstr local p "/pres/" "/", all
+    local k = strpos("`p'", "figures/")
+    if `k' > 0 {
+        local base = substr("`p'", 1, `k' + 7)
+        local rest = substr("`p'", `k' + 8, .)
+    }
+    else {
+        local slash = strrpos("`p'", "/")
+        local base = substr("`p'", 1, `slash')
+        local rest = substr("`p'", `slash' + 1, .)
+    }
+    local tscale = cond(`xsize' >= `ysize', (2/3) * `xsize' / min(`xsize', `ysize'), 1)
+    if "`mode'" == "presentation" local mode pres
+    foreach m in paper pres {
+        if "`mode'" != "" & "`mode'" != "`m'" continue
+        local dir "`base'`m'"
+        cap mkdir "`dir'"
+        local sub "`rest'"
+        while strpos("`sub'", "/") > 0 {
+            local seg = substr("`sub'", 1, strpos("`sub'", "/") - 1)
+            local dir "`dir'/`seg'"
+            cap mkdir "`dir'"
+            local sub = substr("`sub'", strpos("`sub'", "/") + 1, .)
+        }
+        local s = cond("`m'" == "pres", `tscale' * $PRES_SCALE, `tscale')
+        graph display, scale(`s')
+        graph export "`base'`m'/`rest'", replace
+    }
+end
 version 17
 
 program main
@@ -80,9 +116,9 @@ program plot_panels
        subtitle(, size(tiny) bcolor(none)) ///
        xline(2014, lcolor(gs10) lpattern(dot)) ///
        yline(0, lcolor(gs12)) ///
-       xtitle("year", size(small)) ytitle("log price (centered at 2013)", size(small)) ///
-       xlab(2010(2)2019, labsize(vsmall)) ylab(, labsize(vsmall))
-    graph export ../output/figures/extreme_trends_top10.pdf, replace
+       xtitle("Year", size(medsmall)) ytitle("Log price (centered at 2013)", size(medsmall)) ///
+       xlab(2010(2)2019, labsize(small)) ylab(, labsize(small))
+    fig_export, path("../output/figures/extreme_trends_top10.pdf")
     restore
 
     preserve
@@ -100,9 +136,9 @@ program plot_panels
        subtitle(, size(tiny) bcolor(none)) ///
        xline(2014, lcolor(gs10) lpattern(dot)) ///
        yline(0, lcolor(gs12)) ///
-       xtitle("year", size(small)) ytitle("log price (centered at 2013)", size(small)) ///
-       xlab(2010(2)2019, labsize(vsmall)) ylab(, labsize(vsmall))
-    graph export ../output/figures/extreme_trends_bottom10.pdf, replace
+       xtitle("Year", size(medsmall)) ytitle("Log price (centered at 2013)", size(medsmall)) ///
+       xlab(2010(2)2019, labsize(small)) ylab(, labsize(small))
+    fig_export, path("../output/figures/extreme_trends_bottom10.pdf")
     restore
 end
 

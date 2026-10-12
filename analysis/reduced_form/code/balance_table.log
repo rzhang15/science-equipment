@@ -31,6 +31,8 @@ Notes:
 
 . version 17
 
+. set scheme modern
+
 . 
 . local samp all_jrnls
 
@@ -69,7 +71,7 @@ Notes:
 . use ../output/prepped_samples/es_`samp'`suf', clear
 
 . gen nih_cost_k   = nih_total_cost / 1000
-(59,850 missing values generated)
+(68,580 missing values generated)
 
 . gen yrs_lab_2014 = 2014 - min_year
 
@@ -124,103 +126,32 @@ Notes:
 exposure median =   0.0214; PIs: less-exposed 6758, more-exposed 6757
 
 . 
-. local clbl0  "Plant biology"
+. recode cluster_30 (2 19 21 = 1) (4 14 = 2) (7 20 = 3) (12 17 18 = 4) (0 1 6 2
+> 7 = 5) ///
+>                   (3 5 8 9 10 11 13 15 16 22 23 24 25 26 28 29 = 6), gen(area
+> )
+(13515 differences between cluster_30 and area)
 
-. local clbl1  "Microbiology and antimicrobials"
+. label define area 1 "Molecular and cellular biology" 2 "Materials and bioengi
+> neering" ///
+>                   3 "Biochemistry and chemistry" 4 "Neuroscience and cognitio
+> n" ///
+>                   5 "Organismal and environmental biology" 6 "Clinical and di
+> sease research"
 
-. local clbl2  "Molecular and cell biology"
+. label values area area
 
-. local clbl3  "Endocrinology and metabolism"
-
-. local clbl4  "Materials and nanoscience"
-
-. local clbl5  "Social and behavioral health"
-
-. local clbl6  "Animal and nutritional physiology"
-
-. local clbl7  "Structural chemistry and enzymology"
-
-. local clbl8  "Maternal and perinatal health"
-
-. local clbl9  "Breast cancer"
-
-. local clbl10 "Surgery and gastroenterology"
-
-. local clbl11 "HIV/AIDS"
-
-. local clbl12 "Neuroscience"
-
-. local clbl13 "Hematologic oncology and radiation"
-
-. local clbl14 "Computational and analytical methods"
-
-. local clbl15 "Cardiology"
-
-. local clbl16 "Orthopedics"
-
-. local clbl17 "Sleep medicine"
-
-. local clbl18 "Sensory systems and cognition"
-
-. local clbl19 "Immunology and inflammation"
-
-. local clbl20 "Pharmacology and drug discovery"
-
-. local clbl21 "Genetics and genomics"
-
-. local clbl22 "Lipid metabolism and atherosclerosis"
-
-. local clbl23 "Clinical physiology and pulmonary medicine"
-
-. local clbl24 "Vaccines and virology"
-
-. local clbl25 "Prostate and urologic cancer"
-
-. local clbl26 "Transplantation and nephrology"
-
-. local clbl27 "Ecology and environmental biology"
-
-. local clbl28 "Clinical diabetes"
-
-. local clbl29 "Women's and reproductive health"
-
-. 
-. local n_top 5
-
-. preserve
-
-.     contract cluster_30 if !mi(cluster_30)
-
-.     gsort -_freq
-
-.     keep in 1/`n_top'
-(20 observations deleted)
-
-.     forval i = 1/`n_top' {
-  2.         local top_clus `top_clus' `=cluster_30[`i']'
-  3.     }
-
-. restore
-
-. di as text "top `n_top' research clusters by PI count: `top_clus'"
-top 5 research clusters by PI count: 2 4 7 12 18
+. local n_area 6
 
 . local clus_vars ""
 
 . local clus_labs ""
 
-. foreach k of local top_clus {
-  2.     gen byte clus_`k' = cluster_30 == `k' if !mi(cluster_30)
-  3.     local clus_vars `clus_vars' clus_`k'
-  4.     local clus_labs `"`clus_labs' "`clbl`k''""'
+. forval a = 1/`n_area' {
+  2.     gen byte area_`a' = area == `a' if !mi(area)
+  3.     local clus_vars `clus_vars' area_`a'
+  4.     local clus_labs `"`clus_labs' "`: label area `a''""'
   5. }
-
-. gen byte clus_other = !inlist(cluster_30, `=subinstr("`top_clus'", " ", ",", 
-> .)') if !mi(cluster_30)
-
-. local clus_vars `clus_vars' clus_other
-
-. local clus_labs `"`clus_labs' "Other research areas""'
 
 . 
 . local vars `out_vars' `pi_vars'
@@ -235,13 +166,13 @@ balance[12,9]
  ppr_cnt_any      4.0600      2.6911      4.2594      2.9518      0.1994
 cite_affl_wt      4.0166      4.4192      4.5022      5.1888      0.4856
 avg_num_co~s      4.4137      2.3519      4.5442      2.5161      0.1305
-    n_grants      1.2468      0.9970      1.2880      1.0462      0.0412
-  nih_cost_k    490.5235    660.3862    484.7324    526.2757     -5.7911
+    n_grants      1.2529      0.8010      1.2949      0.8471      0.0421
+  nih_cost_k    502.2828    541.6800    496.5980    472.6365     -5.6848
     exposure      0.0048      0.0177      0.0520      0.0238      0.0472
 mkt_spend_~r      0.2459      0.1130      0.2911      0.1010      0.0452
 yrs_lab_2014     17.3350     11.4358     16.5656     11.3100     -0.7694
       public      0.6144      0.4868      0.6066      0.4885     -0.0078
-    nih_athr      0.5509      0.4974      0.5634      0.4960      0.0125
+    nih_athr      0.4879      0.4999      0.4973      0.5000      0.0094
    foia_athr      0.0086      0.0922      0.0036      0.0595     -0.0050
 
                       se           p    normdiff           N
@@ -249,33 +180,33 @@ yrs_lab_2014     17.3350     11.4358     16.5656     11.3100     -0.7694
  ppr_cnt_any      0.0486      0.0000      0.0706  13515.0000
 cite_affl_wt      0.0829      0.0000      0.1008  13515.0000
 avg_num_co~s      0.0419      0.0019      0.0536  13515.0000
-    n_grants      0.0235      0.0804      0.0403   7530.0000
-  nih_cost_k     13.7801      0.6743     -0.0097   7530.0000
+    n_grants      0.0202      0.0374      0.0510   6657.0000
+  nih_cost_k     12.4691      0.6485     -0.0112   6657.0000
     exposure      0.0004      0.0000      2.2516  13515.0000
 mkt_spend_~r      0.0018      0.0000      0.4216  13515.0000
 yrs_lab_2014      0.1957      0.0001     -0.0676  13515.0000
       public      0.0084      0.3554     -0.0159  13515.0000
-    nih_athr      0.0085      0.1431      0.0252  13515.0000
+    nih_athr      0.0086      0.2747      0.0188  13515.0000
    foia_athr      0.0013      0.0002     -0.0648  13515.0000
 
 . fill_stats, mat(balance_area) vars(`clus_vars')
 
 balance_area[6,9]
-              mean_low      sd_low   mean_high     sd_high        diff
-    clus_2      0.1002      0.3003      0.1968      0.3976      0.0967
-    clus_4      0.0263      0.1602      0.1391      0.3461      0.1128
-    clus_7      0.1129      0.3165      0.0488      0.2155     -0.0641
-   clus_12      0.1085      0.3110      0.0394      0.1945     -0.0691
-   clus_18      0.0778      0.2679      0.0472      0.2121     -0.0306
-clus_other      0.5743      0.4945      0.5286      0.4992     -0.0456
+          mean_low      sd_low   mean_high     sd_high        diff          se
+area_1      0.1496      0.3567      0.2856      0.4517      0.1360      0.0070
+area_2      0.0499      0.2177      0.2066      0.4049      0.1567      0.0056
+area_3      0.1271      0.3331      0.0549      0.2278     -0.0722      0.0049
+area_4      0.1961      0.3970      0.0904      0.2868     -0.1056      0.0060
+area_5      0.2344      0.4236      0.1367      0.3436     -0.0976      0.0066
+area_6      0.2430      0.4289      0.2257      0.4181     -0.0173      0.0073
 
-                    se           p    normdiff           N
-    clus_2      0.0061      0.0000      0.2743  13515.0000
-    clus_4      0.0046      0.0000      0.4182  13515.0000
-    clus_7      0.0047      0.0000     -0.2366  13515.0000
-   clus_12      0.0045      0.0000     -0.2664  13515.0000
-   clus_18      0.0042      0.0000     -0.1267  13515.0000
-clus_other      0.0085      0.0000     -0.0919  13515.0000
+                 p    normdiff           N
+area_1      0.0000      0.3342  13515.0000
+area_2      0.0000      0.4822  13515.0000
+area_3      0.0000     -0.2530  13515.0000
+area_4      0.0000     -0.3050  13515.0000
+area_5      0.0000     -0.2531  13515.0000
+area_6      0.0177     -0.0408  13515.0000
 
 . 
 . cap mkdir ../output/tables
@@ -284,37 +215,41 @@ clus_other      0.0085      0.0000     -0.0919  13515.0000
 
 . matrix_to_txt, saving("../output/tables/`samp'/balance_pi`suf'.txt") ///
 >     matrix(balance) title(<tab:balance_pi`suf'>) format(%20.4f) replace
-(file ../output/tables/all_jrnls/balance_pi_r1_r2.txt not found)
 
 . matrix_to_txt, saving("../output/tables/`samp'/balance_area`suf'.txt") ///
 >     matrix(balance_area) title(<tab:balance_area`suf'>) format(%20.4f) replac
 > e
-(file ../output/tables/all_jrnls/balance_area_r1_r2.txt not found)
 
 . 
-. local d = char(36)
+. local bs = char(92)
 
-. forval r = 1/`nr' {
-  2.     local fmt %9.2f
-  3.     if `r' == 6 local fmt %15.2fc
-  4.     if `r' == 9 local fmt %9.1f
-  5.     if inlist(`r', 7, 8) local fmt %9.3f
-  6.     local cells`r' ""
+. local tex_vars ppr_cnt ppr_cnt_any cite_affl_wt n_grants nih_cost_k exposure 
+> mkt_spend_shr yrs_lab_2014 public nih_athr
+
+. local tex_fmts %9.3f   %9.3f       %9.3f        %9.3f    %15.3fc    %9.3f    
+> %9.3f         %9.3f        %9.3f  %9.3f
+
+. local tex_ns   NPIs    NPIs        NPIs         NNIHMatched NNIHMatched NPIs 
+> NPIs          NPIs         NPIs   NPIs
+
+. local i = 0
+
+. foreach v of local tex_vars {
+  2.     local ++i
+  3.     local fmt : word `i' of `tex_fmts'
+  4.     local nmac : word `i' of `tex_ns'
+  5.     local r = rownumb(balance, "`v'")
+  6.     local cells_`v' ""
   7.     forval c = 1/7 {
-  8.         local v = balance[`r',`c']
+  8.         local x = balance[`r',`c']
   9.         local f `fmt'
  10.         if `c' == 7 local f %9.3f
- 11.         local cell = subinstr(trim(string(abs(`v'), "`f'")), ",", "{,}", .
-> )
- 12.         if `v' < 0 local cell `d'-`d'`cell'
- 13.         if `c' == 6 local cell (`cell')
- 14.         local cells`r' "`cells`r'' & `cell'"
- 15.     }
+ 11.         local cell = subinstr(trim(string(`x', "`f'")), ",", "{,}", .)
+ 12.         if `c' == 6 local cell (`cell')
+ 13.         local cells_`v' "`cells_`v'' & `cell'"
+ 14.     }
+ 15.     local cells_`v' "`cells_`v'' & `bs'`nmac'"
  16. }
-
-. local pct_low  = string(100 * `n_low'  / (`n_low' + `n_high'), "%4.1f")
-
-. local pct_high = string(100 * `n_high' / (`n_low' + `n_high'), "%4.1f")
 
 . local n_low_c    = subinstr(string(`n_low',    "%12.0fc"), ",", "{,}", .)
 
@@ -332,7 +267,6 @@ clus_other      0.0085      0.0000     -0.0919  13515.0000
 . tempname fh
 
 . file open `fh' using "`out'", write replace
-(file ../output/tables/all_jrnls/balance_pi_r1_r2.tex not found)
 
 . file write `fh' "\begin{table}[H]" _n
 
@@ -346,77 +280,74 @@ clus_other      0.0085      0.0000     -0.0919  13515.0000
 
 . file write `fh' "\setlength{\tabcolsep}{3pt}" _n
 
-. file write `fh' "\begin{tabular}{@{}l*{7}{r}@{}}" _n
+. file write `fh' "\resizebox{\textwidth}{!}{%" _n
+
+. file write `fh' "\begin{tabular}{@{}l*{7}{d{3.3}}r@{}}" _n
 
 . file write `fh' "\toprule" _n
 
 . file write `fh' " & \multicolumn{2}{c}{Less exposed} & \multicolumn{2}{c}{Mor
-> e exposed} & \multicolumn{2}{c}{Difference} & \\" _n
+> e exposed} & \multicolumn{2}{c}{Difference} & & \\" _n
 
 . file write `fh' "\cmidrule(lr){2-3} \cmidrule(lr){4-5} \cmidrule(lr){6-7}" _n
 
-. file write `fh' " & Mean & SD & Mean & SD & Coef. & (SE) & \$p\$-value \\" _n
+. file write `fh' " & \mc{Mean} & \mc{SD} & \mc{Mean} & \mc{SD} & \mc{Coef.} & 
+> \mc{(SE)} & \mc{\$p\$-value} & N \\" _n
 
 . file write `fh' "\midrule" _n
 
-. file write `fh' "\multicolumn{8}{l}{\textit{Panel A: Pre-period (2010--2013) 
+. file write `fh' "\multicolumn{9}{l}{\textit{Panel A: Pre-period (2010--2013) 
 > PI averages}} \\" _n
 
-. file write `fh' "\quad Publications (last-author) `cells1' \\" _n
+. file write `fh' "\quad Publications (last author) `cells_ppr_cnt' \\" _n
 
-. file write `fh' "\quad Publications (any position) `cells2' \\" _n
+. file write `fh' "\quad Publications (any position) `cells_ppr_cnt_any' \\" _n
 
-. file write `fh' "\quad Citation-weighted output `cells3' \\" _n
+. file write `fh' "\quad Citation-weighted output `cells_cite_affl_wt' \\" _n
 
-. file write `fh' "\quad Coauthors per paper `cells4' \\" _n
+. file write `fh' "\quad Active NIH grants `cells_n_grants' \\" _n
 
-. file write `fh' "\quad Active NIH grants `cells5' \\" _n
-
-. file write `fh' "\quad NIH funding (" _char(92) _char(36) " thousands)`cells6
-> ' \\" _n
+. file write `fh' "\quad NIH funding (" _char(92) _char(36) " thousands) `cells
+> _nih_cost_k' \\" _n
 
 . file write `fh' "\addlinespace" _n
 
-. file write `fh' "\multicolumn{8}{l}{\textit{Panel B: PI characteristics}} \\"
+. file write `fh' "\multicolumn{9}{l}{\textit{Panel B: PI characteristics}} \\"
 >  _n
 
-. file write `fh' "\quad Exposure measure `cells7' \\" _n
+. file write `fh' "\quad Exposure measure `cells_exposure' \\" _n
 
-. file write `fh' "\quad Treated-market share \$S_i\$`cells8' \\" _n
+. file write `fh' "\quad Treated-market share \$S_i\$ `cells_mkt_spend_shr' \\"
+>  _n
 
-. file write `fh' "\quad Years as PI in 2014 `cells9' \\" _n
+. file write `fh' "\quad Years as PI in 2014 `cells_yrs_lab_2014' \\" _n
 
-. file write `fh' "\quad Public university `cells10' \\" _n
+. file write `fh' "\quad Public university `cells_public' \\" _n
 
-. file write `fh' "\quad Matched to NIH records `cells11' \\" _n
-
-. file write `fh' "\quad FOIA PI (observed exposure) `cells12' \\" _n
-
-. file write `fh' "\midrule" _n
-
-. file write `fh' "Number of PIs & `n_low_c' & & `n_high_c' & & & & \\" _n
+. file write `fh' "\quad Matched to NIH records `cells_nih_athr' \\" _n
 
 . file write `fh' "\bottomrule" _n
 
-. file write `fh' "\end{tabular}" _n
+. file write `fh' "\end{tabular}%" _n
+
+. file write `fh' "}" _n
 
 . file write `fh' "\floatfoot{\textit{Notes:} One observation per PI in the all
-> -journal R1 and R2 panel (\NPIs\ PIs). More-exposed PIs are those whose expos
-> ure measure is above its median across PIs (`exp_med_c'); less-exposed PIs ar
-> e at or below the median." _n
+> -journal R1 and R2 panel (\NPIs\ PIs, `n_low_c' less-exposed and `n_high_c' m
+> ore-exposed). More-exposed PIs are those whose exposure measure is above its 
+> median across PIs (`exp_med_c'); less-exposed PIs are at or below the median.
+>  N is the number of PIs in each row." _n
 
 . file write `fh' "Panel A averages each outcome over a PI's pre-merger years, 
-> 2010--2013. Coauthors per paper is averaged over pre-period years with at lea
-> st one last-author publication." _n
+> 2010--2013." _n
 
 . file write `fh' "Active NIH grants and NIH funding are observed only for PIs 
 > matched to NIH records (`n_low_nihc' less-exposed and `n_high_nihc' more-expo
 > sed PIs)." _n
 
 . file write `fh' "Panel B reports time-invariant PI characteristics. Years as 
-> PI is the number of years since a PI's first last-author publication, measure
-> d in 2014. Public university, matched to NIH records, and FOIA PI are shares.
-> " _n
+> PI is the number of years since a PI's first last-authored publication, measu
+> red in 2014. Public university and matched to NIH records are shares." _n
 
 . file write `fh' "The exposure measure and treated-market share \$S_i\$ are th
 > e shift-share cost increase and the pre-merger treated-market spending share 
@@ -435,6 +366,8 @@ clus_other      0.0085      0.0000     -0.0919  13515.0000
 wrote ../output/tables/all_jrnls/balance_pi_r1_r2.tex
 
 . 
+. local d = char(36)
+
 . local na : word count `clus_vars'
 
 . forval r = 1/`na' {
@@ -452,7 +385,6 @@ wrote ../output/tables/all_jrnls/balance_pi_r1_r2.tex
 . local out ../output/tables/`samp'/balance_area`suf'.tex
 
 . file open `fh' using "`out'", write replace
-(file ../output/tables/all_jrnls/balance_area_r1_r2.tex not found)
 
 . file write `fh' "\begin{table}[H]" _n
 
@@ -501,9 +433,8 @@ wrote ../output/tables/all_jrnls/balance_pi_r1_r2.tex
 > e at or below the median." _n
 
 . file write `fh' "Each row is the share of PIs whose pre-period publication te
-> xt falls in one of the `n_top' largest of the 30 topical research clusters, n
-> amed by their most distinctive terms; all remaining clusters are grouped as o
-> ther research areas, so shares in each column sum to one." _n
+> xt falls in one of six research areas, formed by grouping the 30 topical clus
+> ters of PI publication text; shares in each column sum to one." _n
 
 . file write `fh' "Difference is the more-exposed minus less-exposed share, wit
 > h heteroskedasticity-robust standard errors in parentheses and the \$p\$-valu
@@ -515,6 +446,79 @@ wrote ../output/tables/all_jrnls/balance_pi_r1_r2.tex
 
 . di as text "wrote `out'"
 wrote ../output/tables/all_jrnls/balance_area_r1_r2.tex
+
+. 
+. keep area high
+
+. gen one = 1
+
+. gcollapse (count) n = one, by(area high)
+
+. bys high: egen tot = total(n)
+
+. gen share = 100 * n / tot
+
+. drop n tot
+
+. reshape wide share, i(area) j(high)
+(j = 0 1)
+
+Data                               Long   ->   Wide
+-----------------------------------------------------------------------------
+Number of observations               12   ->   6           
+Number of variables                   3   ->   3           
+j variable (2 values)              high   ->   (dropped)
+xij variables:
+                                  share   ->   share0 share1
+-----------------------------------------------------------------------------
+
+. gen diff = share1 - share0
+
+. gsort -diff
+
+. gen pos    = `n_area' + 1 - _n
+
+. gen pos_lo = pos + 0.19
+
+. gen pos_hi = pos - 0.19
+
+. gen lab0 = string(share0, "%4.1f")
+
+. gen lab1 = string(share1, "%4.1f")
+
+. local ylabs ""
+
+. forval i = 1/`n_area' {
+  2.     local ylabs `"`ylabs' `=pos[`i']' "`: label area `=area[`i']''""'
+  3. }
+
+. qui sum share0
+
+. local xmax = r(max)
+
+. qui sum share1
+
+. local xmax = 1.12 * max(`xmax', r(max))
+
+. tw (bar share0 pos_lo, horizontal barwidth(0.34) color(ebblue)) ///
+>    (bar share1 pos_hi, horizontal barwidth(0.34) color(dkorange)) ///
+>    (scatter pos_lo share0, msymbol(none) mlabel(lab0) mlabpos(3) mlabcolor(bl
+> ack) mlabsize(small)) ///
+>    (scatter pos_hi share1, msymbol(none) mlabel(lab1) mlabpos(3) mlabcolor(bl
+> ack) mlabsize(small)), ///
+>     ylabel(`ylabs', angle(0) nogrid labsize(small) notick) ytitle("") yscale(
+> lstyle(none)) ///
+>     xlabel(none) xtick(none) xscale(range(0 `xmax') lstyle(none)) ///
+>     xtitle("Share of PIs (%)", color(black)) ///
+>     legend(order(1 "Less exposed" 2 "More exposed") pos(12) ring(1) rows(1) s
+> ize(small) region(lstyle(none)))
+
+. cap mkdir ../output/figures
+
+. cap mkdir ../output/figures/`samp'
+
+. graph export ../output/figures/`samp'/balance_area`suf'.pdf, replace
+file ../output/figures/all_jrnls/balance_area_r1_r2.pdf saved as PDF format
 
 . 
 end of do-file

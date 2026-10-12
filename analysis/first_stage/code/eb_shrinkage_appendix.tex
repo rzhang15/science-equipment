@@ -43,4 +43,30 @@ into the shift-share exposure measure. The same procedure is applied to the
 market-level spending coefficients ($\hat\tau^2 = 0.093$, $\hat\mu = 0.37$),
 which are used only descriptively.
 
+The precision weights above take the reported $\widehat{se}_m$ at face value,
+but each is a cluster-robust standard error computed from three market
+clusters (one treated, two matched controls), so the share of cross-market
+spread attributed to true heterogeneity, $0.94$, is an upper bound. The
+placebo assignments of Figure~4 provide a model-free noise benchmark:
+within a placebo draw the cross-market variance of the estimated
+coefficients is $0.020$, nine times the mean reported $\widehat{se}_m^{\,2}$
+of $0.002$, and it is flat across markets sorted by reported standard error
+(Appendix Figure~\ref{fig:placebo_noise_vs_se}), so the excess is noise
+common to every market rather than noise that scales with
+$\widehat{se}_m$. Re-estimating the prior with noise variance
+$\widehat{se}_m^{\,2} + 0.018$ gives $\hat\tau^2 = 0.013$ (39 percent of
+the raw cross-market variance), a shrinkage target of $\hat\mu = 0.06$, and
+weights between $0.25$ and $0.42$ (median $0.41$). Because the weights are
+nearly uniform, the re-shrunk effects are a rescaling of the baseline ones:
+their correlation with $\hat\beta^{EB}_m$ is $0.998$ (rank correlation
+$0.997$, 2013-spend-weighted correlation $0.999$), so the cross-sectional
+ordering of the exposure measure and every reduced-form $t$-statistic are
+unchanged. Adopting the placebo benchmark would scale the reduced-form
+coefficient by $1/0.41 = 2.4$, from $-0.42$ to about $-1.0$. The implied
+output loss rises less than proportionally, because shrinkage toward
+$\hat\mu$ holds up the level of exposure while removing its dispersion:
+average exposure falls from $0.028$ to $0.021$ rather than to $0.012$, so
+the implied decline for the average PI rises from $1.2$ to about $2.1$
+percent.
+
 \end{document}

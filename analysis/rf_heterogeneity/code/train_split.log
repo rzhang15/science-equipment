@@ -1,0 +1,332 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: 32-user 64-core network perpetual
+Serial number: 501706311472
+  Licensed to: Harvard Research Computing
+               Cambridge MA
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 120,000; see help set_maxvar.
+
+. do train_split.do 
+
+. set more off
+
+. use /n/home02/cxu75/sci_eq/analysis/rf_heterogeneity/temp/es_all_jrnls_r1_r2.
+> dta, clear
+
+. cap drop train_yrs
+
+. cap drop y_longtrain
+
+. cap drop y_shorttrain
+
+. gen train_yrs = min_year - min_year_any
+
+. qui sum train_yrs if athr_indicator == 1 & young == 1, d
+
+. local train_med = r(p50)
+
+. di as text "training yrs among early-career PIs: p10=" r(p10) " p25=" r(p25) 
+> " p50=" r(p50) " p75=" r(p75) " p90=" r(p90) " mean=" %5.2f r(mean)
+training yrs among early-career PIs: p10=0 p25=1 p50=5 p75=9 p90=14 mean= 6.20
+
+. qui sum train_yrs if athr_indicator == 1 & old == 1, d
+
+. di as text "training yrs among late-career PIs: p50=" r(p50) " mean=" %5.2f r
+> (mean)
+training yrs among late-career PIs: p50=2 mean= 3.84
+
+. tab train_yrs if athr_indicator == 1 & young == 1
+
+  train_yrs |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          0 |      1,348       20.38       20.38
+          1 |        458        6.93       27.31
+          2 |        397        6.00       33.31
+          3 |        430        6.50       39.82
+          4 |        421        6.37       46.18
+          5 |        457        6.91       53.09
+          6 |        419        6.34       59.43
+          7 |        381        5.76       65.19
+          8 |        389        5.88       71.07
+          9 |        360        5.44       76.52
+         10 |        285        4.31       80.83
+         11 |        223        3.37       84.20
+         12 |        181        2.74       86.93
+         13 |        171        2.59       89.52
+         14 |        131        1.98       91.50
+         15 |        103        1.56       93.06
+         16 |         80        1.21       94.27
+         17 |         56        0.85       95.12
+         18 |         59        0.89       96.01
+         19 |         53        0.80       96.81
+         20 |         30        0.45       97.26
+         21 |         24        0.36       97.63
+         22 |         15        0.23       97.85
+         23 |         20        0.30       98.16
+         24 |         10        0.15       98.31
+         25 |         20        0.30       98.61
+         26 |         15        0.23       98.84
+         27 |         10        0.15       98.99
+         28 |         12        0.18       99.17
+         29 |          8        0.12       99.29
+         30 |          8        0.12       99.41
+         31 |          3        0.05       99.46
+         32 |          6        0.09       99.55
+         33 |          1        0.02       99.56
+         34 |          3        0.05       99.61
+         35 |          7        0.11       99.71
+         36 |          2        0.03       99.74
+         37 |          3        0.05       99.79
+         38 |          1        0.02       99.80
+         39 |          1        0.02       99.82
+         40 |          2        0.03       99.85
+         42 |          1        0.02       99.86
+         43 |          1        0.02       99.88
+         46 |          1        0.02       99.89
+         48 |          1        0.02       99.91
+         49 |          1        0.02       99.92
+         51 |          1        0.02       99.94
+         52 |          1        0.02       99.95
+         53 |          1        0.02       99.97
+         55 |          1        0.02       99.98
+         62 |          1        0.02      100.00
+------------+-----------------------------------
+      Total |      6,613      100.00
+
+. gen byte y_longtrain  = train_yrs >  `train_med' if young == 1 & !mi(train_yr
+> s)
+(69,020 missing values generated)
+
+. gen byte y_shorttrain = train_yrs <= `train_med' if young == 1 & !mi(train_yr
+> s)
+(69,020 missing values generated)
+
+. qui count if athr_indicator == 1 & y_longtrain == 1
+
+. di as text "long training (> `train_med' yrs): " r(N)
+long training (> 5 yrs): 3102
+
+. qui count if athr_indicator == 1 & y_shorttrain == 1
+
+. di as text "short training (<= `train_med' yrs): " r(N)
+short training (<= 5 yrs): 3511
+
+. qui sum train_yrs if athr_indicator == 1 & y_longtrain == 1
+
+. di as text "  mean yrs long = " %5.2f r(mean)
+  mean yrs long = 11.13
+
+. qui sum train_yrs if athr_indicator == 1 & y_shorttrain == 1
+
+. di as text "  mean yrs short = " %5.2f r(mean)
+  mean yrs short =  1.85
+
+. qui sum min_year if athr_indicator == 1 & y_longtrain == 1
+
+. di as text "  mean first last-author yr long = " %6.1f r(mean)
+  mean first last-author yr long = 2006.5
+
+. qui sum min_year if athr_indicator == 1 & y_shorttrain == 1
+
+. di as text "  mean first last-author yr short = " %6.1f r(mean)
+  mean first last-author yr short = 2005.7
+
+. 
+. gen post       = year >= 2014
+
+. gen Z_it       = exposure      * post
+
+. gen Z_share_it = mkt_spend_shr * post
+
+. foreach pair in "y_longtrain y_shorttrain" {
+  2.     local g1 : word 1 of `pair'
+  3.     local g2 : word 2 of `pair'
+  4.     gen Z_`g1'  = Z_it       * `g1'
+  5.     gen Z_`g2'  = Z_it       * `g2'
+  6.     gen S_`g1'  = Z_share_it * `g1'
+  7.     gen S_`g2'  = Z_share_it * `g2'
+  8.     gen PT_`g1' = post * `g1'
+  9.     ppmlhdfe ppr_cnt Z_`g1' Z_`g2' S_`g1' S_`g2' PT_`g1', absorb(athr_id y
+> ear) vce(cluster athr_id)
+ 10.     gunique athr_id if e(sample)
+ 11.     local npi = r(unique)
+ 12.     lincom Z_`g1' - Z_`g2'
+ 13.     di as result _n "== `pair': N=" e(N) " PIs=`npi'"
+ 14.     di as result "   `g1' = " %7.4f _b[Z_`g1'] " (" %6.4f _se[Z_`g1'] ")"
+ 15.     di as result "   `g2' = " %7.4f _b[Z_`g2'] " (" %6.4f _se[Z_`g2'] ")"
+ 16.     di as result "   diff = " %7.4f r(estimate) " (" %6.4f r(se) ")  p=" %
+> 5.3f r(p)
+ 17. }
+(69,020 missing values generated)
+(69,020 missing values generated)
+(69,020 missing values generated)
+(69,020 missing values generated)
+(69,020 missing values generated)
+Iteration 1:   deviance = 7.3984e+04  eps = .         iters = 3    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.47  P   
+Iteration 2:   deviance = 7.1992e+04  eps = 2.77e-02  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.76      
+Iteration 3:   deviance = 7.1972e+04  eps = 2.79e-04  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.82      
+Iteration 4:   deviance = 7.1972e+04  eps = 4.35e-07  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.82      
+Iteration 5:   deviance = 7.1972e+04  eps = 3.21e-11  iters = 2    tol = 1.0e-0
+> 5                                                                            
+>    min(eta) =  -1.82   S  
+Iteration 6:   deviance = 7.1972e+04  eps = 0.00e+00  iters = 2    tol = 1.0e-0
+> 8                                                                            
+>    min(eta) =  -1.82   S O
+-------------------------------------------------------------------------------
+> -----------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon 
+> below tolerance)
+Converged in 6 iterations and 13 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =     66,130
+Absorbing 2 HDFE groups                           Residual df     =      6,612
+Statistics robust to heteroskedasticity           Wald chi2(5)    =      26.54
+Deviance             =  71971.50508               Prob > chi2     =     0.0001
+Log pseudolikelihood = -98453.60832               Pseudo R2       =     0.1765
+
+Number of clusters (athr_id)=      6,613
+                            (Std. err. adjusted for 6,613 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+Z_y_longtr~n |   .2558501   .3466495     0.74   0.460    -.4235703    .9352706
+Z_y_shortt~n |  -1.494518   .3172017    -4.71   0.000    -2.116222   -.8728142
+S_y_longtr~n |   .0467745   .1130818     0.41   0.679    -.1748617    .2684107
+S_y_shortt~n |   .0344537   .1088385     0.32   0.752    -.1788659    .2477732
+PT_y_longt~n |  -.0241492   .0461442    -0.52   0.601    -.1145901    .0662917
+       _cons |   .7176817   .0172507    41.60   0.000      .683871    .7514924
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |      6613        6613           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+N = 66,130; 6,613 balanced groups of size 10
+
+ ( 1)  Z_y_longtrain - Z_y_shorttrain = 0
+
+------------------------------------------------------------------------------
+     ppr_cnt | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   1.750368   .4698753     3.73   0.000     .8294296    2.671307
+------------------------------------------------------------------------------
+
+== y_longtrain y_shorttrain: N=66130 PIs=6613
+   y_longtrain =  0.2559 (0.3466)
+   y_shorttrain = -1.4945 (0.3172)
+   diff =  1.7504 (0.4699)  p=0.000
+
+. * continuous version: interaction with training years among early-career PIs
+. gen Z_y     = Z_it * young
+
+. gen Z_ytr   = Z_it * young * train_yrs
+
+. gen S_y     = Z_share_it * young
+
+. gen S_ytr   = Z_share_it * young * train_yrs
+
+. gen PT_y    = post * young
+
+. gen PT_ytr  = post * young * train_yrs
+
+. gen Z_o     = Z_it * old
+
+. gen S_o     = Z_share_it * old
+
+. ppmlhdfe ppr_cnt Z_y Z_ytr Z_o S_y S_ytr S_o PT_y PT_ytr, absorb(athr_id year
+> ) vce(cluster athr_id)
+Iteration 1:   deviance = 1.5068e+05  eps = .         iters = 3    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.54  P   
+Iteration 2:   deviance = 1.4653e+05  eps = 2.83e-02  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.85      
+Iteration 3:   deviance = 1.4650e+05  eps = 2.49e-04  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.91      
+Iteration 4:   deviance = 1.4650e+05  eps = 2.11e-07  iters = 2    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -1.92      
+Iteration 5:   deviance = 1.4650e+05  eps = 8.34e-12  iters = 2    tol = 1.0e-0
+> 5                                                                            
+>    min(eta) =  -1.92   S  
+Iteration 6:   deviance = 1.4650e+05  eps = 1.84e-16  iters = 2    tol = 1.0e-0
+> 8                                                                            
+>    min(eta) =  -1.92   S O
+-------------------------------------------------------------------------------
+> -----------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon 
+> below tolerance)
+Converged in 6 iterations and 13 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =    135,150
+Absorbing 2 HDFE groups                           Residual df     =     13,514
+Statistics robust to heteroskedasticity           Wald chi2(8)    =     128.88
+Deviance             =  146495.4745               Prob > chi2     =     0.0000
+Log pseudolikelihood = -203511.6591               Pseudo R2       =     0.1956
+
+Number of clusters (athr_id)=     13,515
+                           (Std. err. adjusted for 13,515 clusters in athr_id)
+------------------------------------------------------------------------------
+             |               Robust
+     ppr_cnt | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         Z_y |  -1.499345   .3312581    -4.53   0.000    -2.148599   -.8500913
+       Z_ytr |   .1339101   .0409496     3.27   0.001     .0536504    .2141698
+         Z_o |  -.2087189    .249117    -0.84   0.402    -.6969793    .2795416
+         S_y |  -.0189115    .115944    -0.16   0.870    -.2461577    .2083346
+       S_ytr |   .0097491   .0135261     0.72   0.471    -.0167617    .0362598
+         S_o |  -.0654308   .0689264    -0.95   0.342     -.200524    .0696625
+        PT_y |   .1413375   .0400769     3.53   0.000     .0627883    .2198867
+      PT_ytr |  -.0059052   .0038108    -1.55   0.121    -.0133742    .0015638
+       _cons |   .7562142   .0100464    75.27   0.000     .7365237    .7759048
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     athr_id |     13515       13515           0    *|
+        year |        10           1           9     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. di as result _n "== continuous: early-career response at 0 training yrs = " %
+> 7.4f _b[Z_y] " (" %6.4f _se[Z_y] ")"
+
+== continuous: early-career response at 0 training yrs = -1.4993 (0.3313)
+
+. di as result "   change per training yr = " %7.4f _b[Z_ytr] " (" %6.4f _se[Z_
+> ytr] ")  p=" %5.3f (2*normal(-abs(_b[Z_ytr]/_se[Z_ytr])))
+   change per training yr =  0.1339 (0.0409)  p=0.001
+
+. 
+end of do-file

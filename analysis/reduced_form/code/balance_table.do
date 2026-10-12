@@ -4,6 +4,42 @@ capture log close
 version 17
 set scheme modern
 
+global PRES_SCALE 1.2
+
+cap program drop fig_export
+program fig_export
+    syntax, path(string) [mode(string) xsize(real 6) ysize(real 4)]
+    local p : subinstr local path "/paper/" "/", all
+    local p : subinstr local p "/pres/" "/", all
+    local k = strpos("`p'", "figures/")
+    if `k' > 0 {
+        local base = substr("`p'", 1, `k' + 7)
+        local rest = substr("`p'", `k' + 8, .)
+    }
+    else {
+        local slash = strrpos("`p'", "/")
+        local base = substr("`p'", 1, `slash')
+        local rest = substr("`p'", `slash' + 1, .)
+    }
+    local tscale = cond(`xsize' >= `ysize', (2/3) * `xsize' / min(`xsize', `ysize'), 1)
+    if "`mode'" == "presentation" local mode pres
+    foreach m in paper pres {
+        if "`mode'" != "" & "`mode'" != "`m'" continue
+        local dir "`base'`m'"
+        cap mkdir "`dir'"
+        local sub "`rest'"
+        while strpos("`sub'", "/") > 0 {
+            local seg = substr("`sub'", 1, strpos("`sub'", "/") - 1)
+            local dir "`dir'/`seg'"
+            cap mkdir "`dir'"
+            local sub = substr("`sub'", strpos("`sub'", "/") + 1, .)
+        }
+        local s = cond("`m'" == "pres", `tscale' * $PRES_SCALE, `tscale')
+        graph display, scale(`s')
+        graph export "`base'`m'/`rest'", replace
+    }
+end
+
 local samp all_jrnls
 local suf  _r1_r2
 
@@ -34,7 +70,21 @@ program fill_stats
     mat list `mat', format(%12.4f)
 end
 
+import delimited ../external/nih_grants/pi_athr_crosswalk.csv, clear varnames(1) stringcols(_all)
+keep athr_id
+drop if mi(athr_id)
+duplicates drop athr_id, force
+gen byte nih_name_matched = 1
+save ../temp/nih_name_matches, replace
+
 use ../output/prepped_samples/es_`samp'`suf', clear
+merge m:1 athr_id using ../temp/nih_name_matches, keep(1 3) nogen
+replace nih_name_matched = 0 if mi(nih_name_matched)
+foreach v in n_grants nih_total_cost {
+    replace `v' = 0 if mi(`v') & nih_name_matched == 1
+    replace `v' = . if nih_name_matched != 1
+}
+replace nih_athr = nih_name_matched
 gen nih_cost_k   = nih_total_cost / 1000
 gen yrs_lab_2014 = 2014 - min_year
 replace foia_athr = 0 if mi(foia_athr)
@@ -62,6 +112,7 @@ qui count if !mi(n_grants) & high == 0
 local n_low_nih = r(N)
 qui count if !mi(n_grants) & high == 1
 local n_high_nih = r(N)
+local n_nih = `n_low_nih' + `n_high_nih'
 di as text "exposure median = " %8.4f `exp_med' "; PIs: less-exposed `n_low', more-exposed `n_high'"
 
 recode cluster_30 (2 19 21 = 1) (4 14 = 2) (7 20 = 3) (12 17 18 = 4) (0 1 6 27 = 5) ///
@@ -91,25 +142,29 @@ matrix_to_txt, saving("../output/tables/`samp'/balance_pi`suf'.txt") ///
 matrix_to_txt, saving("../output/tables/`samp'/balance_area`suf'.txt") ///
     matrix(balance_area) title(<tab:balance_area`suf'>) format(%20.4f) replace
 
-local d = char(36)
-forval r = 1/`nr' {
-    local fmt %9.2f
-    if `r' == 6 local fmt %15.2fc
-    if `r' == 9 local fmt %9.1f
-    if inlist(`r', 7, 8) local fmt %9.3f
-    local cells`r' ""
+local bs = char(92)
+local tex_vars ppr_cnt ppr_cnt_any cite_affl_wt n_grants nih_cost_k exposure mkt_spend_shr yrs_lab_2014 public nih_athr
+local tex_fmts %9.3f   %9.3f       %9.3f        %9.3f    %15.3fc    %9.3f    %9.3f         %9.3f        %9.3f  %9.3f
+local tex_ns   NPIs    NPIs        NPIs         NNIH     NNIH       NPIs     NPIs          NPIs         NPIs   NPIs
+local n_nih_c = subinstr(string(`n_nih', "%12.0fc"), ",", "{,}", .)
+local i = 0
+foreach v of local tex_vars {
+    local ++i
+    local fmt : word `i' of `tex_fmts'
+    local nmac : word `i' of `tex_ns'
+    local r = rownumb(balance, "`v'")
+    local cells_`v' ""
     forval c = 1/7 {
-        local v = balance[`r',`c']
+        local x = balance[`r',`c']
         local f `fmt'
         if `c' == 7 local f %9.3f
-        local cell = subinstr(trim(string(abs(`v'), "`f'")), ",", "{,}", .)
-        if `v' < 0 local cell `d'-`d'`cell'
+        local cell = subinstr(trim(string(`x', "`f'")), ",", "{,}", .)
         if `c' == 6 local cell (`cell')
-        local cells`r' "`cells`r'' & `cell'"
+        local cells_`v' "`cells_`v'' & `cell'"
     }
+    if "`nmac'" == "NNIH" local cells_`v' "`cells_`v'' & `n_nih_c'"
+    else                  local cells_`v' "`cells_`v'' & `bs'`nmac'"
 }
-local pct_low  = string(100 * `n_low'  / (`n_low' + `n_high'), "%4.1f")
-local pct_high = string(100 * `n_high' / (`n_low' + `n_high'), "%4.1f")
 local n_low_c    = subinstr(string(`n_low',    "%12.0fc"), ",", "{,}", .)
 local n_high_c   = subinstr(string(`n_high',   "%12.0fc"), ",", "{,}", .)
 local n_low_nihc = subinstr(string(`n_low_nih',  "%12.0fc"), ",", "{,}", .)
@@ -125,41 +180,40 @@ file write `fh' "\caption{Balance Across More- and Less-Exposed PIs}" _n
 file write `fh' "\label{tab:balance_pi}" _n
 file write `fh' "\setstretch{1}" _n
 file write `fh' "\setlength{\tabcolsep}{3pt}" _n
-file write `fh' "\begin{tabular}{@{}l*{7}{r}@{}}" _n
+file write `fh' "\resizebox{\textwidth}{!}{%" _n
+file write `fh' "\begin{tabular}{@{}l*{7}{d{3.3}}r@{}}" _n
 file write `fh' "\toprule" _n
-file write `fh' " & \multicolumn{2}{c}{Less exposed} & \multicolumn{2}{c}{More exposed} & \multicolumn{2}{c}{Difference} & \\" _n
+file write `fh' " & \multicolumn{2}{c}{Less exposed} & \multicolumn{2}{c}{More exposed} & \multicolumn{2}{c}{Difference} & & \\" _n
 file write `fh' "\cmidrule(lr){2-3} \cmidrule(lr){4-5} \cmidrule(lr){6-7}" _n
-file write `fh' " & Mean & SD & Mean & SD & Coef. & (SE) & \$p\$-value \\" _n
+file write `fh' " & \mc{Mean} & \mc{SD} & \mc{Mean} & \mc{SD} & \mc{Coef.} & \mc{(SE)} & \mc{\$p\$-value} & N \\" _n
 file write `fh' "\midrule" _n
-file write `fh' "\multicolumn{8}{l}{\textit{Panel A: Pre-period (2010--2013) PI averages}} \\" _n
-file write `fh' "\quad Publications (last-author) `cells1' \\" _n
-file write `fh' "\quad Publications (any position) `cells2' \\" _n
-file write `fh' "\quad Citation-weighted output `cells3' \\" _n
-file write `fh' "\quad Coauthors per paper `cells4' \\" _n
-file write `fh' "\quad Active NIH grants `cells5' \\" _n
-file write `fh' "\quad NIH funding (" _char(92) _char(36) " thousands)`cells6' \\" _n
+file write `fh' "\multicolumn{9}{l}{\textit{Panel A: Pre-period (2010--2013) PI averages}} \\" _n
+file write `fh' "\quad Publications (last author) `cells_ppr_cnt' \\" _n
+file write `fh' "\quad Publications (any position) `cells_ppr_cnt_any' \\" _n
+file write `fh' "\quad Citation-weighted output `cells_cite_affl_wt' \\" _n
+file write `fh' "\quad Active NIH grants `cells_n_grants' \\" _n
+file write `fh' "\quad NIH funding (" _char(92) _char(36) " thousands) `cells_nih_cost_k' \\" _n
 file write `fh' "\addlinespace" _n
-file write `fh' "\multicolumn{8}{l}{\textit{Panel B: PI characteristics}} \\" _n
-file write `fh' "\quad Exposure measure `cells7' \\" _n
-file write `fh' "\quad Treated-market share \$S_i\$`cells8' \\" _n
-file write `fh' "\quad Years as PI in 2014 `cells9' \\" _n
-file write `fh' "\quad Public university `cells10' \\" _n
-file write `fh' "\quad Matched to NIH records `cells11' \\" _n
-file write `fh' "\quad FOIA PI (observed exposure) `cells12' \\" _n
-file write `fh' "\midrule" _n
-file write `fh' "Number of PIs & `n_low_c' & & `n_high_c' & & & & \\" _n
+file write `fh' "\multicolumn{9}{l}{\textit{Panel B: PI characteristics}} \\" _n
+file write `fh' "\quad Exposure measure `cells_exposure' \\" _n
+file write `fh' "\quad Treated-market share \$S_i\$ `cells_mkt_spend_shr' \\" _n
+file write `fh' "\quad Years as PI in 2014 `cells_yrs_lab_2014' \\" _n
+file write `fh' "\quad Public university `cells_public' \\" _n
+file write `fh' "\quad Matched to NIH records `cells_nih_athr' \\" _n
 file write `fh' "\bottomrule" _n
-file write `fh' "\end{tabular}" _n
-file write `fh' "\floatfoot{\textit{Notes:} One observation per PI in the all-journal R1 and R2 panel (\NPIs\ PIs). More-exposed PIs are those whose exposure measure is above its median across PIs (`exp_med_c'); less-exposed PIs are at or below the median." _n
-file write `fh' "Panel A averages each outcome over a PI's pre-merger years, 2010--2013. Coauthors per paper is averaged over pre-period years with at least one last-author publication." _n
-file write `fh' "Active NIH grants and NIH funding are observed only for PIs matched to NIH records (`n_low_nihc' less-exposed and `n_high_nihc' more-exposed PIs)." _n
-file write `fh' "Panel B reports time-invariant PI characteristics. Years as PI is the number of years since a PI's first last-author publication, measured in 2014. Public university, matched to NIH records, and FOIA PI are shares." _n
+file write `fh' "\end{tabular}%" _n
+file write `fh' "}" _n
+file write `fh' "\floatfoot{\textit{Notes:} One observation per PI in the all-journal R1 and R2 panel (\NPIs\ PIs, `n_low_c' less-exposed and `n_high_c' more-exposed). More-exposed PIs are those whose exposure measure is above its median across PIs (`exp_med_c'); less-exposed PIs are at or below the median. N is the number of PIs in each row." _n
+file write `fh' "Panel A averages each outcome over a PI's pre-merger years, 2010--2013." _n
+file write `fh' "Active NIH grants and NIH funding are observed only for the `n_nih_c' PIs matched to NIH records (`n_low_nihc' less-exposed and `n_high_nihc' more-exposed), including matched PIs with no active research award in a given year." _n
+file write `fh' "Panel B reports time-invariant PI characteristics. Years as PI is the number of years since a PI's first last-authored publication, measured in 2014. Public university and matched to NIH records are shares." _n
 file write `fh' "The exposure measure and treated-market share \$S_i\$ are the shift-share cost increase and the pre-merger treated-market spending share defined in Section~\ref{sec:exposure}, observed for FOIA PIs and imputed for the rest." _n
 file write `fh' "Difference is the more-exposed minus less-exposed mean, with heteroskedasticity-robust standard errors in parentheses and the \$p\$-value of the two-sided test that it equals zero.}" _n
 file write `fh' "\end{table}" _n
 file close `fh'
 di as text "wrote `out'"
 
+local d = char(36)
 local na : word count `clus_vars'
 forval r = 1/`na' {
     local acells`r' ""
@@ -234,4 +288,4 @@ tw (bar share0 pos_lo, horizontal barwidth(0.34) color(ebblue)) ///
     legend(order(1 "Less exposed" 2 "More exposed") pos(12) ring(1) rows(1) size(small) region(lstyle(none)))
 cap mkdir ../output/figures
 cap mkdir ../output/figures/`samp'
-graph export ../output/figures/`samp'/balance_area`suf'.pdf, replace
+fig_export, path("../output/figures/`samp'/balance_area`suf'.pdf")

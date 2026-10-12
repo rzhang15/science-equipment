@@ -81,6 +81,48 @@ cap mkdir ../output/tables/`samp'/robustness
 matrix_to_txt, saving("../output/tables/`samp'/robustness/exposure_variants`suf'.txt") ///
     matrix(expvar) title(<tab:exposure_variants`suf'>) format(%20.4f) replace
 
+* Panel B: number of nearest FOIA PIs used in the imputation (baseline k = 3).
+* Imputed PIs take exposure and S_i from the _cf_k`k' file; FOIA PIs keep observed values.
+mat expk = J(9,5,.)
+forval k = 1/5 {
+    import delimited "../external/exposure/final_imputed_shift_share_hc_all3_cf_k`k'.csv", clear
+    keep athr_id exposure_ss sum_imputed_shares
+    save ../temp/exposure_k`k', replace
+
+    use ../output/prepped_samples/es_`samp'`suf', clear
+    merge m:1 athr_id using ../temp/exposure_k`k', keep(1 3)
+    keep if foia_athr == 1 | _merge == 3
+    replace exposure      = exposure_ss        if foia_athr != 1
+    replace mkt_spend_shr = sum_imputed_shares if foia_athr != 1
+    drop _merge exposure_ss sum_imputed_shares
+    gen post  = year >= 2014
+    gen Z_it  = exposure      * post
+    gen Zs_it = mkt_spend_shr * post
+
+    ppmlhdfe ppr_cnt Z_it Zs_it, absorb(athr_id year) vce(cluster athr_id)
+    mat expk[1,`k'] = _b[Z_it]
+    mat expk[2,`k'] = _se[Z_it]
+    local b = _b[Z_it]
+    qui sum exposure if e(sample)
+    local xbar = r(mean)
+    qui sum ppr_cnt if year < 2014 & e(sample)
+    mat expk[5,`k'] = 100 * (1 - exp(`b'*`xbar'))
+    mat expk[6,`k'] = r(mean)
+    mat expk[7,`k'] = e(N)
+    mat expk[8,`k'] = `xbar'
+
+    ppmlhdfe ppr_cnt Z_it, absorb(athr_id year) vce(cluster athr_id)
+    mat expk[3,`k'] = _b[Z_it]
+    mat expk[4,`k'] = _se[Z_it]
+    mat expk[9,`k'] = e(N)
+}
+mat rownames expk = b_wshare se_wshare b_base se_base decline_pct ///
+                    pre_mean N_wshare avg_exposure N_base
+mat colnames expk = k1 k2 k3 k4 k5
+mat list expk, format(%9.4f)
+matrix_to_txt, saving("../output/tables/`samp'/robustness/exposure_variants_k`suf'.txt") ///
+    matrix(expk) title(<tab:exposure_variants_k`suf'>) format(%20.4f) replace
+
 forval c = 1/5 {
     foreach p in w n {
         local r  = cond("`p'" == "w", 1, 3)
@@ -99,6 +141,20 @@ forval c = 1/5 {
     local pm`c' = trim(string(expvar[6,`c'], "%5.2f"))
     local nn`c' = subinstr(trim(string(expvar[7,`c'], "%12.0fc")), ",", "{,}", .)
 }
+forval k = 1/5 {
+    foreach p in w n {
+        local r  = cond("`p'" == "w", 1, 3)
+        local b  = expk[`r',`k']
+        local se = expk[`r'+1,`k']
+        local t  = abs(`b'/`se')
+        local kst`p'`k' = cond(`t' >= 2.576, "^{***}", cond(`t' >= 1.960, "^{**}", cond(`t' >= 1.645, "^{*}", "")))
+        local kb`p'`k'  = trim(string(`b', "%6.3f"))
+        local kse`p'`k' = trim(string(`se', "%6.3f"))
+    }
+    local kdc`k' = trim(string(expk[5,`k'], "%4.1f"))
+    local kpm`k' = trim(string(expk[6,`k'], "%5.2f"))
+    local knn`k' = subinstr(trim(string(expk[7,`k'], "%12.0fc")), ",", "{,}", .)
+}
 
 local out ../output/tables/`samp'/robustness/rf_exposure_variants`suf'.tex
 * char(36): "\$" fails to escape right after an empty macro
@@ -115,6 +171,7 @@ file write `fh' " & (1) & (2) & (3) & (4) & (5) \\" _n
 file write `fh' " & Baseline & Renormalized & Positive & Precision- & High- \\" _n
 file write `fh' " &          & shares       & exposure & weighted   & similarity \\" _n
 file write `fh' "\midrule" _n
+file write `fh' "\multicolumn{6}{l}{\textit{Panel A: Exposure construction}} \\[2pt]" _n
 file write `fh' "\multicolumn{6}{l}{\textit{Post \$\times\$ Exposure}} \\[2pt]" _n
 file write `fh' "\quad With \$S_i\$ control   & \$\RFCoef`stw1'`d' & \$`bw2'`stw2'`d' & \$`bw3'`stw3'`d' & \$`bw4'`stw4'`d' & \$`bw5'`stw5'`d' \\" _n
 file write `fh' "                          & \$(\RFCoefSd)\$ & \$(`sew2')\$ & \$(`sew3')\$ & \$(`sew4')\$ & \$(`sew5')\$ \\" _n
@@ -125,14 +182,29 @@ file write `fh' "Implied output decline (\%) & \OutputDecline & `dc2' & `dc3' & 
 file write `fh' "\midrule" _n
 file write `fh' "Pre-period mean             & \PoisMean & `pm2' & `pm3' & `pm4' & `pm5' \\" _n
 file write `fh' "Observations                & \RFObs & `nn2' & `nn3' & `nn4' & `nn5' \\" _n
+file write `fh' "\midrule" _n
+file write `fh' "\multicolumn{6}{l}{\textit{Panel B: Number of nearest FOIA PIs in the imputation}} \\[2pt]" _n
+file write `fh' " & \$k=1\$ & \$k=2\$ & \$k=3\$ & \$k=4\$ & \$k=5\$ \\" _n
+file write `fh' " &  &  & (baseline) &  &  \\" _n
+file write `fh' "\multicolumn{6}{l}{\textit{Post \$\times\$ Exposure}} \\[2pt]" _n
+file write `fh' "\quad With \$S_i\$ control   & \$`kbw1'`kstw1'`d' & \$`kbw2'`kstw2'`d' & \$`kbw3'`kstw3'`d' & \$`kbw4'`kstw4'`d' & \$`kbw5'`kstw5'`d' \\" _n
+file write `fh' "                          & \$(`ksew1')\$ & \$(`ksew2')\$ & \$(`ksew3')\$ & \$(`ksew4')\$ & \$(`ksew5')\$ \\" _n
+file write `fh' "\quad No \$S_i\$ control     & \$`kbn1'`kstn1'`d' & \$`kbn2'`kstn2'`d' & \$`kbn3'`kstn3'`d' & \$`kbn4'`kstn4'`d' & \$`kbn5'`kstn5'`d' \\" _n
+file write `fh' "                          & \$(`ksen1')\$ & \$(`ksen2')\$ & \$(`ksen3')\$ & \$(`ksen4')\$ & \$(`ksen5')\$ \\" _n
+file write `fh' "\addlinespace" _n
+file write `fh' "Implied output decline (\%) & `kdc1' & `kdc2' & `kdc3' & `kdc4' & `kdc5' \\" _n
+file write `fh' "\midrule" _n
+file write `fh' "Pre-period mean             & `kpm1' & `kpm2' & `kpm3' & `kpm4' & `kpm5' \\" _n
+file write `fh' "Observations                & `knn1' & `knn2' & `knn3' & `knn4' & `knn5' \\" _n
 file write `fh' "\bottomrule" _n
 file write `fh' "\end{tabular}" _n
 file write `fh' "\floatfoot{\textit{Notes:} Each column is a Poisson (PPML) difference-in-differences regression of annual publication counts on the interaction of post-merger timing with PI exposure, with author and year fixed effects and standard errors clustered at the PI level." _n
-file write `fh' "Column (1) is the baseline exposure measure of Table~\ref{tab:rf_main}." _n
+file write `fh' "Panel A varies how exposure is constructed. Column (1) is the baseline exposure measure of Table~\ref{tab:rf_main}." _n
 file write `fh' "Column (2) renormalizes each PI's market shares to sum to one (exposure divided by the treated-market share \$S_i\$); renormalization is the \citet{borusyak_quasi-experimental_2022} alternative to including \$S_i\$ as a control, so the no-control row does not apply." _n
 file write `fh' "Column (3) restricts the panel to PIs with strictly positive exposure." _n
 file write `fh' "Column (4) weights each PI by the maximum text similarity of their publications to a FOIA PI, so that precisely imputed exposures receive more weight; the implied decline is evaluated at the similarity-weighted average exposure." _n
 file write `fh' "Column (5) restricts to the top `hisim_pct'\% of imputed PIs by maximum similarity (FOIA PIs, whose exposure is observed, are always retained)." _n
+file write `fh' "Panel B varies the number of nearest FOIA PIs (by text similarity) whose observed spending shares are averaged to impute each non-FOIA PI's exposure and treated-market share \$S_i\$; the baseline uses \$k=3\$, and FOIA PIs keep their observed values in every column." _n
 file write `fh' "The implied output decline is the reduction for the average PI implied by the with-\$S_i\$ coefficient (for column (2), the renormalized coefficient) at that column's average exposure, expressed as a percent of the pre-period mean." _n
 file write `fh' "Significance: \$^{*}\$ \$p<0.10\$, \$^{**}\$ \$p<0.05\$, \$^{***}\$ \$p<0.01\$.}" _n
 file write `fh' "\end{table}" _n

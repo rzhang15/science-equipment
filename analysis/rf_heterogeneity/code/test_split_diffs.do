@@ -8,7 +8,7 @@ log using test_split_diffs.log, replace
 
 local fes athr_id year
 local vce_cl athr_id
-local pairs `" "young old" "r1 r2" "high_pre_ppr low_pre_ppr" "high_nihd low_nihd" "big_msa small_msa" "hiw_tfnd low_tfnd" "hiw_lsf low_lsf" "hiw_endow low_endow" "'
+local pairs `" "young old" "r1 r2" "high_nihd low_nihd" "big_msa small_msa" "hiw_tfnd low_tfnd" "hiw_lsf low_lsf" "hiw_endow low_endow" "'
 
 foreach suf in _r1_r2 {
     cap confirm file "../temp/es_all_jrnls`suf'.dta"

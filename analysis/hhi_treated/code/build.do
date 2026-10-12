@@ -4,6 +4,42 @@ capture log close
 program drop _all
 set scheme modern
 preliminaries
+
+global PRES_SCALE 1.2
+
+cap program drop fig_export
+program fig_export
+    syntax, path(string) [mode(string) xsize(real 6) ysize(real 4)]
+    local p : subinstr local path "/paper/" "/", all
+    local p : subinstr local p "/pres/" "/", all
+    local k = strpos("`p'", "figures/")
+    if `k' > 0 {
+        local base = substr("`p'", 1, `k' + 7)
+        local rest = substr("`p'", `k' + 8, .)
+    }
+    else {
+        local slash = strrpos("`p'", "/")
+        local base = substr("`p'", 1, `slash')
+        local rest = substr("`p'", `slash' + 1, .)
+    }
+    local tscale = cond(`xsize' >= `ysize', (2/3) * `xsize' / min(`xsize', `ysize'), 1)
+    if "`mode'" == "presentation" local mode pres
+    foreach m in paper pres {
+        if "`mode'" != "" & "`mode'" != "`m'" continue
+        local dir "`base'`m'"
+        cap mkdir "`dir'"
+        local sub "`rest'"
+        while strpos("`sub'", "/") > 0 {
+            local seg = substr("`sub'", 1, strpos("`sub'", "/") - 1)
+            local dir "`dir'/`seg'"
+            cap mkdir "`dir'"
+            local sub = substr("`sub'", strpos("`sub'", "/") + 1, .)
+        }
+        local s = cond("`m'" == "pres", `tscale' * $PRES_SCALE, `tscale')
+        graph display, scale(`s')
+        graph export "`base'`m'/`rest'", replace
+    }
+end
 version 17
 
 program main 
@@ -17,17 +53,17 @@ program comp_hhi
     corr simulated_hhi delta_hhi
     local corr: dis %4.3f r(rho)
     tw scatter simulated_hhi delta_hhi, mlabel(category) msize(vsmall) mlabsize(tiny) ///
-      ytitle("Simulated HHI = 2 x Thermo x LifeTech",  size(small))  ///
+      ytitle("Simulated HHI = 2 x Thermo x LifeTech",  size(medsmall))  ///
       xlab(, labsize(small)) ylab(, labsize(small)) ///
-      xtitle("Delta HHI (Post Period - Pre Period HHI)", size(small)) ///
-      legend(on order(- "Correlation : `corr'") ring(0) pos(1) size(vsmall))
-    graph export ../output/figures/sim_delta_hhi.pdf, replace
+      xtitle("Delta HHI (post period - pre period HHI)", size(medsmall)) ///
+      legend(on order(- "Correlation : `corr'") ring(0) pos(1) size(small))
+    fig_export, path("../output/figures/sim_delta_hhi.pdf")
     sum simulated_hhi, d
     local mean : dis %4.3f r(mean)
     local sd  : dis %4.3f r(sd)
     local N : dis %4.3f r(N)
-    tw hist simulated_hhi, freq bin(20) color(lavender%80) xtitle("Simulated HHI", size(small)) xlab(, labsize(small)) ylab(, labsize(small)) legend(on order(- "Mean = `mean'" "SD = `sd'" "# of mkts = `N'") ring(0) pos(1) size(small))
-    graph export ../output/figures/sim_hhi_dist.pdf, replace
+    tw hist simulated_hhi, freq bin(20) color(lavender%80) xtitle("Simulated HHI", size(medsmall)) xlab(, labsize(small)) ylab(, labsize(small)) legend(on order(- "Mean = `mean'" "SD = `sd'" "# of mkts = `N'") ring(0) pos(1) size(small))
+    fig_export, path("../output/figures/sim_hhi_dist.pdf")
     
     sum delta_hhi, d
     local mean : dis %4.3f r(mean)
@@ -37,9 +73,9 @@ program comp_hhi
     local p50: dis  %4.3f r(p50)
     local p75: dis  %4.3f r(p75)
     
-    tw hist delta_hhi, freq bin(20) color(lavender%80) xlabel(-7000(1000)3000, labsize(small)) ylab(, labsize(small)) ytitle(, size(small)) xtitle("Delta HHI", size(small)) ///
-      legend(on order(- "Mean = `mean'" "SD = `sd'" "# of mkts = `N'" "p25 = `p25'" "p50 = `p50'" "p75 = `p75'") ring(0) pos(11) size(small))
-    graph export ../output/figures/delta_hhi_dist.pdf, replace
+    tw hist delta_hhi, freq bin(20) color(lavender%80) xlabel(-7000(1000)3000, labsize(small)) ylab(, labsize(small)) ytitle(, size(small)) xtitle("Delta HHI", size(medsmall)) ///
+      legend(on order(- "Mean = `mean'" "SD = `sd'" "# of mkts = `N'" "P25 = `p25'" "P50 = `p50'" "P75 = `p75'") ring(0) pos(11) size(small))
+    fig_export, path("../output/figures/delta_hhi_dist.pdf")
 end
 
 main

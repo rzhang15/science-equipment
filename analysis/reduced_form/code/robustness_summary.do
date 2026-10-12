@@ -2,15 +2,51 @@ set more off
 clear all
 capture log close
 set scheme modern
+
+global PRES_SCALE 1.2
+
+cap program drop fig_export
+program fig_export
+    syntax, path(string) [mode(string) xsize(real 6) ysize(real 4)]
+    local p : subinstr local path "/paper/" "/", all
+    local p : subinstr local p "/pres/" "/", all
+    local k = strpos("`p'", "figures/")
+    if `k' > 0 {
+        local base = substr("`p'", 1, `k' + 7)
+        local rest = substr("`p'", `k' + 8, .)
+    }
+    else {
+        local slash = strrpos("`p'", "/")
+        local base = substr("`p'", 1, `slash')
+        local rest = substr("`p'", `slash' + 1, .)
+    }
+    local tscale = cond(`xsize' >= `ysize', (2/3) * `xsize' / min(`xsize', `ysize'), 1)
+    if "`mode'" == "presentation" local mode pres
+    foreach m in paper pres {
+        if "`mode'" != "" & "`mode'" != "`m'" continue
+        local dir "`base'`m'"
+        cap mkdir "`dir'"
+        local sub "`rest'"
+        while strpos("`sub'", "/") > 0 {
+            local seg = substr("`sub'", 1, strpos("`sub'", "/") - 1)
+            local dir "`dir'/`seg'"
+            cap mkdir "`dir'"
+            local sub = substr("`sub'", strpos("`sub'", "/") + 1, .)
+        }
+        local s = cond("`m'" == "pres", `tscale' * $PRES_SCALE, `tscale')
+        graph display, scale(`s')
+        graph export "`base'`m'/`rest'", replace
+    }
+end
 version 17
 
 local samp      all_jrnls
 local suf       _r1_r2
 local hisim_pct 50
 
-local specs base noshare clyr hisim precision positive ols olsln
+local specs base noshare clyr stageyr hisim precision positive ols olsln
 local rows  h_top base ///
-            h_ident noshare clyr ///
+            h_ident noshare clyr stageyr ///
             h_expo  hisim precision positive ///
             h_form  ols olsln
 
@@ -19,6 +55,7 @@ local lab_base      "{bf:Baseline}"
 local lab_h_ident   "{bf:Identification}"
 local lab_noshare   "No treated-share control"
 local lab_clyr      "Research cluster × year FEs"
+local lab_stageyr   "Career stage × year FEs"
 local lab_h_expo    "{bf:Exposure measurement}"
 local lab_hisim     "High-similarity imputations only"
 local lab_precision "Weighted by imputation precision"
@@ -36,6 +73,8 @@ program prep_panel
     bys athr_id: gen byte _one = _n == 1
     qui _pctile max_sim if _one == 1 & foia_athr != 1, p(`=100 - `hisim'')
     gen byte hisim = max_sim >= r(r1)
+    qui sum min_year if _one == 1, d
+    gen byte early = min_year > r(p50) if !mi(min_year)
     drop _one
 end
 
@@ -56,6 +95,7 @@ foreach s of local specs {
     local form ppml
     if "`s'" == "noshare"   local ctrl ""
     if "`s'" == "clyr"      local fes athr_id i.cluster_30#i.year
+    if "`s'" == "stageyr"   local fes athr_id i.early#i.year
     if "`s'" == "hisim"     local cond hisim == 1
     if "`s'" == "precision" local wt [pw=max_sim]
     if "`s'" == "positive"  local cond exposure > 0
@@ -176,11 +216,11 @@ tw rcap ub lb y if base == 0, horizontal lcolor(ebblue%70) msize(vsmall) yaxis(1
      yscale(noline range(`ylo' `yhi') axis(1)) ///
      yscale(noline range(`ylo' `yhi') axis(2)) ///
      ytitle("", axis(1)) ytitle("", axis(2)) ///
-     xtitle("Output-cost elasticity (95% CI)", size(small)) ///
+     xtitle("Output-cost elasticity (95% CI)", size(medsmall)) ///
      xlabel(`xmin'(0.2)`xmax', labsize(small) format(%3.1f)) ///
-     legend(off) ysize(4.5) xsize(7) plotregion(margin(l=zero r=zero b=zero t=zero))
+     legend(off) ysize(4) xsize(6.2) plotregion(margin(l=zero r=zero b=zero t=zero))
 cap mkdir ../output/figures
 cap mkdir ../output/figures/`samp'
 cap mkdir ../output/figures/`samp'/robustness
-graph export ../output/figures/`samp'/robustness/robust_summary`suf'.pdf, replace
+fig_export, path("../output/figures/`samp'/robustness/robust_summary`suf'.pdf") xsize(6.2) ysize(4)
 di as text "wrote ../output/figures/`samp'/robustness/robust_summary`suf'.pdf"
